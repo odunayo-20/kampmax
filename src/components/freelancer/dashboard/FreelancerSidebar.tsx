@@ -17,6 +17,7 @@ import {
   Lock,
   Search,
   Bookmark,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { FreelancerOnboardingStatus } from "@/types/freelancer";
@@ -64,6 +65,7 @@ export function FreelancerSidebar({
       items: [
         { label: "My Services", href: "/freelancer/services", icon: Briefcase },
         { label: "Portfolio", href: "/freelancer/portfolio", icon: Sparkles },
+        { label: "Verification & Pro", href: "/freelancer/verification", icon: ShieldCheck },
       ],
     },
     {

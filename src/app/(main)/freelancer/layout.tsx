@@ -10,6 +10,8 @@ import { FreelancerAccessGate } from "@/components/freelancer/dashboard/Freelanc
 import { FreelancerSidebar } from "@/components/freelancer/dashboard/FreelancerSidebar";
 import { FreelancerTopbar } from "@/components/freelancer/dashboard/FreelancerTopbar";
 import { FREELANCER_ONBOARDING_STATUS } from "@/types/freelancer";
+import { VerificationStatusBanner } from "@/components/verification/VerificationStatusBanner";
+import { getFreelancerKycState } from "@/services/verification";
 
 /**
  * Freelancer module shell.
@@ -96,7 +98,14 @@ export default function FreelancerLayout({ children }: { children: React.ReactNo
       {/* Main column */}
       <div className="lg:pl-64">
         <FreelancerTopbar displayName={displayName} status={statusLabel} />
-        <main className="mx-auto max-w-6xl px-4 py-6 lg:px-8">
+        <main className="mx-auto max-w-6xl px-4 py-6 lg:px-8 space-y-5">
+          {pathname !== "/freelancer/verification" && (
+            <VerificationStatusBanner
+              status={getFreelancerKycState().status}
+              role="freelancer"
+              verificationHref="/freelancer/verification"
+            />
+          )}
           <div key={pathname}>{children}</div>
         </main>
       </div>

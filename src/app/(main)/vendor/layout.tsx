@@ -13,12 +13,16 @@ import { VendorAccessGate } from "@/components/vendor-dashboard/VendorAccessGate
 import { VendorSidebar } from "@/components/vendor-dashboard/VendorSidebar";
 import { VendorTopbar } from "@/components/vendor-dashboard/VendorTopbar";
 
+import { VerificationStatusBanner } from "@/components/verification/VerificationStatusBanner";
+import { getVendorKycState } from "@/services/verification";
+
 export default function VendorLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { status } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const access = getVendorAccess();
   const permissions = getVendorPermissions();
+  const kycState = getVendorKycState();
 
   if (status === "loading") {
     return (
@@ -93,7 +97,14 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
       {/* Main column */}
       <div className="lg:pl-64">
         <VendorTopbar storeName={storeName} storeSlug={storeSlug} />
-        <main className="mx-auto max-w-6xl px-4 py-6 lg:px-8">
+        <main className="mx-auto max-w-6xl px-4 py-6 lg:px-8 space-y-5">
+          {pathname !== "/vendor/verification" && (
+            <VerificationStatusBanner
+              status={kycState.status}
+              role="vendor"
+              verificationHref="/vendor/verification"
+            />
+          )}
           <div key={pathname}>{children}</div>
         </main>
       </div>

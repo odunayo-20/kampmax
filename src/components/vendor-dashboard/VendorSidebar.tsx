@@ -17,6 +17,7 @@ import {
   Home,
   Lock,
   MessageSquare,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { VendorPermissions } from "@/types/vendor-dashboard";
@@ -75,6 +76,7 @@ export function VendorSidebar({ storeName, permissions, status }: VendorSidebarP
     {
       title: "Account",
       items: [
+        { href: "/vendor/verification", label: "Verification & KYC", icon: ShieldCheck },
         { href: "/vendor/staff", label: "Staff", icon: UsersRound, permission: "canManageStaff", placeholder: true },
         { href: "/vendor/financials", label: "Financials", icon: Wallet, permission: "canViewFinancials" },
         {

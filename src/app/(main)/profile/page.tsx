@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   ChevronRight, LogOut, Store, Package, Heart, MapPin,
   CreditCard, Wallet, Bell, Shield, HelpCircle,
-  Settings, Star, ChevronDown, Pencil, Clock, Lock,
+  Settings, Star, ChevronDown, Pencil, Clock, Lock, ShieldCheck,
 } from "lucide-react";
 import { Avatar } from "@/components/atoms/Avatar";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -264,6 +264,13 @@ export default function ProfilePage() {
           description={wallet ? `Balance: ${formatNaira(wallet.balance)}` : "No wallet"}
           action={<ChevronRight className="h-4 w-4 text-kampmax-text-secondary" />}
           onClick={() => router.push("/profile/wallet")}
+        />
+        <SettingsRow
+          icon={<ShieldCheck className="h-5 w-5 text-kampmax-blue" />}
+          label="Identity Verification (NIN & BVN)"
+          description={currentUser.isVerified ? "Verified student identity" : "Verify your NIN & student credentials"}
+          action={<ChevronRight className="h-4 w-4 text-kampmax-text-secondary" />}
+          onClick={() => router.push(vendor ? "/vendor/verification" : "/freelancer/verification")}
         />
       </SettingsGroup>
 
