@@ -106,19 +106,17 @@ function RegisterForm() {
 
     try {
       const result = await register({
-        name: name.trim(),
         email: email.trim().toLowerCase(),
-        phone: phone.trim(),
+        username: name.trim(),
+        firstName: name.trim(),
+        lastName: "",
         password,
-        campusId,
-        role: choice.role,
-        department: department || undefined,
-        level: level || undefined,
+        phone: phone.trim(),
       });
       if (result.success) {
         router.push(choice.next ?? "/home");
       } else {
-        setErrors({ general: result.message });
+        setErrors({ general: result.message ?? "Registration failed." });
       }
     } catch {
       setErrors({ general: "Something went wrong. Please try again." });

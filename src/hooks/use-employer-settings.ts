@@ -279,25 +279,25 @@ export function useChangePassword() {
 }
 
 export function useDeactivateAccount() {
-  const { token } = useAuth();
+  const { accessToken } = useAuth();
 
   return useMutation({
     mutationFn: async () => {
-      if (!token) throw new Error("Not authenticated.");
+      if (!accessToken) throw new Error("Not authenticated.");
       await delay(400);
-      return authService.deactivateAccount(token);
+      return authService.deactivateAccount(accessToken);
     },
   });
 }
 
 export function useDeleteAccount() {
-  const { token } = useAuth();
+  const { accessToken } = useAuth();
 
   return useMutation({
     mutationFn: async (verifiedEmail: string) => {
-      if (!token) throw new Error("Not authenticated.");
+      if (!accessToken) throw new Error("Not authenticated.");
       await delay(400);
-      return authService.deleteAccount(token, verifiedEmail);
+      return authService.deleteAccount(accessToken, verifiedEmail);
     },
   });
 }

@@ -42,7 +42,7 @@ export default function ForgotPasswordPage() {
       if (result.success) {
         setSent(true);
       } else {
-        setError(result.message);
+        setError(result.message ?? "Failed to send password reset.");
       }
     } catch {
       setError("Something went wrong. Please try again.");

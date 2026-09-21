@@ -107,7 +107,7 @@ function VerifyOtpForm() {
           router.push(`/reset-password?token=${result.token}`);
         }, 1500);
       } else {
-        setError(result.message);
+        setError(result.message ?? "Verification failed.");
         setCode(new Array(OTP_LENGTH).fill(""));
         inputRefs.current[0]?.focus();
       }

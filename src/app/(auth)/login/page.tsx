@@ -85,7 +85,7 @@ function LoginForm() {
       if (result.success) {
         router.push(returnTo);
       } else {
-        setErrors({ general: result.message });
+        setErrors({ general: result.message ?? "Login failed." });
       }
     } catch {
       setErrors({ general: "Something went wrong. Please try again." });

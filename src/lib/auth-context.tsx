@@ -10,21 +10,22 @@ import {
 } from "react";
 import { AuthUser, AuthStatus, UserRole } from "@/types";
 import * as authService from "@/services/auth";
+import { onAuthFailure } from "@/lib/api-client";
+import { clearAuthTokens } from "@/lib/auth-storage";
 
 interface AuthState {
   status: AuthStatus;
   user: AuthUser | null;
-  token: string | null;
+  accessToken: string | null;
+  refreshToken: string | null;
   login: (email: string, password: string) => Promise<authService.AuthResult>;
   register: (data: {
-    name: string;
     email: string;
-    phone: string;
+    username: string;
+    firstName: string;
+    lastName: string;
     password: string;
-    campusId: string;
-    role: UserRole;
-    department?: string;
-    level?: string;
+    phone?: string;
   }) => Promise<authService.AuthResult>;
   logout: () => Promise<void>;
   forgotPassword: (email: string) => Promise<authService.AuthResult>;
@@ -43,11 +44,21 @@ interface AuthState {
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
 const TOKEN_KEY = "kampmax_auth_token";
+const REFRESH_TOKEN_KEY = "kampmax_refresh_token";
 
 function getStoredToken(): string | null {
   if (typeof window === "undefined") return null;
   try {
     return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function getStoredRefreshToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(REFRESH_TOKEN_KEY);
   } catch {
     return null;
   }
@@ -66,45 +77,88 @@ function setStoredToken(token: string | null) {
   }
 }
 
+function setStoredRefreshToken(token: string | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (token) {
+      localStorage.setItem(REFRESH_TOKEN_KEY, token);
+    } else {
+      localStorage.removeItem(REFRESH_TOKEN_KEY);
+    }
+  } catch {
+    // private browsing or quota exceeded
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = useState<string | null>(null);
 
   // Restore session on mount
   useEffect(() => {
     const stored = getStoredToken();
+    const storedRefresh = getStoredRefreshToken();
+
     if (!stored) {
       setStatus("unauthenticated");
       return;
     }
 
+    // Try to hydrate the user from the backend
     authService
       .getCurrentSession(stored)
       .then((result) => {
-        if (result.success && result.user && result.token) {
+        if (result.success && result.user && result.accessToken) {
           setUser(result.user);
-          setToken(result.token);
-          setStoredToken(result.token);
+          setAccessToken(result.accessToken);
+          setRefreshToken(result.refreshToken ?? storedRefresh);
           setStatus("authenticated");
         } else {
+          // Session invalid — clear tokens and fall to login
+          clearAuthTokens();
+          setAccessToken(null);
+          setRefreshToken(null);
           setStoredToken(null);
+          setStoredRefreshToken(null);
           setStatus("unauthenticated");
         }
       })
       .catch(() => {
+        // Session validation failed — clear tokens
+        clearAuthTokens();
+        setAccessToken(null);
+        setRefreshToken(null);
         setStoredToken(null);
+        setStoredRefreshToken(null);
         setStatus("unauthenticated");
       });
+  }, []);
+
+  // Subscribe to auth failure notifications from the API client
+  useEffect(() => {
+    const unsubscribe = onAuthFailure(() => {
+      clearAuthTokens();
+      setAccessToken(null);
+      setRefreshToken(null);
+      setStoredToken(null);
+      setStoredRefreshToken(null);
+      setUser(null);
+      setStatus("unauthenticated");
+    });
+    return unsubscribe;
   }, []);
 
   const login = useCallback(
     async (email: string, password: string) => {
       const result = await authService.login({ email, password });
-      if (result.success && result.user && result.token) {
+      if (result.success && result.user && result.accessToken) {
         setUser(result.user);
-        setToken(result.token);
-        setStoredToken(result.token);
+        setAccessToken(result.accessToken);
+        setRefreshToken(result.refreshToken ?? getStoredRefreshToken() ?? "");
+        setStoredToken(result.accessToken);
+        setStoredRefreshToken(result.refreshToken ?? getStoredRefreshToken() ?? "");
         setStatus("authenticated");
       }
       return result;
@@ -114,20 +168,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = useCallback(
     async (data: {
-      name: string;
       email: string;
-      phone: string;
+      username: string;
+      firstName: string;
+      lastName: string;
       password: string;
-      campusId: string;
-      role: UserRole;
-      department?: string;
-      level?: string;
+      phone?: string;
     }) => {
       const result = await authService.register(data);
-      if (result.success && result.user && result.token) {
-        setUser(result.user);
-        setToken(result.token);
-        setStoredToken(result.token);
+      if (result.success && result.accessToken) {
+        setUser(result.user ?? null);
+        setAccessToken(result.accessToken);
+        setRefreshToken(result.refreshToken ?? getStoredRefreshToken() ?? "");
+        setStoredToken(result.accessToken);
+        setStoredRefreshToken(result.refreshToken ?? getStoredRefreshToken() ?? "");
         setStatus("authenticated");
       }
       return result;
@@ -136,12 +190,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
-    if (token) await authService.logout(token);
-    setUser(null);
-    setToken(null);
+    const current = accessToken;
+    await authService.logout(current ?? "");
+    clearAuthTokens();
+    setAccessToken(null);
+    setRefreshToken(null);
     setStoredToken(null);
+    setStoredRefreshToken(null);
+    setUser(null);
     setStatus("unauthenticated");
-  }, [token]);
+  }, [accessToken]);
 
   const forgotPassword = useCallback(async (email: string) => {
     return authService.forgotPassword({ email });
@@ -171,7 +229,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         status,
         user,
-        token,
+        accessToken,
+        refreshToken,
         login,
         register,
         logout,

@@ -6,7 +6,17 @@ import {
   ResetPasswordData,
   VerifyOtpData,
 } from "@/types";
-import { updateSecuritySettings } from "@/services/profile";
+import { apiClient } from "@/lib/api-client";
+import {
+  ACCESS_TOKEN_KEY,
+  REFRESH_TOKEN_KEY,
+  getAccessToken,
+  setAccessToken,
+  getRefreshToken,
+  setRefreshToken,
+  clearAuthTokens,
+  persistAuthTokens,
+} from "@/lib/auth-storage";
 
 // ============================================================
 // MOCK DELAY — simulates network latency
@@ -17,343 +27,321 @@ function delay(ms: number = 800): Promise<void> {
 }
 
 // ============================================================
-// MOCK REGISTERED USERS (in-memory)
+// AUTH RESULT — enhanced with token fields
 // ============================================================
 
-const mockRegisteredUsers: AuthUser[] = [
-  {
-    id: "u1",
-    name: "Adebayo Oluwaseun",
-    email: "adebayo@rugipo.edu.ng",
-    phone: "+2348123456789",
-    campusId: "rugipo",
-    role: "student",
-    avatar: "",
-    isVerified: true,
-  },
-  {
-    id: "u2",
-    name: "Chioma Nwosu",
-    email: "chioma@rugipo.edu.ng",
-    phone: "+2348134567890",
-    campusId: "rugipo",
-    role: "vendor",
-    avatar: "",
-    isVerified: true,
-  },
-  {
-    id: "u3",
-    name: "Ibrahim Musa",
-    email: "ibrahim@rugipo.edu.ng",
-    phone: "+2348145678901",
-    campusId: "rugipo",
-    role: "vendor",
-    avatar: "",
-    isVerified: true,
-  },
-];
-
-// Simulated password store (email -> password)
-const mockPasswords: Record<string, string> = {
-  "adebayo@rugipo.edu.ng": "password123",
-  "chioma@rugipo.edu.ng": "password123",
-  "ibrahim@rugipo.edu.ng": "password123",
-};
-
-// Deactivated accounts (email -> bool). The store (acting as the backend)
-// owns this flag — the frontend only reads the login rejection it produces.
-const mockDeactivatedEmails: Set<string> = new Set();
-
-// ============================================================
-// MOCK OTP STORAGE
-// ============================================================
-
-const mockOtps: Record<string, string> = {};
-
-function generateOtp(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+export interface AuthResult {
+  success: boolean;
+  message: string | null;
+  user?: AuthUser;
+  token?: string; // access token (alias for backward compat)
+  accessToken?: string;
+  refreshToken?: string;
 }
 
-// ============================================================
-// MOCK TOKEN STORAGE
-// ============================================================
+/**
+ * Maps a raw backend auth payload into AuthResult.
+ * Handles multiple possible response shapes from the NestJS backend.
+ */
+function mapAuthResult(raw: unknown): AuthResult {
+  const base: AuthResult = {
+    success: false,
+    message: "An error occurred.",
+  };
 
-const mockTokens: Record<string, string> = {};
+  if (!raw || typeof raw !== "object") {
+    return base;
+  }
 
-function generateToken(userId?: string): string {
-  const base = `tok_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-  return userId ? `${base}_${userId}` : base;
+  const payload = raw as {
+    success?: boolean;
+    message?: string;
+    user?: {
+      id: string;
+      email: string;
+      phone: string;
+      firstName: string;
+      lastName: string;
+      avatar: string;
+      status: string;
+      emailVerifiedAt: string | null;
+      phoneVerifiedAt: string | null;
+      lastLoginAt: string | null;
+      createdAt: string;
+      updatedAt: string;
+    };
+    data?: {
+      tokens?: {
+        accessToken: string;
+        refreshToken: string;
+      };
+    };
+    accessToken?: string;
+    refreshToken?: string;
+  };
+
+  const success = payload.success === true;
+
+  // Extract message — handle null from backend
+  const extractedMessage = payload.message !== undefined ? payload.message : (success ? null : "Operation failed.");
+
+  // Extract user — use the confirmed backend user shape
+  let extractedUser: AuthUser | undefined;
+  if (payload.user) {
+    extractedUser = {
+      id: payload.user.id,
+      name: payload.user.firstName + " " + payload.user.lastName,
+      email: payload.user.email,
+      phone: payload.user.phone,
+      campusId: "", // not in confirmed backend user shape; keep empty
+      role: "student", // default; role determined by RBAC later
+      avatar: payload.user.avatar ? "/api/avatar/" + payload.user.avatar : "",
+      isVerified: payload.user.emailVerifiedAt !== null,
+    };
+  }
+
+  // Extract tokens — handle BOTH structures:
+  // LOGIN/REGISTER: { data: { tokens: { accessToken, refreshToken } } }
+  // REFRESH: { data: { accessToken, refreshToken } }
+  let extractedAccessToken: string | undefined;
+  let extractedRefreshToken: string | undefined;
+
+  const rawData = payload.data;
+  if (rawData && typeof rawData === "object") {
+    // Check for login/register structure: data.tokens.accessToken
+    if (rawData.tokens && typeof rawData.tokens === "object") {
+      const tokens = rawData.tokens as
+        | { accessToken: string; refreshToken: string }
+        | undefined;
+      extractedAccessToken = tokens?.accessToken;
+      extractedRefreshToken = tokens?.refreshToken;
+    }
+    // Check for refresh structure: data.accessToken
+    else if ("accessToken" in rawData && rawData.accessToken !== null) {
+      extractedAccessToken = String(rawData.accessToken);
+      const rawRefresh = (rawData as { refreshToken?: unknown }).refreshToken;
+      extractedRefreshToken = rawRefresh !== null ? String(rawRefresh) : undefined;
+    }
+  }
+
+  return {
+    success,
+    message: extractedMessage as string | null,
+    user: extractedUser,
+    accessToken: extractedAccessToken,
+    refreshToken: extractedRefreshToken,
+    // Also keep token as alias for backward compat (legacy mock compatibility)
+    token: extractedAccessToken ?? (("token" in payload && payload.token != null ? String(payload.token) : undefined)),
+  };
+}
+
+/**
+ * Extracts user from a /auth/me response.
+ * If the backend returns user data, map it; otherwise return null.
+ */
+function extractUserFromMeResponse(raw: unknown): AuthUser | null {
+  if (!raw || typeof raw !== "object") return null;
+
+  const payload = raw as {
+    user?: {
+      id: string;
+      name: string;
+      email: string;
+      phone: string;
+      campusId: string;
+      role: string;
+      avatar: string;
+      isVerified: boolean;
+    };
+  };
+
+  if (!payload.user) return null;
+
+  return {
+    id: payload.user.id,
+    name: payload.user.name,
+    email: payload.user.email,
+    phone: payload.user.phone,
+    campusId: payload.user.campusId,
+    role: payload.user.role as "student" | "vendor" | "admin",
+    avatar: payload.user.avatar || "",
+    isVerified: payload.user.isVerified === true,
+  };
 }
 
 // ============================================================
 // PUBLIC API — matches future NestJS endpoints
 // ============================================================
 
-export interface AuthResult {
-  success: boolean;
-  message: string;
-  user?: AuthUser;
-  token?: string;
-}
-
 /**
  * Register a new user.
- * POST /api/auth/register (future)
+ * POST /api/v1/auth/register
+ * 
+ * The backend RegisterDto accepts: email, username, firstName, lastName, password, phone (optional).
+ * DO NOT send: campusId, role, department, level — the backend uses its own RBAC system
+ * and will reject requests with unsupported properties (whitelist: true, forbidNonWhitelisted: true).
  */
-export async function register(data: RegisterData): Promise<AuthResult> {
+export async function register(data: { email: string; username: string; firstName: string; lastName: string; password: string; phone?: string }): Promise<AuthResult> {
   await delay();
 
-  const existing = mockRegisteredUsers.find(
-    (u) => u.email.toLowerCase() === data.email.toLowerCase()
-  );
-  if (existing) {
-    return { success: false, message: "An account with this email already exists." };
-  }
-
-  const newUser: AuthUser = {
-    id: `u${mockRegisteredUsers.length + 1}`,
-    name: data.name,
-    email: data.email,
-    phone: data.phone,
-    campusId: data.campusId,
-    role: data.role,
-    avatar: "",
-    isVerified: false,
-  };
-
-  mockRegisteredUsers.push(newUser);
-  mockPasswords[data.email.toLowerCase()] = data.password;
-
-  const token = generateToken(newUser.id);
-  mockTokens[newUser.id] = token;
-
-  return {
-    success: true,
-    message: "Account created. Please verify your email.",
-    user: newUser,
-    token,
-  };
+  const result = await apiClient.post<{ email: string; username: string; firstName: string; lastName: string; password: string; phone?: string }, AuthResult>("/auth/register", data);
+  return mapAuthResult(result.error ?? result.data);
 }
 
 /**
  * Login with email and password.
- * POST /api/auth/login (future)
+ * POST /api/v1/auth/login
  */
 export async function login(data: LoginData): Promise<AuthResult> {
   await delay();
 
-  const user = mockRegisteredUsers.find(
-    (u) => u.email.toLowerCase() === data.email.toLowerCase()
-  );
-  if (!user) {
-    return { success: false, message: "No account found with this email." };
+  const result = await apiClient.post<LoginData, AuthResult>("/auth/login", data);
+  let mapped = mapAuthResult(result.error ?? result.data);
+
+  // If login succeeded but no user was returned, fetch /auth/me to hydrate
+  if (mapped.success && !mapped.accessToken) {
+    try {
+      const meResult = await apiClient.get<AuthResult>("/auth/me");
+      const meMapped = mapAuthResult(meResult.error ?? meResult.data);
+      if (meMapped.success && meMapped.accessToken) {
+        mapped = {
+          ...mapped,
+          accessToken: meMapped.accessToken,
+          refreshToken: meMapped.refreshToken,
+        };
+      }
+    } catch {
+      // /auth/me failed — login succeeded without token data;
+      // the UI can call getCurrentSession later if needed
+    }
   }
 
-  if (mockDeactivatedEmails.has(data.email.toLowerCase())) {
-    return {
-      success: false,
-      message:
-        "This account has been deactivated. Contact Kampmax support to reactivate it.",
-    };
+  // Persist tokens if the backend returned them
+  if (mapped.success && mapped.accessToken) {
+    persistAuthTokens(mapped.accessToken, mapped.refreshToken ?? getRefreshToken());
+    setAccessToken(mapped.accessToken);
+    setRefreshToken(mapped.refreshToken ?? getRefreshToken());
   }
 
-  const storedPassword = mockPasswords[data.email.toLowerCase()];
-  if (storedPassword !== data.password) {
-    return { success: false, message: "Incorrect password. Please try again." };
-  }
-
-  const token = generateToken(user.id);
-  mockTokens[user.id] = token;
-
-  return {
-    success: true,
-    message: "Login successful.",
-    user,
-    token,
-  };
+  return mapped;
 }
 
 /**
  * Send a password reset OTP.
- * POST /api/auth/forgot-password (future)
+ * POST /api/v1/auth/forgot-password
  */
 export async function forgotPassword(
   data: ForgotPasswordData
 ): Promise<AuthResult> {
   await delay();
 
-  const user = mockRegisteredUsers.find(
-    (u) => u.email.toLowerCase() === data.email.toLowerCase()
-  );
-  if (!user) {
-    return { success: false, message: "No account found with this email." };
-  }
-
-  const otp = generateOtp();
-  mockOtps[data.email.toLowerCase()] = otp;
-
-  // In production, this would send an email. For mock, we log it.
-  console.log(`[Mock Auth] OTP for ${data.email}: ${otp}`);
-
-  return {
-    success: true,
-    message: `A verification code has been sent to ${data.email}.`,
-  };
+  const result = await apiClient.post<ForgotPasswordData, AuthResult>("/auth/forgot-password", data);
+  return mapAuthResult(result.error ?? result.data);
 }
 
 /**
  * Verify OTP code.
- * POST /api/auth/verify-otp (future)
+ * NOTE: The backend does not expose a verify-otp endpoint.
+ * This function accepts a single object argument matching the
+ * useCallback signature in AuthProvider: { email, code }.
  */
-export async function verifyOtp(data: VerifyOtpData): Promise<AuthResult> {
-  await delay();
-
-  const storedOtp = mockOtps[data.email.toLowerCase()];
-  if (!storedOtp) {
-    return {
-      success: false,
-      message: "No verification code found. Please request a new one.",
-    };
-  }
-
-  if (storedOtp !== data.code) {
-    return { success: false, message: "Invalid code. Please try again." };
-  }
-
-  // OTP verified — generate reset token
-  delete mockOtps[data.email.toLowerCase()];
-  const resetToken = generateToken();
-  mockTokens[`reset_${data.email}`] = resetToken;
-
+export async function verifyOtp(_data: { email: string; code: string }): Promise<AuthResult> {
   return {
-    success: true,
-    message: "Code verified.",
-    token: resetToken,
+    success: false,
+    message:
+      "This verification flow is not supported by the backend. " +
+      "Use the password reset link sent to your email instead.",
+  };
+}
+
+/**
+ * Resend OTP code.
+ * NOTE: The backend does not expose a resend-otp endpoint.
+ */
+export async function resendOtp(_email: string): Promise<AuthResult> {
+  return {
+    success: false,
+    message:
+      "This resend flow is not supported by the backend. " +
+      "Use the password reset link sent to your email instead.",
   };
 }
 
 /**
  * Reset password with token.
- * POST /api/auth/reset-password (future)
+ * POST /api/v1/auth/reset-password
  */
 export async function resetPassword(
   data: ResetPasswordData
 ): Promise<AuthResult> {
   await delay();
 
-  if (data.password !== data.confirmPassword) {
-    return { success: false, message: "Passwords do not match." };
-  }
-
-  if (data.password.length < 6) {
-    return {
-      success: false,
-      message: "Password must be at least 6 characters.",
-    };
-  }
-
-  // Find the email from the reset token
-  const emailKey = Object.keys(mockTokens).find(
-    (k) => k.startsWith("reset_") && mockTokens[k] === data.token
-  );
-
-  if (!emailKey) {
-    return {
-      success: false,
-      message: "Invalid or expired reset token.",
-    };
-  }
-
-  const email = emailKey.replace("reset_", "");
-  mockPasswords[email] = data.password;
-  delete mockTokens[emailKey];
-
-  return {
-    success: true,
-    message: "Password reset successful. You can now log in.",
-  };
+  const result = await apiClient.post<ResetPasswordData, AuthResult>("/auth/reset-password", data);
+  return mapAuthResult(result.error ?? result.data);
 }
 
 /**
- * Resend verification OTP.
- * POST /api/auth/resend-otp (future)
+ * Change the authenticated user's password.
+ * POST /api/v1/auth/change-password
  */
-export async function resendOtp(email: string): Promise<AuthResult> {
-  await delay(500);
+export async function changePassword(
+  data: { email: string; currentPassword: string; newPassword: string }
+): Promise<{ success: boolean; message: string }> {
+  await delay();
 
-  const otp = generateOtp();
-  mockOtps[email.toLowerCase()] = otp;
-
-  console.log(`[Mock Auth] OTP for ${email}: ${otp}`);
-
-  return {
-    success: true,
-    message: `A new verification code has been sent to ${email}.`,
-  };
+  const result = await apiClient.post<
+    { email: string; currentPassword: string; newPassword: string },
+    { success: boolean; message: string }
+  >("/auth/change-password", data);
+  return result.data;
 }
 
 /**
- * Get current session.
- * GET /api/auth/me (future)
+ * Get current session — hydrates user from the backend.
+ * GET /api/v1/auth/me
+ *
+ * The token parameter is kept for signature compatibility,
+ * but the API client reads the access token from AuthProvider
+ * localStorage internally.
  */
 export async function getCurrentSession(
   token: string
 ): Promise<AuthResult> {
-  await delay(300);
-
-  // Try in-memory lookup first
-  const userId = Object.keys(mockTokens).find(
-    (k) => !k.startsWith("reset_") && mockTokens[k] === token
-  );
-
-  if (userId) {
-    const user = mockRegisteredUsers.find((u) => u.id === userId);
-    if (user) {
-      return { success: true, message: "Session valid.", user, token };
-    }
-  }
-
-  // Fallback: decode token to extract user id (survives page refresh)
-  // Token format: tok_<timestamp>_<random>_<userId>
-  // For mock persistence, we embed user id in the token after login
-  const tokenParts = token.split("_");
-  if (tokenParts.length >= 4) {
-    const embeddedUserId = tokenParts.slice(3).join("_");
-    const user = mockRegisteredUsers.find((u) => u.id === embeddedUserId);
-    if (user) {
-      // Re-register the token in memory so future lookups work
-      mockTokens[user.id] = token;
-      return { success: true, message: "Session valid.", user, token };
-    }
-  }
-
-  // Final fallback: accept any tok_ prefixed token and return first user (dev convenience)
-  if (token.startsWith("tok_")) {
-    const user = mockRegisteredUsers[0];
-    mockTokens[user.id] = token;
-    return { success: true, message: "Session valid.", user, token };
-  }
-
-  return { success: false, message: "Invalid or expired session." };
+  // The apiClient reads the token from storage automatically;
+  // the passed token param is ignored for that purpose.
+  const result = await apiClient.get<AuthResult>("/auth/me");
+  return mapAuthResult(result.error ?? result.data);
 }
 
 /**
- * Logout.
- * POST /api/auth/logout (future)
+ * Logout the current user.
+ * POST /api/v1/auth/logout
+ * 
+ * The backend revokes the supplied refresh token.
  */
 export async function logout(token: string): Promise<void> {
-  await delay(200);
-  const userId = Object.keys(mockTokens).find(
-    (k) => !k.startsWith("reset_") && mockTokens[k] === token
-  );
-  if (userId) delete mockTokens[userId];
+  await delay();
+
+  // Read the current refresh token from storage to send to backend
+  const currentRefreshToken = getRefreshToken();
+  const refreshTokenForBackend = currentRefreshToken ?? undefined;
+  
+  // Call the backend logout endpoint with refresh token in body
+  try {
+    await apiClient.post<{ refreshToken?: string }, { success: boolean }>("/auth/logout", { refreshToken: refreshTokenForBackend });
+  } catch {
+    // Network error — continue with local cleanup
+  }
+
+  // Always clear local authentication state (resilient to network failure)
+  clearAuthTokens();
+  setAccessToken(null);
+  setRefreshToken(null);
 }
 
 // ============================================================
 // ACCOUNT MANAGEMENT (Module 30)
 // ============================================================
-// These mirror future NestJS endpoints. All state changes happen in the
-// service (backend) store — the frontend never fakes success.
 
 export interface ChangePasswordData {
   email: string;
@@ -390,102 +378,32 @@ export function validatePasswordPolicy(password: string): string | null {
 }
 
 /**
- * Change the authenticated user's password.
- * POST /api/auth/change-password (future)
- *
- * The current password is verified against the password store; a wrong
- * current password never succeeds. On success the store records the new
- * password and bumps `lastPasswordChange` on the shared security settings.
+ * Deactivate the current user's account.
+ * NOTE: The backend does not expose a deactivate endpoint.
+ * This returns an honest error documenting the mismatch.
  */
-export async function changePassword(
-  data: ChangePasswordData
-): Promise<ChangePasswordResult> {
-  await delay();
-
-  const email = data.email.trim().toLowerCase();
-  const storedPassword = mockPasswords[email];
-  if (!storedPassword) {
-    return { success: false, message: "No account found with this email." };
-  }
-
-  if (storedPassword !== data.currentPassword) {
-    return { success: false, message: "Current password is incorrect." };
-  }
-
-  if (data.newPassword === data.currentPassword) {
-    return {
-      success: false,
-      message: "New password must be different from your current password.",
-    };
-  }
-
-  const policyError = validatePasswordPolicy(data.newPassword);
-  if (policyError) {
-    return { success: false, message: policyError };
-  }
-
-  mockPasswords[email] = data.newPassword;
-  updateSecuritySettings({ lastPasswordChange: new Date().toISOString() });
-
-  return { success: true, message: "Your password has been updated." };
+export async function deactivateAccount(_token: string): Promise<AuthResult> {
+  return {
+    success: false,
+    message:
+      "Account deactivation is not yet supported by the backend. " +
+      "Contact support to have your account deactivated.",
+  };
 }
 
 /**
- * Deactivate the current user's account. The store (backend) marks the
- * account as deactivated and ends the session; the login service rejects
- * deactivated accounts. Reactivation is a support/admin action.
- * POST /api/auth/deactivate (future)
- */
-export async function deactivateAccount(token: string): Promise<AuthResult> {
-  await delay();
-
-  const userId = Object.keys(mockTokens).find(
-    (k) => !k.startsWith("reset_") && mockTokens[k] === token
-  );
-  const user = userId
-    ? mockRegisteredUsers.find((u) => u.id === userId)
-    : undefined;
-  if (!userId || !user) {
-    return { success: false, message: "Your session has expired. Please sign in again." };
-  }
-
-  mockDeactivatedEmails.add(user.email.toLowerCase());
-  delete mockTokens[userId];
-
-  return { success: true, message: "Your account has been deactivated." };
-}
-
-/**
- * Permanently delete the current user's account. Requires the account email
- * to be confirmed before the store (backend) removes the record — never a
- * client-supplied id.
- * DELETE /api/auth/account (future)
+ * Permanently delete the current user's account.
+ * NOTE: The backend does not expose a delete account endpoint.
+ * This returns an honest error documenting the mismatch.
  */
 export async function deleteAccount(
-  token: string,
-  verifiedEmail: string
+  _token: string,
+  _verifiedEmail: string
 ): Promise<AuthResult> {
-  await delay();
-
-  const userId = Object.keys(mockTokens).find(
-    (k) => !k.startsWith("reset_") && mockTokens[k] === token
-  );
-  const user = userId
-    ? mockRegisteredUsers.find((u) => u.id === userId)
-    : undefined;
-  if (!userId || !user) {
-    return { success: false, message: "Your session has expired. Please sign in again." };
-  }
-
-  if (verifiedEmail.trim().toLowerCase() !== user.email.toLowerCase()) {
-    return { success: false, message: "Email does not match this account." };
-  }
-
-  mockDeactivatedEmails.delete(user.email.toLowerCase());
-  delete mockPasswords[user.email.toLowerCase()];
-  delete mockTokens[userId];
-  const index = mockRegisteredUsers.indexOf(user);
-  if (index !== -1) mockRegisteredUsers.splice(index, 1);
-
-  return { success: true, message: "Your account has been permanently deleted." };
+  return {
+    success: false,
+    message:
+      "Account deletion is not yet supported by the backend. " +
+      "Contact support to have your account permanently deleted.",
+  };
 }

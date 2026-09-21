@@ -52,7 +52,7 @@ function ResetPasswordForm() {
       if (result.success) {
         setSuccess(true);
       } else {
-        setErrors({ general: result.message });
+        setErrors({ general: result.message ?? "Failed to reset password." });
       }
     } catch {
       setErrors({ general: "Something went wrong. Please try again." });
