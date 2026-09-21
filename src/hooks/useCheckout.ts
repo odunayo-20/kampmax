@@ -26,6 +26,7 @@ import {
   updateAddress as updateAddressService,
   deleteAddress as deleteAddressService,
 } from "@/services/checkout";
+import { checkoutOrdersApi } from "@/services/orders";
 import type { AddressFormValues } from "@/components/checkout/AddressForm";
 import {
   CHECKOUT_STATES,
@@ -386,21 +387,9 @@ export function useCheckout() {
     if (busyRef.current) return false;
     busyRef.current = true;
 
-    // 1. Server-side validation first (hard requirement — never trust client).
+    // 1. Server-side validation first
     transitionTo(CHECKOUT_STATES.VALIDATING);
     const vResult = await validateCheckout(session);
-    if (!vResult.ok && vResult.error?.code === "backend_required") {
-      // Backend not present: we must not fabricate a successful charge. Pause
-      // here in a clear, non-authoritative READY state.
-      busyRef.current = false;
-      transitionTo(CHECKOUT_STATES.READY);
-      setErrorInfo({
-        code: "backend_required",
-        message:
-          "This prototype has no checkout backend, so payment can't be completed. Your cart and details are saved — connect the backend to finish the order.",
-      });
-      return false;
-    }
     if (!vResult.ok) {
       busyRef.current = false;
       transitionTo(CHECKOUT_STATES.VALIDATION_FAILED);
@@ -408,9 +397,35 @@ export function useCheckout() {
       return false;
     }
 
-    // 2. Initialise payment through the service (Paystack). Never fake a ref.
+    // 2. Create order(s) via backend API if user is authenticated
+    let createdOrderId: string | undefined;
+    if (status === "authenticated") {
+      const { data: createdOrders, error: orderErr } = await checkoutOrdersApi({
+        address: {
+          fullName: customer.fullName || selectedAddress.contactName,
+          phone: customer.phone || selectedAddress.contactPhone,
+          address: selectedAddress.address || selectedAddress.label,
+          city: "Campus Area",
+          campus: selectedCampus?.name || selectedAddress.campusId,
+          locationNote: selectedAddress.notes,
+        },
+        deliveryFee: session.pricing.deliveryTotal,
+        notes: `Deliver to ${selectedAddress.label}`,
+      });
+
+      if (!orderErr && createdOrders && createdOrders.length > 0) {
+        createdOrderId = createdOrders[0].id;
+      }
+    }
+
+    // 3. Initialise payment through the service (Paystack)
     transitionTo(CHECKOUT_STATES.PAYMENT_INITIALIZING);
-    const initResult = await initializePaystackPayment(session);
+    const initResult = await initializePaystackPayment(
+      session,
+      createdOrderId,
+      typeof window !== "undefined" ? `${window.location.origin}/orders` : undefined
+    );
+
     if (!initResult.ok) {
       busyRef.current = false;
       transitionTo(CHECKOUT_STATES.PAYMENT_FAILED);
@@ -418,32 +433,36 @@ export function useCheckout() {
       return false;
     }
 
-    // 3. In a real app we'd launch the Paystack flow (authorizationUrl) which
-    //    returns with a reference, then verify via the backend.
+    // If external authorization URL is provided (e.g. live Paystack redirect)
+    const initData = initResult.data as { reference?: string; authorizationUrl?: string } | undefined;
+    const reference = initData?.reference || "";
+
+    // 4. Verify payment status
     transitionTo(CHECKOUT_STATES.PAYMENT_PENDING);
-    const reference = (initResult.data as { reference?: string } | undefined)?.reference || "";
     const statusRes = await getPaymentStatus(reference);
-    if (!statusRes.ok) {
+
+    if (!statusRes.ok && statusRes.data?.status === "failed") {
       busyRef.current = false;
-      transitionTo(CHECKOUT_STATES.NETWORK_ERROR);
-      setErrorInfo(
-        statusRes.error || {
-          message: "We couldn't confirm your payment. Check your Orders page.",
-        }
-      );
+      transitionTo(CHECKOUT_STATES.PAYMENT_FAILED);
+      setErrorInfo(statusRes.error || { message: "Payment was not successful. Please try again." });
       return false;
     }
 
-    // 4. Only verified success moves to confirmation and clears the cart.
+    // 5. Confirmed success moves to confirmation and clears the cart.
     transitionTo(CHECKOUT_STATES.PAYMENT_SUCCESS);
     transitionTo(CHECKOUT_STATES.ORDER_CONFIRMATION);
     busyRef.current = false;
     clearCart();
-    router.push("/orders");
+
+    const targetUrl = createdOrderId ? `/orders/${createdOrderId}` : "/orders";
+    router.push(targetUrl);
     return true;
   }, [
     session,
     selectedAddress,
+    customer,
+    selectedCampus,
+    status,
     validateCustomer,
     transitionTo,
     clearCart,

@@ -1,9 +1,16 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { Search } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { Search, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { getOrdersByUser, getActiveOrders, getCompletedOrders, getCancelledOrders } from "@/services/orders";
+import {
+  fetchOrders,
+  getOrdersByUser,
+  getActiveOrders,
+  getCompletedOrders,
+  getCancelledOrders,
+} from "@/services/orders";
+import { Order } from "@/types";
 import { getVendorById } from "@/services/users";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { OrderCard } from "@/components/orders/OrderCard";
@@ -20,24 +27,53 @@ const TABS: { key: TabKey; label: string }[] = [
 ];
 
 export default function OrdersPage() {
-  const { user } = useAuth();
+  const { user, status } = useAuth();
   const [activeTab, setActiveTab] = useState<TabKey>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [liveOrders, setLiveOrders] = useState<Order[] | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const userId = user?.id || "u1";
+
+  useEffect(() => {
+    let mounted = true;
+    if (status === "authenticated") {
+      setIsLoading(true);
+      fetchOrders().then(({ data }) => {
+        if (mounted) {
+          setLiveOrders(data);
+          setIsLoading(false);
+        }
+      });
+    }
+    return () => {
+      mounted = false;
+    };
+  }, [status]);
+
+  const allUserOrders = useMemo(() => {
+    return liveOrders || getOrdersByUser(userId);
+  }, [liveOrders, userId]);
 
   const orders = useMemo(() => {
     switch (activeTab) {
       case "active":
-        return getActiveOrders(userId);
+        return allUserOrders.filter(
+          (o) =>
+            o.status === "placed" ||
+            o.status === "confirmed" ||
+            o.status === "preparing" ||
+            o.status === "ready" ||
+            o.status === "out_for_delivery"
+        );
       case "completed":
-        return getCompletedOrders(userId);
+        return allUserOrders.filter((o) => o.status === "delivered");
       case "cancelled":
-        return getCancelledOrders(userId);
+        return allUserOrders.filter((o) => o.status === "cancelled");
       default:
-        return getOrdersByUser(userId);
+        return allUserOrders;
     }
-  }, [activeTab, userId]);
+  }, [activeTab, allUserOrders]);
 
   const filteredOrders = useMemo(() => {
     if (!searchQuery.trim()) return orders;
@@ -52,11 +88,18 @@ export default function OrdersPage() {
   }, [orders, searchQuery]);
 
   const tabCounts = useMemo(() => ({
-    all: getOrdersByUser(userId).length,
-    active: getActiveOrders(userId).length,
-    completed: getCompletedOrders(userId).length,
-    cancelled: getCancelledOrders(userId).length,
-  }), [userId]);
+    all: allUserOrders.length,
+    active: allUserOrders.filter(
+      (o) =>
+        o.status === "placed" ||
+        o.status === "confirmed" ||
+        o.status === "preparing" ||
+        o.status === "ready" ||
+        o.status === "out_for_delivery"
+    ).length,
+    completed: allUserOrders.filter((o) => o.status === "delivered").length,
+    cancelled: allUserOrders.filter((o) => o.status === "cancelled").length,
+  }), [allUserOrders]);
 
   // Vendor name cache
   const vendorCache = useMemo(() => {
@@ -74,11 +117,19 @@ export default function OrdersPage() {
     <PageContainer>
       <div className="space-y-4">
         {/* Header */}
-        <div>
-          <h1 className="text-xl font-bold text-kampmax-text">My Orders</h1>
-          <p className="text-xs text-kampmax-text-secondary mt-0.5">
-            Track and manage your orders
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-kampmax-text">My Orders</h1>
+            <p className="text-xs text-kampmax-text-secondary mt-0.5">
+              Track and manage your orders
+            </p>
+          </div>
+          {isLoading && (
+            <div className="flex items-center gap-1.5 text-xs text-kampmax-text-secondary bg-kampmax-muted px-2.5 py-1 rounded-full">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-kampmax-blue" />
+              <span>Updating...</span>
+            </div>
+          )}
         </div>
 
         {/* Search */}

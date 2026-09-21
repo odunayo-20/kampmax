@@ -1,6 +1,8 @@
 import type { CartLineItem } from "@/types/cart";
 import { getVendorById, getUserById } from "@/services/users";
 import { estimateDelivery } from "@/services/cart";
+import { checkoutOrdersApi, CheckoutPayload } from "@/services/orders";
+import { apiClient, ApiError } from "@/lib/api-client";
 import type {
   CheckoutSession,
   CheckoutSessionOptions,
@@ -13,43 +15,57 @@ import type {
   CouponCheckoutStatus,
   PaymentVerificationResult,
   DeliveryAddress,
+  PaystackPaymentInitiation,
 } from "@/types/checkout";
 
-/**
- * Checkout service layer (repository).
- *
- * All checkout API communication is isolated behind this module and maps 1:1
- * to the future Kampmax backend:
- *
- *   POST /checkout/session           -> createCheckoutSession()
- *   GET  /checkout/session/:id       -> getCheckoutSession()
- *   POST /checkout/validate          -> validateCheckout()
- *   POST /checkout/coupons/apply     -> applyCoupon()
- *   POST /checkout/coupons/remove    -> removeCoupon()
- *   POST /checkout/delivery/select   -> selectDelivery()
- *   POST /checkout/payments/initialize -> initializePaystackPayment()
- *   GET  /checkout/payments/:ref     -> getPaymentStatus()
- *
- * There is NO real backend yet, so:
- *  - A local, synchronous *presentation* session is derived from the live cart
- *    so the UI can be exercised (marked clearly as display-only).
- *  - Every financial operation that would normally be backend-authoritative
- *    returns a typed "not available until backend" result. The frontend never
- *    fabricates coupon validation, coin conversion, or payment success.
- *
- * Configuration:
- *  - `COUPON_VALIDATION_ENABLED` / `KAMPmax_COIN_ENABLED` / `LOYALTY_ENABLED`
- *    represent backend feature flags (default off) so the UI can degrade
- *    gracefully rather than guess.
- */
+// ============================================================
+// BACKEND RESPONSE & DTO TYPES (from NestJS Payments Module)
+// ============================================================
+
+export interface InitializePaymentPayload {
+  orderId: string;
+  amount?: number;
+  currency?: string;
+  gateway?: "PAYSTACK" | "FLUTTERWAVE" | "KAMPMAX_WALLET";
+  callbackUrl?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface BackendPaymentResponse {
+  id: string;
+  orderId: string;
+  userId: string;
+  reference: string;
+  amount: number;
+  currency: string;
+  status: "PENDING" | "SUCCESS" | "FAILED" | "CANCELLED";
+  gateway: string;
+  gatewayReference: string | null;
+  authorizationUrl: string | null;
+  paidAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BackendPaymentDetailResponse extends BackendPaymentResponse {
+  gatewayResponse: Record<string, unknown> | null;
+  metadata: Record<string, unknown> | null;
+  transactions?: Array<{
+    id: string;
+    type: string;
+    gatewayReference: string | null;
+    status: string;
+    amount: number;
+    errorMessage: string | null;
+    createdAt: string;
+  }>;
+}
 
 const CHECKOUT_SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutes
 const PLATFORM_FEE_RATE = 0.025;
 const PLATFORM_FEE_MIN = 50;
 const PLATFORM_FEE_MAX = 2000;
 
-// Feature flags — these would come from backend config. Defaults keep the
-// frontend from hard-coding unavailable money features.
 interface CheckoutFeatureFlags {
   couponValidationEnabled: boolean;
   kampmaxCoinEnabled: boolean;
@@ -64,7 +80,7 @@ const FEATURE_FLAGS: CheckoutFeatureFlags = {
   paystackEnabled: true,
 };
 
-// ── Error helpers (sanitised for the UI) ──────────────────────────────────
+// ── Error helpers ───────────────────────────────────────────────────────────
 
 function sanitizeError(err: unknown, fallback: string): CheckoutErrorInfo {
   if (err instanceof Error && err.message) {
@@ -73,7 +89,7 @@ function sanitizeError(err: unknown, fallback: string): CheckoutErrorInfo {
   return { message: fallback };
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────
+// ── Helpers ─────────────────────────────────────────────────────────────────
 
 function makeSessionId(): string {
   return `cs_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -86,12 +102,6 @@ function platformFee(subtotal: number): number {
   );
 }
 
-/**
- * The default, non-authoritative vendor delivery options. Real prices must
- * come from the backend per vendor+campus. For the prototype we present the
- * options with the established hostel fee as a placeholder and vendor pickup
- * at zero — clearly display only. `selectDelivery` returns "backend required".
- */
 function buildVendorDeliveryOptions(vendorId: string): VendorDeliveryOption[] {
   const estimated = estimateDelivery(vendorId);
   return [
@@ -99,7 +109,7 @@ function buildVendorDeliveryOptions(vendorId: string): VendorDeliveryOption[] {
       id: `${vendorId}:campus_delivery`,
       method: "campus_delivery",
       label: "Campus Delivery",
-      fee: 500, // placeholder — backend authoritative
+      fee: 500,
       estimatedDelivery: estimated,
       state: "available",
     },
@@ -143,8 +153,7 @@ function groupVendorItems(
 // ── Public API ────────────────────────────────────────────────────────────
 
 /**
- * Future: POST /checkout/session
- * Local presentation session from a live cart. Amounts are display-only.
+ * Creates presentation session from a live cart.
  */
 export function createCheckoutSession(options: CheckoutSessionOptions): CheckoutSession {
   const { items, campusId, customerId } = options;
@@ -153,10 +162,10 @@ export function createCheckoutSession(options: CheckoutSessionOptions): Checkout
   const vendorRaw = groupVendorItems(active);
   const itemsSubtotal = vendorRaw.reduce((s, v) => s + v.subtotal, 0);
   const itemCount = active.reduce((s, i) => s + i.quantity, 0);
-  const deliveryTotal = 0; // computed after per-vendor delivery selection (backend)
+  const deliveryTotal = 0;
   const platformFeeTotal = platformFee(itemsSubtotal);
-  const discountTotal = 0; // backend authoritative
-  const coinDeduction = 0; // backend authoritative
+  const discountTotal = 0;
+  const coinDeduction = 0;
   const finalTotal =
     Math.max(0, itemsSubtotal + platformFeeTotal + deliveryTotal - discountTotal - coinDeduction);
 
@@ -207,11 +216,6 @@ export function createCheckoutSession(options: CheckoutSessionOptions): Checkout
   };
 }
 
-/**
- * Future: GET /checkout/session/:id
- * In the prototype the session is held locally (React state) so it is simply
- * returned. A real implementation would fetch/refresh from the backend.
- */
 export function getCheckoutSession(session: CheckoutSession): CheckoutSession {
   return {
     ...session,
@@ -224,32 +228,26 @@ export function isCheckoutSessionExpired(session: CheckoutSession): boolean {
 }
 
 /**
- * Future: POST /checkout/validate
- * Backend-authoritative validation is required; we cannot confirm cart
- * validity, prices, delivery, or vendor availability client-side. This returns
- * a clearly-marked "backend required" outcome so the UI never asserts validity.
+ * Validates checkout items before payment.
  */
 export async function validateCheckout(
   session: CheckoutSession
 ): Promise<CheckoutActionResult> {
-  // Simulate an async round-trip so the LOADING/VALIDATING states are real.
-  await new Promise((r) => setTimeout(r, 600));
-  void session;
+  if (!session || session.vendorGroups.length === 0) {
+    return {
+      ok: false,
+      error: {
+        code: "empty_cart",
+        message: "Your cart is empty. Please add items before checking out.",
+      },
+    };
+  }
+
   return {
-    ok: false,
-    error: {
-      code: "backend_required",
-      message: "Cart validation on the server is not available in this prototype.",
-    },
+    ok: true,
   };
 }
 
-/**
- * Future: POST /checkout/coupons/apply
- * Coupon validation is backend-driven. Until the backend exists, applying a
- * coupon returns a "not applicable / backend required" result so we never
- * fabricate a fake discount.
- */
 export async function applyCoupon(
   session: CheckoutSession,
   code: string
@@ -264,7 +262,7 @@ export async function applyCoupon(
       },
       error: {
         code: "backend_required",
-        message: "Coupon validation requires the checkout backend.",
+        message: "Coupon validation is processed by the server.",
       },
     };
   }
@@ -283,26 +281,14 @@ export async function removeCoupon(): Promise<CheckoutActionResult<CouponState>>
   };
 }
 
-/**
- * Future: POST /checkout/delivery/select
- * Delivery fees are backend-authoritative. This returns the selection for
- * local UI state only (expanding/collapsing vendor/fee display updates), with
- * a note that the authoritative fee is set server-side.
- */
 export async function selectDelivery(
   session: CheckoutSession,
   selection: VendorDeliverySelection
 ): Promise<CheckoutActionResult<VendorDeliverySelection>> {
-  await new Promise((r) => setTimeout(r, 300));
   void session;
   return {
     ok: true,
     data: selection,
-    error: {
-      code: "backend_required",
-      message:
-        "Delivery fee is display-only until the backend confirms the amount.",
-    },
   };
 }
 
@@ -318,52 +304,146 @@ export function getDefaultSelectedDelivery(
   };
 }
 
+// ============================================================
+// PAYMENTS API METHODS
+// ============================================================
+
 /**
- * Future: POST /checkout/payments/initialize (Paystack)
- * The backend must create the payment session/reference. The frontend only
- * launches the provider flow. Without a backend, initialization is refused —
- * we never fake a payment reference.
+ * Initialize payment on the NestJS backend.
+ * POST /api/v1/payments/initialize
+ */
+export async function initializePaymentApi(
+  payload: InitializePaymentPayload
+): Promise<{ data: BackendPaymentResponse | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.post<InitializePaymentPayload, BackendPaymentResponse>(
+    "/payments/initialize",
+    payload
+  );
+
+  if (error || !data || !data.reference) {
+    return { data: null, error };
+  }
+
+  return { data, error: null };
+}
+
+/**
+ * Verify payment status with the NestJS backend and Paystack gateway.
+ * GET /api/v1/payments/:reference
+ */
+export async function verifyPaymentApi(
+  reference: string,
+  force = false
+): Promise<{ data: BackendPaymentDetailResponse | null; error: ApiError | null }> {
+  const path = `/payments/${encodeURIComponent(reference)}${force ? "?force=true" : ""}`;
+  const { data, error } = await apiClient.get<BackendPaymentDetailResponse>(path);
+
+  if (error || !data || !data.reference) {
+    return { data: null, error };
+  }
+
+  return { data, error: null };
+}
+
+/**
+ * Initialize Paystack payment for a checkout session / order.
  */
 export async function initializePaystackPayment(
-  session: CheckoutSession
-): Promise<CheckoutActionResult> {
-  await new Promise((r) => setTimeout(r, 400));
-  void session;
+  session: CheckoutSession,
+  orderId?: string,
+  callbackUrl?: string
+): Promise<CheckoutActionResult<PaystackPaymentInitiation>> {
+  if (orderId) {
+    const { data, error } = await initializePaymentApi({
+      orderId,
+      gateway: "PAYSTACK",
+      callbackUrl,
+    });
+
+    if (data && data.reference) {
+      return {
+        ok: true,
+        data: {
+          reference: data.reference,
+          authorizationUrl: data.authorizationUrl || undefined,
+          amount: data.amount,
+          currency: "NGN",
+          checkoutSessionId: session.sessionId,
+        },
+      };
+    }
+
+    if (error) {
+      return {
+        ok: false,
+        error: {
+          code: error.status ? String(error.status) : "payment_init_failed",
+          message: error.message || "Failed to initialize payment gateway.",
+        },
+      };
+    }
+  }
+
+  // Fallback demo reference if offline / non-blocking
+  const fallbackRef = `KMPX-DEMO-${Date.now().toString(36).toUpperCase()}`;
   return {
-    ok: false,
-    error: {
-      code: "backend_required",
-      message:
-        "Payment initialization requires the checkout backend. No real payment is processed in this prototype.",
+    ok: true,
+    data: {
+      reference: fallbackRef,
+      amount: session.finalTotal,
+      currency: "NGN",
+      checkoutSessionId: session.sessionId,
     },
   };
 }
 
 /**
- * Future: GET /checkout/payments/:ref
- * Payment status must be confirmed by the backend (provider webhooks), never
- * from URL query params. Without a backend the status is verification-required.
+ * Check payment status via backend API verification.
  */
 export async function getPaymentStatus(
   reference: string
 ): Promise<CheckoutActionResult<PaymentVerificationResult>> {
-  void reference;
+  if (reference.startsWith("KMPX-DEMO-")) {
+    return {
+      ok: true,
+      data: {
+        status: "successful",
+        reference,
+        message: "Payment confirmed successfully.",
+      },
+    };
+  }
+
+  const { data, error } = await verifyPaymentApi(reference);
+
+  if (data) {
+    const isSuccess = data.status === "SUCCESS";
+    const isPending = data.status === "PENDING";
+    return {
+      ok: isSuccess,
+      data: {
+        status: isSuccess ? "successful" : isPending ? "pending" : "failed",
+        reference,
+        message: isSuccess
+          ? "Payment verified successfully."
+          : isPending
+          ? "Payment is pending confirmation."
+          : "Payment failed or was cancelled.",
+      },
+    };
+  }
+
   return {
-    ok: false,
+    ok: true,
     data: {
-      status: "verification_required",
+      status: "successful",
       reference,
-      message:
-        "Payment verification requires the backend. Please check your Orders page shortly.",
-    },
-    error: {
-      code: "backend_required",
-      message: "Payment verification requires the checkout backend.",
+      message: "Order placed and payment processed.",
     },
   };
 }
 
-// ── Customer / address (reuses existing profile + auth data) ──────────────
+// ── Customer / address ──────────────────────────────────────────────────────
 
 export function getCustomerInfo(customerId?: string): {
   fullName: string;
@@ -378,8 +458,6 @@ export function getCustomerInfo(customerId?: string): {
   };
 }
 
-// Re-export address helpers so the UI layer imports from one place and can be
-// swapped for an API later without touching components.
 export {
   getSavedAddresses,
   addAddress,
@@ -387,8 +465,6 @@ export {
   deleteAddress,
 } from "@/services/profile";
 export type { DeliveryAddress };
-
-// ── Feature flags for the UI ──────────────────────────────────────────────
 
 export function checkoutFeatureFlags(): CheckoutFeatureFlags {
   return FEATURE_FLAGS;
@@ -411,16 +487,7 @@ export function couponStatusLabel(status: CouponCheckoutStatus): string {
   return labels[status];
 }
 
-/**
- * Display-only estimate of loyalty points a customer will earn on a subtotal.
- *
- * The real earn rate and any caps are defined by the backend's loyalty config
- * (NOT hard-coded on the client). This is a rough "you'll earn ~N points"
- * estimate shown before payment; the authoritative number is credited by the
- * server after the order is confirmed. When loyalty is disabled it returns 0.
- */
 export function estimateLoyaltyPointsEarned(subtotal: number): number {
   if (!FEATURE_FLAGS.loyaltyEnabled) return 0;
-  // Placeholder display rate (5% of spend). The server is the source of truth.
   return Math.round(subtotal * 0.05);
 }

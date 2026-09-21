@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -14,6 +14,7 @@ import {
   MessageCircle,
   AlertTriangle,
   LifeBuoy,
+  Loader2,
 } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Breadcrumbs, BreadcrumbItem } from "@/components/layout/Breadcrumbs";
@@ -23,9 +24,9 @@ import { OrderTimeline } from "@/components/orders/OrderTimeline";
 import { OrderItems } from "@/components/orders/OrderItems";
 import { OrderFees } from "@/components/orders/OrderFees";
 import { OrderActions } from "@/components/orders/OrderActions";
-import { getOrderById } from "@/services/orders";
+import { getOrderById, fetchOrderById, cancelOrderApi } from "@/services/orders";
 import { getVendorById } from "@/services/users";
-import { PICKUP_LOCATION_LABELS, PickupLocation } from "@/types";
+import { PICKUP_LOCATION_LABELS, PickupLocation, Order } from "@/types";
 import { formatDate, cn } from "@/lib/utils";
 
 export default function OrderDetailPage({
@@ -35,12 +36,40 @@ export default function OrderDetailPage({
 }) {
   const { id } = use(params);
   const router = useRouter();
-  const order = getOrderById(id);
-  const vendor = order ? getVendorById(order.vendorId) : undefined;
+
+  const [order, setOrder] = useState<Order | null>(() => getOrderById(id) || null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [isCancelled, setIsCancelled] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchOrderById(id).then(({ data }) => {
+      if (mounted) {
+        if (data) setOrder(data);
+        setIsLoading(false);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [id]);
+
+  const vendor = order ? getVendorById(order.vendorId) : undefined;
+
+  if (isLoading && !order) {
+    return (
+      <PageContainer>
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-kampmax-blue mb-3" />
+          <p className="text-sm text-kampmax-text-secondary">Loading order details…</p>
+        </div>
+      </PageContainer>
+    );
+  }
 
   if (!order) {
     return (
@@ -62,7 +91,7 @@ export default function OrderDetailPage({
             Order not found
           </h2>
           <p className="text-sm text-kampmax-text-secondary max-w-xs mb-5">
-            Order #{id} doesn't exist or may have been removed.
+            Order #{id} doesn&apos;t exist or may have been removed.
           </p>
           <Button
             onClick={() => router.push("/orders")}
@@ -90,9 +119,12 @@ export default function OrderDetailPage({
     setShowCancelModal(true);
   }
 
-  function confirmCancel() {
+  async function confirmCancel() {
+    setIsCancelling(true);
+    await cancelOrderApi(order!.id);
     setIsCancelled(true);
     setShowCancelModal(false);
+    setIsCancelling(false);
   }
 
   function handleReorder() {
@@ -100,7 +132,6 @@ export default function OrderDetailPage({
   }
 
   function handleReview() {
-    // Placeholder — will connect to review flow later
     alert("Review flow coming soon!");
   }
 
@@ -149,122 +180,114 @@ export default function OrderDetailPage({
           </Link>
         </div>
 
-        {/* Timeline */}
-        <section className="bg-white rounded-xl border border-kampmax-border p-4">
-          <h3 className="text-sm font-semibold text-kampmax-text flex items-center gap-2 mb-3">
-            <Clock className="h-4 w-4 text-kampmax-blue" />
-            Order Timeline
-          </h3>
-          <OrderTimeline
-            timeline={
-              isCancelled
-                ? [
-                    ...order.timeline,
-                    {
-                      status: "cancelled" as const,
-                      timestamp: new Date().toISOString(),
-                      message: cancelReason || "Order cancelled",
-                    },
-                  ]
-                : order.timeline
-            }
-            currentStatus={isCancelled ? "cancelled" : order.status}
-          />
-        </section>
+        {/* Estimated delivery banner */}
+        {order.status !== "delivered" &&
+          order.status !== "cancelled" &&
+          order.estimatedDelivery && (
+            <div className="flex items-center gap-2.5 p-3 rounded-xl bg-kampmax-blue/5 border border-kampmax-blue/20">
+              <Clock className="w-4 h-4 text-kampmax-blue shrink-0" />
+              <span className="text-xs text-kampmax-blue font-medium">
+                Estimated delivery: {order.estimatedDelivery}
+              </span>
+            </div>
+          )}
 
-        {/* Items */}
-        <section className="bg-white rounded-xl border border-kampmax-border p-4">
-          <h3 className="text-sm font-semibold text-kampmax-text flex items-center gap-2 mb-3">
-            <Package className="h-4 w-4 text-kampmax-blue" />
-            Order Items
-          </h3>
-          <OrderItems items={order.items} />
-        </section>
-
-        {/* Fees & Payment */}
-        <section className="bg-white rounded-xl border border-kampmax-border p-4">
-          <h3 className="text-sm font-semibold text-kampmax-text mb-3">
-            Payment Details
-          </h3>
-          <OrderFees
-            subtotal={order.subtotal}
-            platformFee={order.platformFee}
-            deliveryFee={order.deliveryFee}
-            discountAmount={order.discountAmount}
-            total={order.total}
-            paymentMethod={order.paymentMethod}
-            paymentStatus={
-              isCancelled ? "refunded" : order.paymentStatus
-            }
-          />
-        </section>
-
-        {/* Delivery / Pickup */}
-        <section className="bg-white rounded-xl border border-kampmax-border p-4 space-y-3">
-          <h3 className="text-sm font-semibold text-kampmax-text flex items-center gap-2">
-            <DeliveryIcon className="h-4 w-4 text-kampmax-blue" />
-            {order.deliveryMethod === "campus_pickup"
-              ? "Pickup Details"
-              : order.deliveryMethod === "delivery"
-                ? "Delivery Details"
-                : "Meetup Details"}
-          </h3>
-
-          <div className="flex items-start gap-2.5">
-            <MapPin className="w-4 h-4 text-kampmax-text-secondary mt-0.5 shrink-0" />
+        {/* Cancelled notice */}
+        {(isCancelled || order.status === "cancelled") && (
+          <div className="flex items-start gap-2.5 p-3 rounded-xl bg-kampmax-error/5 border border-kampmax-error/20">
+            <AlertTriangle className="w-4 h-4 text-kampmax-error shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm text-kampmax-text">
-                {order.deliveryAddress || "Not specified"}
+              <p className="text-xs text-kampmax-error font-medium">
+                This order has been cancelled
               </p>
-              {order.pickupLocation && (
-                <p className="text-xs text-kampmax-text-secondary mt-0.5">
-                  {PICKUP_LOCATION_LABELS[
-                    order.pickupLocation as PickupLocation
-                  ] || order.pickupLocation}
+              {(cancelReason || order.cancelReason) && (
+                <p className="text-[11px] text-kampmax-error/80 mt-0.5">
+                  Reason: {cancelReason || order.cancelReason}
                 </p>
               )}
             </div>
           </div>
-
-          {order.estimatedDelivery && !isCancelled && (
-            <div className="flex items-center gap-2.5">
-              <Clock className="w-4 h-4 text-kampmax-text-secondary shrink-0" />
-              <p className="text-sm text-kampmax-text-secondary">
-                {order.status === "delivered"
-                  ? `Delivered ${formatDate(new Date(order.deliveredAt || order.estimatedDelivery))}`
-                  : `Estimated: ${formatDate(new Date(order.estimatedDelivery))}`}
-              </p>
-            </div>
-          )}
-
-          {order.notes && (
-            <div className="p-2.5 bg-kampmax-muted rounded-lg">
-              <p className="text-xs text-kampmax-text-secondary">
-                <span className="font-medium">Note:</span> {order.notes}
-              </p>
-            </div>
-          )}
-        </section>
-
-        {/* Vendor */}
-        {vendor && (
-          <section className="bg-white rounded-xl border border-kampmax-border p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-kampmax-navy/10 flex items-center justify-center text-sm font-bold text-kampmax-navy">
-                {vendor.storeName.charAt(0)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-kampmax-text truncate">
-                  {vendor.storeName}
-                </p>
-                <p className="text-xs text-kampmax-text-secondary">
-                  {vendor.rating} ★ · {vendor.totalSales} sales
-                  {vendor.verified && " · Verified"}
-                </p>
-              </div>
-            </div>
-          </section>
         )}
+
+        {/* Order Items */}
+        <OrderItems items={order.items} />
+
+        {/* Delivery / Pickup Info */}
+        <div className="bg-white rounded-xl border border-kampmax-border p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <DeliveryIcon className="w-4 h-4 text-kampmax-navy" />
+            <span className="text-xs font-semibold text-kampmax-text uppercase tracking-wide">
+              {order.deliveryMethod === "campus_pickup"
+                ? "Pickup Information"
+                : order.deliveryMethod === "meetup"
+                ? "Meetup Details"
+                : "Delivery Details"}
+            </span>
+          </div>
+
+          <div className="text-xs space-y-1 text-kampmax-text">
+            {order.deliveryAddress && (
+              <p className="flex items-center gap-1.5 text-kampmax-text-secondary">
+                <MapPin className="w-3.5 h-3.5 shrink-0" />
+                <span>{order.deliveryAddress}</span>
+              </p>
+            )}
+            {order.pickupLocation && (
+              <p className="text-kampmax-text-secondary">
+                Pickup point:{" "}
+                <span className="font-medium text-kampmax-text">
+                  {PICKUP_LOCATION_LABELS[order.pickupLocation as PickupLocation] ||
+                    order.pickupLocation}
+                </span>
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Vendor Card */}
+        {vendor && (
+          <div className="bg-white rounded-xl border border-kampmax-border p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-kampmax-muted flex items-center justify-center font-bold text-xs text-kampmax-navy">
+                  {vendor.storeName?.slice(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <h4 className="text-xs font-semibold text-kampmax-text">
+                    {vendor.storeName}
+                  </h4>
+                  <p className="text-[11px] text-kampmax-text-secondary">
+                    {vendor.rating ? `★ ${vendor.rating}` : "Verified Vendor"}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleContactVendor}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-kampmax-navy bg-kampmax-muted hover:bg-kampmax-border rounded-lg transition-colors"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                Chat
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Timeline */}
+        <OrderTimeline
+          timeline={displayOrder.timeline}
+          currentStatus={displayOrder.status}
+        />
+
+        {/* Fees */}
+        <OrderFees
+          subtotal={displayOrder.subtotal}
+          platformFee={displayOrder.platformFee}
+          deliveryFee={displayOrder.deliveryFee}
+          discountAmount={displayOrder.discountAmount}
+          total={displayOrder.total}
+          paymentMethod={displayOrder.paymentMethod}
+          paymentStatus={displayOrder.paymentStatus}
+        />
 
         {/* Actions */}
         <OrderActions
@@ -274,30 +297,6 @@ export default function OrderDetailPage({
           onReview={handleReview}
           onContactVendor={handleContactVendor}
         />
-
-        {/* Cancel reason (if cancelled) */}
-        {(isCancelled || order.status === "cancelled") && (
-          <section className="bg-kampmax-error/10 rounded-xl border border-kampmax-error/20 p-4">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-kampmax-error mt-0.5 shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-kampmax-error">
-                  Order Cancelled
-                </p>
-                <p className="text-xs text-kampmax-text-secondary mt-0.5">
-                  {isCancelled
-                    ? cancelReason
-                    : order.cancelReason || "No reason provided"}
-                </p>
-                {order.paymentStatus === "refunded" && (
-                  <p className="text-xs text-kampmax-info mt-1">
-                    Refund has been processed to your original payment method.
-                  </p>
-                )}
-              </div>
-            </div>
-          </section>
-        )}
 
         {/* Back button */}
         <Button
@@ -345,16 +344,18 @@ export default function OrderDetailPage({
             <div className="flex gap-2">
               <button
                 onClick={() => setShowCancelModal(false)}
+                disabled={isCancelling}
                 className="flex-1 h-10 text-sm font-medium border border-kampmax-border rounded-lg hover:bg-kampmax-muted transition-colors"
               >
                 Keep Order
               </button>
               <button
                 onClick={confirmCancel}
-                disabled={!cancelReason}
-                className="flex-1 h-10 text-sm font-medium bg-kampmax-error text-white rounded-lg hover:bg-kampmax-error/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                disabled={!cancelReason || isCancelling}
+                className="flex-1 h-10 text-sm font-medium bg-kampmax-error text-white rounded-lg hover:bg-kampmax-error/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors inline-flex items-center justify-center gap-1.5"
               >
-                Cancel Order
+                {isCancelling && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>Cancel Order</span>
               </button>
             </div>
           </div>
