@@ -7,6 +7,7 @@ import { VendorQuickActions } from "./VendorQuickActions";
 import { VendorActionRequired } from "./VendorActionRequired";
 import { VendorStoreHealth } from "./VendorStoreHealth";
 import { VendorRecentOrders } from "./VendorRecentOrders";
+import { VendorInventoryAlerts } from "./VendorInventoryAlerts";
 
 export function VendorOverview({ storeSlug }: { storeSlug?: string }) {
   const router = useRouter();
@@ -24,6 +25,9 @@ export function VendorOverview({ storeSlug }: { storeSlug?: string }) {
           <VendorMetricCard key={m.key} metric={m} />
         ))}
       </div>
+
+      {/* Inventory Low Stock Alert */}
+      <VendorInventoryAlerts />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="space-y-4">

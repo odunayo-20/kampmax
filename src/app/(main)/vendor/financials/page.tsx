@@ -8,7 +8,8 @@ import { EscrowReadinessPanel } from "@/components/vendor-financials/EscrowReadi
 import { PayoutAccountCard } from "@/components/vendor-financials/PayoutAccountCard";
 import { TransactionTable } from "@/components/vendor-financials/TransactionTable";
 import { FinancialsSkeleton } from "@/components/vendor-financials/FinancialsSkeleton";
-import { getFinancialOverview } from "@/services/vendor-financials";
+import { RequestPayoutModal } from "@/components/vendor-financials/RequestPayoutModal";
+import { getFinancialOverview, computeAvailable } from "@/services/vendor-financials";
 import type { VendorFinancialOverview } from "@/types/vendor-financials";
 
 export default function FinancialsPage() {
@@ -16,6 +17,16 @@ export default function FinancialsPage() {
   const [overview, setOverview] = useState<VendorFinancialOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [payoutModalOpen, setPayoutModalOpen] = useState(false);
+
+  function loadOverview() {
+    try {
+      const data = getFinancialOverview();
+      setOverview(data);
+    } catch (e) {
+      setError("You don't have access to financials");
+    }
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -28,11 +39,15 @@ export default function FinancialsPage() {
     } finally {
       if (mounted) setLoading(false);
     }
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   if (loading) return <FinancialsSkeleton />;
   if (error || !overview) return <div className="text-center py-12 text-kampmax-text-secondary">{error ?? "No access"}</div>;
+
+  const availableBalance = computeAvailable();
 
   return (
     <div className="space-y-6">
@@ -44,7 +59,7 @@ export default function FinancialsPage() {
 
       <PayoutAccountCard
         account={overview.account}
-        onRequestPayout={() => router.push("/vendor/financials/payouts")}
+        onRequestPayout={() => setPayoutModalOpen(true)}
         canRequest={overview.account.status === "verified"}
       />
 
@@ -62,6 +77,15 @@ export default function FinancialsPage() {
         </div>
         <TransactionTable items={overview.recentTransactions} compact onRowClick={(tx) => router.push(`/vendor/financials/${tx.id}`)} />
       </section>
+
+      {/* Request Payout Modal */}
+      <RequestPayoutModal
+        isOpen={payoutModalOpen}
+        onClose={() => setPayoutModalOpen(false)}
+        account={overview.account}
+        availableBalance={availableBalance}
+        onSuccess={() => loadOverview()}
+      />
     </div>
   );
 }

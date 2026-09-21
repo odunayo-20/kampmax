@@ -2,7 +2,7 @@
 
 import { useState, use } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Printer } from "lucide-react";
 import {
   getVendorOrderDetail,
   getVendorOrderActions,
@@ -20,6 +20,7 @@ import {
 } from "@/services/vendor-orders";
 import { OrderActionsBar } from "@/components/vendor-orders/OrderActionBar";
 import { OrderTimeline } from "@/components/vendor-orders/OrderTimeline";
+import { OrderReceiptModal } from "@/components/vendor-orders/OrderReceiptModal";
 import {
   SummarySection,
   CustomerSection,
@@ -35,6 +36,8 @@ import {
 } from "@/components/vendor-orders/OrderStatusPanels";
 import { OrderNotesPanel } from "@/components/vendor-orders/OrderNotesPanel";
 import type { VendorOrder, VendorOrderActionView, VendorOrderResult } from "@/types/vendor-orders";
+import { getOrCreateDirectConversation } from "@/services/messages";
+import { getCurrentUser } from "@/services/users";
 
 const TRANSITIONS: Record<
   string,
@@ -57,6 +60,7 @@ export default function VendorOrderDetailPage({ params }: { params: Promise<{ id
   const [permissions] = useState(() => getVendorOrderPermissions());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [receiptOpen, setReceiptOpen] = useState(false);
 
   if (!detail) {
     return (
@@ -84,9 +88,23 @@ export default function VendorOrderDetailPage({ params }: { params: Promise<{ id
 
   const runTransition = async (action: VendorOrderActionView, payload?: Record<string, string>) => {
     if (action.key === "message_customer") {
-      router.push("/chat");
+      const currentUser = getCurrentUser();
+      const customerUserId = order.customer.buyerId || "user-1";
+      const result = getOrCreateDirectConversation(currentUser.id, customerUserId);
+
+      const params = new URLSearchParams();
+      params.set("orderId", order.id);
+      params.set("orderTotal", String(order.totals.vendorSubtotal));
+      if (order.customer.displayName) params.set("customerName", order.customer.displayName);
+
+      if (result && result.conversation) {
+        router.push(`/chat/${result.conversation.id}?${params.toString()}`);
+      } else {
+        router.push(`/chat?${params.toString()}`);
+      }
       return { ok: true, code: "ok" as const };
     }
+
     const transition = TRANSITIONS[action.key];
     if (!transition) return { ok: false, code: "invalid_transition" as const, error: "Unsupported action." };
 
@@ -107,19 +125,28 @@ export default function VendorOrderDetailPage({ params }: { params: Promise<{ id
 
   return (
     <div className="space-y-4 max-w-4xl">
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          aria-label="Go back"
-          className="flex h-9 w-9 items-center justify-center rounded-lg bg-white border border-kampmax-border"
-        >
-          <ArrowLeft className="h-5 w-5 text-kampmax-text" />
-        </button>
-        <div className="min-w-0">
-          <h1 className="text-lg font-bold text-kampmax-text">{order.id}</h1>
-          <StoreLine order={order} />
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            aria-label="Go back"
+            className="flex h-9 w-9 items-center justify-center rounded-lg bg-white border border-kampmax-border"
+          >
+            <ArrowLeft className="h-5 w-5 text-kampmax-text" />
+          </button>
+          <div className="min-w-0">
+            <h1 className="text-lg font-bold text-kampmax-text">{order.id}</h1>
+            <StoreLine order={order} />
+          </div>
         </div>
+
+        <button
+          onClick={() => setReceiptOpen(true)}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-xs font-semibold text-neutral-700 shadow-sm transition-colors"
+        >
+          <Printer className="w-4 h-4 text-primary-600" /> Print Receipt
+        </button>
       </div>
 
       {error && (
@@ -183,6 +210,13 @@ export default function VendorOrderDetailPage({ params }: { params: Promise<{ id
           />
         </div>
       </div>
+
+      {/* Order Receipt / Packing Slip Modal */}
+      <OrderReceiptModal
+        order={order}
+        isOpen={receiptOpen}
+        onClose={() => setReceiptOpen(false)}
+      />
     </div>
   );
 }
