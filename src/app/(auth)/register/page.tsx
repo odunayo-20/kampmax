@@ -3,13 +3,11 @@
 import { Suspense, useState, FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, User, Mail, Phone, UserRound, ArrowRight } from "lucide-react";
+import { ArrowLeft, Mail, Phone, UserRound, AtSign, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui";
 import { Input } from "@/components/ui/Input";
 import { PasswordInput } from "@/components/ui/PasswordInput";
-import { Select } from "@/components/ui/Select";
 import { useAuth } from "@/lib/auth-context";
-import { getCampuses } from "@/services/campus";
 import { cn } from "@/lib/utils";
 import { UserRole } from "@/types";
 import { KAMPMAX_ROLE_PATHS, type KampmaxRoleId } from "@/components/layout/footer/role-paths";
@@ -35,63 +33,80 @@ function choiceById(id: KampmaxRoleId): RoleChoice {
   return ROLE_CHOICES.find((c) => c.id === id) ?? ROLE_CHOICES[0];
 }
 
+/**
+ * Validates the password against the backend's RegisterDto policy:
+ * 8+ chars, at least one uppercase, one lowercase, one digit, one special char.
+ */
+function validatePassword(password: string): string | null {
+  if (password.length < 8) return "Password must be at least 8 characters";
+  if (!/[a-z]/.test(password)) return "Password must include a lowercase letter";
+  if (!/[A-Z]/.test(password)) return "Password must include an uppercase letter";
+  if (!/\d/.test(password)) return "Password must include a number";
+  if (!/[@$!%*?&#^()_+\-=]/.test(password)) return "Password must include a special character (e.g. !, @, #)";
+  return null;
+}
+
 function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const preselectedCampus = searchParams.get("campus") || "";
   const { register } = useAuth();
-  const campuses = getCampuses();
 
-  const [step, setStep] = useState<"role" | "form">(
-    preselectedCampus ? "form" : "role"
-  );
+  const [step, setStep] = useState<"role" | "form">("role");
   const [choiceId, setChoiceId] = useState<KampmaxRoleId>("customer");
   const choice = choiceById(choiceId);
 
-  const [name, setName] = useState("");
+  // Form fields — mapped 1-to-1 with backend RegisterDto
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [campusId, setCampusId] = useState(preselectedCampus);
-  const [department, setDepartment] = useState("");
-  const [level, setLevel] = useState("");
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
-  const selectedCampus = campuses.find((c) => c.id === campusId);
-
   function validateForm(): boolean {
     const newErrors: Record<string, string> = {};
 
-    if (!name.trim()) newErrors.name = "Full name is required";
+    if (!firstName.trim()) newErrors.firstName = "First name is required";
+    if (!lastName.trim()) newErrors.lastName = "Last name is required";
+
+    if (!username.trim()) {
+      newErrors.username = "Username is required";
+    } else if (username.trim().length < 3) {
+      newErrors.username = "Username must be at least 3 characters";
+    }
+
     if (!email.trim()) {
       newErrors.email = "Email is required";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       newErrors.email = "Enter a valid email address";
     }
-    if (!phone.trim()) {
-      newErrors.phone = "Phone number is required";
-    } else if (!/^(\+?234|0)[789][01]\d{8}$/.test(phone.replace(/\s/g, ""))) {
-      newErrors.phone = "Enter a valid Nigerian phone number";
+
+    if (phone.trim()) {
+      // Optional — validate format only if provided
+      if (!/^\+?[1-9]\d{1,14}$/.test(phone.replace(/\s/g, ""))) {
+        newErrors.phone = "Enter a valid phone number (e.g. +2348012345678)";
+      }
     }
+
+    const passwordError = validatePassword(password);
     if (!password) {
       newErrors.password = "Password is required";
-    } else if (password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
+    } else if (passwordError) {
+      newErrors.password = passwordError;
     }
+
     if (password !== confirmPassword) {
       newErrors.confirmPassword = "Passwords do not match";
     }
-    if (!campusId) newErrors.campusId = "Please select your campus";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   }
 
-  /** Choose a pathway: profile roles create the base account first, then
-   *  continue into the matching profile onboarding (one account, profiles). */
   function choose(id: KampmaxRoleId) {
     setChoiceId(id);
     setStep("form");
@@ -107,11 +122,12 @@ function RegisterForm() {
     try {
       const result = await register({
         email: email.trim().toLowerCase(),
-        username: name.trim(),
-        firstName: name.trim(),
-        lastName: "",
+        username: username.trim(),
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         password,
-        phone: phone.trim(),
+        // Only send phone if the user filled it in
+        ...(phone.trim() ? { phone: phone.trim() } : {}),
       });
       if (result.success) {
         router.push(choice.next ?? "/home");
@@ -231,15 +247,37 @@ function RegisterForm() {
           </div>
         )}
 
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            label="First name"
+            type="text"
+            placeholder="John"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            error={errors.firstName}
+            leftIcon={<UserRound className="h-4 w-4" />}
+            autoComplete="given-name"
+          />
+          <Input
+            label="Last name"
+            type="text"
+            placeholder="Doe"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            error={errors.lastName}
+            autoComplete="family-name"
+          />
+        </div>
+
         <Input
-          label="Full name"
+          label="Username"
           type="text"
-          placeholder="Enter your full name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          error={errors.name}
-          leftIcon={<UserRound className="h-4 w-4" />}
-          autoComplete="name"
+          placeholder="johndoe"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          error={errors.username}
+          leftIcon={<AtSign className="h-4 w-4" />}
+          autoComplete="username"
         />
 
         <Input
@@ -254,9 +292,9 @@ function RegisterForm() {
         />
 
         <Input
-          label="Phone number"
+          label="Phone number (optional)"
           type="tel"
-          placeholder="+234 812 345 6789"
+          placeholder="+2348012345678"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           error={errors.phone}
@@ -264,57 +302,9 @@ function RegisterForm() {
           autoComplete="tel"
         />
 
-        <Select
-          label="Campus"
-          value={campusId}
-          onChange={(e) => setCampusId(e.target.value)}
-          error={errors.campusId}
-          placeholder="Select your campus"
-        >
-          {campuses.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name} — {c.location}
-            </option>
-          ))}
-        </Select>
-
-        {selectedCampus && (
-          <div className="space-y-4">
-            <Select
-              label="Department"
-              value={department}
-              onChange={(e) => setDepartment(e.target.value)}
-              placeholder="Select your department (optional)"
-            >
-              {selectedCampus.departments.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </Select>
-
-            <Select
-              label="Level"
-              value={level}
-              onChange={(e) => setLevel(e.target.value)}
-              placeholder="Select your level (optional)"
-            >
-              <option value="ND1">ND1</option>
-              <option value="ND2">ND2</option>
-              <option value="HND1">HND1</option>
-              <option value="HND2">HND2</option>
-              <option value="100">100 Level</option>
-              <option value="200">200 Level</option>
-              <option value="300">300 Level</option>
-              <option value="400">400 Level</option>
-              <option value="500">500 Level</option>
-            </Select>
-          </div>
-        )}
-
         <PasswordInput
           label="Password"
-          placeholder="At least 6 characters"
+          placeholder="At least 8 characters"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           error={errors.password}
@@ -329,6 +319,10 @@ function RegisterForm() {
           error={errors.confirmPassword}
           autoComplete="new-password"
         />
+
+        <p className="text-xs text-kampmax-text-secondary">
+          Password must be 8+ characters with uppercase, lowercase, a number, and a special character.
+        </p>
 
         <Button
           type="submit"

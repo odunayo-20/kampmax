@@ -106,14 +106,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Try to hydrate the user from the backend
+    // Try to hydrate the user from the backend.
+    // NOTE: /auth/me returns the user object only — no new tokens.
+    // If we get a valid user back, the session is alive; keep the already-stored token.
     authService
       .getCurrentSession(stored)
       .then((result) => {
-        if (result.success && result.user && result.accessToken) {
+        if (result.success && result.user) {
           setUser(result.user);
-          setAccessToken(result.accessToken);
-          setRefreshToken(result.refreshToken ?? storedRefresh);
+          // Keep the stored access token as state (the API client already uses it from localStorage)
+          setAccessToken(stored);
+          setRefreshToken(storedRefresh);
           setStatus("authenticated");
         } else {
           // Session invalid — clear tokens and fall to login

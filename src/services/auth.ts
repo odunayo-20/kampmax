@@ -53,119 +53,129 @@ function mapAuthResult(raw: unknown): AuthResult {
     return base;
   }
 
+  // After apiClient unwraps the NestJS envelope, the payload we receive is the
+  // inner `data` object directly. Shapes by endpoint:
+  //   LOGIN / REGISTER: { user: {...}, tokens: { accessToken, refreshToken } }
+  //   TOKEN REFRESH:    { accessToken, refreshToken }
+  // We also handle an unlikely passthrough where the full envelope arrives.
   const payload = raw as {
-    success?: boolean;
-    message?: string;
+    // Inner `data` shape — login / register
     user?: {
       id: string;
       email: string;
-      phone: string;
-      firstName: string;
-      lastName: string;
-      avatar: string;
-      status: string;
-      emailVerifiedAt: string | null;
-      phoneVerifiedAt: string | null;
-      lastLoginAt: string | null;
-      createdAt: string;
-      updatedAt: string;
+      phone?: string | null;
+      firstName?: string;
+      lastName?: string;
+      username?: string;
+      avatar?: string | null;
+      status?: string;
+      emailVerifiedAt?: string | null;
+      phoneVerifiedAt?: string | null;
+      lastLoginAt?: string | null;
+      createdAt?: string;
+      updatedAt?: string;
     };
-    data?: {
-      tokens?: {
-        accessToken: string;
-        refreshToken: string;
-      };
+    tokens?: {
+      accessToken?: string;
+      refreshToken?: string;
     };
+    // Token refresh shape
     accessToken?: string;
     refreshToken?: string;
+    // Passthrough envelope fields (should already be unwrapped by apiClient,
+    // but kept here for defensive coding)
+    success?: boolean;
+    message?: string | null;
   };
 
-  const success = payload.success === true;
+  // After apiClient unwrapping, the payload itself IS the data — it won't
+  // have an explicit `success` field (that's the envelope wrapper). Treat it
+  // as successful unless the function was called with an error object.
+  const success = payload.success !== false;
 
   // Extract message — handle null from backend
-  const extractedMessage = payload.message !== undefined ? payload.message : (success ? null : "Operation failed.");
+  const extractedMessage = payload.message !== undefined
+    ? (payload.message as string | null)
+    : (success ? null : "Operation failed.");
 
   // Extract user — use the confirmed backend user shape
   let extractedUser: AuthUser | undefined;
-  if (payload.user) {
+  if (payload.user && payload.user.id) {
+    const u = payload.user;
     extractedUser = {
-      id: payload.user.id,
-      name: payload.user.firstName + " " + payload.user.lastName,
-      email: payload.user.email,
-      phone: payload.user.phone,
+      id: u.id,
+      name: [u.firstName, u.lastName].filter(Boolean).join(" ") || u.username || u.email,
+      email: u.email,
+      phone: u.phone ?? "",
       campusId: "", // not in confirmed backend user shape; keep empty
       role: "student", // default; role determined by RBAC later
-      avatar: payload.user.avatar ? "/api/avatar/" + payload.user.avatar : "",
-      isVerified: payload.user.emailVerifiedAt !== null,
+      avatar: u.avatar ? "/api/avatar/" + u.avatar : "",
+      isVerified: u.emailVerifiedAt != null,
     };
   }
 
-  // Extract tokens — handle BOTH structures:
-  // LOGIN/REGISTER: { data: { tokens: { accessToken, refreshToken } } }
-  // REFRESH: { data: { accessToken, refreshToken } }
+  // Extract tokens — handle both possible unwrapped shapes:
+  // LOGIN/REGISTER: { tokens: { accessToken, refreshToken } }
+  // REFRESH:        { accessToken, refreshToken }
   let extractedAccessToken: string | undefined;
   let extractedRefreshToken: string | undefined;
 
-  const rawData = payload.data;
-  if (rawData && typeof rawData === "object") {
-    // Check for login/register structure: data.tokens.accessToken
-    if (rawData.tokens && typeof rawData.tokens === "object") {
-      const tokens = rawData.tokens as
-        | { accessToken: string; refreshToken: string }
-        | undefined;
-      extractedAccessToken = tokens?.accessToken;
-      extractedRefreshToken = tokens?.refreshToken;
-    }
-    // Check for refresh structure: data.accessToken
-    else if ("accessToken" in rawData && rawData.accessToken !== null) {
-      extractedAccessToken = String(rawData.accessToken);
-      const rawRefresh = (rawData as { refreshToken?: unknown }).refreshToken;
-      extractedRefreshToken = rawRefresh !== null ? String(rawRefresh) : undefined;
-    }
+  if (payload.tokens && typeof payload.tokens === "object") {
+    // Login / register structure (already unwrapped by apiClient)
+    extractedAccessToken = payload.tokens.accessToken;
+    extractedRefreshToken = payload.tokens.refreshToken;
+  } else if (payload.accessToken) {
+    // Refresh token response structure
+    extractedAccessToken = payload.accessToken;
+    extractedRefreshToken = payload.refreshToken;
   }
 
   return {
     success,
-    message: extractedMessage as string | null,
+    message: extractedMessage,
     user: extractedUser,
     accessToken: extractedAccessToken,
     refreshToken: extractedRefreshToken,
-    // Also keep token as alias for backward compat (legacy mock compatibility)
-    token: extractedAccessToken ?? (("token" in payload && payload.token != null ? String(payload.token) : undefined)),
+    token: extractedAccessToken,
   };
 }
 
 /**
  * Extracts user from a /auth/me response.
- * If the backend returns user data, map it; otherwise return null.
+ *
+ * The backend SafeUser shape (from GET /auth/me) is a FLAT object:
+ *   { id, email, phone, firstName, lastName, username, avatar, status,
+ *     emailVerifiedAt, phoneVerifiedAt, lastLoginAt, createdAt, updatedAt }
+ *
+ * There is NO nested `user` key and NO tokens — just the user fields directly.
  */
 function extractUserFromMeResponse(raw: unknown): AuthUser | null {
   if (!raw || typeof raw !== "object") return null;
 
-  const payload = raw as {
-    user?: {
-      id: string;
-      name: string;
-      email: string;
-      phone: string;
-      campusId: string;
-      role: string;
-      avatar: string;
-      isVerified: boolean;
-    };
+  const u = raw as {
+    id?: string;
+    email?: string;
+    phone?: string | null;
+    firstName?: string;
+    lastName?: string;
+    username?: string;
+    avatar?: string | null;
+    status?: string;
+    emailVerifiedAt?: string | null;
   };
 
-  if (!payload.user) return null;
+  // id and email are the minimum required fields
+  if (!u.id || !u.email) return null;
 
   return {
-    id: payload.user.id,
-    name: payload.user.name,
-    email: payload.user.email,
-    phone: payload.user.phone,
-    campusId: payload.user.campusId,
-    role: payload.user.role as "student" | "vendor" | "admin",
-    avatar: payload.user.avatar || "",
-    isVerified: payload.user.isVerified === true,
+    id: u.id,
+    name: [u.firstName, u.lastName].filter(Boolean).join(" ") || u.username || u.email,
+    email: u.email,
+    phone: u.phone ?? "",
+    campusId: "", // not in backend SafeUser; will be added when campus module is connected
+    role: "student" as "student" | "vendor" | "admin", // default; RBAC handled separately
+    avatar: u.avatar ? `/api/avatar/${u.avatar}` : "",
+    isVerified: u.emailVerifiedAt != null,
   };
 }
 
@@ -184,9 +194,16 @@ function extractUserFromMeResponse(raw: unknown): AuthUser | null {
 export async function register(data: { email: string; username: string; firstName: string; lastName: string; password: string; phone?: string }): Promise<AuthResult> {
   await delay();
 
-  const result = await apiClient.post<{ email: string; username: string; firstName: string; lastName: string; password: string; phone?: string }, AuthResult>("/auth/register", data);
-  return mapAuthResult(result.error ?? result.data);
+  const result = await apiClient.post<{ email: string; username: string; firstName: string; lastName: string; password: string; phone?: string }, unknown>("/auth/register", data);
+
+  // If the API client reports an error, return a failure immediately
+  if (result.error) {
+    return { success: false, message: result.error.message ?? "Registration failed." };
+  }
+
+  return mapAuthResult(result.data);
 }
+
 
 /**
  * Login with email and password.
@@ -195,26 +212,14 @@ export async function register(data: { email: string; username: string; firstNam
 export async function login(data: LoginData): Promise<AuthResult> {
   await delay();
 
-  const result = await apiClient.post<LoginData, AuthResult>("/auth/login", data);
-  let mapped = mapAuthResult(result.error ?? result.data);
+  const result = await apiClient.post<LoginData, unknown>("/auth/login", data);
 
-  // If login succeeded but no user was returned, fetch /auth/me to hydrate
-  if (mapped.success && !mapped.accessToken) {
-    try {
-      const meResult = await apiClient.get<AuthResult>("/auth/me");
-      const meMapped = mapAuthResult(meResult.error ?? meResult.data);
-      if (meMapped.success && meMapped.accessToken) {
-        mapped = {
-          ...mapped,
-          accessToken: meMapped.accessToken,
-          refreshToken: meMapped.refreshToken,
-        };
-      }
-    } catch {
-      // /auth/me failed — login succeeded without token data;
-      // the UI can call getCurrentSession later if needed
-    }
+  // If the API client reports an error, return a failure immediately
+  if (result.error) {
+    return { success: false, message: result.error.message ?? "Login failed." };
   }
+
+  const mapped = mapAuthResult(result.data);
 
   // Persist tokens if the backend returned them
   if (mapped.success && mapped.accessToken) {
@@ -225,6 +230,7 @@ export async function login(data: LoginData): Promise<AuthResult> {
 
   return mapped;
 }
+
 
 /**
  * Send a password reset OTP.
@@ -300,17 +306,32 @@ export async function changePassword(
  * Get current session — hydrates user from the backend.
  * GET /api/v1/auth/me
  *
- * The token parameter is kept for signature compatibility,
- * but the API client reads the access token from AuthProvider
- * localStorage internally.
+ * The backend returns a flat SafeUser object (no tokens, no nested `user` key).
+ * The `token` parameter is kept for signature compatibility but the API client
+ * reads the access token from localStorage automatically.
  */
 export async function getCurrentSession(
   token: string
 ): Promise<AuthResult> {
-  // The apiClient reads the token from storage automatically;
-  // the passed token param is ignored for that purpose.
-  const result = await apiClient.get<AuthResult>("/auth/me");
-  return mapAuthResult(result.error ?? result.data);
+  const result = await apiClient.get<unknown>("/auth/me");
+
+  if (result.error) {
+    return { success: false, message: result.error.message };
+  }
+
+  const user = extractUserFromMeResponse(result.data);
+  if (!user) {
+    return { success: false, message: "Unable to restore session." };
+  }
+
+  return {
+    success: true,
+    message: null,
+    user,
+    // /auth/me does NOT return tokens — the caller already has the stored token
+    accessToken: undefined,
+    refreshToken: undefined,
+  };
 }
 
 /**

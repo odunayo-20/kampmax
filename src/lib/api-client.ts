@@ -293,57 +293,82 @@ async function parseResponse<T>(response: Response): Promise<{
   }
 
   // Determine if the backend considers the call successful
-  const backendSuccess = typeof rawBody === "object" && rawBody !== null && "success" in rawBody
-    ? (rawBody as { success?: boolean }).success
-    : undefined;
+  const backendSuccess =
+    typeof rawBody === "object" && rawBody !== null && "success" in rawBody
+      ? (rawBody as { success?: boolean }).success
+      : undefined;
 
-  if (backendSuccess === true) {
-    // Success envelope: extract data payload
-    const backendData = (rawBody as BackendSuccessResponse).data;
+  const isHttpOk = response.ok;
+
+  // Considered success if:
+  // 1. backend explicitly returned { success: true }
+  // 2. HTTP response is 2xx and backend did NOT explicitly return { success: false }
+  const isSuccessful =
+    backendSuccess === true || (isHttpOk && backendSuccess !== false);
+
+  if (isSuccessful) {
     let data: T = {} as T;
 
-    // Try to cast the data payload to the expected type
-    if (backendData !== null && typeof backendData !== "undefined") {
-      data = backendData as T;
+    if (
+      backendSuccess === true &&
+      typeof rawBody === "object" &&
+      rawBody !== null &&
+      "data" in rawBody
+    ) {
+      // Unpack envelope
+      const backendData = (rawBody as BackendSuccessResponse).data;
+      if (backendData !== null && typeof backendData !== "undefined") {
+        data = backendData as T;
+      }
+    } else if (rawBody !== null && typeof rawBody !== "undefined") {
+      // Flat or non-enveloped 2xx response
+      data = rawBody as T;
     }
 
-    const apiError: ApiError = new Error("") as unknown as ApiError;
-    apiError.code = undefined;
-    apiError.status = (rawBody as BackendSuccessResponse).statusCode;
-    apiError.statusText = "";
-    apiError.response = rawBody;
-    apiError.data = backendData;
+    const message =
+      typeof rawBody === "object" && rawBody !== null && "message" in rawBody
+        ? String((rawBody as { message?: unknown }).message || "")
+        : "";
 
     return {
       parsed: {
         success: true,
         data,
-        statusCode: (rawBody as BackendSuccessResponse).statusCode,
-        message: (rawBody as BackendSuccessResponse).message,
+        statusCode: status,
+        message,
       },
       apiError: null,
     };
   } else {
-    // Error envelope
+    // Error response
     let errorMessage = "";
     let errorCode: string | number | undefined = undefined;
     let backendErrorData: unknown = rawBody;
 
     if (typeof rawBody === "object" && rawBody !== null) {
       const typedBody = rawBody as BackendErrorResponse;
-      errorMessage = typedBody.message || response.statusText;
+      errorMessage =
+        typedBody.message || response.statusText || "Request failed";
       errorCode = typedBody.statusCode || typedBody.error;
       backendErrorData = typedBody;
     } else {
-      errorMessage = response.statusText;
+      errorMessage = response.statusText || "Request failed";
     }
 
     const apiError: ApiError = new Error(errorMessage) as unknown as ApiError;
-    apiError.code = typeof errorCode === "string" || typeof errorCode === "number" ? errorCode : undefined;
-    // backendErrorData.statusCode is unknown from the cast, narrow to number | undefined
+    apiError.code =
+      typeof errorCode === "string" || typeof errorCode === "number"
+        ? errorCode
+        : undefined;
+
     let resolvedStatus: number | undefined = status;
-    if (typeof backendErrorData === "object" && backendErrorData !== null && "statusCode" in backendErrorData) {
-      const extracted = (backendErrorData as { statusCode?: unknown }).statusCode;
+    if (
+      typeof backendErrorData === "object" &&
+      backendErrorData !== null &&
+      "statusCode" in backendErrorData
+    ) {
+      const extracted = (backendErrorData as { statusCode?: unknown })
+        .statusCode;
       if (typeof extracted === "number") {
         resolvedStatus = extracted;
       }
@@ -351,11 +376,8 @@ async function parseResponse<T>(response: Response): Promise<{
     apiError.status = resolvedStatus;
     apiError.statusText = response.statusText;
     apiError.response = backendErrorData;
-
-    // Preserve the backend's error field if useful
-    if (typeof errorCode === "string" && errorCode.length > 0) {
-      apiError.message = errorMessage;
-    }
+    apiError.data = backendErrorData;
+    apiError.message = errorMessage;
 
     return {
       parsed: {

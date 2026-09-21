@@ -65,8 +65,8 @@ function LoginForm() {
 
     if (!password) {
       newErrors.password = "Password is required";
-    } else if (password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
+    } else if (password.length < 8) {
+      newErrors.password = "Password must be at least 8 characters";
     }
 
     setErrors(newErrors);
@@ -181,14 +181,6 @@ function LoginForm() {
         </Link>
       </p>
 
-      <div className="text-center">
-        <p className="text-xs text-kampmax-text-secondary/60 mt-2">
-          Demo: use any registered email with password &quot;password123&quot;
-        </p>
-        <p className="text-xs text-kampmax-text-secondary/60">
-          e.g. adebayo@rugipo.edu.ng / password123
-        </p>
-      </div>
     </div>
   );
 }
