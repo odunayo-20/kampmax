@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { MarketplaceFilters, Product, SortOption } from "@/types";
-import { getProducts } from "@/services/products";
-import { getCategories } from "@/services/categories";
+import { getProducts, fetchProducts, ProductQueryParams } from "@/services/products";
+import { getCategories, fetchCategories } from "@/services/categories";
 
 const ITEMS_PER_PAGE = 12;
 
@@ -78,15 +78,89 @@ export function useMarketplace(initialCampusId?: string) {
   });
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [categories, setCategories] = useState(() => getCategories());
+  const [serverProducts, setServerProducts] = useState<Product[]>(() => getProducts());
 
-  const allProducts = useMemo(() => getProducts(), []);
-  const categories = useMemo(() => getCategories(), []);
+  // Sync campusId if initialCampusId changes
+  useEffect(() => {
+    if (initialCampusId) {
+      setFilters((prev) => ({
+        ...prev,
+        campusId: initialCampusId,
+      }));
+    }
+  }, [initialCampusId]);
+
+  // Hydrate categories from API
+  useEffect(() => {
+    let mounted = true;
+    fetchCategories().then((res) => {
+      if (mounted && res.data && res.data.length > 0) {
+        setCategories(res.data);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Fetch live products when filters change (with debounced search)
+  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const loadProducts = useCallback(async (currentFilters: MarketplaceFilters) => {
+    setIsLoading(true);
+    try {
+      const queryParams: ProductQueryParams = {
+        limit: 50,
+      };
+      if (currentFilters.search) queryParams.search = currentFilters.search;
+      if (currentFilters.campusId) queryParams.campusId = currentFilters.campusId;
+      if (currentFilters.categoryId) queryParams.categoryId = currentFilters.categoryId;
+      if (currentFilters.vendorId) queryParams.vendorId = currentFilters.vendorId;
+      if (currentFilters.minPrice) {
+        const min = parseFloat(currentFilters.minPrice);
+        if (!isNaN(min)) queryParams.minPrice = min;
+      }
+      if (currentFilters.maxPrice) {
+        const max = parseFloat(currentFilters.maxPrice);
+        if (!isNaN(max)) queryParams.maxPrice = max;
+      }
+
+      const res = await fetchProducts(queryParams);
+      if (res.data && res.data.length > 0) {
+        setServerProducts(res.data);
+      }
+    } catch {
+      // Failover gracefully to cached/mock products
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+
+    // Debounce if user is actively searching
+    const delay = filters.search ? 300 : 0;
+    fetchTimeoutRef.current = setTimeout(() => {
+      loadProducts(filters);
+    }, delay);
+
+    return () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+    };
+  }, [filters, loadProducts]);
 
   const filteredProducts = useMemo(() => {
-    const available = allProducts.filter((p) => p.status === "available");
+    const available = serverProducts.filter((p) => p.status === "available");
     const filtered = filterProducts(available, filters);
     return sortProducts(filtered, filters.sort);
-  }, [allProducts, filters]);
+  }, [serverProducts, filters]);
 
   const displayedProducts = useMemo(
     () => filteredProducts.slice(0, visibleCount),
@@ -144,6 +218,8 @@ export function useMarketplace(initialCampusId?: string) {
     activeFilterCount,
     mobileFilterOpen,
     setMobileFilterOpen,
+    isLoading,
+    reloadProducts: () => loadProducts(filters),
     totalCount: filteredProducts.length,
   };
 }

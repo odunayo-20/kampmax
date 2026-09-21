@@ -5,10 +5,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { 
   getCategories, 
-  getCategoryById 
+  getCategoryById,
+  fetchCategories,
 } from "@/services/categories";
 import { 
-  getProductsByCategory 
+  getProductsByCategory,
+  fetchProductsByCategory,
 } from "@/services/products";
 import { getVendorById } from "@/services/users";
 import { campuses } from "@/data/campus";
@@ -104,10 +106,33 @@ function CategoryPageContent({ params }: CategoryPageProps) {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [error, setError] = useState<string | null>(null);
 
-  const category = getCategoryById(categoryId);
-  const allProducts = getProductsByCategory(categoryId).filter(p => p.status === "available");
-  const categories = getCategories();
+  const [categories, setCategories] = useState(() => getCategories());
+  const [allProducts, setAllProducts] = useState<Product[]>(() =>
+    getProductsByCategory(categoryId).filter((p) => p.status === "available")
+  );
+
+  const category = categories.find((c) => c.id === categoryId) || getCategoryById(categoryId);
   const filterDefinitions = useMemo(() => getFilterDefinitionsForCategory(categoryId), [categoryId]);
+
+  // Hydrate categories and products
+  useEffect(() => {
+    let mounted = true;
+    fetchCategories().then((res) => {
+      if (mounted && res.data && res.data.length > 0) {
+        setCategories(res.data);
+      }
+    });
+
+    fetchProductsByCategory(categoryId).then((res) => {
+      if (mounted && res.data && res.data.length > 0) {
+        setAllProducts(res.data.filter((p) => p.status === "available"));
+      }
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, [categoryId]);
 
   // Initialize filters from URL
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { Product } from "@/types";
+import { Product, ProductCondition, ProductStatus } from "@/types";
 import {
   products as mockProducts,
   getProductById as _getProductById,
@@ -7,21 +7,374 @@ import {
   getFeaturedProducts as _getFeaturedProducts,
   getRecentProducts as _getRecentProducts,
 } from "@/data/products";
+import { apiClient, ApiError } from "@/lib/api-client";
+
+// ============================================================
+// BACKEND RESPONSE & DTO TYPES (from NestJS Products Module)
+// ============================================================
+
+export type BackendProductCondition = "NEW" | "LIKE_NEW" | "GOOD" | "FAIR" | "POOR";
+export type BackendProductStatus = "ACTIVE" | "INACTIVE" | "PENDING" | "SOLD_OUT" | "ARCHIVED";
+export type BackendProductType = "PHYSICAL" | "DIGITAL" | "SERVICE";
+
+export interface BackendProductListItem {
+  id: string;
+  vendorId: string;
+  categoryId: string | null;
+  campusId: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  type: BackendProductType;
+  condition: BackendProductCondition;
+  price: number;
+  compareAtPrice: number | null;
+  stockQuantity: number;
+  sku: string | null;
+  status: BackendProductStatus;
+  images: string[];
+  createdAt: string | Date;
+}
+
+export interface BackendProductDetail extends BackendProductListItem {
+  attributes?: Record<string, string>;
+  variations?: Array<{
+    name: string;
+    options: Array<{
+      label: string;
+      price?: number;
+      stockQuantity?: number;
+      sku?: string;
+    }>;
+  }>;
+  updatedAt: string | Date;
+}
+
+export interface BackendPaginatedProducts {
+  data: BackendProductListItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface ProductQueryParams {
+  search?: string;
+  campusId?: string;
+  vendorId?: string;
+  categoryId?: string;
+  status?: BackendProductStatus;
+  minPrice?: number;
+  maxPrice?: number;
+  page?: number;
+  limit?: number;
+}
+
+export interface CreateProductPayload {
+  vendorId: string;
+  campusId: string;
+  name: string;
+  price: number;
+  categoryId?: string;
+  slug?: string;
+  description?: string;
+  type?: BackendProductType;
+  condition?: BackendProductCondition;
+  compareAtPrice?: number;
+  stockQuantity?: number;
+  sku?: string;
+  images?: string[];
+  attributes?: Record<string, string>;
+  variations?: unknown[];
+}
+
+export interface UpdateProductPayload {
+  name?: string;
+  price?: number;
+  categoryId?: string;
+  campusId?: string;
+  slug?: string;
+  description?: string;
+  type?: BackendProductType;
+  condition?: BackendProductCondition;
+  compareAtPrice?: number;
+  stockQuantity?: number;
+  sku?: string;
+  images?: string[];
+  status?: BackendProductStatus;
+  attributes?: Record<string, string>;
+  variations?: unknown[];
+}
+
+// In-memory cache for synchronous fallback access
+let cachedProducts: Product[] = [...mockProducts];
+
+/**
+ * Maps a backend product entity into the frontend Product model.
+ */
+export function mapBackendProductToFrontend(
+  raw: BackendProductListItem | BackendProductDetail
+): Product {
+  // Normalize condition
+  let condition: ProductCondition = "New";
+  if (raw.condition === "FAIR" || raw.condition === "POOR") {
+    condition = "Fair";
+  } else if (raw.condition === "LIKE_NEW" || raw.condition === "GOOD") {
+    condition = "Used";
+  } else {
+    condition = "New";
+  }
+
+  // Normalize status
+  let status: ProductStatus = "available";
+  if (raw.status === "SOLD_OUT") {
+    status = "sold";
+  } else if (raw.status === "INACTIVE" || raw.status === "ARCHIVED") {
+    status = "removed";
+  } else {
+    status = "available";
+  }
+
+  const existing = mockProducts.find((p) => p.id === raw.id);
+
+  return {
+    id: raw.id,
+    title: raw.name,
+    description: raw.description || existing?.description || "",
+    price: Number(raw.price),
+    originalPrice: raw.compareAtPrice ? Number(raw.compareAtPrice) : existing?.originalPrice,
+    categoryId: raw.categoryId || existing?.categoryId || "c1",
+    vendorId: raw.vendorId || existing?.vendorId || "v1",
+    campusId: raw.campusId || existing?.campusId || "unilag",
+    images: raw.images && raw.images.length > 0 ? raw.images : (existing?.images || []),
+    condition,
+    status,
+    stock: raw.stockQuantity ?? existing?.stock ?? 1,
+    sku: raw.sku || existing?.sku,
+    createdAt: typeof raw.createdAt === "string" ? raw.createdAt : (raw.createdAt?.toISOString?.() || existing?.createdAt || new Date().toISOString()),
+    location: existing?.location,
+    tags: existing?.tags || [],
+    viewCount: existing?.viewCount || 0,
+    saveCount: existing?.saveCount || 0,
+    rating: existing?.rating || 4.5,
+    ratingCount: existing?.ratingCount || 10,
+    soldCount: existing?.soldCount || 0,
+    allowDelivery: existing?.allowDelivery ?? true,
+    allowPickup: existing?.allowPickup ?? true,
+    deliveryFee: existing?.deliveryFee ?? 0,
+  };
+}
+
+// ============================================================
+// ASYNC API CLIENT METHODS
+// ============================================================
+
+/**
+ * Fetch paginated products from the backend API with search/filtering.
+ * GET /api/v1/products
+ */
+export async function fetchProducts(
+  params: ProductQueryParams = {}
+): Promise<{
+  data: Product[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  error: ApiError | null;
+}> {
+  const searchParams = new URLSearchParams();
+  if (params.search) searchParams.append("search", params.search);
+  if (params.campusId) searchParams.append("campusId", params.campusId);
+  if (params.vendorId) searchParams.append("vendorId", params.vendorId);
+  if (params.categoryId) searchParams.append("categoryId", params.categoryId);
+  if (params.status) searchParams.append("status", params.status);
+  if (params.minPrice !== undefined) searchParams.append("minPrice", String(params.minPrice));
+  if (params.maxPrice !== undefined) searchParams.append("maxPrice", String(params.maxPrice));
+  if (params.page) searchParams.append("page", String(params.page));
+  if (params.limit) searchParams.append("limit", String(params.limit));
+
+  const queryString = searchParams.toString();
+  const path = `/products${queryString ? `?${queryString}` : ""}`;
+
+  const { data, error } = await apiClient.get<BackendPaginatedProducts>(path);
+
+  if (error || !data) {
+    // Filter fallback cache locally
+    let fallback = [...cachedProducts];
+    if (params.campusId) fallback = fallback.filter((p) => p.campusId === params.campusId);
+    if (params.categoryId) fallback = fallback.filter((p) => p.categoryId === params.categoryId);
+    if (params.vendorId) fallback = fallback.filter((p) => p.vendorId === params.vendorId);
+    if (params.search) {
+      const q = params.search.toLowerCase();
+      fallback = fallback.filter(
+        (p) =>
+          p.title.toLowerCase().includes(q) ||
+          p.description.toLowerCase().includes(q) ||
+          p.tags?.some((t) => t.toLowerCase().includes(q))
+      );
+    }
+    if (params.minPrice !== undefined) fallback = fallback.filter((p) => p.price >= params.minPrice!);
+    if (params.maxPrice !== undefined) fallback = fallback.filter((p) => p.price <= params.maxPrice!);
+
+    return {
+      data: fallback,
+      total: fallback.length,
+      page: params.page || 1,
+      limit: params.limit || 20,
+      totalPages: Math.ceil(fallback.length / (params.limit || 20)) || 1,
+      error,
+    };
+  }
+
+  const mapped = data.data.map(mapBackendProductToFrontend);
+
+  // Update in-memory cache with newly fetched items
+  const mappedMap = new Map(mapped.map((p) => [p.id, p]));
+  cachedProducts = [
+    ...mapped,
+    ...cachedProducts.filter((p) => !mappedMap.has(p.id)),
+  ];
+
+  return {
+    data: mapped,
+    total: data.total,
+    page: data.page,
+    limit: data.limit,
+    totalPages: data.totalPages,
+    error: null,
+  };
+}
+
+/**
+ * Fetch a single product by ID from the backend API.
+ * GET /api/v1/products/:id
+ */
+export async function fetchProductById(
+  id: string
+): Promise<{ data: Product | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.get<BackendProductDetail>(`/products/${id}`);
+
+  if (error || !data) {
+    const fallback = cachedProducts.find((p) => p.id === id) || _getProductById(id) || null;
+    return { data: fallback, error };
+  }
+
+  const mapped = mapBackendProductToFrontend(data);
+
+  // Update cached copy
+  const idx = cachedProducts.findIndex((p) => p.id === id);
+  if (idx >= 0) {
+    cachedProducts[idx] = mapped;
+  } else {
+    cachedProducts.unshift(mapped);
+  }
+
+  return { data: mapped, error: null };
+}
+
+/**
+ * Fetch products filtered by campus.
+ */
+export async function fetchProductsByCampus(
+  campusId: string,
+  params: Omit<ProductQueryParams, "campusId"> = {}
+) {
+  return fetchProducts({ ...params, campusId });
+}
+
+/**
+ * Fetch products filtered by category.
+ */
+export async function fetchProductsByCategory(
+  categoryId: string,
+  campusId?: string,
+  params: Omit<ProductQueryParams, "categoryId" | "campusId"> = {}
+) {
+  return fetchProducts({ ...params, categoryId, campusId });
+}
+
+/**
+ * Create a new product (Authenticated Vendor).
+ * POST /api/v1/products
+ */
+export async function createProduct(
+  payload: CreateProductPayload
+): Promise<{ data: Product | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.post<BackendProductDetail>("/products", payload);
+
+  if (error || !data) {
+    return { data: null, error };
+  }
+
+  const mapped = mapBackendProductToFrontend(data);
+  cachedProducts.unshift(mapped);
+
+  return { data: mapped, error: null };
+}
+
+/**
+ * Update an existing product (Authenticated Vendor/Admin).
+ * PATCH /api/v1/products/:id
+ */
+export async function updateProduct(
+  id: string,
+  payload: UpdateProductPayload
+): Promise<{ data: Product | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.patch<BackendProductDetail>(`/products/${id}`, payload);
+
+  if (error || !data) {
+    return { data: null, error };
+  }
+
+  const mapped = mapBackendProductToFrontend(data);
+  const idx = cachedProducts.findIndex((p) => p.id === id);
+  if (idx >= 0) {
+    cachedProducts[idx] = mapped;
+  } else {
+    cachedProducts.unshift(mapped);
+  }
+
+  return { data: mapped, error: null };
+}
+
+/**
+ * Delete / remove a product (Authenticated Vendor/Admin).
+ * DELETE /api/v1/products/:id
+ */
+export async function deleteProduct(
+  id: string
+): Promise<{ success: boolean; error: ApiError | null }> {
+  const { error } = await apiClient.delete<void>(`/products/${id}`);
+
+  if (error) {
+    return { success: false, error };
+  }
+
+  cachedProducts = cachedProducts.filter((p) => p.id !== id);
+  return { success: true, error: null };
+}
+
+// ============================================================
+// SYNCHRONOUS FALLBACK HELPERS (preserves backward compatibility)
+// ============================================================
 
 export function getProducts(): Product[] {
-  return mockProducts;
+  return cachedProducts.length > 0 ? cachedProducts : mockProducts;
 }
 
 export function getProductById(id: string): Product | undefined {
-  return _getProductById(id);
+  return cachedProducts.find((p) => p.id === id) || _getProductById(id);
 }
 
 export function getProductsByCategory(categoryId: string): Product[] {
-  return _getProductsByCategory(categoryId);
+  const found = cachedProducts.filter((p) => p.categoryId === categoryId);
+  return found.length > 0 ? found : _getProductsByCategory(categoryId);
 }
 
 export function getProductsByVendor(vendorId: string): Product[] {
-  return _getProductsByVendor(vendorId);
+  const found = cachedProducts.filter((p) => p.vendorId === vendorId);
+  return found.length > 0 ? found : _getProductsByVendor(vendorId);
 }
 
 export function getFeaturedProducts(): Product[] {
@@ -34,7 +387,7 @@ export function getRecentProducts(): Product[] {
 
 export function searchProducts(query: string): Product[] {
   const q = query.toLowerCase();
-  return mockProducts.filter(
+  return (cachedProducts.length > 0 ? cachedProducts : mockProducts).filter(
     (p) =>
       p.title.toLowerCase().includes(q) ||
       p.description.toLowerCase().includes(q) ||
@@ -43,23 +396,26 @@ export function searchProducts(query: string): Product[] {
 }
 
 export function getProductsByCampus(campusId: string): Product[] {
-  return mockProducts.filter((p) => p.campusId === campusId);
+  const found = (cachedProducts.length > 0 ? cachedProducts : mockProducts).filter(
+    (p) => p.campusId === campusId
+  );
+  return found;
 }
 
 export function getFeaturedProductsByCampus(campusId: string): Product[] {
-  return mockProducts.filter(
+  return (cachedProducts.length > 0 ? cachedProducts : mockProducts).filter(
     (p) => p.campusId === campusId && p.originalPrice && p.originalPrice > p.price
   );
 }
 
 export function getPopularProductsByCampus(campusId: string): Product[] {
-  return mockProducts
+  return (cachedProducts.length > 0 ? cachedProducts : mockProducts)
     .filter((p) => p.campusId === campusId)
     .sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0));
 }
 
 export function getRecentProductsByCampus(campusId: string): Product[] {
-  return mockProducts
+  return (cachedProducts.length > 0 ? cachedProducts : mockProducts)
     .filter((p) => p.campusId === campusId)
     .sort(
       (a, b) =>
@@ -68,7 +424,7 @@ export function getRecentProductsByCampus(campusId: string): Product[] {
 }
 
 export function getRecommendedProductsByCampus(campusId: string): Product[] {
-  const campusProducts = mockProducts.filter((p) => p.campusId === campusId);
-  return campusProducts
+  return (cachedProducts.length > 0 ? cachedProducts : mockProducts)
+    .filter((p) => p.campusId === campusId)
     .sort((a, b) => (b.saveCount || 0) - (a.saveCount || 0));
 }

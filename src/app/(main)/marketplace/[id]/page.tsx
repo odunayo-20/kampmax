@@ -8,12 +8,13 @@ import { PageContainer, Breadcrumbs } from "@/components/layout";
 import { Button } from "@/components/ui";
 import { useCart } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
-import { getProductById, getProductsByCategory } from "@/services/products";
+import { getProductById, fetchProductById, getProductsByCategory } from "@/services/products";
 import { getVendorById } from "@/services/users";
 import { getReviewsByProduct, getReviewSummary, hasUserReviewedProduct } from "@/services/reviews";
 import { ReviewList, StarRatingDisplay, ReviewForm } from "@/components/reviews";
 import { formatNaira, calculateDiscountPercentage } from "@/lib/utils";
 import { campuses } from "@/data/campus";
+import { Product } from "@/types";
 import {
   ProductGallery,
   VariantSelector,
@@ -55,7 +56,21 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const [added, setAdded] = useState(false);
   const [buyLoading, setBuyLoading] = useState(false);
 
-  const product = getProductById(id);
+  const [product, setProduct] = useState<Product | null>(() => getProductById(id) || null);
+  const [isLoading, setIsLoading] = useState(!product);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchProductById(id).then((res) => {
+      if (mounted) {
+        if (res.data) setProduct(res.data);
+        setIsLoading(false);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [id]);
 
   const gallery = useMemo(() => {
     if (!product) return [];
@@ -80,6 +95,25 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     });
     setSelectedVariants(init);
   }, [variantGroups]);
+
+  if (isLoading && !product) {
+    return (
+      <PageContainer className="py-8">
+        <div className="animate-pulse space-y-6">
+          <div className="h-4 w-48 bg-neutral-200 rounded" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="aspect-square bg-neutral-200 rounded-xl" />
+            <div className="space-y-4">
+              <div className="h-8 bg-neutral-200 rounded w-3/4" />
+              <div className="h-6 bg-neutral-200 rounded w-1/3" />
+              <div className="h-24 bg-neutral-200 rounded" />
+              <div className="h-12 bg-neutral-200 rounded" />
+            </div>
+          </div>
+        </div>
+      </PageContainer>
+    );
+  }
 
   if (!product) {
     return (
