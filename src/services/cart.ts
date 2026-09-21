@@ -2,6 +2,7 @@ import type { Product } from "@/types";
 import { getVendorById } from "@/services/users";
 import { getProductById } from "@/services/products";
 import { getStockForSelection } from "@/components/marketplace/product-detail/types";
+import { apiClient, ApiError } from "@/lib/api-client";
 import {
   type CartLineItem,
   type CartVendorGroup,
@@ -11,23 +12,57 @@ import {
   type AvailabilityStatus,
 } from "@/types/cart";
 
-/**
- * Cart service layer.
- *
- * All cart data flow is isolated behind this module. The calls are
- * intentionally structured to map 1:1 to the future backend endpoints:
- *
- *   GET    /cart            -> getServerCart()
- *   POST   /cart/items      -> addToServerCart()
- *   PATCH  /cart/items/:id  -> updateServerCartItem()
- *   DELETE /cart/items/:id  -> removeServerCartItem()
- *   POST   /cart/merge      -> mergeCarts()
- *   POST   /cart/validate   -> validateCartItems()
- *
- * Until the API exists, these operate on local state and the synchronous
- * product/vendor services already in the codebase. No fake backend entities
- * are introduced here.
- */
+// ============================================================
+// BACKEND RESPONSE & DTO TYPES (from NestJS Cart Module)
+// ============================================================
+
+export interface BackendSelectedVariation {
+  name: string;
+  option: string;
+  price?: number;
+  sku?: string;
+}
+
+export interface BackendCartItemResponse {
+  id: string;
+  productId: string;
+  productName: string;
+  productSlug: string;
+  productImage: string | null;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+  selectedVariation: BackendSelectedVariation | null;
+  inStock: boolean;
+  isActive: boolean;
+  availableStock: number;
+}
+
+export interface BackendCartItemGroup {
+  vendorId: string;
+  vendorName: string;
+  items: BackendCartItemResponse[];
+  subtotal: number;
+}
+
+export interface BackendCartResponse {
+  id: string;
+  items: BackendCartItemGroup[];
+  itemCount: number;
+  grandTotal: number;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
+export interface AddCartItemPayload {
+  productId: string;
+  quantity: number;
+  selectedVariation?: BackendSelectedVariation;
+}
+
+export interface UpdateCartItemPayload {
+  quantity: number;
+}
 
 // ── Local helpers (no I/O) ────────────────────────────────────────────────
 
@@ -108,6 +143,69 @@ export function makeLineId(): string {
 }
 
 /**
+ * Maps backend CartResponse items into frontend CartLineItem[]
+ */
+export function mapBackendCartToFrontend(cart: BackendCartResponse): CartLineItem[] {
+  if (!cart || !Array.isArray(cart.items)) return [];
+
+  const lines: CartLineItem[] = [];
+
+  for (const group of cart.items) {
+    for (const item of group.items) {
+      const existingProduct = getProductById(item.productId);
+
+      const product: Product = existingProduct || {
+        id: item.productId,
+        title: item.productName,
+        description: "",
+        price: Number(item.unitPrice),
+        categoryId: "c1",
+        vendorId: group.vendorId,
+        campusId: "unilag",
+        images: item.productImage ? [item.productImage] : ["/placeholder-product.svg"],
+        condition: "New",
+        status: item.isActive ? (item.inStock ? "available" : "sold") : "removed",
+        createdAt: new Date().toISOString(),
+        stock: item.availableStock,
+      };
+
+      const selectedVariants = item.selectedVariation
+        ? { [item.selectedVariation.name]: item.selectedVariation.option }
+        : undefined;
+
+      const variantLabel = item.selectedVariation
+        ? `${item.selectedVariation.name}: ${item.selectedVariation.option}`
+        : undefined;
+
+      const availabilityStatus: AvailabilityStatus =
+        !item.isActive
+          ? "unavailable"
+          : !item.inStock
+          ? "out_of_stock"
+          : "available";
+
+      lines.push({
+        id: item.id,
+        productId: item.productId,
+        vendorId: group.vendorId,
+        product,
+        quantity: item.quantity,
+        variantLabel,
+        selectedVariants,
+        savedForLater: false,
+        availableStock: item.availableStock,
+        maxPurchaseQuantity: Math.min(10, item.availableStock || 10),
+        availabilityStatus,
+        validationStatus: "valid",
+        unitPrice: Number(item.unitPrice),
+      });
+    }
+  }
+
+  return lines;
+}
+
+/**
  * Turn a selected product + quantity into a cart line, enriching it with
  * stock/availability computed from the current catalog.
  */
@@ -154,12 +252,6 @@ export function buildCartLine(
 
 /**
  * Merge a guest cart with an authenticated (server) cart.
- *
- * Rules:
- *  - Same product (+ same future variant) quantities are combined.
- *  - The combined quantity is capped by `maxPurchaseQuantity` / stock.
- *  - Capped lines are reported as adjustments with a clear message.
- *  - Server cart is never overwritten; guest contents are folded in.
  */
 export function mergeCarts(
   guest: CartLineItem[],
@@ -207,11 +299,103 @@ export function mergeCarts(
   return { mergedItems, adjustments, removedItems };
 }
 
-// ── Server cart proxies (map to future endpoints) ─────────────────────────
+// ============================================================
+// ASYNC API CLIENT METHODS (Connecting to NestJS /cart)
+// ============================================================
 
 /**
- * Future: GET /cart
- * Currently returns an empty server cart, as no server cart exists yet.
+ * Fetch authenticated server cart.
+ * GET /api/v1/cart
+ */
+export async function fetchServerCart(): Promise<{
+  cart: BackendCartResponse | null;
+  items: CartLineItem[];
+  error: ApiError | null;
+}> {
+  const { data, error } = await apiClient.get<BackendCartResponse>("/cart");
+
+  if (error || !data || !data.id) {
+    return { cart: null, items: [], error };
+  }
+
+  const items = mapBackendCartToFrontend(data);
+  return { cart: data, items, error: null };
+}
+
+/**
+ * Add an item to authenticated server cart.
+ * POST /api/v1/cart/items
+ */
+export async function addToServerCart(
+  payload: AddCartItemPayload
+): Promise<{ cart: BackendCartResponse | null; items: CartLineItem[]; error: ApiError | null }> {
+  const { data, error } = await apiClient.post<AddCartItemPayload, BackendCartResponse>(
+    "/cart/items",
+    payload
+  );
+
+  if (error || !data || !data.id) {
+    return { cart: null, items: [], error };
+  }
+
+  const items = mapBackendCartToFrontend(data);
+  return { cart: data, items, error: null };
+}
+
+/**
+ * Update quantity of a cart item in authenticated server cart.
+ * PATCH /api/v1/cart/items/:id
+ */
+export async function updateServerCartItem(
+  itemId: string,
+  payload: UpdateCartItemPayload
+): Promise<{ cart: BackendCartResponse | null; items: CartLineItem[]; error: ApiError | null }> {
+  const { data, error } = await apiClient.patch<UpdateCartItemPayload, BackendCartResponse>(
+    `/cart/items/${itemId}`,
+    payload
+  );
+
+  if (error || !data || !data.id) {
+    return { cart: null, items: [], error };
+  }
+
+  const items = mapBackendCartToFrontend(data);
+  return { cart: data, items, error: null };
+}
+
+/**
+ * Remove an item from authenticated server cart.
+ * DELETE /api/v1/cart/items/:id
+ */
+export async function removeServerCartItem(
+  itemId: string
+): Promise<{ cart: BackendCartResponse | null; items: CartLineItem[]; error: ApiError | null }> {
+  const { data, error } = await apiClient.delete<BackendCartResponse>(`/cart/items/${itemId}`);
+
+  if (error || !data || !data.id) {
+    return { cart: null, items: [], error };
+  }
+
+  const items = mapBackendCartToFrontend(data);
+  return { cart: data, items, error: null };
+}
+
+/**
+ * Clear entire authenticated server cart.
+ * DELETE /api/v1/cart
+ */
+export async function clearServerCart(): Promise<{ success: boolean; error: ApiError | null }> {
+  const { error } = await apiClient.delete<{ message: string }>("/cart");
+
+  if (error) {
+    return { success: false, error };
+  }
+
+  return { success: true, error: null };
+}
+
+/**
+ * Backward-compatible synchronous placeholder.
  */
 export function getServerCart(customerId?: string): CartLineItem[] {
   void customerId;
@@ -220,8 +404,6 @@ export function getServerCart(customerId?: string): CartLineItem[] {
 
 /**
  * Validate cart lines against the current catalog (product status, stock).
- * Price changes are detected by comparing stored `unitPrice` to the
- * product's current price.
  */
 export function validateCartItems(
   items: CartLineItem[]

@@ -301,9 +301,9 @@ export async function fetchProductsByCategory(
 export async function createProduct(
   payload: CreateProductPayload
 ): Promise<{ data: Product | null; error: ApiError | null }> {
-  const { data, error } = await apiClient.post<BackendProductDetail>("/products", payload);
+  const { data, error } = await apiClient.post<CreateProductPayload, BackendProductDetail>("/products", payload);
 
-  if (error || !data) {
+  if (error || !data || !data.id) {
     return { data: null, error };
   }
 
@@ -321,9 +321,9 @@ export async function updateProduct(
   id: string,
   payload: UpdateProductPayload
 ): Promise<{ data: Product | null; error: ApiError | null }> {
-  const { data, error } = await apiClient.patch<BackendProductDetail>(`/products/${id}`, payload);
+  const { data, error } = await apiClient.patch<UpdateProductPayload, BackendProductDetail>(`/products/${id}`, payload);
 
-  if (error || !data) {
+  if (error || !data || !data.id) {
     return { data: null, error };
   }
 

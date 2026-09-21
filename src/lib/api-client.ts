@@ -402,7 +402,7 @@ export class ApiClient {
   }
 
   /** GET */
-  async get<T>(path: string, options: RequestInit = {}): Promise<{ data: T; error: ApiError | null }> {
+  async get<T = unknown>(path: string, options: RequestInit = {}): Promise<{ data: T; error: ApiError | null }> {
     const response = await fetchApi(path, { ...options, method: "GET" });
     const parsed = await parseResponse<T>(response);
 
@@ -415,8 +415,8 @@ export class ApiClient {
   }
 
   /** POST */
-  async post<T, R>(path: string, body: T, options: RequestInit = {}): Promise<{ data: R; error: ApiError | null }> {
-    const response = await fetchApi(path, { ...options, method: "POST", body: JSON.stringify(body) });
+  async post<T = unknown, R = T>(path: string, body?: T, options: RequestInit = {}): Promise<{ data: R; error: ApiError | null }> {
+    const response = await fetchApi(path, { ...options, method: "POST", body: body !== undefined ? JSON.stringify(body) : undefined });
     const parsed = await parseResponse<R>(response);
 
     if (parsed.parsed.success && parsed.parsed.data !== undefined) {
@@ -427,8 +427,8 @@ export class ApiClient {
   }
 
   /** PUT */
-  async put<T, R>(path: string, body: T, options: RequestInit = {}): Promise<{ data: R; error: ApiError | null }> {
-    const response = await fetchApi(path, { ...options, method: "PUT", body: JSON.stringify(body) });
+  async put<T = unknown, R = T>(path: string, body?: T, options: RequestInit = {}): Promise<{ data: R; error: ApiError | null }> {
+    const response = await fetchApi(path, { ...options, method: "PUT", body: body !== undefined ? JSON.stringify(body) : undefined });
     const parsed = await parseResponse<R>(response);
 
     if (parsed.parsed.success && parsed.parsed.data !== undefined) {
@@ -439,8 +439,8 @@ export class ApiClient {
   }
 
   /** PATCH */
-  async patch<T, R>(path: string, body: T, options: RequestInit = {}): Promise<{ data: R; error: ApiError | null }> {
-    const response = await fetchApi(path, { ...options, method: "PATCH", body: JSON.stringify(body) });
+  async patch<T = unknown, R = T>(path: string, body?: T, options: RequestInit = {}): Promise<{ data: R; error: ApiError | null }> {
+    const response = await fetchApi(path, { ...options, method: "PATCH", body: body !== undefined ? JSON.stringify(body) : undefined });
     const parsed = await parseResponse<R>(response);
 
     if (parsed.parsed.success && parsed.parsed.data !== undefined) {
@@ -451,7 +451,7 @@ export class ApiClient {
   }
 
   /** DELETE */
-  async delete<R>(path: string, options: RequestInit = {}): Promise<{ data: R; error: ApiError | null }> {
+  async delete<R = unknown>(path: string, options: RequestInit = {}): Promise<{ data: R; error: ApiError | null }> {
     const response = await fetchApi(path, { ...options, method: "DELETE" });
     const parsed = await parseResponse<R>(response);
 

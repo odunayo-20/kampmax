@@ -18,12 +18,15 @@ import {
   groupItemsByVendor,
   mergeCarts,
   validateCartItems,
-  getServerCart,
   makeLineId,
+  fetchServerCart,
+  addToServerCart,
+  updateServerCartItem,
+  removeServerCartItem,
+  clearServerCart,
 } from "@/services/cart";
 import { useAuth } from "@/lib/auth-context";
 import { useApp } from "@/lib/app-context";
-import { getVendorById } from "@/services/users";
 import { getProductById } from "@/services/products";
 
 // ── Constants ──
@@ -188,41 +191,53 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  // Persist on every change.
+  // Persist on every change for guest/offline.
   useEffect(() => {
     if (isLoading) return;
     writeStoredCart(items);
   }, [items, isLoading]);
 
-  // Merge guest cart into user's server cart once when auth is established.
-  const mergeGuestWithServer = useCallback(() => {
+  // Synchronize authenticated server cart and merge guest cart when auth is established.
+  const mergeGuestWithServer = useCallback(async () => {
     if (status !== "authenticated" || !user) return;
     if (mergedRef.current === user.id) return;
     mergedRef.current = user.id;
 
-    const server = getServerCart(user.id);
-    const guest = items.filter((i) => !i.savedForLater) as CartLineItem[];
-    if (guest.length === 0) return;
+    try {
+      const serverRes = await fetchServerCart();
+      const serverItems = serverRes.items;
+      const guest = items.filter((i) => !i.savedForLater) as CartLineItem[];
 
-    const { mergedItems, adjustments } = mergeCarts(guest, server);
-    const next = mergedItems.map((m) => {
-      const asCartItem: CartItem = m;
-      return asCartItem;
-    });
-    const saved = items.filter((i) => i.savedForLater);
-    setItems([...next, ...saved]);
-
-    if (adjustments.length > 0) {
-      setFeedback({
-        type: "info",
-        message:
-          "Some item quantities were adjusted to fit the available stock.",
-      });
+      if (guest.length > 0) {
+        // Send guest items to backend cart
+        for (const g of guest) {
+          await addToServerCart({
+            productId: g.productId,
+            quantity: g.quantity,
+            selectedVariation: g.selectedVariants
+              ? {
+                  name: Object.keys(g.selectedVariants)[0] || "Variation",
+                  option: Object.values(g.selectedVariants)[0] || "",
+                }
+              : undefined,
+          });
+        }
+        const updated = await fetchServerCart();
+        const saved = items.filter((i) => i.savedForLater);
+        setItems([...updated.items, ...saved]);
+      } else if (serverItems.length > 0) {
+        const saved = items.filter((i) => i.savedForLater);
+        setItems([...serverItems, ...saved]);
+      }
+    } catch {
+      // Keep local state if server sync fails
     }
   }, [status, user, items]);
 
   useEffect(() => {
-    mergeGuestWithServer();
+    if (status === "authenticated") {
+      mergeGuestWithServer();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
@@ -247,6 +262,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         selectedVariants: options?.selectedVariants,
         unitPrice: options?.unitPrice,
       });
+
+      // Optimistic local state update
       setItems((prev) => {
         const existing = prev.find(
           (i) =>
@@ -267,7 +284,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
               : i
           );
         }
-        // If it was saved for later, move it back to the active cart.
         const saved = prev.find(
           (i) => i.product.id === product.id && i.savedForLater
         );
@@ -281,37 +297,72 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return [...prev, line];
       });
 
+      // Send to backend if authenticated
+      if (status === "authenticated") {
+        addToServerCart({
+          productId: product.id,
+          quantity,
+          selectedVariation: options?.selectedVariants
+            ? {
+                name: Object.keys(options.selectedVariants)[0] || "Variation",
+                option: Object.values(options.selectedVariants)[0] || "",
+              }
+            : undefined,
+        }).then((res) => {
+          if (res.items && res.items.length > 0) {
+            setItems((prev) => {
+              const saved = prev.filter((i) => i.savedForLater);
+              return [...res.items, ...saved];
+            });
+          }
+        }).catch(() => {});
+      }
+
       setFeedback({ type: "success", message: `${product.title} added to cart.` });
       if (options?.openDrawer !== false) {
         setIsCartOpen(true);
       }
     },
-    []
+    [status]
   );
 
   const removeItem = useCallback(
     (productId: string) => {
       setPendingId(productId);
       setPendingAction("remove");
+
+      // Find cart line item ID if available
+      const targetItem = items.find((i) => i.product.id === productId);
+      const lineId = (targetItem as CartLineItem)?.id;
+
       setItems((prev) => prev.filter((i) => i.product.id !== productId));
       setFeedback({ type: "info", message: "Item removed from your cart." });
-      // Loading indicator clears on next render tick.
+
+      if (status === "authenticated" && lineId) {
+        removeServerCartItem(lineId).catch(() => {});
+      }
+
       queueMicrotask(() => {
         setPendingId(null);
         setPendingAction(null);
       });
     },
-    []
+    [items, status]
   );
 
   const updateQuantity = useCallback(
     (productId: string, quantity: number) => {
       if (quantity <= 0) {
-        setItems((prev) => prev.filter((i) => i.product.id !== productId));
+        removeItem(productId);
         return;
       }
+
       setPendingId(productId);
       setPendingAction("quantity");
+
+      const targetItem = items.find((i) => i.product.id === productId);
+      const lineId = (targetItem as CartLineItem)?.id;
+
       setItems((prev) =>
         prev.map((i) =>
           i.product.id === productId && !i.savedForLater
@@ -319,12 +370,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
             : i
         )
       );
+
+      if (status === "authenticated" && lineId) {
+        updateServerCartItem(lineId, { quantity }).catch(() => {});
+      }
+
       queueMicrotask(() => {
         setPendingId(null);
         setPendingAction(null);
       });
     },
-    []
+    [items, removeItem, status]
   );
 
   const saveForLater = useCallback(
@@ -375,7 +431,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
     []
   );
 
-  const clearCart = useCallback(() => setItems([]), []);
+  const clearCart = useCallback(() => {
+    setItems([]);
+    if (status === "authenticated") {
+      clearServerCart().catch(() => {});
+    }
+  }, [status]);
 
   const validateCart = useCallback(() => {
     const lines = items.filter((i) => !i.savedForLater) as CartLineItem[];
@@ -390,7 +451,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return {
           ...i,
           validationStatus: res.status,
-          // expose for the UI but keep the line intact; message only when invalid
           message:
             res.status === "valid" ? undefined : (res as { message?: string }).message,
         } as CartLineItem;
