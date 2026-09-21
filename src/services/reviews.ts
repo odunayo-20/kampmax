@@ -1,4 +1,29 @@
-import { Review, ReviewSummary, ReviewReport, ReviewReportReason, ReviewSortOption } from "@/types";
+// ============================================================
+// REVIEWS SERVICE
+// ============================================================
+//
+// Two-tier approach:
+//
+//  TIER 1 — ASYNC BACKEND API (production path)
+//    All async functions call apiClient and mirror NestJS /reviews endpoints:
+//      POST   /reviews                          → create
+//      GET    /reviews/me                       → current user's reviews
+//      GET    /reviews/:id                      → single review (auth)
+//      PATCH  /reviews/:id                      → update own review
+//      DELETE /reviews/:id                      → delete own review
+//      GET    /reviews/target/:type/:id         → public reviews for a target
+//      GET    /reviews/summary/:type/:id        → rating summary for a target
+//
+//  TIER 2 — MOCK HELPERS (prototype / offline)
+//    Sync helpers backed by in-memory mock data. These remain
+//    intact to avoid breaking callers in the UI that haven't been
+//    migrated to async yet.
+//
+// SECURITY: The backend owns review authorship (reviewerId is set
+// server-side from the JWT). The frontend never fabricates review
+// counts, averages or verification status.
+
+import type { Review, ReviewSummary, ReviewReport, ReviewReportReason, ReviewSortOption } from "@/types";
 import {
   reviews as mockReviews,
   reviewReports as mockReports,
@@ -8,6 +33,211 @@ import {
   getAverageRating as _getAverageRating,
   getReviewSummary as _getReviewSummary,
 } from "@/data/reviews";
+import { apiClient } from "@/lib/api-client";
+import type { ApiError } from "@/lib/api-client";
+
+// ── Backend response shapes ──────────────────────────────────
+
+/** Mirrors ReviewTargetType enum on the backend */
+export type BackendReviewTargetType =
+  | "product"
+  | "vendor"
+  | "freelancer"
+  | "service"
+  | "service_provider";
+
+/** Mirrors ReviewStatus enum on the backend */
+export type BackendReviewStatus = "pending" | "approved" | "rejected" | "flagged";
+
+export interface BackendReview {
+  id: string;
+  reviewerId: string;
+  targetType: BackendReviewTargetType;
+  targetId: string;
+  rating: number;
+  title?: string;
+  comment?: string;
+  status: BackendReviewStatus;
+  moderatedBy?: string;
+  moderationReason?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BackendRatingSummary {
+  average: number;
+  total: number;
+  distribution: Record<number, number>;
+}
+
+export interface BackendPaginatedReviews {
+  data: BackendReview[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+// ── DTOs ─────────────────────────────────────────────────────
+
+export interface CreateReviewDto {
+  targetType: BackendReviewTargetType;
+  targetId: string;
+  rating: number;
+  title?: string;
+  comment?: string;
+}
+
+export interface UpdateReviewDto {
+  rating?: number;
+  title?: string;
+  comment?: string;
+}
+
+// ═══════════════════════════════════════════════════════════
+// ASYNC BACKEND API
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * Create a new review (authenticated).
+ * Endpoint: POST /reviews
+ */
+export async function createReview(dto: CreateReviewDto): Promise<{
+  review: BackendReview | null;
+  error: ApiError | null;
+}> {
+  const { data, error } = await apiClient.post<CreateReviewDto, BackendReview>("/reviews", dto);
+  if (error) return { review: null, error };
+  return { review: data, error: null };
+}
+
+/**
+ * List the current authenticated user's reviews.
+ * Endpoint: GET /reviews/me
+ */
+export async function getMyReviews(query: {
+  page?: number;
+  limit?: number;
+} = {}): Promise<{
+  reviews: BackendReview[];
+  total: number;
+  page: number;
+  totalPages: number;
+  error: ApiError | null;
+}> {
+  const params = new URLSearchParams();
+  if (query.page) params.set("page", String(query.page));
+  if (query.limit) params.set("limit", String(query.limit));
+  const qs = params.toString();
+
+  const { data, error } = await apiClient.get<BackendPaginatedReviews>(
+    `/reviews/me${qs ? `?${qs}` : ""}`
+  );
+  if (error) return { reviews: [], total: 0, page: 1, totalPages: 1, error };
+
+  return {
+    reviews: data.data ?? [],
+    total: data.total ?? 0,
+    page: data.page ?? 1,
+    totalPages: data.totalPages ?? 1,
+    error: null,
+  };
+}
+
+/**
+ * Fetch a single review by ID (authenticated).
+ * Endpoint: GET /reviews/:id
+ */
+export async function getReviewById(id: string): Promise<{
+  review: BackendReview | null;
+  error: ApiError | null;
+}> {
+  const { data, error } = await apiClient.get<BackendReview>(`/reviews/${id}`);
+  if (error) return { review: null, error };
+  return { review: data, error: null };
+}
+
+/**
+ * Update the current user's own review.
+ * Endpoint: PATCH /reviews/:id
+ */
+export async function updateMyReview(
+  id: string,
+  dto: UpdateReviewDto
+): Promise<{ review: BackendReview | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.patch<UpdateReviewDto, BackendReview>(
+    `/reviews/${id}`,
+    dto
+  );
+  if (error) return { review: null, error };
+  return { review: data, error: null };
+}
+
+/**
+ * Delete the current user's own review.
+ * Endpoint: DELETE /reviews/:id
+ */
+export async function deleteMyReview(id: string): Promise<{
+  success: boolean;
+  error: ApiError | null;
+}> {
+  const { error } = await apiClient.delete(`/reviews/${id}`);
+  if (error) return { success: false, error };
+  return { success: true, error: null };
+}
+
+/**
+ * List public approved reviews for a target entity.
+ * Endpoint: GET /reviews/target/:targetType/:targetId
+ */
+export async function listPublicReviews(
+  targetType: BackendReviewTargetType,
+  targetId: string,
+  query: { page?: number; limit?: number } = {}
+): Promise<{
+  reviews: BackendReview[];
+  total: number;
+  page: number;
+  totalPages: number;
+  error: ApiError | null;
+}> {
+  const params = new URLSearchParams();
+  if (query.page) params.set("page", String(query.page));
+  if (query.limit) params.set("limit", String(query.limit));
+  const qs = params.toString();
+
+  const { data, error } = await apiClient.get<BackendPaginatedReviews>(
+    `/reviews/target/${targetType}/${targetId}${qs ? `?${qs}` : ""}`
+  );
+  if (error) return { reviews: [], total: 0, page: 1, totalPages: 1, error };
+
+  return {
+    reviews: data.data ?? [],
+    total: data.total ?? 0,
+    page: data.page ?? 1,
+    totalPages: data.totalPages ?? 1,
+    error: null,
+  };
+}
+
+/**
+ * Get the rating summary (average, count, distribution) for a target.
+ * Endpoint: GET /reviews/summary/:targetType/:targetId
+ */
+export async function getTargetRatingSummary(
+  targetType: BackendReviewTargetType,
+  targetId: string
+): Promise<{ summary: BackendRatingSummary | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.get<BackendRatingSummary>(
+    `/reviews/summary/${targetType}/${targetId}`
+  );
+  if (error) return { summary: null, error };
+  return { summary: data, error: null };
+}
+
+// ═══════════════════════════════════════════════════════════
+// MOCK / PROTOTYPE HELPERS (sync — Tier 2)
+// ═══════════════════════════════════════════════════════════
 
 export function getReviewsByVendor(vendorId: string): Review[] {
   return _getReviewsByVendor(vendorId);
