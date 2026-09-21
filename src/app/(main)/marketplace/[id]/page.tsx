@@ -11,6 +11,8 @@ import { useAuth } from "@/lib/auth-context";
 import { getProductById, fetchProductById, getProductsByCategory } from "@/services/products";
 import { getVendorById } from "@/services/users";
 import { getReviewsByProduct, getReviewSummary, hasUserReviewedProduct } from "@/services/reviews";
+import { isWishlisted, toggleWishlist } from "@/services/wishlist";
+import { addRecentlyViewed } from "@/services/recently-viewed";
 import { ReviewList, StarRatingDisplay, ReviewForm } from "@/components/reviews";
 import { formatNaira, calculateDiscountPercentage } from "@/lib/utils";
 import { campuses } from "@/data/campus";
@@ -31,6 +33,7 @@ import {
   AddedToCartToast,
   ProductInfoHeader,
   DesktopActions,
+  RecentlyViewedBar,
   getVariantGroups,
   getPersonalizationFields,
   getSpecs,
@@ -48,7 +51,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const { user } = useAuth();
 
   const [quantity, setQuantity] = useState(1);
-  const [liked, setLiked] = useState(false);
+  const [liked, setLiked] = useState(() => isWishlisted(id));
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [reviewRefresh, setReviewRefresh] = useState(0);
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
@@ -63,7 +66,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     let mounted = true;
     fetchProductById(id).then((res) => {
       if (mounted) {
-        if (res.data) setProduct(res.data);
+        if (res.data) {
+          setProduct(res.data);
+          addRecentlyViewed(res.data);
+        }
         setIsLoading(false);
       }
     });
@@ -71,6 +77,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       mounted = false;
     };
   }, [id]);
+
+  useEffect(() => {
+    if (product) {
+      addRecentlyViewed(product);
+    }
+  }, [product]);
 
   const gallery = useMemo(() => {
     if (!product) return [];
@@ -227,7 +239,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           </div>
 
           <div className="space-y-5">
-            <DesktopActions initialLiked={liked} onLikeToggle={setLiked} onShare={() => navigator.share?.({ title: product.title, url: window.location.href }).catch(() => {})} />
+            <DesktopActions
+              initialLiked={liked}
+              onLikeToggle={(newLiked) => {
+                if (product) toggleWishlist(product.id);
+                setLiked(newLiked);
+              }}
+              onShare={() => navigator.share?.({ title: product.title, url: window.location.href }).catch(() => {})}
+            />
 
             <ProductInfoHeader
               product={product}
@@ -265,10 +284,17 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               onBuyNow={handleBuyNow}
             />
 
-            <VendorCard vendor={vendor} campusName={campus.name} productLocation={product.location} />
+            <VendorCard
+              vendor={vendor}
+              campusName={campus.name}
+              productLocation={product.location}
+              productId={product.id}
+              productTitle={product.title}
+              productPrice={effectivePrice}
+              productImage={gallery[0]}
+            />
 
             <CampusDelivery campus={campus} productLocation={product.location} />
-
           </div>
         </div>
 
@@ -303,6 +329,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           <ReviewForm isOpen={showReviewForm} onClose={() => setShowReviewForm(false)} targetId={product.id} target="product" vendorId={product.vendorId} productId={product.id} onSuccess={() => setReviewRefresh((n) => n + 1)} />
 
           <RelatedProducts products={similar} currentCategoryId={product.categoryId} />
+
+          <RecentlyViewedBar />
         </div>
       </PageContainer>
 

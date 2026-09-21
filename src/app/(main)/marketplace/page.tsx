@@ -1,8 +1,9 @@
 "use client";
 
-import { Suspense, useMemo } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { SlidersHorizontal, X } from "lucide-react";
+import { X } from "lucide-react";
+import { Product } from "@/types";
 import { useMarketplace } from "@/hooks/useMarketplace";
 import { useApp } from "@/lib/app-context";
 import { getCampuses } from "@/services/campus";
@@ -18,14 +19,16 @@ import {
   ProductGrid,
   ProductSkeleton,
   EmptyMarketplaceState,
+  QuickViewModal,
+  RecentlyViewedBar,
 } from "@/components/marketplace";
 import { Button } from "@/components/atoms/Button";
 
 function MarketplaceContent() {
   const searchParams = useSearchParams();
-  const initialCategory = searchParams.get("category") || "";
   const { selectedCampus } = useApp();
   const campuses = useMemo(() => getCampuses(), []);
+  const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
 
   const {
     filters,
@@ -154,6 +157,7 @@ function MarketplaceContent() {
                       product={product}
                       vendorName={vendor?.name}
                       vendorVerified={vendor?.verified}
+                      onQuickView={setQuickViewProduct}
                     />
                   );
                 })}
@@ -177,6 +181,9 @@ function MarketplaceContent() {
               onClearFilters={clearFilters}
             />
           )}
+
+          {/* Recently Viewed Bar */}
+          <RecentlyViewedBar onQuickView={setQuickViewProduct} />
         </div>
       </div>
 
@@ -189,6 +196,12 @@ function MarketplaceContent() {
         activeCount={activeFilterCount}
         categories={categories}
         campuses={campuses}
+      />
+
+      {/* Quick View Modal */}
+      <QuickViewModal
+        product={quickViewProduct}
+        onClose={() => setQuickViewProduct(null)}
       />
     </PageContainer>
   );

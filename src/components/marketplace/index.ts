@@ -7,6 +7,8 @@ export { CategoryTabs } from "./CategoryTabs";
 export { ProductGrid } from "./ProductGrid";
 export { ProductSkeleton } from "./ProductSkeleton";
 export { EmptyMarketplaceState } from "./EmptyMarketplaceState";
+export { QuickViewModal } from "./QuickViewModal";
+export { RecentlyViewedBar } from "./RecentlyViewedBar";
 
 export * from "./listing/types";
 export { Breadcrumb } from "./listing/Breadcrumb";

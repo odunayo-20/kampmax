@@ -1,13 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { Store, MessageCircle, MapPin, Clock, ShieldCheck, Star } from "lucide-react";
-import { Avatar } from "@/components/ui";
-import { Button } from "@/components/ui";
+import { useRouter } from "next/navigation";
+import { Store, MessageCircle, MapPin, ShieldCheck, Star } from "lucide-react";
+import { Avatar, Button } from "@/components/ui";
+import { useAuth } from "@/lib/auth-context";
+import { getOrCreateDirectConversation } from "@/services/messages";
 
 interface VendorCardProps {
   vendor: {
     id: string;
+    userId?: string;
     storeName: string;
     verified: boolean;
     rating: number;
@@ -17,22 +20,64 @@ interface VendorCardProps {
   } | null | undefined;
   campusName: string;
   productLocation?: string;
+  productId?: string;
+  productTitle?: string;
+  productPrice?: number;
+  productImage?: string;
 }
 
-export function VendorCard({ vendor, campusName, productLocation }: VendorCardProps) {
+export function VendorCard({
+  vendor,
+  campusName,
+  productLocation,
+  productId,
+  productTitle,
+  productPrice,
+  productImage,
+}: VendorCardProps) {
+  const router = useRouter();
+  const { user, status } = useAuth();
+
   if (!vendor) return null;
+
+  const targetUserId = vendor.userId || vendor.id;
+
+  function handleMessageVendor() {
+    if (status !== "authenticated" || !user) {
+      router.push(`/login?returnTo=${encodeURIComponent(window.location.pathname)}`);
+      return;
+    }
+
+    const result = getOrCreateDirectConversation(user.id, targetUserId);
+    if (result && result.conversation) {
+      // Build a query string so the chat page can auto-populate the product context
+      const params = new URLSearchParams();
+      if (productId) params.set("productId", productId);
+      if (productTitle) params.set("productTitle", productTitle);
+      if (productPrice !== undefined) params.set("productPrice", String(productPrice));
+      if (productImage) params.set("productImage", productImage);
+      const qs = params.toString();
+      router.push(`/chat/${result.conversation.id}${qs ? `?${qs}` : ""}`);
+    } else {
+      router.push("/chat");
+    }
+  }
 
   return (
     <div className="rounded-[10px] border border-neutral-200 bg-white p-4">
-      <p className="text-xs font-semibold tracking-wide uppercase text-neutral-500 mb-3">Sold by</p>
+      <p className="text-xs font-semibold tracking-wide uppercase text-neutral-500 mb-3">
+        Sold by
+      </p>
       <div className="flex items-start gap-3">
         <Avatar name={vendor.storeName} size="md" className="h-10 w-10" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-sm font-bold text-neutral-900 truncate">{vendor.storeName}</span>
+            <span className="text-sm font-bold text-neutral-900 truncate">
+              {vendor.storeName}
+            </span>
             {vendor.verified && (
               <span className="inline-flex items-center gap-1 rounded-full bg-primary-50 border border-primary-100 px-1.5 py-0.5 text-[11px] font-semibold text-primary-700">
-                <ShieldCheck className="h-3 w-3" /> Verified
+                <ShieldCheck className="h-3 w-3" /> Verified Seller
               </span>
             )}
           </div>
@@ -57,16 +102,24 @@ export function VendorCard({ vendor, campusName, productLocation }: VendorCardPr
         </div>
       </div>
       <div className="mt-3 flex gap-2">
-        <Link href={vendor.slug ? `/store/${vendor.slug}` : `/marketplace?vendor=${vendor.id}`}>
+        <Link
+          href={vendor.slug ? `/store/${vendor.slug}` : `/marketplace?vendor=${vendor.id}`}
+          className="flex-1"
+        >
           <Button variant="outline" size="sm" className="w-full">
             <Store className="h-4 w-4 mr-1.5" /> Visit Store
           </Button>
         </Link>
-        <Link href="/chat">
-          <Button variant="secondary" size="sm" className="w-full">
-            <MessageCircle className="h-4 w-4 mr-1.5" /> Message
+        <div className="flex-1">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="w-full"
+            onClick={handleMessageVendor}
+          >
+            <MessageCircle className="h-4 w-4 mr-1.5" /> Message Seller
           </Button>
-        </Link>
+        </div>
       </div>
     </div>
   );

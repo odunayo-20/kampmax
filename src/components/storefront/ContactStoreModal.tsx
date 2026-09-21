@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { X, MessageCircle, Check } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/atoms/Button";
+import { getOrCreateDirectConversation, sendMessage } from "@/services/messages";
+import { getVendorById } from "@/services/users";
 
 interface ContactStoreModalProps {
   isOpen: boolean;
@@ -23,6 +26,7 @@ export function ContactStoreModal({
   vendorId,
   storeName,
 }: ContactStoreModalProps) {
+  const router = useRouter();
   const { user } = useAuth();
   const [message, setMessage] = useState("");
   const [sent, setSent] = useState(false);
@@ -40,20 +44,29 @@ export function ContactStoreModal({
   if (!isOpen) return null;
 
   async function handleSend() {
-    if (!message.trim() || sending) return;
+    if (!message.trim() || sending || !user) return;
     setSending(true);
-    // In production this creates a Kampmax thread via the messaging API.
+
     try {
-      await new Promise((r) => setTimeout(r, 600));
-      void vendorId;
-      void user?.name;
-      setSending(false);
-      setSent(true);
-      setTimeout(() => {
-        setSent(false);
-        setMessage("");
+      const vendor = getVendorById(vendorId);
+      const targetUserId = vendor?.userId || vendorId;
+      const result = getOrCreateDirectConversation(user.id, targetUserId);
+
+      if (result?.conversation) {
+        sendMessage(result.conversation.id, user.id, message.trim());
+        setSending(false);
+        setSent(true);
+        setTimeout(() => {
+          setSent(false);
+          setMessage("");
+          onClose();
+          router.push(`/chat/${result.conversation.id}`);
+        }, 1000);
+      } else {
+        setSending(false);
         onClose();
-      }, 1600);
+        router.push("/chat");
+      }
     } catch {
       setSending(false);
     }
