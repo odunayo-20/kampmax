@@ -9,6 +9,7 @@ import {
   submitFreelancerKycVerification,
   simulateVerificationApproval,
 } from "@/services/verification";
+import { uploadFileDirect } from "@/services/media";
 import type { KycDocumentType, SubmitVerificationDto } from "@/types/verification";
 
 interface KycVerificationModalProps {
@@ -26,6 +27,7 @@ export function KycVerificationModal({
 }: KycVerificationModalProps) {
   const [activeStep, setActiveStep] = useState<1 | 2 | 3>(1);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
   // Form states
@@ -38,6 +40,7 @@ export function KycVerificationModal({
     role === "vendor" ? "CAC_DOCUMENT" : "STUDENT_ID"
   );
   const [documentFileName, setDocumentFileName] = useState("");
+  const [uploadedDocUrl, setUploadedDocUrl] = useState("");
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -81,12 +84,12 @@ export function KycVerificationModal({
         {
           type: "NIN_SLIP",
           name: "National Identification Number Slip",
-          url: "https://kampmax-docs.s3.amazonaws.com/uploads/nin-verified.pdf",
+          url: uploadedDocUrl || "https://kampmax-docs.s3.amazonaws.com/uploads/nin-verified.pdf",
         },
         {
           type: documentType,
           name: documentFileName || `${documentType.replace(/_/g, " ")} Document`,
-          url: "https://kampmax-docs.s3.amazonaws.com/uploads/id-document.pdf",
+          url: uploadedDocUrl || "https://kampmax-docs.s3.amazonaws.com/uploads/id-document.pdf",
         },
       ],
     };
@@ -314,20 +317,32 @@ export function KycVerificationModal({
                   </select>
                 </div>
 
-                <div className="rounded-xl border-2 border-dashed border-neutral-300 p-6 text-center hover:border-kampmax-blue transition-colors cursor-pointer bg-neutral-50/50">
+                <div className="rounded-xl border-2 border-dashed border-neutral-300 p-6 text-center hover:border-kampmax-blue transition-colors bg-neutral-50/50">
                   <Upload className="mx-auto h-8 w-8 text-neutral-400 mb-2" />
                   <p className="text-xs font-semibold text-kampmax-navy">
-                    {documentFileName || "Click to upload document (PDF, JPG, PNG)"}
+                    {uploadingDoc
+                      ? "Uploading document to secure server..."
+                      : documentFileName
+                      ? `✓ ${documentFileName}`
+                      : "Click to upload document (PDF, JPG, PNG)"}
                   </p>
                   <p className="text-[11px] text-neutral-400 mt-0.5">
-                    Max file size: 5MB
+                    Max file size: 10MB
                   </p>
                   <input
                     type="file"
                     accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      if (e.target.files?.[0]) {
-                        setDocumentFileName(e.target.files[0].name);
+                    disabled={uploadingDoc}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setUploadingDoc(true);
+                        setDocumentFileName(file.name);
+                        const res = await uploadFileDirect(file, "document");
+                        if (res.data?.url) {
+                          setUploadedDocUrl(res.data.url);
+                        }
+                        setUploadingDoc(false);
                       }
                     }}
                     className="hidden"
@@ -337,7 +352,7 @@ export function KycVerificationModal({
                     htmlFor="kyc-doc-file"
                     className="mt-3 inline-block rounded-lg bg-white border border-neutral-200 px-3 py-1.5 text-xs font-medium text-kampmax-navy cursor-pointer hover:bg-neutral-100"
                   >
-                    Select File
+                    {documentFileName ? "Change File" : "Select File"}
                   </label>
                 </div>
 

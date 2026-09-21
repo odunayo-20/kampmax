@@ -5,6 +5,7 @@ import type {
   SubmitVerificationDto,
   KycStatus,
 } from "@/types/verification";
+import { pushUserNotification } from "@/services/notifications";
 
 // ============================================================
 // DEFAULT / MOCK STATE FOR PROTOTYPE
@@ -54,20 +55,30 @@ export async function fetchVendorKycStatus(): Promise<{
     return { data: mockVerificationStates.vendor_default, error };
   }
 
+  const statusRaw = String(data.status || data.verificationStatus || "unverified").toLowerCase();
+  const status: KycStatus =
+    statusRaw === "approved" || statusRaw === "verified"
+      ? "verified"
+      : statusRaw === "pending_review" || statusRaw === "pending"
+      ? "pending_review"
+      : statusRaw === "rejected"
+      ? "rejected"
+      : "unverified";
+
   const mapped: KycVerificationState = {
     userId: data.userId || "u1",
     role: "vendor",
-    status: (data.status?.toLowerCase() as KycStatus) || "unverified",
-    ninVerified: Boolean(data.ninVerified),
-    bvnVerified: Boolean(data.bvnVerified),
+    status,
+    ninVerified: Boolean(data.ninVerified || status === "verified"),
+    bvnVerified: Boolean(data.bvnVerified || status === "verified"),
     phoneVerified: Boolean(data.phoneVerified ?? true),
     emailVerified: Boolean(data.emailVerified ?? true),
     documents: data.documents || [],
     submittedAt: data.submittedAt,
     verifiedAt: data.verifiedAt,
     rejectionReason: data.rejectionReason,
-    canTrade: data.status === "APPROVED" || data.status === "verified",
-    canWithdraw: data.status === "APPROVED" || data.status === "verified",
+    canTrade: status === "verified",
+    canWithdraw: status === "verified",
   };
 
   mockVerificationStates.vendor_default = mapped;
@@ -76,11 +87,36 @@ export async function fetchVendorKycStatus(): Promise<{
 
 /**
  * Submit vendor identity & KYC documents for review.
- * POST /api/v1/vendors/me/verification/submit
+ * Connects to:
+ *   1. POST /vendors/me/bank-accounts (if bank info provided)
+ *   2. POST /vendors/me/documents (for each KYC document)
+ *   3. POST /vendors/me/verification/submit
  */
 export async function submitVendorKycVerification(
   dto: SubmitVerificationDto
 ): Promise<{ success: boolean; data?: KycVerificationState; error: ApiError | null }> {
+  // 1. Submit bank account if provided
+  if (dto.bankCode && dto.accountNumber) {
+    await apiClient.post("/vendors/me/bank-accounts", {
+      bankCode: dto.bankCode,
+      accountNumber: dto.accountNumber,
+      accountName: dto.accountName || "Vendor Payout Account",
+      isPrimary: true,
+    }).catch(() => null);
+  }
+
+  // 2. Submit documents if provided
+  if (dto.documents && dto.documents.length > 0) {
+    for (const doc of dto.documents) {
+      await apiClient.post("/vendors/me/documents", {
+        type: doc.type,
+        name: doc.name,
+        mediaId: doc.url,
+      }).catch(() => null);
+    }
+  }
+
+  // 3. Trigger KYC review submission
   const { data, error } = await apiClient.post<SubmitVerificationDto, any>(
     "/vendors/me/verification/submit",
     dto
@@ -88,24 +124,40 @@ export async function submitVendorKycVerification(
 
   // Optimistic prototype update
   const current = mockVerificationStates.vendor_default;
+  const updatedDocs: KycDocument[] = dto.documents
+    ? dto.documents.map((d, i) => ({
+        id: `doc_${Date.now()}_${i}`,
+        type: d.type,
+        name: d.name,
+        url: d.url,
+        status: "pending",
+        uploadedAt: new Date().toISOString(),
+      }))
+    : current.documents;
+
   const updated: KycVerificationState = {
     ...current,
     status: "pending_review",
     ninVerified: Boolean(dto.nin),
     bvnVerified: Boolean(dto.bvn),
     submittedAt: new Date().toISOString(),
-    documents: dto.documents
-      ? dto.documents.map((d, i) => ({
-          id: `doc_${Date.now()}_${i}`,
-          type: d.type,
-          name: d.name,
-          url: d.url,
-          status: "pending",
-          uploadedAt: new Date().toISOString(),
-        }))
-      : current.documents,
+    documents: updatedDocs,
   };
   mockVerificationStates.vendor_default = updated;
+
+  // In-app notification record
+  try {
+    pushUserNotification({
+      userId: current.userId,
+      type: "system",
+      category: "account",
+      title: "Vendor Verification Submitted",
+      message: "Your NIN, BVN, and store credentials have been submitted for compliance review.",
+      actionUrl: "/vendor/verification",
+    });
+  } catch {
+    // optional notification dispatch
+  }
 
   if (error) {
     return { success: false, data: updated, error };
@@ -132,8 +184,8 @@ export async function fetchFreelancerKycStatus(): Promise<{
     userId: data.userId || "u1",
     role: "freelancer",
     status: isApproved ? "verified" : data.status === "PENDING_REVIEW" ? "pending_review" : "unverified",
-    ninVerified: Boolean(data.ninVerified),
-    bvnVerified: Boolean(data.bvnVerified),
+    ninVerified: Boolean(data.ninVerified || isApproved),
+    bvnVerified: Boolean(data.bvnVerified || isApproved),
     phoneVerified: true,
     emailVerified: true,
     documents: data.documents || [],
@@ -160,24 +212,40 @@ export async function submitFreelancerKycVerification(
   );
 
   const current = mockVerificationStates.freelancer_default;
+  const updatedDocs: KycDocument[] = dto.documents
+    ? dto.documents.map((d, i) => ({
+        id: `doc_fl_${Date.now()}_${i}`,
+        type: d.type,
+        name: d.name,
+        url: d.url,
+        status: "pending",
+        uploadedAt: new Date().toISOString(),
+      }))
+    : current.documents;
+
   const updated: KycVerificationState = {
     ...current,
     status: "pending_review",
     ninVerified: Boolean(dto.nin),
     bvnVerified: Boolean(dto.bvn),
     submittedAt: new Date().toISOString(),
-    documents: dto.documents
-      ? dto.documents.map((d, i) => ({
-          id: `doc_fl_${Date.now()}_${i}`,
-          type: d.type,
-          name: d.name,
-          url: d.url,
-          status: "pending",
-          uploadedAt: new Date().toISOString(),
-        }))
-      : current.documents,
+    documents: updatedDocs,
   };
   mockVerificationStates.freelancer_default = updated;
+
+  // In-app notification record
+  try {
+    pushUserNotification({
+      userId: current.userId,
+      type: "system",
+      category: "account",
+      title: "Freelancer Pro Verification Submitted",
+      message: "Your NIN, BVN, and identity documents are under review by the compliance team.",
+      actionUrl: "/freelancer/verification",
+    });
+  } catch {
+    // optional notification dispatch
+  }
 
   if (error) {
     return { success: false, data: updated, error };
@@ -210,5 +278,18 @@ export function simulateVerificationApproval(role: "vendor" | "freelancer"): voi
       canTrade: true,
       canWithdraw: true,
     };
+
+    try {
+      pushUserNotification({
+        userId: mockVerificationStates[key].userId,
+        type: "system",
+        category: "account",
+        title: role === "vendor" ? "Store Verification Approved!" : "Freelancer Pro Badge Approved!",
+        message: "Your identity and documents have been verified. Full trading and payout privileges are active.",
+        actionUrl: role === "vendor" ? "/vendor/verification" : "/freelancer/verification",
+      });
+    } catch {
+      // optional
+    }
   }
 }
