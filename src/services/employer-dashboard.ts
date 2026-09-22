@@ -12,6 +12,7 @@
 // module. This facade adds nothing client-trustable: no ids, roles,
 // financial figures or ownership flags are accepted from the UI.
 
+import { apiClient } from "@/lib/api-client";
 import { getCurrentUser, getUserById } from "@/services/users";
 import {
   getEmployerJobsPage,

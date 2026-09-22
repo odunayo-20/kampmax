@@ -19,6 +19,7 @@
 // sections therefore render true empty states + `—` placeholders so the library
 // is API-ready but never fakes activity.
 
+import { apiClient } from "@/lib/api-client";
 import { getCurrentUser, getUserById } from "@/services/users";
 import {
   getFreelancerByApprovedSlug,

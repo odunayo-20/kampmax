@@ -10,6 +10,7 @@
 // submit/resubmit) go through backend-authoritative mutations that return a
 // discriminated success/failure result. The UI never sets status directly.
 
+import { apiClient } from "@/lib/api-client";
 import { getCurrentUser } from "@/services/users";
 import {
   getContractsForFreelancer,
@@ -28,6 +29,55 @@ import type { Contract } from "@/types/contract";
 function currentUserId(): string | null {
   const user = getCurrentUser();
   return user?.id ?? null;
+}
+
+// ── Async Backend API Calls ──────────────────────────────────
+
+export async function getFreelancerContractsApi(): Promise<Contract[]> {
+  const { data, error } = await apiClient.get<Contract[]>("/engagements/me");
+  if (!error && Array.isArray(data)) {
+    return data;
+  }
+  return getFreelancerContracts();
+}
+
+export async function getFreelancerContractApi(contractId: string): Promise<Contract | null> {
+  const { data, error } = await apiClient.get<Contract>(`/engagements/${contractId}`);
+  if (!error && data && data.id) {
+    return data;
+  }
+  return getFreelancerContract(contractId);
+}
+
+export async function acceptFreelancerContractApi(contractId: string): Promise<ActionResult> {
+  const { data, error } = await apiClient.post<undefined, Contract>(`/engagements/${contractId}/start`);
+  if (!error && data) {
+    return { ok: true, contract: data };
+  }
+  return acceptFreelancerContract(contractId);
+}
+
+export async function submitFreelancerDeliverableApi(
+  contractId: string,
+  milestoneId: string,
+  payload: { title: string; description: string; message?: string; links?: string[] }
+): Promise<ActionResult> {
+  const { data, error } = await apiClient.post<{ title: string; description: string; milestoneId: string }, Contract>(
+    `/engagements/${contractId}/submit-work`,
+    { ...payload, milestoneId }
+  );
+  if (!error && data) {
+    return { ok: true, contract: data };
+  }
+  return submitFreelancerDeliverable(contractId, milestoneId, payload);
+}
+
+export async function completeFreelancerContractApi(contractId: string): Promise<ActionResult> {
+  const { data, error } = await apiClient.post<undefined, Contract>(`/engagements/${contractId}/complete`);
+  if (!error && data) {
+    return { ok: true, contract: data };
+  }
+  return completeFreelancerContract(contractId);
 }
 
 // ── Reads ───────────────────────────────────────────────────
