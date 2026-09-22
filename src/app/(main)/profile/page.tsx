@@ -20,7 +20,7 @@ import { getCurrentUser, getVendorByUserId } from "@/services/users";
 import { getOrdersByUser } from "@/services/orders";
 import { useAuth } from "@/lib/auth-context";
 import { useApp } from "@/lib/app-context";
-import { getWalletByUser } from "@/data/wallet";
+import { getWalletByUser } from "@/services/wallet";
 import { formatNaira } from "@/lib/utils";
 import { getLoyaltyProgram, getSavedAddresses, getSavedPaymentMethods } from "@/services/profile";
 
