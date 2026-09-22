@@ -103,13 +103,13 @@ export default function OrderTrackingPage({
       key: "confirmed",
       title: "Vendor Confirmed",
       desc: "Vendor accepted your order and is preparing items",
-      isDone: ["confirmed", "processing", "ready_for_pickup", "out_for_delivery", "delivered"].includes(order.status),
+      isDone: ["confirmed", "preparing", "processing", "ready", "ready_for_pickup", "out_for_delivery", "delivered"].includes(order.status as string),
     },
     {
       key: "processing",
       title: "Packing & Quality Check",
       desc: "Items verified and packaged securely",
-      isDone: ["processing", "ready_for_pickup", "out_for_delivery", "delivered"].includes(order.status),
+      isDone: ["preparing", "processing", "ready", "ready_for_pickup", "out_for_delivery", "delivered"].includes(order.status as string),
     },
     {
       key: "in_transit",
@@ -117,7 +117,7 @@ export default function OrderTrackingPage({
       desc: order.deliveryMethod === "campus_pickup"
         ? `Available at ${order.pickupLocation ? PICKUP_LOCATION_LABELS[order.pickupLocation as PickupLocation] || order.pickupLocation : "Pickup Station"}`
         : `Rider assigned — delivery address: ${order.deliveryAddress || "Campus location"}`,
-      isDone: ["ready_for_pickup", "out_for_delivery", "delivered"].includes(order.status),
+      isDone: ["ready", "ready_for_pickup", "out_for_delivery", "delivered"].includes(order.status as string),
     },
     {
       key: "delivered",
@@ -173,7 +173,7 @@ export default function OrderTrackingPage({
               <h2 className="text-lg font-bold text-white mt-1">
                 {order.status === "delivered"
                   ? "Package Delivered!"
-                  : order.status === "ready_for_pickup"
+                  : (order.status as string) === "ready" || (order.status as string) === "ready_for_pickup"
                   ? "Ready for Pickup!"
                   : order.status === "out_for_delivery"
                   ? "Out for Delivery"

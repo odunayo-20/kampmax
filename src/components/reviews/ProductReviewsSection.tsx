@@ -241,12 +241,13 @@ export function ProductReviewsSection({
 
   // ── Filter + sort ────────────────────────────────────────────────────────
   let filtered = starFilter ? rawReviews.filter((r) => r.rating === starFilter) : rawReviews;
-  const sortFn: (a: Review, b: Review) => number = {
-    recent: (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    highest: (a, b) => b.rating - a.rating,
-    lowest: (a, b) => a.rating - b.rating,
-    helpful: (a, b) => b.helpfulCount - a.helpfulCount,
-  }[sort];
+  const sortFns: Record<string, (a: Review, b: Review) => number> = {
+    recent: (a: Review, b: Review) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    highest: (a: Review, b: Review) => b.rating - a.rating,
+    lowest: (a: Review, b: Review) => a.rating - b.rating,
+    helpful: (a: Review, b: Review) => b.helpfulCount - a.helpfulCount,
+  };
+  const sortFn = sortFns[sort] || sortFns.recent;
   filtered = [...filtered].sort(sortFn);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -459,7 +460,7 @@ export function ProductReviewsSection({
         isOpen={writeOpen}
         onClose={() => setWriteOpen(false)}
         targetId={tab === "product" ? productId : vendorId}
-        target={tab}
+        target={tab === "product" ? "product" : "vendor"}
         vendorId={vendorId}
         productId={productId}
         orderId={orderId}
