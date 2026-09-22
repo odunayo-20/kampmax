@@ -15,6 +15,8 @@ import {
   AlertTriangle,
   LifeBuoy,
   Loader2,
+  ShieldAlert,
+  CheckCircle,
 } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Breadcrumbs, BreadcrumbItem } from "@/components/layout/Breadcrumbs";
@@ -26,6 +28,8 @@ import { OrderFees } from "@/components/orders/OrderFees";
 import { OrderActions } from "@/components/orders/OrderActions";
 import { CampusPickupPinCard } from "@/components/orders/CampusPickupPinCard";
 import { OrderProgressStepper } from "@/components/orders/OrderProgressStepper";
+import { OpenDisputeModal } from "@/components/orders/OpenDisputeModal";
+import { ConfirmEscrowReleaseModal } from "@/components/orders/ConfirmEscrowReleaseModal";
 import { getOrderById, fetchOrderById, cancelOrderApi } from "@/services/orders";
 import { getVendorById } from "@/services/users";
 import { getOrCreateDirectConversation } from "@/services/messages";
@@ -49,6 +53,13 @@ export default function OrderDetailPage({
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [isCancelled, setIsCancelled] = useState(false);
+
+  // Dispute & Release Modals State
+  const [disputeModalOpen, setDisputeModalOpen] = useState(false);
+  const [releaseModalOpen, setReleaseModalOpen] = useState(false);
+  const [disputeFiled, setDisputeFiled] = useState(false);
+  const [disputeDetails, setDisputeDetails] = useState<{ reason: string; statement: string } | null>(null);
+  const [escrowReleased, setEscrowReleased] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -109,9 +120,17 @@ export default function OrderDetailPage({
     );
   }
 
-  const displayOrder = isCancelled
-    ? { ...order, status: "cancelled" as const, cancelReason }
-    : order;
+  const currentStatus = isCancelled
+    ? ("cancelled" as const)
+    : escrowReleased
+    ? ("delivered" as const)
+    : order.status;
+
+  const displayOrder = {
+    ...order,
+    status: currentStatus,
+    cancelReason: cancelReason || order.cancelReason,
+  };
 
   const DELIVERY_ICONS: Record<string, typeof Package> = {
     campus_pickup: Store,
@@ -164,6 +183,15 @@ export default function OrderDetailPage({
     }
   }
 
+  function handleDisputeSubmit(reason: string, statement: string) {
+    setDisputeFiled(true);
+    setDisputeDetails({ reason, statement });
+  }
+
+  function handleEscrowConfirm(rating: number) {
+    setEscrowReleased(true);
+  }
+
   const breadcrumbs: BreadcrumbItem[] = [
     { label: "Orders", href: "/orders" },
     { label: `#${order.id}` },
@@ -188,34 +216,58 @@ export default function OrderDetailPage({
               <h1 className="text-xl font-bold text-kampmax-text">
                 #{order.id}
               </h1>
-              <OrderStatusBadge
-                status={isCancelled ? "cancelled" : order.status}
-              />
+              <OrderStatusBadge status={currentStatus} />
             </div>
             <p className="text-xs text-kampmax-text-secondary mt-0.5">
               Placed {formatDate(new Date(order.createdAt))}
             </p>
           </div>
-          <Link
-            href={`/support/new?order=${order.id}&category=marketplace&subject=Help%20with%20order%20${order.id}`}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-kampmax-blue hover:underline shrink-0"
-          >
-            <LifeBuoy className="h-3.5 w-3.5" />
-            Need help with this order?
-          </Link>
+
+          <div className="flex items-center gap-2">
+            {!disputeFiled && currentStatus !== "cancelled" && currentStatus !== "delivered" && (
+              <button
+                onClick={() => setDisputeModalOpen(true)}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-error-50 hover:bg-error-100 text-error-700 border border-error-200 text-xs font-semibold transition-colors"
+              >
+                <ShieldAlert className="w-3.5 h-3.5" /> Report Issue
+              </button>
+            )}
+
+            {currentStatus !== "cancelled" && currentStatus !== "delivered" && (
+              <button
+                onClick={() => setReleaseModalOpen(true)}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition-colors"
+              >
+                <CheckCircle className="w-3.5 h-3.5" /> Confirm Receipt
+              </button>
+            )}
+          </div>
         </div>
 
+        {/* Dispute Filed Alert Banner */}
+        {disputeFiled && (
+          <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-1">
+            <div className="flex items-center gap-2 font-bold text-amber-800">
+              <AlertTriangle className="w-4 h-4 text-amber-600" />
+              <span>Active Dispute Filed — Escrow Frozen</span>
+            </div>
+            <p className="text-[11px] text-amber-700">
+              Reason: <strong>{disputeDetails?.reason}</strong>. Kampmax Trust & Safety team is reviewing the claim and evidence.
+            </p>
+          </div>
+        )}
+
         {/* Order Progress Stepper */}
-        <OrderProgressStepper status={displayOrder.status} />
+        <OrderProgressStepper status={currentStatus} />
 
         {/* Campus Pickup PIN & QR Verification Card */}
-        {displayOrder.status !== "cancelled" && displayOrder.status !== "delivered" && (
+        {currentStatus !== "cancelled" && currentStatus !== "delivered" && (
           <CampusPickupPinCard order={displayOrder} />
         )}
 
         {/* Estimated delivery banner */}
-        {order.status !== "delivered" &&
-          order.status !== "cancelled" &&
+        {currentStatus !== "delivered" &&
+          currentStatus !== "cancelled" &&
           order.estimatedDelivery && (
             <div className="flex items-center gap-2.5 p-3 rounded-xl bg-kampmax-blue/5 border border-kampmax-blue/20">
               <Clock className="w-4 h-4 text-kampmax-blue shrink-0" />
@@ -226,7 +278,7 @@ export default function OrderDetailPage({
           )}
 
         {/* Cancelled notice */}
-        {(isCancelled || order.status === "cancelled") && (
+        {currentStatus === "cancelled" && (
           <div className="flex items-start gap-2.5 p-3 rounded-xl bg-kampmax-error/5 border border-kampmax-error/20">
             <AlertTriangle className="w-4 h-4 text-kampmax-error shrink-0 mt-0.5" />
             <div>
@@ -340,6 +392,22 @@ export default function OrderDetailPage({
           Back to Orders
         </Button>
       </div>
+
+      {/* Dispute Modal */}
+      <OpenDisputeModal
+        order={displayOrder}
+        isOpen={disputeModalOpen}
+        onClose={() => setDisputeModalOpen(false)}
+        onSubmitDispute={handleDisputeSubmit}
+      />
+
+      {/* Escrow Release Modal */}
+      <ConfirmEscrowReleaseModal
+        order={displayOrder}
+        isOpen={releaseModalOpen}
+        onClose={() => setReleaseModalOpen(false)}
+        onConfirmRelease={handleEscrowConfirm}
+      />
 
       {/* Cancel Modal */}
       {showCancelModal && (
