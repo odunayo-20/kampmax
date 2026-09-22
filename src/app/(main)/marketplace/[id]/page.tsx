@@ -10,10 +10,9 @@ import { useCart } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
 import { getProductById, fetchProductById, getProductsByCategory } from "@/services/products";
 import { getVendorById } from "@/services/users";
-import { getReviewsByProduct, getReviewSummary, hasUserReviewedProduct } from "@/services/reviews";
 import { isWishlisted, toggleWishlist } from "@/services/wishlist";
 import { addRecentlyViewed } from "@/services/recently-viewed";
-import { ReviewList, StarRatingDisplay, ReviewForm } from "@/components/reviews";
+import { ProductReviewsSection } from "@/components/reviews";
 import { formatNaira, calculateDiscountPercentage } from "@/lib/utils";
 import { campuses } from "@/data/campus";
 import { Product } from "@/types";
@@ -52,8 +51,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
   const [quantity, setQuantity] = useState(1);
   const [liked, setLiked] = useState(() => isWishlisted(id));
-  const [showReviewForm, setShowReviewForm] = useState(false);
-  const [reviewRefresh, setReviewRefresh] = useState(0);
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
   const [personalization, setPersonalization] = useState<Record<string, string>>({});
   const [added, setAdded] = useState(false);
@@ -148,9 +145,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const vendor = getVendorById(product.vendorId);
   const campus = campuses.find((c) => c.id === product.campusId) || campuses[0];
   const similar = getProductsByCategory(product.categoryId).filter((p) => p.id !== product.id).slice(0, 4);
-  const productReviews = getReviewsByProduct(product.id);
-  const reviewSummary = getReviewSummary(product.id, "product");
-  const hasReviewed = user ? hasUserReviewedProduct(user.id, product.id) : false;
+
 
   const isSold = product.status === "sold";
   const isRemoved = product.status === "removed";
@@ -302,31 +297,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           <ProductDescription description={product.description} />
           <ProductSpecs specs={specs} productId={product.id} createdAt={product.createdAt} tags={product.tags} />
           <TrustSignals />
-          <section id="reviews" className="rounded-[10px] border border-neutral-200 bg-white p-5">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-neutral-900">Reviews</h2>
-              {user && !hasReviewed && (
-                <button onClick={() => setShowReviewForm(true)} className="inline-flex items-center gap-1 text-xs font-semibold text-primary-600 hover:text-primary-700">
-                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4a2 2 0 114 0v1a1 1 0 01-1 1H9a1 1 0 01-1-1V4a2 2 0 012-2zm0 0v1a1 1 0 01-1 1H9a1 1 0 01-1-1V4a2 2 0 012-2z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 20a2 2 0 002 2h10a2 2 0 002-2V8a2 2 0 00-2-2H7a2 2 0 00-2 2v12z" /></svg>
-                  Write Review
-                </button>
-              )}
-            </div>
-            {reviewSummary.totalReviews > 0 ? (
-              <div className="mt-3 flex items-center gap-3">
-                <span className="text-3xl font-extrabold text-neutral-900">{reviewSummary.averageRating.toFixed(1)}</span>
-                <div>
-                  <StarRatingDisplay rating={reviewSummary.averageRating} count={reviewSummary.totalReviews} size="sm" />
-                  <p className="text-xs text-neutral-500 mt-0.5">Based on {reviewSummary.totalReviews} reviews · {reviewSummary.recommendPercentage}% recommend</p>
-                </div>
-              </div>
-            ) : (
-              <p className="mt-3 text-sm text-neutral-500">No reviews yet — be the first to review.</p>
-            )}
-            <div className="mt-5"><ReviewList key={reviewRefresh} reviews={productReviews} summary={reviewSummary} onRefresh={() => setReviewRefresh((n) => n + 1)} /></div>
-          </section>
-
-          <ReviewForm isOpen={showReviewForm} onClose={() => setShowReviewForm(false)} targetId={product.id} target="product" vendorId={product.vendorId} productId={product.id} onSuccess={() => setReviewRefresh((n) => n + 1)} />
+          <ProductReviewsSection
+            productId={product.id}
+            vendorId={product.vendorId}
+            userId={user?.id ?? null}
+            isVerifiedBuyer={false} // TODO: derive from orders when backend is connected
+            productTitle={product.title}
+          />
 
           <RelatedProducts products={similar} currentCategoryId={product.categoryId} />
 

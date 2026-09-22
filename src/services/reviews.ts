@@ -52,12 +52,19 @@ export type BackendReviewStatus = "pending" | "approved" | "rejected" | "flagged
 export interface BackendReview {
   id: string;
   reviewerId: string;
+  reviewerName?: string;
   targetType: BackendReviewTargetType;
   targetId: string;
   rating: number;
   title?: string;
   comment?: string;
   status: BackendReviewStatus;
+  verifiedPurchase: boolean;
+  vendorReply?: {
+    text: string;
+    repliedAt: string;
+    updatedAt?: string;
+  };
   moderatedBy?: string;
   moderationReason?: string;
   createdAt: string;
@@ -68,7 +75,9 @@ export interface BackendRatingSummary {
   average: number;
   total: number;
   distribution: Record<number, number>;
+  recommendPercentage: number;
 }
+
 
 export interface BackendPaginatedReviews {
   data: BackendReview[];
@@ -221,7 +230,7 @@ export async function listPublicReviews(
 }
 
 /**
- * Get the rating summary (average, count, distribution) for a target.
+ * Get the rating summary (average, count, distribution, recommend %) for a target.
  * Endpoint: GET /reviews/summary/:targetType/:targetId
  */
 export async function getTargetRatingSummary(
@@ -233,6 +242,79 @@ export async function getTargetRatingSummary(
   );
   if (error) return { summary: null, error };
   return { summary: data, error: null };
+}
+
+/**
+ * Vendor posts a public reply to a review.
+ * Endpoint: POST /reviews/:id/vendor-reply
+ */
+export async function vendorRespondToReview(
+  reviewId: string,
+  text: string
+): Promise<{ review: BackendReview | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.post<{ text: string }, BackendReview>(
+    `/reviews/${reviewId}/vendor-reply`,
+    { text }
+  );
+  if (error) return { review: null, error };
+  return { review: data, error: null };
+}
+
+/**
+ * Vendor updates their reply on a review.
+ * Endpoint: PATCH /reviews/:id/vendor-reply
+ */
+export async function vendorUpdateReply(
+  reviewId: string,
+  text: string
+): Promise<{ review: BackendReview | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.patch<{ text: string }, BackendReview>(
+    `/reviews/${reviewId}/vendor-reply`,
+    { text }
+  );
+  if (error) return { review: null, error };
+  return { review: data, error: null };
+}
+
+/**
+ * Vendor deletes their reply from a review.
+ * Endpoint: DELETE /reviews/:id/vendor-reply
+ */
+export async function vendorDeleteReply(
+  reviewId: string
+): Promise<{ success: boolean; error: ApiError | null }> {
+  const { error } = await apiClient.delete(`/reviews/${reviewId}/vendor-reply`);
+  if (error) return { success: false, error };
+  return { success: true, error: null };
+}
+
+/**
+ * Report a review for moderation.
+ * Endpoint: POST /reviews/:id/report
+ */
+export async function reportReviewApi(
+  reviewId: string,
+  reason: string,
+  details?: string
+): Promise<{ review: BackendReview | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.post<{ reason: string; details?: string }, BackendReview>(
+    `/reviews/${reviewId}/report`,
+    { reason, details }
+  );
+  if (error) return { review: null, error };
+  return { review: data, error: null };
+}
+
+/**
+ * Create a new review via the real backend API (async).
+ * Falls back gracefully on error so UI can use mock locally.
+ * Endpoint: POST /reviews
+ */
+export async function createReviewApi(dto: CreateReviewDto): Promise<{
+  review: BackendReview | null;
+  error: ApiError | null;
+}> {
+  return createReview(dto);
 }
 
 // ═══════════════════════════════════════════════════════════
