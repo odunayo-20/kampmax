@@ -1,3 +1,4 @@
+import { apiClient } from "@/lib/api-client";
 import { Conversation, Message } from "@/types";
 import { getUserById, getVendorByUserId } from "@/services/users";
 import {
@@ -16,6 +17,43 @@ function byNewest(a: Conversation, b: Conversation): number {
 
 function byOldest(a: Message, b: Message): number {
   return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+}
+
+export async function getConversationsApi(userId: string): Promise<Conversation[]> {
+  const { data, error } = await apiClient.get<Conversation[]>("/messaging/conversations");
+  if (!error && Array.isArray(data)) {
+    return data.sort(byNewest);
+  }
+  return getConversations(userId);
+}
+
+export async function getMessagesApi(conversationId: string): Promise<Message[]> {
+  const { data, error } = await apiClient.get<Message[]>(`/messaging/conversations/${conversationId}/messages`);
+  if (!error && Array.isArray(data)) {
+    return data.sort(byOldest);
+  }
+  return getMessages(conversationId);
+}
+
+export async function sendMessageApi(
+  conversationId: string,
+  senderId: string,
+  text: string,
+  extra?: Partial<Message>
+): Promise<Message> {
+  const { data, error } = await apiClient.post<{ text: string; extra?: Partial<Message> }, Message>(
+    `/messaging/conversations/${conversationId}/messages`,
+    { text, extra }
+  );
+  if (!error && data && data.id) {
+    return data;
+  }
+  return sendMessage(conversationId, senderId, text, extra);
+}
+
+export async function markAsReadApi(conversationId: string, userId: string): Promise<void> {
+  await apiClient.post(`/messaging/conversations/${conversationId}/read`);
+  markAsRead(conversationId, userId);
 }
 
 export function getConversations(userId: string): Conversation[] {

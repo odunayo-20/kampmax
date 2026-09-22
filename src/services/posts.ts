@@ -1,3 +1,4 @@
+import { apiClient } from "@/lib/api-client";
 import { CampusPost, Comment, SavedPost, ReportReason, PollOption } from "@/types";
 import {
   campusPosts as mockPosts,
@@ -11,6 +12,54 @@ import {
 } from "@/data/posts";
 
 const savedPosts: SavedPost[] = [];
+
+export async function getCampusPostsApi(campusId: string): Promise<CampusPost[]> {
+  const { data, error } = await apiClient.get<CampusPost[]>(`/posts?campusId=${campusId}`);
+  if (!error && Array.isArray(data)) {
+    return data;
+  }
+  return getCampusPosts(campusId);
+}
+
+export async function createPostApi(
+  post: Omit<CampusPost, "id" | "createdAt" | "likes" | "commentCount">
+): Promise<CampusPost> {
+  const { data, error } = await apiClient.post<typeof post, CampusPost>("/posts", post);
+  if (!error && data && data.id) {
+    mockPosts.unshift(data);
+    return data;
+  }
+  return createPost(post);
+}
+
+export async function addCommentApi(
+  comment: Omit<Comment, "id" | "createdAt" | "likes">
+): Promise<Comment> {
+  const { data, error } = await apiClient.post<typeof comment, Comment>(`/posts/${comment.postId}/comments`, comment);
+  if (!error && data && data.id) {
+    mockComments.push(data);
+    return data;
+  }
+  return addComment(comment);
+}
+
+export async function togglePostLikeApi(postId: string): Promise<void> {
+  const { error } = await apiClient.post(`/posts/${postId}/like`);
+  if (error) {
+    togglePostLike(postId);
+  } else {
+    togglePostLike(postId);
+  }
+}
+
+export async function votePollApi(postId: string, optionId: string, userId: string): Promise<void> {
+  const { error } = await apiClient.post(`/posts/${postId}/poll/vote`, { optionId });
+  if (error) {
+    votePoll(postId, optionId, userId);
+  } else {
+    votePoll(postId, optionId, userId);
+  }
+}
 
 export function getCampusPosts(campusId: string): CampusPost[] {
   return _getCampusPosts(campusId);

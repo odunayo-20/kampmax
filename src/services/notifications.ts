@@ -1,3 +1,4 @@
+import { apiClient } from "@/lib/api-client";
 import { Notification, NotificationCategory } from "@/types";
 import {
   getNotificationsByUser as _getNotificationsByUser,
@@ -7,6 +8,19 @@ import {
   markAllNotificationsRead,
   deleteNotificationRecord,
 } from "@/data/notifications";
+
+export async function getNotificationsApi(userId: string): Promise<Notification[]> {
+  const { data, error } = await apiClient.get<Notification[]>("/notifications");
+  if (!error && Array.isArray(data)) {
+    return data;
+  }
+  return getNotifications(userId);
+}
+
+export async function markAsReadApi(notificationId: string): Promise<void> {
+  await apiClient.post(`/notifications/${notificationId}/read`);
+  markAsRead(notificationId);
+}
 
 const categoryLabels: Record<NotificationCategory, string> = {
   orders: "Orders",
