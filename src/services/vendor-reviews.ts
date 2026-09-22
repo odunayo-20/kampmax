@@ -1,3 +1,4 @@
+import { apiClient } from "@/lib/api-client";
 import { getCurrentUser, getVendorByUserId, getUserById } from "@/services/users";
 import { getVendorAccess, getVendorPermissions } from "@/services/vendor-dashboard";
 import { VENDOR_DASHBOARD_GATE } from "@/types/vendor-dashboard";

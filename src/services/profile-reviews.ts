@@ -8,6 +8,7 @@
 // store's rate limit. Notifications are emitted here (backend surrogate),
 // never from components.
 
+import { apiClient } from "@/lib/api-client";
 import type {
   ProfileReview,
   ProfileReviewActionResult,
