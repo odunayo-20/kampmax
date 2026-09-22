@@ -26,19 +26,20 @@ import {
   recentOrders as mockRecentOrders,
 } from "@/data/vendor-dashboard";
 
+import { apiClient } from "@/lib/api-client";
+
 // ============================================================
 // VENDOR DASHBOARD SERVICE LAYER  (Module 10)
 // ============================================================
 //
-// Maps 1:1 to a future backend API:
-//   GET /vendor/me              → access + profile summary
-//   GET /vendor/store           → store management
-//   PATCH /vendor/store         → update store
-//   GET /vendor/dashboard       → overview metrics
-//   GET /vendor/notifications   → notifications
-//   GET /vendor/action-required → action items
-//   GET /vendor/store/health    → store health
-//   POST /vendor/store/branding → logo/cover upload (authenticated)
+// Maps 1:1 to NestJS backend API:
+//   GET /vendors/me              → current user vendor store
+//   PATCH /vendors/me            → update current user vendor store
+//   GET /vendors/dashboard       → overview metrics
+//   GET /vendors/notifications   → notifications
+//   GET /vendors/action-required → action items
+//   GET /vendors/store/health    → store health
+//   POST /vendors/store/branding → logo/cover upload (authenticated)
 //
 // AUTHORIZATION: ownership is ALWAYS derived from the authenticated identity
 // (getCurrentUser().id). We never trust vendorId / storeId / staffId supplied
@@ -234,6 +235,15 @@ export function getStoreHealth(): StoreHealth {
 
 // ── Store management ─────────────────────────────────────────
 
+export async function fetchMyStoreApi(): Promise<VendorStore | null> {
+  const { data, error } = await apiClient.get<VendorStore>("/vendors/me");
+  if (!error && data && data.vendorId) {
+    storeMock.store = data;
+    return data;
+  }
+  return getStore();
+}
+
 export function getStore(): VendorStore | null {
   const access = getVendorAccess();
   if (access.kind !== VENDOR_DASHBOARD_GATE.APPROVED) return null;
@@ -244,6 +254,15 @@ export interface StoreUpdateResult {
   ok: boolean;
   store: VendorStore | null;
   error?: string;
+}
+
+export async function updateStoreApi(patch: Partial<VendorStore>): Promise<StoreUpdateResult> {
+  const { data, error } = await apiClient.patch<Partial<VendorStore>, VendorStore>("/vendors/me", patch);
+  if (!error && data) {
+    storeMock.store = data;
+    return { ok: true, store: data };
+  }
+  return updateStore(patch);
 }
 
 /**

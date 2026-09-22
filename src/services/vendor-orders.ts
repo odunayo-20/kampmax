@@ -1,3 +1,4 @@
+import { apiClient } from "@/lib/api-client";
 import {
   getVendorOrderSlice,
   getVendorParentOrder,
@@ -159,6 +160,20 @@ export function listVendorOrders(query: VendorOrderQuery = {}): VendorOrderPage<
   };
 }
 
+export async function listVendorOrdersApi(query: VendorOrderQuery = {}): Promise<VendorOrderPage<VendorOrder>> {
+  const params = new URLSearchParams();
+  if (query.search) params.append("search", query.search);
+  if (query.fulfillmentStatus && query.fulfillmentStatus !== "all") params.append("status", query.fulfillmentStatus);
+  if (query.page) params.append("page", String(query.page));
+  if (query.pageSize) params.append("pageSize", String(query.pageSize));
+
+  const { data, error } = await apiClient.get<VendorOrderPage<VendorOrder>>(`/orders/vendor?${params.toString()}`);
+  if (!error && data && Array.isArray(data.items)) {
+    return data;
+  }
+  return listVendorOrders(query);
+}
+
 export function getVendorOrderCounts(): VendorOrderCounts {
   const ctx = resolveVendorContext();
   const empty: VendorOrderCounts = {
@@ -198,6 +213,14 @@ export interface VendorOrderDetail {
   parent: VendorParentOrder | null;
   /** Other sellers in the same parent order (names only). */
   siblingSellers: { vendorId: string; storeName: string }[];
+}
+
+export async function getVendorOrderByIdApi(id: string): Promise<VendorOrder | null> {
+  const { data, error } = await apiClient.get<VendorOrder>(`/orders/vendor/${id}`);
+  if (!error && data && data.id) {
+    return data;
+  }
+  return getVendorOrderById(id);
 }
 
 export function getVendorOrderById(id: string): VendorOrder | null {

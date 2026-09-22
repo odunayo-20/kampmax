@@ -1,3 +1,4 @@
+import { apiClient } from "@/lib/api-client";
 import { getCurrentUser, getVendorByUserId } from "./users";
 import { getProductsByVendor, getProductById } from "./products";
 import { getCategories } from "./categories";
@@ -184,6 +185,20 @@ export function getVendorProducts(query: VendorProductQuery = {}): VendorProduct
   const slice = items.slice(start, start + pageSize);
 
   return { items: slice, total, page, pageSize, totalPages };
+}
+
+export async function getVendorProductsApi(query: VendorProductQuery = {}): Promise<VendorProductPage<Product>> {
+  const params = new URLSearchParams();
+  if (query.search) params.append("search", query.search);
+  if (query.status && query.status !== "all") params.append("status", query.status);
+  if (query.page) params.append("page", String(query.page));
+  if (query.pageSize) params.append("pageSize", String(query.pageSize));
+
+  const { data, error } = await apiClient.get<VendorProductPage<Product>>(`/products/vendor?${params.toString()}`);
+  if (!error && data && Array.isArray(data.items)) {
+    return data;
+  }
+  return getVendorProducts(query);
 }
 
 export function getVendorProductById(productId: string): Product | null {
