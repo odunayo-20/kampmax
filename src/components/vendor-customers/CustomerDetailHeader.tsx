@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, MapPin, Phone, Star } from "lucide-react";
+import { ArrowLeft, MapPin, MessageSquare, Phone, Star } from "lucide-react";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { formatDate, formatNaira } from "@/lib/utils";
 import type { VendorCustomerDetails } from "@/types/vendor-customers";
@@ -22,13 +22,22 @@ export function CustomerDetailHeader({ details }: CustomerDetailHeaderProps) {
 
   return (
     <div>
-      <Link
-        href="/vendor/customers"
-        className="mb-3 inline-flex items-center gap-1 text-xs font-medium text-kampmax-text-secondary hover:text-kampmax-blue"
-      >
-        <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
-        Back to customers
-      </Link>
+      <div className="mb-3 flex items-center justify-between">
+        <Link
+          href="/vendor/customers"
+          className="inline-flex items-center gap-1 text-xs font-medium text-kampmax-text-secondary hover:text-kampmax-blue"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
+          Back to customers
+        </Link>
+        <Link
+          href={`/vendor/messages?buyerId=${encodeURIComponent(customer.buyerId)}`}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-kampmax-navy px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-kampmax-navy/90"
+        >
+          <MessageSquare className="h-3.5 w-3.5" aria-hidden />
+          Message Customer
+        </Link>
+      </div>
 
       <div className="rounded-xl border border-kampmax-border bg-white p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
