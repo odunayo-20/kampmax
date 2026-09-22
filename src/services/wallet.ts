@@ -349,6 +349,8 @@ export function getWallet(userId: string): Wallet | undefined {
   return _getWalletByUser(userId);
 }
 
+export const getWalletByUser = getWallet;
+
 export function getWalletBalance(userId: string): number {
   const wallet = getWallet(userId);
   return wallet?.balance ?? 0;
