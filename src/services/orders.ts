@@ -78,11 +78,13 @@ export interface BackendOrderDetail extends BackendOrderListItem {
 }
 
 export interface BackendPaginatedOrders {
-  data: BackendOrderListItem[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
+  items: BackendOrderListItem[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
 }
 
 export interface CheckoutAddressPayload {
@@ -265,7 +267,7 @@ export async function fetchOrders(
 
   const { data, error } = await apiClient.get<BackendPaginatedOrders>(path);
 
-  if (error || !data || !Array.isArray(data.data)) {
+  if (error || !data || !Array.isArray(data.items)) {
     return {
       data: cachedOrders,
       total: cachedOrders.length,
@@ -276,16 +278,16 @@ export async function fetchOrders(
     };
   }
 
-  const mapped = data.data.map(mapBackendOrderToFrontend);
+  const mapped = data.items.map(mapBackendOrderToFrontend);
   // Update cache
   cachedOrders = mapped;
 
   return {
     data: mapped,
-    total: data.total,
-    page: data.page,
-    limit: data.limit,
-    totalPages: data.totalPages,
+    total: data.meta.total,
+    page: data.meta.page,
+    limit: data.meta.limit,
+    totalPages: data.meta.totalPages,
     error: null,
   };
 }

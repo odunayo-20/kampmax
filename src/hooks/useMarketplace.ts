@@ -113,6 +113,10 @@ export function useMarketplace(initialCampusId?: string) {
     try {
       const queryParams: ProductQueryParams = {
         limit: 50,
+        // Public browse must only ever surface purchasable listings — draft,
+        // pending-review, suspended, and archived products belong to the
+        // vendor's own dashboard, not the customer marketplace.
+        status: "ACTIVE",
       };
       if (currentFilters.search) queryParams.search = currentFilters.search;
       if (currentFilters.campusId) queryParams.campusId = currentFilters.campusId;

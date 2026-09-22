@@ -6,17 +6,19 @@ import type {
   StoreReview,
   Storefront,
 } from "@/types/storefront";
-import { getVendorBySlug, getVendorById, getCurrentUser } from "@/services/users";
-import { getProductsByVendor } from "@/services/products";
+import { getVendorBySlug, getVendorById, getCurrentUser, fetchVendorBySlug } from "@/services/users";
+import { getProductsByVendor, fetchProducts } from "@/services/products";
 import { getCampusById } from "@/services/campus";
 import { getCategoryById } from "@/services/categories";
 import {
   getReviewsByVendor,
   getReviewSummary,
   sortReviews,
+  listPublicReviews,
+  getTargetRatingSummary,
 } from "@/services/reviews";
 import { storefrontMeta, VERIFICATION_LABEL, AVAILABILITY_LABEL } from "@/data/storefront";
-import type { Product } from "@/types";
+import type { Product, Vendor } from "@/types";
 import type { ReviewSortOption } from "@/types";
 
 export function isProductPublishable(p: Product): boolean {
@@ -61,6 +63,69 @@ export function getStorefrontByVendorId(vendorId: string): Storefront | null {
 
 export function isUnavailable(storefront: Storefront): boolean {
   return storefront.availabilityStatus !== "active";
+}
+
+/**
+ * Fetch a storefront by slug from the live backend (vendor profile +
+ * real product count + real rating summary). Falls back to the sync/mock
+ * builder only if the vendor cannot be found at all (including in mock data).
+ * GET /api/v1/vendors/slug/:slug
+ */
+export async function fetchStorefrontBySlug(slug: string): Promise<Storefront | null> {
+  const { data: vendor } = await fetchVendorBySlug(slug);
+  if (!vendor) return null;
+  return buildStorefrontAsync(vendor);
+}
+
+async function buildStorefrontAsync(vendor: Vendor): Promise<Storefront> {
+  const meta = storefrontMeta[vendor.id];
+  const campus = getCampusById(vendor.campusId);
+
+  const [productsRes, ratingRes] = await Promise.all([
+    fetchProducts({ vendorId: vendor.id, status: "ACTIVE", limit: 1 }),
+    getTargetRatingSummary("vendor", vendor.id),
+  ]);
+
+  const mockSummary = getReviewSummary(vendor.id, "vendor");
+  const productsCount = productsRes.error
+    ? getProductsByVendor(vendor.id).filter(isProductPublishable).length
+    : productsRes.total;
+  const rating = ratingRes.summary?.average ?? (mockSummary.averageRating || vendor.rating);
+  const reviewCount = ratingRes.summary?.total ?? mockSummary.totalReviews;
+
+  return {
+    vendorId: vendor.id,
+    slug: vendor.slug || vendor.id,
+    storeName: vendor.storeName,
+    logo: meta?.logo,
+    coverImage: vendor.coverImage,
+    tagline: meta?.tagline || vendor.description,
+    description: vendor.description,
+    verificationStatus: meta?.verificationStatus || (vendor.verified ? "verified" : "unverified"),
+    availabilityStatus: meta?.availabilityStatus || "active",
+    rating,
+    reviewCount,
+    attestation: { followers: meta?.followers ?? 0 },
+    productsCount,
+    campusId: vendor.campusId,
+    campusName: campus?.name || vendor.campusId,
+    campuses: [{ id: vendor.campusId, name: campus?.name || vendor.campusId }],
+    specialties: vendor.specialties,
+    responseTime: meta?.responseTime || vendor.responseTime,
+    established: meta?.established || vendor.joinDate,
+    about: meta?.about || {
+      description: vendor.description,
+      campus: campus?.name || vendor.campusId,
+    },
+    policies: meta?.policies || [],
+    delivery: meta?.delivery || {
+      campusDelivery: true,
+      pickupAvailable: true,
+      deliveryAreas: [],
+    },
+    contactSupported: meta?.contactSupported ?? true,
+    supportsServices: meta?.supportsServices ?? false,
+  };
 }
 
 function buildStorefront(vendor: NonNullable<ReturnType<typeof getVendorById>>): Storefront {

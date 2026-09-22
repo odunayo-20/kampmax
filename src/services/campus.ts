@@ -40,11 +40,13 @@ export interface BackendCampusDetail {
 }
 
 export interface BackendPaginatedCampuses {
-  data: BackendCampusListItem[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
+  items: BackendCampusListItem[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
 }
 
 export interface CampusMembershipInfo {
@@ -115,7 +117,7 @@ export async function fetchCampuses(
 
   const { data, error } = await apiClient.get<BackendPaginatedCampuses>(path);
 
-  if (error || !data || !Array.isArray(data.data)) {
+  if (error || !data || !Array.isArray(data.items)) {
     // If backend request fails, return cached campuses
     return {
       data: cachedCampuses,
@@ -127,17 +129,17 @@ export async function fetchCampuses(
     };
   }
 
-  const mapped = data.data.map(mapBackendCampusToFrontend);
+  const mapped = data.items.map(mapBackendCampusToFrontend);
   if (mapped.length > 0 && !params.search && !params.state) {
     cachedCampuses = mapped;
   }
 
   return {
     data: mapped,
-    total: data.total ?? mapped.length,
-    page: data.page ?? 1,
-    limit: data.limit ?? mapped.length,
-    totalPages: data.totalPages ?? 1,
+    total: data.meta?.total ?? mapped.length,
+    page: data.meta?.page ?? 1,
+    limit: data.meta?.limit ?? mapped.length,
+    totalPages: data.meta?.totalPages ?? 1,
     error: null,
   };
 }

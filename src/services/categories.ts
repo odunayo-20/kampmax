@@ -44,11 +44,13 @@ export interface BackendCategoryDetail {
 }
 
 export interface BackendPaginatedCategories {
-  data: BackendCategoryTreeItem[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
+  items: BackendCategoryTreeItem[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
 }
 
 // In-memory cache for synchronous fallback access
@@ -119,7 +121,7 @@ export async function fetchCategories(
 
   const { data, error } = await apiClient.get<BackendPaginatedCategories>(path);
 
-  if (error || !data || !Array.isArray(data.data)) {
+  if (error || !data || !Array.isArray(data.items)) {
     return {
       data: cachedCategories,
       total: cachedCategories.length,
@@ -130,17 +132,17 @@ export async function fetchCategories(
     };
   }
 
-  const mapped = data.data.map(mapBackendCategoryToFrontend);
+  const mapped = data.items.map(mapBackendCategoryToFrontend);
   if (mapped.length > 0 && !params.search) {
     cachedCategories = mapped;
   }
 
   return {
     data: mapped,
-    total: data.total ?? mapped.length,
-    page: data.page ?? 1,
-    limit: data.limit ?? mapped.length,
-    totalPages: data.totalPages ?? 1,
+    total: data.meta?.total ?? mapped.length,
+    page: data.meta?.page ?? 1,
+    limit: data.meta?.limit ?? mapped.length,
+    totalPages: data.meta?.totalPages ?? 1,
     error: null,
   };
 }

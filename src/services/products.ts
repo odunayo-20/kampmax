@@ -13,8 +13,14 @@ import { apiClient, ApiError } from "@/lib/api-client";
 // BACKEND RESPONSE & DTO TYPES (from NestJS Products Module)
 // ============================================================
 
-export type BackendProductCondition = "NEW" | "LIKE_NEW" | "GOOD" | "FAIR" | "POOR";
-export type BackendProductStatus = "ACTIVE" | "INACTIVE" | "PENDING" | "SOLD_OUT" | "ARCHIVED";
+export type BackendProductCondition = "NEW" | "USED" | "REFURBISHED";
+export type BackendProductStatus =
+  | "DRAFT"
+  | "PENDING_REVIEW"
+  | "ACTIVE"
+  | "OUT_OF_STOCK"
+  | "SUSPENDED"
+  | "ARCHIVED";
 export type BackendProductType = "PHYSICAL" | "DIGITAL" | "SERVICE";
 
 export interface BackendProductListItem {
@@ -51,11 +57,13 @@ export interface BackendProductDetail extends BackendProductListItem {
 }
 
 export interface BackendPaginatedProducts {
-  data: BackendProductListItem[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
+  items: BackendProductListItem[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
 }
 
 export interface ProductQueryParams {
@@ -117,19 +125,24 @@ export function mapBackendProductToFrontend(
 ): Product {
   // Normalize condition
   let condition: ProductCondition = "New";
-  if (raw.condition === "FAIR" || raw.condition === "POOR") {
-    condition = "Fair";
-  } else if (raw.condition === "LIKE_NEW" || raw.condition === "GOOD") {
+  if (raw.condition === "USED" || raw.condition === "REFURBISHED") {
     condition = "Used";
   } else {
     condition = "New";
   }
 
-  // Normalize status
+  // Normalize status. Only ACTIVE products are purchasable; everything else
+  // (draft, pending review, out of stock, suspended, archived) must never
+  // read as "available" to a customer.
   let status: ProductStatus = "available";
-  if (raw.status === "SOLD_OUT") {
+  if (raw.status === "OUT_OF_STOCK") {
     status = "sold";
-  } else if (raw.status === "INACTIVE" || raw.status === "ARCHIVED") {
+  } else if (
+    raw.status === "SUSPENDED" ||
+    raw.status === "ARCHIVED" ||
+    raw.status === "DRAFT" ||
+    raw.status === "PENDING_REVIEW"
+  ) {
     status = "removed";
   } else {
     status = "available";
@@ -199,7 +212,7 @@ export async function fetchProducts(
 
   const { data, error } = await apiClient.get<BackendPaginatedProducts>(path);
 
-  if (error || !data) {
+  if (error || !data || !Array.isArray(data.items)) {
     // Filter fallback cache locally
     let fallback = [...cachedProducts];
     if (params.campusId) fallback = fallback.filter((p) => p.campusId === params.campusId);
@@ -227,7 +240,7 @@ export async function fetchProducts(
     };
   }
 
-  const mapped = data.data.map(mapBackendProductToFrontend);
+  const mapped = data.items.map(mapBackendProductToFrontend);
 
   // Update in-memory cache with newly fetched items
   const mappedMap = new Map(mapped.map((p) => [p.id, p]));
@@ -238,10 +251,10 @@ export async function fetchProducts(
 
   return {
     data: mapped,
-    total: data.total,
-    page: data.page,
-    limit: data.limit,
-    totalPages: data.totalPages,
+    total: data.meta.total,
+    page: data.meta.page,
+    limit: data.meta.limit,
+    totalPages: data.meta.totalPages,
     error: null,
   };
 }

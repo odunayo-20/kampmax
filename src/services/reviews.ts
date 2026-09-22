@@ -80,11 +80,13 @@ export interface BackendRatingSummary {
 
 
 export interface BackendPaginatedReviews {
-  data: BackendReview[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
+  items: BackendReview[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
 }
 
 // ── DTOs ─────────────────────────────────────────────────────
@@ -145,10 +147,10 @@ export async function getMyReviews(query: {
   if (error) return { reviews: [], total: 0, page: 1, totalPages: 1, error };
 
   return {
-    reviews: data.data ?? [],
-    total: data.total ?? 0,
-    page: data.page ?? 1,
-    totalPages: data.totalPages ?? 1,
+    reviews: data.items ?? [],
+    total: data.meta?.total ?? 0,
+    page: data.meta?.page ?? 1,
+    totalPages: data.meta?.totalPages ?? 1,
     error: null,
   };
 }
@@ -221,10 +223,10 @@ export async function listPublicReviews(
   if (error) return { reviews: [], total: 0, page: 1, totalPages: 1, error };
 
   return {
-    reviews: data.data ?? [],
-    total: data.total ?? 0,
-    page: data.page ?? 1,
-    totalPages: data.totalPages ?? 1,
+    reviews: data.items ?? [],
+    total: data.meta?.total ?? 0,
+    page: data.meta?.page ?? 1,
+    totalPages: data.meta?.totalPages ?? 1,
     error: null,
   };
 }

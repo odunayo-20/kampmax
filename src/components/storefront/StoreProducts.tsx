@@ -8,6 +8,8 @@ import {
   getStoreProducts,
   isUnavailable,
 } from "@/services/storefront";
+import { fetchProducts } from "@/services/products";
+import type { Product } from "@/types";
 import { ProductCard, ProductGrid } from "@/components/marketplace";
 import { Button } from "@/components/atoms/Button";
 import { StoreCategories } from "./StoreCategories";
@@ -21,6 +23,41 @@ interface StoreProductsProps {
 
 const PAGE_SIZE = 12;
 
+/** Client-side sort + paginate over an already vendor/status/search-filtered live product list. */
+function paginateAndSort(
+  products: Product[],
+  sort: StoreSortOption,
+  page: number,
+  pageSize: number
+): { items: Product[]; total: number; page: number; pageSize: number; totalPages: number; unavailableCount: number } {
+  const sorted = [...products];
+  switch (sort) {
+    case "price_asc":
+      sorted.sort((a, b) => a.price - b.price);
+      break;
+    case "price_desc":
+      sorted.sort((a, b) => b.price - a.price);
+      break;
+    case "rating":
+      sorted.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+      break;
+    case "newest":
+      sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      break;
+    case "featured":
+    default:
+      sorted.sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0));
+      break;
+  }
+
+  const total = sorted.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const start = (page - 1) * pageSize;
+  const items = sorted.slice(start, start + pageSize);
+
+  return { items, total, page, pageSize, totalPages, unavailableCount: 0 };
+}
+
 /** Store product catalog: search, categories, sort, availability, pagination. */
 export function StoreProducts({ store }: StoreProductsProps) {
   const categories = useMemo(() => getStoreCategories(store), [store]);
@@ -30,23 +67,59 @@ export function StoreProducts({ store }: StoreProductsProps) {
   const [sort, setSort] = useState<StoreSortOption>("featured");
   const [page, setPage] = useState(1);
   const [shopUnavailable] = useState(isUnavailable(store));
+  const [liveProducts, setLiveProducts] = useState<Product[] | null>(null);
+  const [isFetching, setIsFetching] = useState(true);
 
   // Reset pagination whenever the filters change.
   useEffect(() => {
     setPage(1);
   }, [search, categoryId, sort]);
 
-  const result = getStoreProducts(store, {
-    search,
-    categoryId,
-    sort,
-    availability: "available",
-    page,
-    pageSize: PAGE_SIZE,
-  });
+  // Fetch this vendor's live catalog from the backend (debounced on search).
+  useEffect(() => {
+    let mounted = true;
+    setIsFetching(true);
+    const timeout = setTimeout(
+      () => {
+        fetchProducts({
+          vendorId: store.vendorId,
+          status: "ACTIVE",
+          search: search || undefined,
+          categoryId: categoryId || undefined,
+          limit: 100,
+        })
+          .then((res) => {
+            if (mounted) setLiveProducts(res.data);
+          })
+          .finally(() => {
+            if (mounted) setIsFetching(false);
+          });
+      },
+      search ? 300 : 0
+    );
+    return () => {
+      mounted = false;
+      clearTimeout(timeout);
+    };
+  }, [store.vendorId, search, categoryId]);
+
+  const result = liveProducts
+    ? paginateAndSort(liveProducts, sort, page, PAGE_SIZE)
+    : getStoreProducts(store, {
+        search,
+        categoryId,
+        sort,
+        availability: "available",
+        page,
+        pageSize: PAGE_SIZE,
+      });
 
   const hasFilters = search !== "" || categoryId !== "" || sort !== "featured";
   const remaining = result.total - (page * PAGE_SIZE > result.total ? result.total : page * PAGE_SIZE);
+
+  if (isFetching && liveProducts === null) {
+    return <StoreProductsSkeleton count={8} />;
+  }
 
   return (
     <div className="space-y-4">

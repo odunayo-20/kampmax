@@ -1,6 +1,6 @@
 import type { Metadata, ResolvingMetadata } from "next";
 import { notFound } from "next/navigation";
-import { getStorefrontBySlug } from "@/services/storefront";
+import { fetchStorefrontBySlug } from "@/services/storefront";
 import { StorefrontView } from "@/components/storefront/StorefrontView";
 import { getSiteBaseUrl } from "@/lib/utils";
 
@@ -13,7 +13,7 @@ export async function generateMetadata(
   parent: ResolvingMetadata
 ): Promise<Metadata> {
   const { slug } = await params;
-  const store = getStorefrontBySlug(slug);
+  const store = await fetchStorefrontBySlug(slug);
 
   if (!store) {
     notFound();
@@ -56,7 +56,7 @@ export async function generateMetadata(
 
 export default async function StorePage({ params }: StorePageProps) {
   const { slug } = await params;
-  const store = getStorefrontBySlug(slug);
+  const store = await fetchStorefrontBySlug(slug);
 
   if (!store) {
     notFound();
