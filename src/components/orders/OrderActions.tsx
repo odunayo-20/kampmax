@@ -1,6 +1,7 @@
 "use client";
 
-import { MessageCircle, RotateCcw, Star, XCircle } from "lucide-react";
+import { MessageCircle, RotateCcw, Star, Truck, XCircle } from "lucide-react";
+import Link from "next/link";
 import { Order } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -10,6 +11,7 @@ interface OrderActionsProps {
   onReorder: () => void;
   onReview: () => void;
   onContactVendor: () => void;
+  onTrack?: () => void;
 }
 
 export function OrderActions({
@@ -18,6 +20,7 @@ export function OrderActions({
   onReorder,
   onReview,
   onContactVendor,
+  onTrack,
 }: OrderActionsProps) {
   const isActive =
     order.status !== "delivered" && order.status !== "cancelled";
@@ -26,6 +29,20 @@ export function OrderActions({
 
   return (
     <div className="flex flex-wrap gap-2">
+      {/* Track Package button */}
+      {isActive && (
+        <Link
+          href={`/orders/${order.id}/track`}
+          className={cn(
+            "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+            "bg-kampmax-navy text-white hover:bg-kampmax-navy/90"
+          )}
+        >
+          <Truck className="w-3.5 h-3.5 text-white" />
+          Track Live
+        </Link>
+      )}
+
       {/* Contact vendor — always available */}
       <button
         onClick={onContactVendor}
@@ -82,3 +99,4 @@ export function OrderActions({
     </div>
   );
 }
+

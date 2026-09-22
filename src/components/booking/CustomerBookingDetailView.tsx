@@ -9,6 +9,7 @@ import {
   CalendarClock,
   CalendarPlus,
   MapPin,
+  MessageCircle,
   Phone,
   RefreshCcw,
   ShieldCheck,
@@ -179,15 +180,26 @@ export function CustomerBookingDetailView({ bookingId }: { bookingId: string }) 
             </section>
 
             <section aria-labelledby="provider-title" className="rounded-xl border border-neutral-200 bg-white p-4">
-              <h2 id="provider-title" className="text-xs font-bold uppercase tracking-wide text-neutral-400">
-                Provider
-              </h2>
-              <Link
-                href={`/services/providers/${booking.providerId}`}
-                className="mt-2 inline-flex items-center gap-1.5 text-sm font-bold text-primary-700 hover:underline"
-              >
-                View provider profile <ArrowLeft className="h-3.5 w-3.5 rotate-180" aria-hidden />
-              </Link>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 id="provider-title" className="text-xs font-bold uppercase tracking-wide text-neutral-400">
+                    Provider
+                  </h2>
+                  <Link
+                    href={`/services/providers/${booking.providerId}`}
+                    className="mt-1 inline-flex items-center gap-1.5 text-sm font-bold text-primary-700 hover:underline"
+                  >
+                    View provider profile <ArrowLeft className="h-3.5 w-3.5 rotate-180" aria-hidden />
+                  </Link>
+                </div>
+                <Link
+                  href={`/chat?serviceId=${booking.serviceId}&bookingRef=${booking.bookingReference}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white font-bold text-xs rounded-lg transition-colors shadow-xs"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  Message Provider
+                </Link>
+              </div>
             </section>
 
             <section aria-labelledby="timeline-title" className="rounded-xl border border-neutral-200 bg-white p-4">
