@@ -24,10 +24,14 @@ import { OrderTimeline } from "@/components/orders/OrderTimeline";
 import { OrderItems } from "@/components/orders/OrderItems";
 import { OrderFees } from "@/components/orders/OrderFees";
 import { OrderActions } from "@/components/orders/OrderActions";
+import { CampusPickupPinCard } from "@/components/orders/CampusPickupPinCard";
+import { OrderProgressStepper } from "@/components/orders/OrderProgressStepper";
 import { getOrderById, fetchOrderById, cancelOrderApi } from "@/services/orders";
 import { getVendorById } from "@/services/users";
+import { getOrCreateDirectConversation } from "@/services/messages";
+import { useAuth } from "@/lib/auth-context";
 import { PICKUP_LOCATION_LABELS, PickupLocation, Order } from "@/types";
-import { formatDate, cn } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 
 export default function OrderDetailPage({
   params,
@@ -36,6 +40,7 @@ export default function OrderDetailPage({
 }) {
   const { id } = use(params);
   const router = useRouter();
+  const { user } = useAuth();
 
   const [order, setOrder] = useState<Order | null>(() => getOrderById(id) || null);
   const [isLoading, setIsLoading] = useState(true);
@@ -132,11 +137,31 @@ export default function OrderDetailPage({
   }
 
   function handleReview() {
-    alert("Review flow coming soon!");
+    if (vendor) {
+      router.push(`/store/${vendor.slug || vendor.id}#reviews`);
+    } else {
+      router.push("/marketplace");
+    }
   }
 
   function handleContactVendor() {
-    router.push("/chat");
+    if (!order) return;
+    const currentUserId = user?.id || "u1";
+    const vendorUserId = vendor?.userId || vendor?.id || order.vendorId;
+    const result = getOrCreateDirectConversation(currentUserId, vendorUserId);
+
+    const params = new URLSearchParams();
+    params.set("orderId", order.id);
+    params.set("orderTotal", String(order.total));
+    if (order.items[0]?.product?.title) {
+      params.set("productTitle", order.items[0].product.title);
+    }
+
+    if (result && result.conversation) {
+      router.push(`/chat/${result.conversation.id}?${params.toString()}`);
+    } else {
+      router.push(`/chat?${params.toString()}`);
+    }
   }
 
   const breadcrumbs: BreadcrumbItem[] = [
@@ -179,6 +204,14 @@ export default function OrderDetailPage({
             Need help with this order?
           </Link>
         </div>
+
+        {/* Order Progress Stepper */}
+        <OrderProgressStepper status={displayOrder.status} />
+
+        {/* Campus Pickup PIN & QR Verification Card */}
+        {displayOrder.status !== "cancelled" && displayOrder.status !== "delivered" && (
+          <CampusPickupPinCard order={displayOrder} />
+        )}
 
         {/* Estimated delivery banner */}
         {order.status !== "delivered" &&
