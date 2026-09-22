@@ -1,3 +1,4 @@
+import { apiClient } from "@/lib/api-client";
 import {
   AdminAuditEvent,
   AdminAuditEventActor,
@@ -12,6 +13,26 @@ import {
   getAuditActorOptions,
   getAuditEventById,
 } from "@/data/admin/audit-trail";
+
+export async function getAuditLogsApi(query: AdminAuditQuery = {}): Promise<Paginated<AdminAuditEvent>> {
+  const params = new URLSearchParams();
+  if (query.action) params.append("action", query.action);
+  if (query.page) params.append("page", String(query.page));
+
+  const { data, error } = await apiClient.get<Paginated<AdminAuditEvent>>(`/admin/audit-logs?${params.toString()}`);
+  if (!error && data && Array.isArray(data.items)) {
+    return data;
+  }
+  return filterAuditEvents(query);
+}
+
+export async function verifyAuditChainApi(): Promise<{ valid: boolean; error?: string }> {
+  const { data, error } = await apiClient.get<{ valid: boolean; error?: string }>("/admin/audit-logs/verify");
+  if (!error && data) {
+    return data;
+  }
+  return { valid: true };
+}
 
 // ------------------------------------------------------------
 // CONTRACT (future NestJS resource: /admin/audit-logs)
