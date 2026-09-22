@@ -26,17 +26,7 @@
 import { apiClient } from "@/lib/api-client";
 import type { ApiError } from "@/lib/api-client";
 import { getCurrentUser } from "@/services/users";
-import {
-  submitProposalRecord,
-  getProposalsByFreelancer,
-  getProposalsForOpportunity,
-  getProposalById,
-  updateProposalDraftRecord,
-  withdrawProposalRecord,
-  setProposalShortlistedRecord,
-  setProposalRejectedRecord,
-  setProposalAcceptedRecord,
-} from "@/data/opportunity";
+import { getProposalsByFreelancer } from "@/data/opportunity";
 import type {
   Proposal,
   ProposalInput,
@@ -98,11 +88,7 @@ export async function submitProposalApi(
     input
   );
   if (!error && data) return { proposal: data, error: null };
-  // Offline fallback
-  const uid = currentUserId();
-  if (!uid) return { proposal: null, error };
-  const local = submitProposalRecord(uid, input);
-  return { proposal: local as unknown as ProposalResponse, error };
+  return { proposal: null, error };
 }
 
 /**
@@ -121,14 +107,7 @@ export async function getMyProposalsApi(
     `/proposals/me${qs ? `?${qs}` : ""}`
   );
   if (!error && data) return { result: data, proposals: [], error: null };
-  // Offline fallback — return from local store
-  const uid = currentUserId();
-  const proposals = uid ? getProposalsByFreelancer(uid) : [];
-  const filtered =
-    query.status && query.status !== "all"
-      ? proposals.filter((p) => p.status === query.status)
-      : proposals;
-  return { result: null, proposals: filtered, error };
+  return { result: null, proposals: [], error };
 }
 
 /**
@@ -148,9 +127,7 @@ export async function getProposalsForJobApi(
     `/proposals/jobs/${jobId}${qs ? `?${qs}` : ""}`
   );
   if (!error && data) return { result: data, proposals: [], error: null };
-  // Offline fallback
-  const proposals = getProposalsForOpportunity(jobId);
-  return { result: null, proposals, error };
+  return { result: null, proposals: [], error };
 }
 
 /**
@@ -162,9 +139,7 @@ export async function getProposalByIdApi(
 ): Promise<{ proposal: ProposalResponse | null; error: ApiError | null }> {
   const { data, error } = await apiClient.get<ProposalResponse>(`/proposals/${proposalId}`);
   if (!error && data) return { proposal: data, error: null };
-  // Offline fallback
-  const local = getProposalById(proposalId);
-  return { proposal: local as unknown as ProposalResponse ?? null, error };
+  return { proposal: null, error };
 }
 
 /**
@@ -180,11 +155,7 @@ export async function updateProposalApi(
     patch
   );
   if (!error && data) return { proposal: data, error: null };
-  // Offline fallback
-  const uid = currentUserId();
-  if (!uid) return { proposal: null, error };
-  const updated = updateProposalDraftRecord(uid, proposalId, patch);
-  return { proposal: updated as unknown as ProposalResponse ?? null, error };
+  return { proposal: null, error };
 }
 
 /**
@@ -198,11 +169,7 @@ export async function withdrawProposalApi(
     `/proposals/${proposalId}/withdraw`
   );
   if (!error && data) return { proposal: data, error: null };
-  // Offline fallback
-  const uid = currentUserId();
-  if (!uid) return { proposal: null, error };
-  const updated = withdrawProposalRecord(uid, proposalId);
-  return { proposal: updated as unknown as ProposalResponse ?? null, error };
+  return { proposal: null, error };
 }
 
 /**
@@ -216,9 +183,7 @@ export async function shortlistProposalApi(
     `/proposals/${proposalId}/shortlist`
   );
   if (!error && data) return { proposal: data, error: null };
-  // Offline fallback
-  const updated = setProposalShortlistedRecord(proposalId);
-  return { proposal: updated as unknown as ProposalResponse ?? null, error };
+  return { proposal: null, error };
 }
 
 /**
@@ -234,9 +199,7 @@ export async function rejectProposalApi(
     reason ? { reason } : {}
   );
   if (!error && data) return { proposal: data, error: null };
-  // Offline fallback
-  const updated = setProposalRejectedRecord(proposalId, reason ?? null);
-  return { proposal: updated as unknown as ProposalResponse ?? null, error };
+  return { proposal: null, error };
 }
 
 /**
@@ -258,9 +221,7 @@ export async function acceptProposalApi(
   if (!error && data) {
     return { proposal: data.proposal, engagementId: data.engagementId, error: null };
   }
-  // Offline fallback
-  const updated = setProposalAcceptedRecord(proposalId);
-  return { proposal: updated as unknown as ProposalResponse ?? null, engagementId: null, error };
+  return { proposal: null, engagementId: null, error };
 }
 
 // ═══════════════════════════════════════════════════════════

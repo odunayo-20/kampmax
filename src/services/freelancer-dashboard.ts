@@ -450,7 +450,6 @@ import { getMyProposalsApi } from "@/services/proposals";
 /**
  * Determine dashboard access gate state from the live backend.
  * Reads verificationStatus from GET /freelancers/me to determine approval gate.
- * Falls back to the local draft store on error.
  */
 export async function getFreelancerDashboardAccessApi(): Promise<FreelancerAccess> {
   const { profile, error } = await getMyFreelancerProfile();
@@ -472,18 +471,17 @@ export async function getFreelancerDashboardAccessApi(): Promise<FreelancerAcces
     }
     return { kind: FREELANCER_DASHBOARD_GATE.IN_PROGRESS, status: "DRAFT" as any, canUseDashboard: false, message: "Complete your freelancer profile to go live.", displayName };
   }
-  // Fallback to local store access check
-  return getFreelancerDashboardAccess();
+  throw error ?? new Error("Unable to load freelancer profile.");
 }
 
 /**
  * Load full freelancer dashboard data from the backend.
  * Aggregates: GET /freelancers/me + GET /engagements/me + GET /proposals/me
- * Falls back to getFreelancerDashboard() if all APIs fail.
  */
 export async function getFreelancerDashboardApi(): Promise<FreelancerDashboard | null> {
   // Try to get profile from backend
-  const { profile } = await getMyFreelancerProfile();
+  const { profile, error } = await getMyFreelancerProfile();
+  if (error) throw error;
 
   // Fetch engagements
   const contracts = await getFreelancerContractsApi();
@@ -491,8 +489,7 @@ export async function getFreelancerDashboardApi(): Promise<FreelancerDashboard |
   // Fetch proposals
   const { proposals } = await getMyProposalsApi();
 
-  // If no profile at all, fall back
-  if (!profile) return getFreelancerDashboard();
+  if (!profile) return null;
 
   const vs = profile.verificationStatus;
   const isApproved = vs === "approved" || vs === "APPROVED";

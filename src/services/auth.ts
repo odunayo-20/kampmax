@@ -246,49 +246,78 @@ export async function forgotPassword(
 }
 
 /**
- * Verify OTP code.
- * NOTE: The backend does not expose a verify-otp endpoint.
- * This function accepts a single object argument matching the
- * useCallback signature in AuthProvider: { email, code }.
+ * Verify a password reset OTP code.
+ * POST /api/v1/auth/verify-reset-otp
+ *
+ * On success the backend returns a short-lived reset token ({ token }),
+ * which the caller forwards to /reset-password.
  */
-export async function verifyOtp(_data: { email: string; code: string }): Promise<AuthResult> {
-  return {
-    success: false,
-    message:
-      "This verification flow is not supported by the backend. " +
-      "Use the password reset link sent to your email instead.",
-  };
+export async function verifyOtp(data: { email: string; code: string }): Promise<AuthResult> {
+  await delay();
+
+  const result = await apiClient.post<{ email: string; code: string }, { token?: string }>(
+    "/auth/verify-reset-otp",
+    data
+  );
+
+  if (result.error) {
+    return { success: false, message: result.error.message ?? "Verification failed." };
+  }
+
+  const token = result.data?.token;
+  if (!token) {
+    return { success: false, message: "Verification failed." };
+  }
+
+  return { success: true, message: null, token };
 }
 
 /**
- * Resend OTP code.
- * NOTE: The backend does not expose a resend-otp endpoint.
+ * Resend a password reset OTP code.
+ * POST /api/v1/auth/resend-otp
  */
-export async function resendOtp(_email: string): Promise<AuthResult> {
-  return {
-    success: false,
-    message:
-      "This resend flow is not supported by the backend. " +
-      "Use the password reset link sent to your email instead.",
-  };
+export async function resendOtp(email: string): Promise<AuthResult> {
+  await delay();
+
+  const result = await apiClient.post<{ email: string }, { message?: string }>(
+    "/auth/resend-otp",
+    { email }
+  );
+
+  if (result.error) {
+    return { success: false, message: result.error.message ?? "Failed to resend code." };
+  }
+
+  return { success: true, message: result.data?.message ?? null };
 }
 
 /**
  * Reset password with token.
  * POST /api/v1/auth/reset-password
+ *
+ * The backend's ResetPasswordDto only accepts { token, password } (validated
+ * with whitelist: true, forbidNonWhitelisted: true) — confirmPassword is a
+ * client-side-only field and must not be sent, or the request is rejected.
  */
 export async function resetPassword(
   data: ResetPasswordData
 ): Promise<AuthResult> {
   await delay();
 
-  const result = await apiClient.post<ResetPasswordData, AuthResult>("/auth/reset-password", data);
+  const result = await apiClient.post<{ token: string; password: string }, AuthResult>(
+    "/auth/reset-password",
+    { token: data.token, password: data.password }
+  );
   return mapAuthResult(result.error ?? result.data);
 }
 
 /**
  * Change the authenticated user's password.
  * POST /api/v1/auth/change-password
+ *
+ * The backend's ChangePasswordDto only accepts { currentPassword, newPassword }
+ * (validated with whitelist: true, forbidNonWhitelisted: true) — the caller's
+ * email is not sent; the user is identified via the bearer token.
  */
 export async function changePassword(
   data: { email: string; currentPassword: string; newPassword: string }
@@ -296,10 +325,18 @@ export async function changePassword(
   await delay();
 
   const result = await apiClient.post<
-    { email: string; currentPassword: string; newPassword: string },
-    { success: boolean; message: string }
-  >("/auth/change-password", data);
-  return result.data;
+    { currentPassword: string; newPassword: string },
+    { message?: string }
+  >("/auth/change-password", {
+    currentPassword: data.currentPassword,
+    newPassword: data.newPassword,
+  });
+
+  if (result.error) {
+    return { success: false, message: result.error.message ?? "Failed to change password." };
+  }
+
+  return { success: true, message: result.data?.message ?? "Password changed successfully." };
 }
 
 /**

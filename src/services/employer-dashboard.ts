@@ -260,19 +260,16 @@ export function getEmployerContracts(): EmployerDashboardContract[] {
 /**
  * Fetch employer dashboard summary from the backend.
  * Endpoint: GET /api/v1/employers/me/dashboard
- * Falls back to getEmployerDashboardSummary() on error.
  */
 export async function getEmployerDashboardApi(): Promise<EmployerDashboardSummary | null> {
   const { data, error } = await apiClient.get<EmployerDashboardSummary>("/employers/me/dashboard");
-  if (!error && data) return data;
-  // Offline fallback — compose from local stores
-  return getEmployerDashboardSummary();
+  if (error) throw error;
+  return data;
 }
 
 /**
  * Fetch employer's own profile from the backend to determine access gate state.
  * Endpoint: GET /api/v1/employers/me
- * Falls back to getEmployerDashboardAccess() on error.
  */
 export async function getEmployerDashboardAccessApi() {
   const { profile, error } = await getEmployerProfileApi();
@@ -291,5 +288,5 @@ export async function getEmployerDashboardAccessApi() {
     }
     return { kind: "in_progress" as const, status: "DRAFT" as any, canUseDashboard: false, message: "Complete your employer profile to start hiring.", displayName };
   }
-  return getEmployerDashboardAccess();
+  throw error ?? new Error("Unable to load employer profile.");
 }

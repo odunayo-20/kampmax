@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { getMyProposals } from "@/services/opportunity";
+import { getMyProposalsApi } from "@/services/proposals";
 import type { ProposalStatus } from "@/types/opportunity";
 import { PROPOSAL_STATUS } from "@/types/opportunity";
 import { PROPOSAL_FILTER_TABS } from "@/config/opportunity";
@@ -21,7 +21,9 @@ type StatusFilter = ProposalStatus | "all";
 function ProposalsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [proposals, setProposals] = useState<Awaited<ReturnType<typeof getMyProposalsApi>>["proposals"]>([]);
+  const [error, setError] = useState<string | null>(null);
   const isFirstRender = useRef(true);
 
   const statusParam = searchParams.get("status") ?? "all";
@@ -41,7 +43,21 @@ function ProposalsContent() {
     return () => clearTimeout(t);
   }, [status]);
 
-  const proposals = useMemo(() => getMyProposals(), []);
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    void getMyProposalsApi({ status: status === "all" ? "all" : status }).then((response) => {
+      if (cancelled) return;
+      if (response.error || !response.result) {
+        setError(response.error?.message ?? "We couldn't load your proposals.");
+        setProposals([]);
+        return;
+      }
+      setError(null);
+      setProposals(response.result.data as never);
+    }).finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [status]);
   const filtered = useMemo(
     () => (status === "all" ? proposals : proposals.filter((p) => p.status === status)),
     [proposals, status]
@@ -70,6 +86,7 @@ function ProposalsContent() {
 
   return (
     <div className="space-y-6">
+      {error && <ProposalErrorState message={error} onRetry={() => setError(null)} />}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <MyProposalsHeader count={proposals.length} />
       </div>

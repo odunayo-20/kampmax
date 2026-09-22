@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { getOpportunitiesPage } from "@/services/opportunity";
+import { getOpportunitiesPageApi } from "@/services/opportunity";
 import type { OpportunitySortKey, OpportunityWorkArrangement } from "@/types/opportunity";
 import { useDebounce } from "@/hooks";
 import {
@@ -85,7 +85,8 @@ function FindWorkContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch]);
 
-  // Data is computed from the sync store, keyed on the debounced/URL values.
+  const [result, setResult] = useState({ items: [], total: 0, page: 1, size: PAGE_SIZE, totalPages: 1 });
+
   const query = useMemo(
     () => ({
       search: debouncedSearch,
@@ -99,13 +100,31 @@ function FindWorkContent() {
     [debouncedSearch, categoryParam, expParam, arrangement, sortParam, pageParam]
   );
 
-  const result = useMemo(() => {
-    try {
-      return getOpportunitiesPage(query);
-    } catch {
-      setError("We couldn't load opportunities right now.");
-      return { items: [], total: 0, page: 1, size: PAGE_SIZE, totalPages: 1 };
-    }
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    void getOpportunitiesPageApi({
+      search: query.search,
+      categoryId: query.categoryId,
+      experience: query.experience,
+      arrangement: query.arrangement,
+      page: query.page,
+      size: query.size,
+    }).then((response) => {
+      if (cancelled) return;
+      if (response.error) {
+        setError(response.error.message);
+        return;
+      }
+      setResult(response.page);
+      setLoading(false);
+    }).catch(() => {
+      if (!cancelled) setError("We couldn't load opportunities right now.");
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
   }, [query]);
 
   const hasFilters = Boolean(searchInput.trim() || categoryParam || expParam || arrParam);

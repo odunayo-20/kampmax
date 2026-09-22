@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Sparkles, X, ArrowRight, Bell, Handshake } from "lucide-react";
 import { timeAgo } from "@/lib/utils";
-import { getFreelancerDashboard, getFreelancerDashboardAccess, getFreelancerNotificationSummary } from "@/services/freelancer-dashboard";
+import { getFreelancerDashboardApi, getFreelancerDashboardAccessApi, getFreelancerNotificationSummary } from "@/services/freelancer-dashboard";
 import { FreelancerMetricCard } from "@/components/freelancer/dashboard/FreelancerMetricCard";
 import { FreelancerQuickActions } from "@/components/freelancer/dashboard/FreelancerQuickActions";
 import { FreelancerProfileStatusCard } from "@/components/freelancer/dashboard/FreelancerProfileStatusCard";
@@ -16,10 +16,20 @@ import { FreelancerNextContractAction } from "@/components/freelancer/dashboard/
 import { FreelancerFinancialSummary } from "@/components/freelancer/dashboard/FreelancerFinancialSummary";
 
 export default function FreelancerDashboardPage() {
-  const [dashboard] = useState(() => getFreelancerDashboard());
+  const [dashboard, setDashboard] = useState<Awaited<ReturnType<typeof getFreelancerDashboardApi>>>(null);
+  const [loading, setLoading] = useState(true);
   const [notif] = useState(() => getFreelancerNotificationSummary());
   const [showWelcome, setShowWelcome] = useState(true);
-  const displayName = getFreelancerDashboardAccess().displayName ?? "Freelancer";
+  const [displayName, setDisplayName] = useState("Freelancer");
+
+  useEffect(() => {
+    void Promise.all([getFreelancerDashboardApi(), getFreelancerDashboardAccessApi()]).then(([data, access]) => {
+      setDashboard(data);
+      setDisplayName(access.displayName ?? "Freelancer");
+    }).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return null;
 
   if (!dashboard) {
     return (

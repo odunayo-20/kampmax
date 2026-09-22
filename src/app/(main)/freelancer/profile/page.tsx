@@ -2,15 +2,19 @@
 
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { useState } from "react";
-import { getFreelancerDashboard } from "@/services/freelancer-dashboard";
+import { useEffect, useState } from "react";
+import { getFreelancerDashboardApi } from "@/services/freelancer-dashboard";
 import { getCurrentUser } from "@/services/users";
 import { FreelancerProfileStatusCard } from "@/components/freelancer/dashboard/FreelancerProfileStatusCard";
 import { FreelancerProfilePreview } from "@/components/freelancer/dashboard/FreelancerProfilePreview";
 
 export default function FreelancerProfilePage() {
-  const [dashboard] = useState(() => getFreelancerDashboard());
+  const [dashboard, setDashboard] = useState<Awaited<ReturnType<typeof getFreelancerDashboardApi>>>(null);
   const user = getCurrentUser();
+
+  useEffect(() => {
+    void getFreelancerDashboardApi().then(setDashboard);
+  }, []);
 
   if (!dashboard) {
     return (

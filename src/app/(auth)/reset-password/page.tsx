@@ -7,6 +7,7 @@ import { ArrowLeft, CheckCircle2, Lock } from "lucide-react";
 import { Button } from "@/components/ui";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { useAuth } from "@/lib/auth-context";
+import { validatePasswordPolicy } from "@/services/auth";
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -24,10 +25,11 @@ function ResetPasswordForm() {
   function validate(): boolean {
     const newErrors: Record<string, string> = {};
 
+    const passwordError = validatePasswordPolicy(password);
     if (!password) {
       newErrors.password = "Password is required";
-    } else if (password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
+    } else if (passwordError) {
+      newErrors.password = passwordError;
     }
 
     if (!confirmPassword) {
@@ -140,7 +142,7 @@ function ResetPasswordForm() {
 
         <PasswordInput
           label="New password"
-          placeholder="At least 6 characters"
+          placeholder="At least 8 characters"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           error={errors.password}
@@ -160,8 +162,8 @@ function ResetPasswordForm() {
           <div className="flex items-start gap-2">
             <Lock className="h-4 w-4 text-kampmax-text-secondary mt-0.5 flex-shrink-0" />
             <p className="text-xs text-kampmax-text-secondary">
-              Use at least 6 characters with a mix of letters, numbers, and
-              symbols for a stronger password.
+              Use at least 8 characters with uppercase, lowercase, a number,
+              and a symbol (e.g. !, @, #).
             </p>
           </div>
         </div>

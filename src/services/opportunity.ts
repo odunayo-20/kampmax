@@ -1009,15 +1009,51 @@ export interface PaginatedJobResult {
  * Browse published jobs with search and filters.
  * Endpoint: GET /api/v1/jobs
  */
+const EXPERIENCE_LEVEL_QUERY_MAP: Record<string, string> = {
+  any_level: "",
+  entry_level: "JUNIOR",
+  beginner: "JUNIOR",
+  junior: "JUNIOR",
+  intermediate: "MIDLEVEL",
+  midlevel: "MIDLEVEL",
+  experienced: "SENIOR",
+  senior: "SENIOR",
+  expert: "EXPERT",
+  "": "",
+};
+
+const WORK_ARRANGEMENT_QUERY_MAP: Record<string, string> = {
+  remote: "REMOTE",
+  on_site: "ONSITE",
+  on_campus: "ONSITE",
+  hybrid: "HYBRID",
+};
+
 export async function getOpportunitiesPageApi(
   query: OpportunityQuery = {}
 ): Promise<{ page: OpportunityPage; error: ApiError | null }> {
   const params = new URLSearchParams();
-  if (query.q) params.set("q", query.q);
+
+  if (query.search) params.set("search", query.search);
   if (query.categoryId) params.set("categoryId", query.categoryId);
   if (query.campusId) params.set("campusId", query.campusId);
+
+  const normalizedExperience = query.experience?.trim();
+  if (normalizedExperience) {
+    const experienceLevel = EXPERIENCE_LEVEL_QUERY_MAP[normalizedExperience.toLowerCase()];
+    if (experienceLevel) params.set("experienceLevel", experienceLevel);
+  }
+
+  const normalizedArrangement = query.arrangement?.trim();
+  if (normalizedArrangement) {
+    const locationType = WORK_ARRANGEMENT_QUERY_MAP[normalizedArrangement.toLowerCase()];
+    if (locationType) params.set("locationType", locationType);
+  }
+
+  if (query.sort) params.set("sort", query.sort);
   if (query.page) params.set("page", String(query.page));
   if (query.size) params.set("limit", String(query.size));
+
   const qs = params.toString();
   const { data, error } = await apiClient.get<PaginatedJobResult>(`/jobs${qs ? `?${qs}` : ""}`);
   if (!error && data) {
@@ -1033,7 +1069,7 @@ export async function getOpportunitiesPageApi(
       error: null,
     };
   }
-  return { page: getOpportunitiesPage(query), error };
+  return { page: emptyJobPage(query.size ?? 9), error };
 }
 
 /**
@@ -1045,7 +1081,7 @@ export async function getJobByIdApi(
 ): Promise<{ job: Opportunity | null; error: ApiError | null }> {
   const { data, error } = await apiClient.get<Opportunity>(`/jobs/${id}`);
   if (!error && data) return { job: data, error: null };
-  return { job: getDiscoverableOpportunity(id), error };
+  return { job: null, error };
 }
 
 /**
@@ -1072,9 +1108,7 @@ export async function createJobApi(
 ): Promise<{ job: JobResponse | null; error: ApiError | null }> {
   const { data, error } = await apiClient.post<OpportunityInput, JobResponse>("/jobs", input);
   if (!error && data) return { job: data, error: null };
-  // Offline fallback
-  const local = createJobForEmployer(input);
-  return { job: local.opportunity as unknown as JobResponse ?? null, error };
+  return { job: null, error };
 }
 
 /**
@@ -1102,9 +1136,7 @@ export async function publishJobApi(
 ): Promise<{ job: JobResponse | null; error: ApiError | null }> {
   const { data, error } = await apiClient.post<undefined, JobResponse>(`/jobs/${id}/publish`);
   if (!error && data) return { job: data, error: null };
-  // Offline fallback
-  const local = publishJobForEmployer(id);
-  return { job: local.opportunity as unknown as JobResponse ?? null, error };
+  return { job: null, error };
 }
 
 /**
@@ -1128,9 +1160,7 @@ export async function closeJobApi(
 ): Promise<{ job: JobResponse | null; error: ApiError | null }> {
   const { data, error } = await apiClient.post<undefined, JobResponse>(`/jobs/${id}/close`);
   if (!error && data) return { job: data, error: null };
-  // Offline fallback
-  const local = closeJobForEmployer(id);
-  return { job: local.opportunity as unknown as JobResponse ?? null, error };
+  return { job: null, error };
 }
 
 /**

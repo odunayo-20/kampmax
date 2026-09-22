@@ -151,8 +151,7 @@ export function getEmployerDashboardAccess(): EmployerAccess {
 
 // ── Async Backend API (NestJS /employers) ───────────────────
 //
-// Every function calls apiClient and falls back to the local store on error
-// so the onboarding wizard always renders — even when the backend is offline.
+// Every function calls apiClient and returns backend errors to the onboarding UI.
 
 export interface EmployerBackendProfile {
   id: string;
@@ -221,7 +220,6 @@ export async function getEmployerPublicProfileApi(
 /**
  * Submit employer profile for review (DRAFT → PENDING_REVIEW).
  * Endpoint: PATCH /employers/me (with status field) — backend transitions the state.
- * Falls back to the local submitEmployerApplication() on error.
  */
 export async function submitEmployerApplicationApi(): Promise<{
   success: boolean;
@@ -233,11 +231,7 @@ export async function submitEmployerApplicationApi(): Promise<{
     EmployerBackendProfile
   >("/employers/me", { status: "PENDING_REVIEW" });
   if (!error && data) return { success: true, profile: data, error: null };
-  // Offline fallback
-  const uid = currentUserId();
-  if (!uid) return { success: false, profile: null, error };
-  const local = submitEmployerProfileForUser();
-  return { success: local.success, profile: null, error };
+  return { success: false, profile: null, error };
 }
 
 // ── Sync/Local API ──────────────────────────────────────────

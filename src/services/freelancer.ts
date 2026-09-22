@@ -311,13 +311,11 @@ export async function getFreelancerServiceBySlug(
 // ═══════════════════════════════════════════════════════════
 //
 // These async helpers call the real NestJS freelancer endpoints
-// for the onboarding wizard. On API failure they fall back to the
-// in-memory draft store so the wizard never breaks offline.
+// for the onboarding wizard. Backend failures are returned to the caller.
 
 /**
  * Create a new freelancer profile on the backend.
  * Endpoint: POST /freelancers
- * Falls back to the in-memory store (createFlApplication) on error.
  */
 export async function createFlApplicationApi(): Promise<{
   created: boolean;
@@ -331,15 +329,12 @@ export async function createFlApplicationApi(): Promise<{
   if (!error && data) {
     return { created: true, profile: data, error: null };
   }
-  // Offline fallback — seed the local draft store.
-  const local = createFlApplication();
-  return { created: local.created, profile: null, error };
+  return { created: false, profile: null, error };
 }
 
 /**
  * Fetch the authenticated user's own private freelancer profile (= current draft state).
  * Endpoint: GET /freelancers/me
- * Falls back to the in-memory draft on error.
  */
 export async function getFlOnboardingDraftApi(): Promise<{
   profile: FreelancerPrivateProfile | null;
@@ -353,7 +348,6 @@ export async function getFlOnboardingDraftApi(): Promise<{
 /**
  * Persist draft changes to the backend.
  * Endpoint: PATCH /freelancers/me
- * Also writes to the local draft store for optimistic UI.
  */
 export async function saveFlDraftApi(
   patch: Partial<FreelancerPrivateProfile>
@@ -369,7 +363,6 @@ export async function saveFlDraftApi(
 /**
  * Submit the freelancer profile for review (DRAFT → PENDING_REVIEW).
  * Endpoint: POST /freelancers/me/verification
- * Falls back to the local submitFlApplication() on error.
  */
 export async function submitFlApplicationApi(): Promise<{
   success: boolean;
@@ -380,9 +373,7 @@ export async function submitFlApplicationApi(): Promise<{
     "/freelancers/me/verification"
   );
   if (!error && data) return { success: true, profile: data, error: null };
-  // Offline fallback
-  const local = submitFlApplication();
-  return { success: local.success, profile: null, error };
+  return { success: false, profile: null, error };
 }
 
 // ═══════════════════════════════════════════════════════════

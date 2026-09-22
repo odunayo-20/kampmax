@@ -6,9 +6,8 @@ import { CheckCircle2, ShieldAlert, ArrowLeft } from "lucide-react";
 import {
   getDiscoverableOpportunity,
   getJobEligibility,
-  createProposalDraft,
-  submitProposal,
 } from "@/services/opportunity";
+import { submitProposalApi } from "@/services/proposals";
 import { ELIGIBILITY_CODE } from "@/types/opportunity";
 import type { Proposal, ProposalInput } from "@/types/opportunity";
 import {
@@ -88,25 +87,19 @@ function CreateProposalContent() {
     router.push("/freelancer/proposals");
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (busy) return;
     setBusy(true);
     setError(null);
     // Ensure a draft record exists, then submit it. This is the only path
     // that transitions DRAFT → SUBMITTED (backend/status-owned).
-    const created = createProposalDraft(buildInput(values));
-    if (!created.ok || !created.proposal) {
-      setBusy(false);
-      setError(created.message);
-      return;
-    }
-    const res = submitProposal(created.proposal.id);
+    const res = await submitProposalApi(buildInput(values));
     setBusy(false);
-    if (!res.ok || !res.proposal) {
-      setError(res.message);
+    if (res.error || !res.proposal) {
+      setError(res.error?.message ?? "We couldn't submit your proposal.");
       return;
     }
-    setSubmittedProposal(res.proposal);
+    setSubmittedProposal(res.proposal as unknown as Proposal);
     setStep("success");
   }
 

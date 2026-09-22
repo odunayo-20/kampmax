@@ -2,273 +2,117 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
-import {
-  EmployerJobListQuery,
-  JobListQuery,
-  dashboardKeys,
-  jobKeys,
-} from "@/lib/query-keys";
-import {
-  closeJobForEmployer,
-  createJobForEmployer,
-  getDiscoverableOpportunity,
-  getEmployerJob,
-  getEmployerJobsPage,
-  getEmployerJobsSummary,
-  getOpportunitiesPage,
-  getSavedJobsForUser,
-  publishJobForEmployer,
-  saveJobForUser,
-  unsaveJobForUser,
-  updateJobForEmployer,
-} from "@/services/opportunity";
-import type {
-  Opportunity,
-  OpportunityInput,
-  OpportunityPage,
-  OpportunityResult,
-  OpportunityStatus,
-} from "@/types/opportunity";
+import { EmployerJobListQuery, JobListQuery, dashboardKeys, jobKeys } from "@/lib/query-keys";
+import { closeJobApi, createJobApi, getJobByIdApi, getMyJobsApi, getOpportunitiesPageApi, getSavedJobsForUser, publishJobApi, saveJobForUser, unsaveJobForUser, updateJobApi } from "@/services/opportunity";
+import type { Opportunity, OpportunityInput, OpportunityPage, OpportunityResult, OpportunityStatus } from "@/types/opportunity";
 import { JOBS_PAGE_SIZE } from "@/config/jobs";
 
-/**
- * Simulates network latency for the sync, in-memory store so the UI
- * exercises the same loading states it will against the real API.
- */
-function delay(ms = 250): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function throwIfNotOk(result: OpportunityResult): void {
+  if (!result.ok) throw Object.assign(new Error(result.message), { code: result.code });
 }
 
-/**
- * Service calls return backend-style results. Mutations must THROW on a
- * non-ok result so TanStack Query's error/retry machinery works and the
- * friendly error mapper can translate the backend `code`.
- */
-function throwIfNotOk(res: OpportunityResult, returnValue?: unknown): unknown {
-  if (!res.ok) {
-    throw Object.assign(new Error(res.message), { code: res.code });
-  }
-  return returnValue ?? res;
+function throwIfApiError<T>(result: { data: T | null; error: Error | null }): T {
+  if (result.error || result.data === null) throw result.error ?? new Error("The backend returned no data.");
+  return result.data;
 }
 
-// ────────────────────────────────────────────────────────────────
-// Marketplace reads (public discovery — OPEN only)
-// ────────────────────────────────────────────────────────────────
-
-/** Marketplace job list. Not user-scoped (public OPEN data only). */
 export function useJobs(filters: JobListQuery) {
   const { status } = useAuth();
-  const enabled = status === "authenticated";
-
   return useQuery({
     queryKey: jobKeys.list(filters),
-    enabled,
+    enabled: status === "authenticated",
     queryFn: async (): Promise<OpportunityPage> => {
-      await delay();
-      return getOpportunitiesPage({
-        search: filters.search,
-        categoryId: filters.categoryId,
-        experience: filters.experience,
-        arrangement: filters.arrangement as never,
-        sort: filters.sort as never,
-        page: filters.page,
-        size: filters.size ?? JOBS_PAGE_SIZE,
-      });
+      const response = await getOpportunitiesPageApi({ search: filters.search, categoryId: filters.categoryId, experience: filters.experience, arrangement: filters.arrangement as never, sort: filters.sort as never, page: filters.page, size: filters.size ?? JOBS_PAGE_SIZE });
+      if (response.error) throw response.error;
+      return response.page;
     },
   });
 }
 
-/**
- * Public job detail. Only discoverable (OPEN) jobs resolve; anything else —
- * draft, pending review or deleted — surfaces as NOT_FOUND so the UI never
- * reveals the existence of hidden postings.
- */
 export function useJob(id: string) {
   const { status } = useAuth();
-  const enabled = status === "authenticated" && !!id;
-
   return useQuery({
     queryKey: jobKeys.detail(id),
-    enabled,
-    queryFn: async (): Promise<Opportunity> => {
-      await delay(0);
-      const opportunity = getDiscoverableOpportunity(id);
-      if (!opportunity) {
-        throw Object.assign(new Error("Opportunity not found"), {
-          code: "NOT_FOUND",
-        });
-      }
-      return opportunity;
-    },
+    enabled: status === "authenticated" && !!id,
+    queryFn: async (): Promise<Opportunity> => throwIfApiError(await getJobByIdApi(id)) as unknown as Opportunity,
   });
 }
 
-// ────────────────────────────────────────────────────────────────
-// Saved jobs (per user)
-// ────────────────────────────────────────────────────────────────
-
-/** Saved job ids for the authenticated user. */
 export function useSavedJobIds() {
   const { status, user } = useAuth();
-  const userId = user?.id ?? null;
-  const enabled = status === "authenticated" && !!userId;
-
-  return useQuery({
-    queryKey: jobKeys.saved(userId ?? ""),
-    enabled,
-    queryFn: async (): Promise<string[]> => {
-      await delay(0);
-      return getSavedJobsForUser().map((o) => o.id);
-    },
-  });
+  const userId = user?.id ?? "";
+  return useQuery({ queryKey: jobKeys.saved(userId), enabled: status === "authenticated" && !!userId, queryFn: async () => getSavedJobsForUser().map((job) => job.id) });
 }
 
 export function useSaveJob() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const userId = user?.id ?? null;
-
-  return useMutation({
-    mutationFn: async (jobId: string) => {
-      await delay(0);
-      throwIfNotOk(saveJobForUser(jobId));
-    },
-    onSuccess: () => {
-      if (userId) queryClient.invalidateQueries({ queryKey: jobKeys.saved(userId) });
-    },
-  });
+  return useMutation({ mutationFn: (jobId: string) => { const result = saveJobForUser(jobId); throwIfNotOk(result); }, onSuccess: () => { if (user?.id) void queryClient.invalidateQueries({ queryKey: jobKeys.saved(user.id) }); } });
 }
 
 export function useUnsaveJob() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const userId = user?.id ?? null;
-
-  return useMutation({
-    mutationFn: async (jobId: string) => {
-      await delay(0);
-      throwIfNotOk(unsaveJobForUser(jobId));
-    },
-    onSuccess: () => {
-      if (userId) queryClient.invalidateQueries({ queryKey: jobKeys.saved(userId) });
-    },
-  });
+  return useMutation({ mutationFn: (jobId: string) => { const result = unsaveJobForUser(jobId); throwIfNotOk(result); }, onSuccess: () => { if (user?.id) void queryClient.invalidateQueries({ queryKey: jobKeys.saved(user.id) }); } });
 }
 
-// ────────────────────────────────────────────────────────────────
-// Employer reads (owner-scoped)
-// ────────────────────────────────────────────────────────────────
-
-/** Employer job list across spine statuses (owner-scoped). */
 export function useEmployerJobs(filters: EmployerJobListQuery) {
   const { status, user } = useAuth();
-  const userId = user?.id ?? null;
-  const enabled = status === "authenticated" && !!userId;
-
+  const userId = user?.id ?? "";
   return useQuery({
-    queryKey: jobKeys.employerList(userId ?? "", filters),
-    enabled,
+    queryKey: jobKeys.employerList(userId, filters),
+    enabled: status === "authenticated" && !!userId,
     queryFn: async (): Promise<OpportunityPage> => {
-      await delay();
-      return getEmployerJobsPage({
-        status: filters.status as never,
-        sort: filters.sort as never,
-        page: filters.page,
-        size: filters.size,
-      });
+      const response = await getMyJobsApi(filters.page, filters.size);
+      if (response.error || !response.result) throw response.error ?? new Error("The backend returned no jobs.");
+      return { items: response.result.data as unknown as Opportunity[], total: response.result.total, page: response.result.page, size: response.result.limit, totalPages: response.result.totalPages };
     },
   });
 }
 
-/** Owner-scoped single job (any spine status). NOT_FOUND for non-owners. */
 export function useEmployerJob(id: string) {
   const { status, user } = useAuth();
-  const userId = user?.id ?? null;
-  const enabled = status === "authenticated" && !!userId && !!id;
-
-  return useQuery({
-    queryKey: jobKeys.employerDetail(userId ?? "", id),
-    enabled,
-    queryFn: async (): Promise<Opportunity> => {
-      await delay(0);
-      const opportunity = getEmployerJob(id);
-      if (!opportunity) {
-        throw Object.assign(new Error("Job not found"), { code: "NOT_FOUND" });
-      }
-      return opportunity;
-    },
-  });
+  const userId = user?.id ?? "";
+  return useQuery({ queryKey: jobKeys.employerDetail(userId, id), enabled: status === "authenticated" && !!userId && !!id, queryFn: async (): Promise<Opportunity> => throwIfApiError(await getJobByIdApi(id)) as unknown as Opportunity });
 }
 
-/** Per-status counts for the employer's filter tabs. */
 export function useEmployerJobsSummary() {
   const { status, user } = useAuth();
-  const userId = user?.id ?? null;
-  const enabled = status === "authenticated" && !!userId;
-
+  const userId = user?.id ?? "";
   return useQuery({
-    queryKey: jobKeys.employerCounts(userId ?? ""),
-    enabled,
+    queryKey: jobKeys.employerCounts(userId),
+    enabled: status === "authenticated" && !!userId,
     queryFn: async (): Promise<Record<OpportunityStatus, number> & { all: number }> => {
-      await delay(0);
-      return getEmployerJobsSummary();
+      const response = await getMyJobsApi(1, 100);
+      if (response.error || !response.result) throw response.error ?? new Error("The backend returned no jobs.");
+      const counts = { draft: 0, pending_review: 0, open: 0, closed: 0, expired: 0, cancelled: 0, all: response.result.total };
+      for (const job of response.result.data) if (job.status in counts) counts[job.status as keyof typeof counts] += 1;
+      return counts;
     },
   });
 }
-
-// ────────────────────────────────────────────────────────────────
-// Employer mutations (owner-scoped, store-owned transitions)
-// ────────────────────────────────────────────────────────────────
 
 function invalidateAllJobs(queryClient: ReturnType<typeof useQueryClient>) {
-  queryClient.invalidateQueries({ queryKey: jobKeys.all });
-  queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
+  void queryClient.invalidateQueries({ queryKey: jobKeys.all });
+  void queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
 }
 
-/** Creates a DRAFT job owned by the authenticated employer. */
 export function useCreateJob() {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: OpportunityInput): Promise<Opportunity> => {
-      await delay();
-      return throwIfNotOk(createJobForEmployer(input)) as Opportunity;
-    },
-    onSuccess: () => invalidateAllJobs(queryClient),
-  });
+  return useMutation({ mutationFn: async (input: OpportunityInput) => throwIfApiError(await createJobApi(input)) as unknown as Opportunity, onSuccess: () => invalidateAllJobs(queryClient) });
 }
 
-/** Updates a DRAFT job (owner + DRAFT only). */
 export function useUpdateJob() {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, input }: { id: string; input: OpportunityInput }): Promise<Opportunity> => {
-      await delay();
-      return throwIfNotOk(updateJobForEmployer(id, input)) as Opportunity;
-    },
-    onSuccess: () => invalidateAllJobs(queryClient),
-  });
+  return useMutation({ mutationFn: async ({ id, input }: { id: string; input: OpportunityInput }) => throwIfApiError(await updateJobApi(id, input)) as unknown as Opportunity, onSuccess: () => invalidateAllJobs(queryClient) });
 }
 
-/** DRAFT → PENDING_REVIEW (backend-owned transition, moderation = Module 32). */
 export function usePublishJob() {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: string): Promise<Opportunity> => {
-      await delay();
-      return throwIfNotOk(publishJobForEmployer(id)) as Opportunity;
-    },
-    onSuccess: () => invalidateAllJobs(queryClient),
-  });
+  return useMutation({ mutationFn: async (id: string) => throwIfApiError(await publishJobApi(id)) as unknown as Opportunity, onSuccess: () => invalidateAllJobs(queryClient) });
 }
 
-/** OPEN → CLOSED (owner retracts a live posting). */
 export function useCloseJob() {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: string): Promise<Opportunity> => {
-      await delay();
-      return throwIfNotOk(closeJobForEmployer(id)) as Opportunity;
-    },
-    onSuccess: () => invalidateAllJobs(queryClient),
-  });
+  return useMutation({ mutationFn: async (id: string) => throwIfApiError(await closeJobApi(id)) as unknown as Opportunity, onSuccess: () => invalidateAllJobs(queryClient) });
 }

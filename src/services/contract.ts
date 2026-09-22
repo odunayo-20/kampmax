@@ -42,9 +42,9 @@ function currentUserId(): string | null {
  * Endpoint: GET /api/v1/engagements/me
  */
 export async function getFreelancerContractsApi(): Promise<Contract[]> {
-  const { data, error } = await apiClient.get<Contract[]>("/engagements/me");
-  if (!error && Array.isArray(data)) return data;
-  return getFreelancerContracts();
+  const { data, error } = await apiClient.get<{ data: Contract[] }>("/engagements/me");
+  if (error) throw error;
+  return data?.data ?? [];
 }
 
 /**
@@ -52,9 +52,9 @@ export async function getFreelancerContractsApi(): Promise<Contract[]> {
  * Endpoint: GET /api/v1/engagements/employer/me
  */
 export async function getEmployerEngagementsApi(): Promise<Contract[]> {
-  const { data, error } = await apiClient.get<Contract[]>("/engagements/employer/me");
-  if (!error && Array.isArray(data)) return data;
-  return [];
+  const { data, error } = await apiClient.get<{ data: Contract[] }>("/engagements/employer/me");
+  if (error) throw error;
+  return data?.data ?? [];
 }
 
 /**
@@ -63,8 +63,8 @@ export async function getEmployerEngagementsApi(): Promise<Contract[]> {
  */
 export async function getEngagementApi(engagementId: string): Promise<Contract | null> {
   const { data, error } = await apiClient.get<Contract>(`/engagements/${engagementId}`);
-  if (!error && data && data.id) return data;
-  return getFreelancerContract(engagementId);
+  if (error) throw error;
+  return data?.id ? data : null;
 }
 
 /**
@@ -127,8 +127,7 @@ export async function completeEngagementApi(engagementId: string): Promise<Actio
     `/engagements/${engagementId}/complete`
   );
   if (!error && data) return { ok: true, contract: data };
-  // Offline fallback
-  return completeFreelancerContract(engagementId);
+  return { ok: false, code: "API_ERROR", message: error?.message ?? "Failed to complete engagement." };
 }
 
 /**
@@ -144,8 +143,7 @@ export async function cancelEngagementApi(
     reason ? { reason } : {}
   );
   if (!error && data) return { ok: true, contract: data };
-  // Offline fallback
-  return cancelFreelancerContract(engagementId, reason ?? "Cancelled");
+  return { ok: false, code: "API_ERROR", message: error?.message ?? "Failed to cancel engagement." };
 }
 
 export async function getFreelancerContractApi(contractId: string): Promise<Contract | null> {
@@ -153,7 +151,7 @@ export async function getFreelancerContractApi(contractId: string): Promise<Cont
   if (!error && data && data.id) {
     return data;
   }
-  return getFreelancerContract(contractId);
+  return null;
 }
 
 export async function acceptFreelancerContractApi(contractId: string): Promise<ActionResult> {
@@ -161,7 +159,7 @@ export async function acceptFreelancerContractApi(contractId: string): Promise<A
   if (!error && data) {
     return { ok: true, contract: data };
   }
-  return acceptFreelancerContract(contractId);
+  return { ok: false, code: "API_ERROR", message: error?.message ?? "Failed to start engagement." };
 }
 
 export async function submitFreelancerDeliverableApi(
@@ -176,7 +174,7 @@ export async function submitFreelancerDeliverableApi(
   if (!error && data) {
     return { ok: true, contract: data };
   }
-  return submitFreelancerDeliverable(contractId, milestoneId, payload);
+  return { ok: false, code: "API_ERROR", message: error?.message ?? "Failed to submit work." };
 }
 
 export async function completeFreelancerContractApi(contractId: string): Promise<ActionResult> {
@@ -184,7 +182,7 @@ export async function completeFreelancerContractApi(contractId: string): Promise
   if (!error && data) {
     return { ok: true, contract: data };
   }
-  return completeFreelancerContract(contractId);
+  return { ok: false, code: "API_ERROR", message: error?.message ?? "Failed to complete engagement." };
 }
 
 // ── Reads ───────────────────────────────────────────────────

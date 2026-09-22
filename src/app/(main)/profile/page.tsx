@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ChevronRight, LogOut, Store, Package, Heart, MapPin,
@@ -16,27 +16,44 @@ import {
   ProfileLoyaltyBadge,
 } from "@/components/profile";
 import { SettingsGroup, SettingsRow } from "@/components/profile/SettingsGroup";
-import { getCurrentUser, getVendorByUserId } from "@/services/users";
+import { getVendorByUserId } from "@/services/users";
 import { getOrdersByUser } from "@/services/orders";
 import { useAuth } from "@/lib/auth-context";
 import { useApp } from "@/lib/app-context";
 import { getWalletByUser } from "@/services/wallet";
 import { formatNaira } from "@/lib/utils";
-import { getLoyaltyProgram, getSavedAddresses, getSavedPaymentMethods } from "@/services/profile";
+import { fetchMyProfile, getLoyaltyProgram, getSavedAddresses, getSavedPaymentMethods, mapBackendProfileToFrontend } from "@/services/profile";
+import type { User } from "@/types";
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, status } = useAuth();
   const { selectedCampus } = useApp();
-  const currentUser = getCurrentUser();
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [showVendorCard, setShowVendorCard] = useState(true);
+
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    void fetchMyProfile().then(({ data }) => {
+      if (data) setCurrentUser(mapBackendProfileToFrontend(data));
+    });
+  }, [status]);
+
+  if (!currentUser) {
+    return (
+      <PageContainer>
+        <div className="py-12 text-center text-sm text-kampmax-text-secondary">Loading profile...</div>
+      </PageContainer>
+    );
+  }
+
   const vendor = getVendorByUserId(currentUser.id);
   const orders = getOrdersByUser(currentUser.id);
   const wallet = getWalletByUser(currentUser.id);
   const loyalty = getLoyaltyProgram();
   const savedAddressesCount = getSavedAddresses().length;
   const savedPaymentMethodsCount = getSavedPaymentMethods().length;
-  const [loggingOut, setLoggingOut] = useState(false);
-  const [showVendorCard, setShowVendorCard] = useState(true);
 
   const activeOrders = orders.filter((o) =>
     ["placed", "confirmed", "preparing", "ready", "out_for_delivery"].includes(o.status)
