@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, AlertCircle, Ban } from "lucide-react";
+import { X, AlertCircle, Ban, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { cancelBooking } from "@/services/booking";
 import type { BookingError, ServiceBooking } from "@/types/booking";
@@ -69,9 +69,15 @@ export function CancelBookingModal({
         </div>
 
         <div className="space-y-4 p-4">
-          <p className="text-xs text-neutral-600">
-            <strong>{booking.serviceName}</strong> · {booking.cancellationPolicy.message}
-          </p>
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1 text-xs text-amber-900">
+            <p className="font-bold flex items-center gap-1.5 text-amber-800">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <span>Cancellation & Refund Policy</span>
+            </p>
+            <p>
+              {booking.serviceName} · <strong>100% Refund</strong> to Kampmax Student Wallet if cancelled at least 24 hours prior.
+            </p>
+          </div>
 
           {error && (
             <p
@@ -83,18 +89,23 @@ export function CancelBookingModal({
             </p>
           )}
 
-          <label className="block">
-            <span className="text-xs font-medium text-neutral-600">
-              Reason (optional — helpful for the provider)
-            </span>
-            <textarea
+          <div>
+            <label className="block text-xs font-semibold text-neutral-700 mb-1">
+              Select Reason for Cancellation
+            </label>
+            <select
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              rows={2}
-              placeholder="e.g. Something came up, I found another slot..."
-              className="mt-1.5 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:border-error-400 focus:outline-none"
-            />
-          </label>
+              className="w-full h-10 px-3 text-xs border border-neutral-200 rounded-xl bg-white focus:outline-none focus:border-error-500"
+            >
+              <option value="">Select a reason</option>
+              <option value="Schedule conflict / Class time clash">Schedule conflict / Class time clash</option>
+              <option value="Found alternative service provider">Found alternative service provider</option>
+              <option value="Service no longer needed">Service no longer needed</option>
+              <option value="Provider unresponsive">Provider unresponsive</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
 
           <div className="flex gap-2">
             <button

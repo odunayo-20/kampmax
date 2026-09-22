@@ -74,8 +74,8 @@ interface CheckoutFeatureFlags {
 }
 
 const FEATURE_FLAGS: CheckoutFeatureFlags = {
-  couponValidationEnabled: false,
-  kampmaxCoinEnabled: false,
+  couponValidationEnabled: true,
+  kampmaxCoinEnabled: true,
   loyaltyEnabled: true,
   paystackEnabled: true,
 };
@@ -353,46 +353,40 @@ export async function initializePaystackPayment(
   orderId?: string,
   callbackUrl?: string
 ): Promise<CheckoutActionResult<PaystackPaymentInitiation>> {
-  if (orderId) {
-    const { data, error } = await initializePaymentApi({
-      orderId,
-      gateway: "PAYSTACK",
-      callbackUrl,
-    });
-
-    if (data && data.reference) {
-      return {
-        ok: true,
-        data: {
-          reference: data.reference,
-          authorizationUrl: data.authorizationUrl || undefined,
-          amount: data.amount,
-          currency: "NGN",
-          checkoutSessionId: session.sessionId,
-        },
-      };
-    }
-
-    if (error) {
-      return {
-        ok: false,
-        error: {
-          code: error.status ? String(error.status) : "payment_init_failed",
-          message: error.message || "Failed to initialize payment gateway.",
-        },
-      };
-    }
+  if (!orderId) {
+    return {
+      ok: false,
+      error: {
+        code: "missing_order_id",
+        message: "An active order ID is required to initialize payment.",
+      },
+    };
   }
 
-  // Fallback demo reference if offline / non-blocking
-  const fallbackRef = `KMPX-DEMO-${Date.now().toString(36).toUpperCase()}`;
+  const { data, error } = await initializePaymentApi({
+    orderId,
+    gateway: "PAYSTACK",
+    callbackUrl,
+  });
+
+  if (data && data.reference) {
+    return {
+      ok: true,
+      data: {
+        reference: data.reference,
+        authorizationUrl: data.authorizationUrl || undefined,
+        amount: data.amount,
+        currency: "NGN",
+        checkoutSessionId: session.sessionId,
+      },
+    };
+  }
+
   return {
-    ok: true,
-    data: {
-      reference: fallbackRef,
-      amount: session.finalTotal,
-      currency: "NGN",
-      checkoutSessionId: session.sessionId,
+    ok: false,
+    error: {
+      code: error?.status ? String(error.status) : "payment_init_failed",
+      message: error?.message || "Failed to initialize payment gateway with backend.",
     },
   };
 }
@@ -403,14 +397,10 @@ export async function initializePaystackPayment(
 export async function getPaymentStatus(
   reference: string
 ): Promise<CheckoutActionResult<PaymentVerificationResult>> {
-  if (reference.startsWith("KMPX-DEMO-")) {
+  if (!reference) {
     return {
-      ok: true,
-      data: {
-        status: "successful",
-        reference,
-        message: "Payment confirmed successfully.",
-      },
+      ok: false,
+      error: { code: "missing_reference", message: "Payment reference is required." },
     };
   }
 
@@ -434,11 +424,10 @@ export async function getPaymentStatus(
   }
 
   return {
-    ok: true,
-    data: {
-      status: "successful",
-      reference,
-      message: "Order placed and payment processed.",
+    ok: false,
+    error: {
+      code: error?.status ? String(error.status) : "verification_failed",
+      message: error?.message || "Payment verification failed or returned invalid status from backend.",
     },
   };
 }

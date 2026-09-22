@@ -93,6 +93,7 @@ export function CouponSection({
         </button>
       </div>
 
+
       {enabled && !isApplied && coupon.status !== "idle" && coupon.status !== "loading" && (
         <p
           role={coupon.status === "invalid" ? "alert" : "status"}
@@ -107,14 +108,6 @@ export function CouponSection({
             <CheckCircle2 className="w-3 h-3" />
           )}
           {couponStatusLabel(coupon.status)}
-        </p>
-      )}
-
-      {!enabled && (
-        <p className="text-xs text-kampmax-text-secondary flex items-start gap-1.5">
-          <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-          Promo codes are validated securely by the checkout server at
-          confirmation. They&apos;re not enabled in this prototype.
         </p>
       )}
     </section>

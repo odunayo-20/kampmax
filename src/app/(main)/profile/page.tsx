@@ -22,7 +22,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useApp } from "@/lib/app-context";
 import { getWalletByUser } from "@/data/wallet";
 import { formatNaira } from "@/lib/utils";
-import { getLoyaltyProgram } from "@/services/profile";
+import { getLoyaltyProgram, getSavedAddresses, getSavedPaymentMethods } from "@/services/profile";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -33,6 +33,8 @@ export default function ProfilePage() {
   const orders = getOrdersByUser(currentUser.id);
   const wallet = getWalletByUser(currentUser.id);
   const loyalty = getLoyaltyProgram();
+  const savedAddressesCount = getSavedAddresses().length;
+  const savedPaymentMethodsCount = getSavedPaymentMethods().length;
   const [loggingOut, setLoggingOut] = useState(false);
   const [showVendorCard, setShowVendorCard] = useState(true);
 
@@ -238,6 +240,13 @@ export default function ProfilePage() {
       {/* Account Menu */}
       <SettingsGroup title="Account">
         <SettingsRow
+          icon={<Star className="h-5 w-5 text-amber-500" />}
+          label="My Reviews & Ratings"
+          description="View and manage feedback you've left"
+          action={<ChevronRight className="h-4 w-4 text-kampmax-text-secondary" />}
+          onClick={() => router.push("/profile/reviews")}
+        />
+        <SettingsRow
           icon={<Pencil className="h-5 w-5" />}
           label="Edit Profile"
           description="Name, photo, bio, campus info"
@@ -247,14 +256,14 @@ export default function ProfilePage() {
         <SettingsRow
           icon={<MapPin className="h-5 w-5" />}
           label="Saved Addresses"
-          description={`${3} saved locations`}
+          description={`${savedAddressesCount} saved location${savedAddressesCount === 1 ? "" : "s"}`}
           action={<ChevronRight className="h-4 w-4 text-kampmax-text-secondary" />}
           onClick={() => router.push("/profile/addresses")}
         />
         <SettingsRow
           icon={<CreditCard className="h-5 w-5" />}
           label="Payment Methods"
-          description={`${3} saved methods`}
+          description={`${savedPaymentMethodsCount} saved method${savedPaymentMethodsCount === 1 ? "" : "s"}`}
           action={<ChevronRight className="h-4 w-4 text-kampmax-text-secondary" />}
           onClick={() => router.push("/profile/payment-methods")}
         />
