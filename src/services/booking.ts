@@ -1,31 +1,4 @@
-// ============================================================
-// SERVICE BOOKING SERVICE LAYER  (Modules 18–19)
-// ============================================================
-//
-// Maps 1:1 to the future booking API. The UI talks ONLY to these functions —
-// never to the backend store directly.
-//
-//   GET   /bookings/availability?serviceId=:id   → bookable days + slots
-//   POST  /bookings                              → create booking (idempotent)
-//   POST  /bookings/:id/cancel
-//   POST  /bookings/:id/reschedule
-//   GET   /me/bookings?query=...                 → customer list (paged)
-//   GET   /me/bookings/:id                       → customer detail
-//   POST  /me/bookings/:id/confirm-completion
-//   POST  /me/bookings/:id/report-problem
-//   POST  /me/bookings/:id/review
-//   GET   /service-provider/bookings?query=...
-//   GET   /service-provider/bookings/:id
-//   POST  /service-provider/bookings/:id/accept|decline|start|complete
-//
-// CONTRACT:
-//   - Availability, prices, status transitions, and cancellation policy are
-//     computed by the backend store only. Nothing here re-derives a slot.
-//   - Every mutation carries a per-submission idempotency key; ambiguous
-//     timeouts must be resolved by re-checking status, not blind retry.
-//   - Errors map to HTTP-ish codes (401/403/404/409/422/429/500/timeout).
-//   - Ownership is derived from the authenticated user, never client input.
-
+import { apiClient } from "@/lib/api-client";
 import type {
   BookingAvailabilityResponse,
   BookingEvidence,

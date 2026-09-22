@@ -1,3 +1,4 @@
+import { apiClient } from "@/lib/api-client";
 import type {
   ServiceProviderOnboardingDraft,
   ServiceProviderOnboardingDocument,

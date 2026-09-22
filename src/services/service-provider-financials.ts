@@ -14,6 +14,7 @@
 //   providerEarnings. Per pending booking the service exposes a projected
 //   settlement (never styled as paid). There is NO escrow-release UI here.
 
+import { apiClient } from "@/lib/api-client";
 import { getSpProfileRecord, pushSpFinancialNotification, recordSpFinancialActivity } from "@/services/service-provider-dashboard";
 import { getBookingsForProvider, settlementPreviewFor } from "@/data/booking";
 import { spFinancialsStore } from "@/data/service-provider-financials";

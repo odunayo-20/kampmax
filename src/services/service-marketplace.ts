@@ -25,6 +25,7 @@
 //   - Favorites are keyed by the authenticated user id (never client-asserted
 //     ownership); guests get empty favorites and full catalog access.
 
+import { apiClient } from "@/lib/api-client";
 import type {
   MarketplaceProvider,
   MarketplaceService,
@@ -44,6 +45,20 @@ import {
   serviceCategorySlug,
   serviceCategoryBySlug,
 } from "@/data/service-marketplace";
+
+export async function getMarketplaceServicesApi(query: MarketplaceServiceQuery = {}): Promise<MarketplaceServicePage> {
+  const params = new URLSearchParams();
+  if (query.q) params.append("q", query.q);
+  if (query.categoryId) params.append("categoryId", query.categoryId);
+  if (query.campusId) params.append("campusId", query.campusId);
+  if (query.page) params.append("page", String(query.page));
+
+  const { data, error } = await apiClient.get<MarketplaceServicePage>(`/service-provider/services?${params.toString()}`);
+  if (!error && data && Array.isArray(data.items)) {
+    return data;
+  }
+  return getServicePage(query);
+}
 import { spServiceCategoryName, SP_SERVICE_CATEGORIES } from "@/data/service-categories";
 import { formatNaira } from "@/lib/utils";
 import type { ServiceProviderLocationType, ServiceProviderPricingModel } from "@/types/service-provider";
