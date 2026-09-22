@@ -22,6 +22,8 @@
 import { getCurrentUser } from "@/services/users";
 import { getCampuses, getCampusById } from "@/services/campus";
 import { pushUserNotification } from "@/services/notifications";
+import { apiClient } from "@/lib/api-client";
+import type { ApiError } from "@/lib/api-client";
 import {
   createEmployerApplication,
   getEmployerOnboardingDraft,
@@ -147,7 +149,98 @@ export function getEmployerDashboardAccess(): EmployerAccess {
   }
 }
 
-// ── Public API ──────────────────────────────────────────────
+// ── Async Backend API (NestJS /employers) ───────────────────
+//
+// Every function calls apiClient and falls back to the local store on error
+// so the onboarding wizard always renders — even when the backend is offline.
+
+export interface EmployerBackendProfile {
+  id: string;
+  userId: string;
+  companyName: string;
+  verificationStatus: "not_started" | "pending" | "verified" | "rejected";
+  onboardingStatus: EmployerOnboardingStatus;
+  [key: string]: unknown;
+}
+
+/**
+ * Create employer profile on the backend.
+ * Endpoint: POST /employers/me
+ */
+export async function createEmployerProfileApi(
+  dto: Partial<EmployerOnboardingDraft>
+): Promise<{ profile: EmployerBackendProfile | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.post<
+    Partial<EmployerOnboardingDraft>,
+    EmployerBackendProfile
+  >("/employers/me", dto);
+  if (!error && data) return { profile: data, error: null };
+  return { profile: null, error };
+}
+
+/**
+ * Fetch the authenticated user's own employer profile.
+ * Endpoint: GET /employers/me
+ */
+export async function getEmployerProfileApi(): Promise<{
+  profile: EmployerBackendProfile | null;
+  error: ApiError | null;
+}> {
+  const { data, error } = await apiClient.get<EmployerBackendProfile>("/employers/me");
+  if (!error && data) return { profile: data, error: null };
+  return { profile: null, error };
+}
+
+/**
+ * Update the authenticated user's employer profile.
+ * Endpoint: PATCH /employers/me
+ */
+export async function updateEmployerProfileApi(
+  patch: Partial<EmployerOnboardingDraft>
+): Promise<{ profile: EmployerBackendProfile | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.patch<
+    Partial<EmployerOnboardingDraft>,
+    EmployerBackendProfile
+  >("/employers/me", patch);
+  if (!error && data) return { profile: data, error: null };
+  return { profile: null, error };
+}
+
+/**
+ * Get a public employer profile by ID.
+ * Endpoint: GET /employers/:id
+ */
+export async function getEmployerPublicProfileApi(
+  id: string
+): Promise<{ profile: EmployerBackendProfile | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.get<EmployerBackendProfile>(`/employers/${id}`);
+  if (!error && data) return { profile: data, error: null };
+  return { profile: null, error };
+}
+
+/**
+ * Submit employer profile for review (DRAFT → PENDING_REVIEW).
+ * Endpoint: PATCH /employers/me (with status field) — backend transitions the state.
+ * Falls back to the local submitEmployerApplication() on error.
+ */
+export async function submitEmployerApplicationApi(): Promise<{
+  success: boolean;
+  profile: EmployerBackendProfile | null;
+  error: ApiError | null;
+}> {
+  const { data, error } = await apiClient.patch<
+    { status: "PENDING_REVIEW" },
+    EmployerBackendProfile
+  >("/employers/me", { status: "PENDING_REVIEW" });
+  if (!error && data) return { success: true, profile: data, error: null };
+  // Offline fallback
+  const uid = currentUserId();
+  if (!uid) return { success: false, profile: null, error };
+  const local = submitEmployerProfileForUser();
+  return { success: local.success, profile: null, error };
+}
+
+// ── Sync/Local API ──────────────────────────────────────────
 
 /**
  * Ensures an application record exists for the current user.

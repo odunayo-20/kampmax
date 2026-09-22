@@ -438,3 +438,114 @@ function availabilityLabel(
       : "Not available";
   return { status: mapped ?? null, label };
 }
+
+// ═══════════════════════════════════════════════════════════
+// ASYNC BACKEND API — FREELANCER DASHBOARD
+// ═══════════════════════════════════════════════════════════
+
+import { getMyFreelancerProfile } from "@/services/freelancer";
+import { getFreelancerContractsApi } from "@/services/contract";
+import { getMyProposalsApi } from "@/services/proposals";
+
+/**
+ * Determine dashboard access gate state from the live backend.
+ * Reads verificationStatus from GET /freelancers/me to determine approval gate.
+ * Falls back to the local draft store on error.
+ */
+export async function getFreelancerDashboardAccessApi(): Promise<FreelancerAccess> {
+  const { profile, error } = await getMyFreelancerProfile();
+  if (!error && profile) {
+    const vs = profile.verificationStatus;
+    const user = getCurrentUser();
+    const displayName = user?.name;
+    if (vs === "approved" || vs === "APPROVED") {
+      return { kind: FREELANCER_DASHBOARD_GATE.APPROVED, status: "APPROVED" as any, canUseDashboard: true, message: null, displayName };
+    }
+    if (vs === "pending" || vs === "PENDING_REVIEW") {
+      return { kind: FREELANCER_DASHBOARD_GATE.PENDING_REVIEW, status: "PENDING_REVIEW" as any, canUseDashboard: false, message: "Your freelancer profile is under review.", displayName };
+    }
+    if (vs === "rejected" || vs === "REJECTED") {
+      return { kind: FREELANCER_DASHBOARD_GATE.REJECTED, status: "REJECTED" as any, canUseDashboard: false, message: "Your freelancer profile requires changes before it can go live.", displayName };
+    }
+    if (vs === "suspended" || vs === "SUSPENDED") {
+      return { kind: FREELANCER_DASHBOARD_GATE.SUSPENDED, status: "SUSPENDED" as any, canUseDashboard: false, message: "Your freelancer profile is currently unavailable.", displayName };
+    }
+    return { kind: FREELANCER_DASHBOARD_GATE.IN_PROGRESS, status: "DRAFT" as any, canUseDashboard: false, message: "Complete your freelancer profile to go live.", displayName };
+  }
+  // Fallback to local store access check
+  return getFreelancerDashboardAccess();
+}
+
+/**
+ * Load full freelancer dashboard data from the backend.
+ * Aggregates: GET /freelancers/me + GET /engagements/me + GET /proposals/me
+ * Falls back to getFreelancerDashboard() if all APIs fail.
+ */
+export async function getFreelancerDashboardApi(): Promise<FreelancerDashboard | null> {
+  // Try to get profile from backend
+  const { profile } = await getMyFreelancerProfile();
+
+  // Fetch engagements
+  const contracts = await getFreelancerContractsApi();
+
+  // Fetch proposals
+  const { proposals } = await getMyProposalsApi();
+
+  // If no profile at all, fall back
+  if (!profile) return getFreelancerDashboard();
+
+  const vs = profile.verificationStatus;
+  const isApproved = vs === "approved" || vs === "APPROVED";
+  if (!isApproved) return null;
+
+  // Build access gate from live profile
+  const user = getCurrentUser();
+  const draft = user ? getFreelancerOnboardingDraft(user.id) : null;
+
+  const active = contracts.filter(
+    (c) => c.status !== CONTRACT_STATUS.COMPLETED && c.status !== CONTRACT_STATUS.CANCELLED
+  ).length;
+  const completed = contracts.filter((c) => c.status === CONTRACT_STATUS.COMPLETED).length;
+
+  const submittedProposals = proposals.filter((p) => p.status === "submitted").length;
+  const underReview = proposals.filter((p) => p.status === "under_review").length;
+  const acceptedProposals = proposals.filter((p) => p.status === "accepted").length;
+  const rejectedProposals = proposals.filter((p) => p.status === "rejected").length;
+
+  const awaitingActionContract = contracts.find(
+    (c) => c.status === CONTRACT_STATUS.PENDING_ACCEPTANCE || c.status === CONTRACT_STATUS.REVISION_REQUESTED
+  ) ?? null;
+
+  const metrics: FreelancerDashboardMetric[] = [
+    { key: "active_proposals", label: "Active Proposals", valueLabel: String(submittedProposals + underReview), tone: "neutral" },
+    { key: "active_contracts", label: "Active Contracts", valueLabel: String(active), tone: "info" },
+    { key: "completed_projects", label: "Completed Projects", valueLabel: String(completed), tone: "success" },
+    { key: "total_earnings", label: "Total Earnings", valueLabel: "—", tone: "neutral", sublabel: "Module 25" },
+  ];
+
+  const profileStatus = computeFreelancerProfileStatus();
+  const deadlines = contracts
+    .filter((c) => c.status !== CONTRACT_STATUS.COMPLETED && c.status !== CONTRACT_STATUS.CANCELLED)
+    .slice(0, 5)
+    .map((c) => ({ id: c.id, title: c.projectTitle, dueDate: c.deadline }));
+
+  return {
+    profile: {
+      headline: (profile as any).professionalTitle ?? draft?.profile?.headline,
+      bio: (profile as any).bio ?? draft?.profile?.bio,
+      photoUrl: (profile as any).avatar ?? draft?.profile?.photoUrl,
+      city: (profile as any).city ?? draft?.profile?.city,
+      remoteAvailable: false,
+      skills: (profile as any).skills?.map((s: any) => s.name ?? s) ?? draft?.skills ?? [],
+    },
+    profileStatus,
+    metrics,
+    availability: availabilityLabel((profile as any).availabilityStatus ?? draft?.availability?.status),
+    opportunities: { total: 0, sample: [] },
+    proposals: { submitted: submittedProposals, underReview, accepted: acceptedProposals, rejected: rejectedProposals },
+    contracts: { active, completed },
+    deadlines,
+    earnings: { thisMonth: 0, pending: 0, available: 0 },
+    activity: buildActivity(user?.id ?? "", awaitingActionContract),
+  };
+}

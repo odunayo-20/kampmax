@@ -32,13 +32,120 @@ function currentUserId(): string | null {
 }
 
 // ── Async Backend API Calls ──────────────────────────────────
+//
+// All routes under /engagements mirror the NestJS EngagementsController.
+// Every function falls back to the local mock store on API error so the
+// UI never breaks while the backend is offline or partially deployed.
 
+/**
+ * List engagements for the current FREELANCER.
+ * Endpoint: GET /api/v1/engagements/me
+ */
 export async function getFreelancerContractsApi(): Promise<Contract[]> {
   const { data, error } = await apiClient.get<Contract[]>("/engagements/me");
-  if (!error && Array.isArray(data)) {
-    return data;
-  }
+  if (!error && Array.isArray(data)) return data;
   return getFreelancerContracts();
+}
+
+/**
+ * List engagements for the current EMPLOYER.
+ * Endpoint: GET /api/v1/engagements/employer/me
+ */
+export async function getEmployerEngagementsApi(): Promise<Contract[]> {
+  const { data, error } = await apiClient.get<Contract[]>("/engagements/employer/me");
+  if (!error && Array.isArray(data)) return data;
+  return [];
+}
+
+/**
+ * Get a single engagement by ID (accessible to both parties).
+ * Endpoint: GET /api/v1/engagements/:engagementId
+ */
+export async function getEngagementApi(engagementId: string): Promise<Contract | null> {
+  const { data, error } = await apiClient.get<Contract>(`/engagements/${engagementId}`);
+  if (!error && data && data.id) return data;
+  return getFreelancerContract(engagementId);
+}
+
+/**
+ * Accept a proposal and create a new engagement (employer / job owner).
+ * Endpoint: POST /api/v1/engagements/accept
+ */
+export async function acceptEngagementApi(
+  proposalId: string
+): Promise<ActionResult> {
+  const { data, error } = await apiClient.post<{ proposalId: string }, Contract>(
+    "/engagements/accept",
+    { proposalId }
+  );
+  if (!error && data) return { ok: true, contract: data };
+  return { ok: false, code: "API_ERROR", message: error?.message ?? "Failed to create engagement." };
+}
+
+/**
+ * Fund an engagement (job owner / employer).
+ * Endpoint: POST /api/v1/engagements/:engagementId/fund
+ */
+export async function fundEngagementApi(engagementId: string): Promise<ActionResult> {
+  const { data, error } = await apiClient.post<undefined, Contract>(
+    `/engagements/${engagementId}/fund`
+  );
+  if (!error && data) return { ok: true, contract: data };
+  return { ok: false, code: "API_ERROR", message: error?.message ?? "Failed to fund engagement." };
+}
+
+/**
+ * Start work on an engagement (employer marks as started).
+ * Endpoint: POST /api/v1/engagements/:engagementId/start
+ */
+export async function startEngagementApi(engagementId: string): Promise<ActionResult> {
+  const { data, error } = await apiClient.post<undefined, Contract>(
+    `/engagements/${engagementId}/start`
+  );
+  if (!error && data) return { ok: true, contract: data };
+  return { ok: false, code: "API_ERROR", message: error?.message ?? "Failed to start engagement." };
+}
+
+/**
+ * Submit work for review (freelancer).
+ * Endpoint: POST /api/v1/engagements/:engagementId/submit-work
+ */
+export async function submitWorkApi(engagementId: string): Promise<ActionResult> {
+  const { data, error } = await apiClient.post<undefined, Contract>(
+    `/engagements/${engagementId}/submit-work`
+  );
+  if (!error && data) return { ok: true, contract: data };
+  return { ok: false, code: "API_ERROR", message: error?.message ?? "Failed to submit work." };
+}
+
+/**
+ * Complete an engagement (employer marks as complete).
+ * Endpoint: POST /api/v1/engagements/:engagementId/complete
+ */
+export async function completeEngagementApi(engagementId: string): Promise<ActionResult> {
+  const { data, error } = await apiClient.post<undefined, Contract>(
+    `/engagements/${engagementId}/complete`
+  );
+  if (!error && data) return { ok: true, contract: data };
+  // Offline fallback
+  return completeFreelancerContract(engagementId);
+}
+
+/**
+ * Cancel an engagement (either party).
+ * Endpoint: POST /api/v1/engagements/:engagementId/cancel
+ */
+export async function cancelEngagementApi(
+  engagementId: string,
+  reason?: string
+): Promise<ActionResult> {
+  const { data, error } = await apiClient.post<{ reason?: string }, Contract>(
+    `/engagements/${engagementId}/cancel`,
+    reason ? { reason } : {}
+  );
+  if (!error && data) return { ok: true, contract: data };
+  // Offline fallback
+  return cancelFreelancerContract(engagementId, reason ?? "Cancelled");
 }
 
 export async function getFreelancerContractApi(contractId: string): Promise<Contract | null> {

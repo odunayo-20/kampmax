@@ -15,6 +15,8 @@
 //     error/eligibility results, never invented records.
 
 import { getCurrentUser, getUserById } from "@/services/users";
+import { apiClient } from "@/lib/api-client";
+import type { ApiError } from "@/lib/api-client";
 import {
   closeOpportunityRecord,
   countEmployerApplicationStatuses,
@@ -971,3 +973,174 @@ export function getFindWorkSummary(): {
 }
 
 export { isSafeExternalUrl, currentUserId };
+
+// ═══════════════════════════════════════════════════════════
+// ASYNC BACKEND API — JOBS (NestJS /jobs)
+// ═══════════════════════════════════════════════════════════
+//
+// All functions call apiClient and fall back to the local sync helpers
+// so the UI never breaks offline / during beta with partial backend.
+
+export interface JobResponse {
+  id: string;
+  title: string;
+  slug: string;
+  status: OpportunityStatus;
+  description: string | null;
+  budgetMin: number | null;
+  budgetMax: number | null;
+  currency: string;
+  deadline: string | null;
+  postedAt: string;
+  createdAt: string;
+  updatedAt: string;
+  [key: string]: unknown;
+}
+
+export interface PaginatedJobResult {
+  data: JobResponse[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+/**
+ * Browse published jobs with search and filters.
+ * Endpoint: GET /api/v1/jobs
+ */
+export async function getOpportunitiesPageApi(
+  query: OpportunityQuery = {}
+): Promise<{ page: OpportunityPage; error: ApiError | null }> {
+  const params = new URLSearchParams();
+  if (query.q) params.set("q", query.q);
+  if (query.categoryId) params.set("categoryId", query.categoryId);
+  if (query.campusId) params.set("campusId", query.campusId);
+  if (query.page) params.set("page", String(query.page));
+  if (query.size) params.set("limit", String(query.size));
+  const qs = params.toString();
+  const { data, error } = await apiClient.get<PaginatedJobResult>(`/jobs${qs ? `?${qs}` : ""}`);
+  if (!error && data) {
+    const items = (data.data ?? []) as unknown as Opportunity[];
+    return {
+      page: {
+        items,
+        total: data.total,
+        page: data.page,
+        size: data.limit,
+        totalPages: data.totalPages,
+      },
+      error: null,
+    };
+  }
+  return { page: getOpportunitiesPage(query), error };
+}
+
+/**
+ * Get a single published job by ID.
+ * Endpoint: GET /api/v1/jobs/:id
+ */
+export async function getJobByIdApi(
+  id: string
+): Promise<{ job: Opportunity | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.get<Opportunity>(`/jobs/${id}`);
+  if (!error && data) return { job: data, error: null };
+  return { job: getDiscoverableOpportunity(id), error };
+}
+
+/**
+ * List jobs created by the authenticated employer.
+ * Endpoint: GET /api/v1/jobs/me
+ */
+export async function getMyJobsApi(
+  page = 1,
+  limit = 20
+): Promise<{ result: PaginatedJobResult | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.get<PaginatedJobResult>(
+    `/jobs/me?page=${page}&limit=${limit}`
+  );
+  if (!error && data) return { result: data, error: null };
+  return { result: null, error };
+}
+
+/**
+ * Create a new job as a DRAFT.
+ * Endpoint: POST /api/v1/jobs
+ */
+export async function createJobApi(
+  input: OpportunityInput
+): Promise<{ job: JobResponse | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.post<OpportunityInput, JobResponse>("/jobs", input);
+  if (!error && data) return { job: data, error: null };
+  // Offline fallback
+  const local = createJobForEmployer(input);
+  return { job: local.opportunity as unknown as JobResponse ?? null, error };
+}
+
+/**
+ * Update a DRAFT job.
+ * Endpoint: PATCH /api/v1/jobs/:id
+ */
+export async function updateJobApi(
+  id: string,
+  input: Partial<OpportunityInput>
+): Promise<{ job: JobResponse | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.patch<Partial<OpportunityInput>, JobResponse>(
+    `/jobs/${id}`,
+    input
+  );
+  if (!error && data) return { job: data, error: null };
+  return { job: null, error };
+}
+
+/**
+ * Publish a DRAFT job (DRAFT → OPEN after moderation).
+ * Endpoint: POST /api/v1/jobs/:id/publish
+ */
+export async function publishJobApi(
+  id: string
+): Promise<{ job: JobResponse | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.post<undefined, JobResponse>(`/jobs/${id}/publish`);
+  if (!error && data) return { job: data, error: null };
+  // Offline fallback
+  const local = publishJobForEmployer(id);
+  return { job: local.opportunity as unknown as JobResponse ?? null, error };
+}
+
+/**
+ * Pause a live job posting.
+ * Endpoint: POST /api/v1/jobs/:id/pause
+ */
+export async function pauseJobApi(
+  id: string
+): Promise<{ job: JobResponse | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.post<undefined, JobResponse>(`/jobs/${id}/pause`);
+  if (!error && data) return { job: data, error: null };
+  return { job: null, error };
+}
+
+/**
+ * Close a live job posting.
+ * Endpoint: POST /api/v1/jobs/:id/close
+ */
+export async function closeJobApi(
+  id: string
+): Promise<{ job: JobResponse | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.post<undefined, JobResponse>(`/jobs/${id}/close`);
+  if (!error && data) return { job: data, error: null };
+  // Offline fallback
+  const local = closeJobForEmployer(id);
+  return { job: local.opportunity as unknown as JobResponse ?? null, error };
+}
+
+/**
+ * Cancel a job.
+ * Endpoint: POST /api/v1/jobs/:id/cancel
+ */
+export async function cancelJobApi(
+  id: string
+): Promise<{ job: JobResponse | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.post<undefined, JobResponse>(`/jobs/${id}/cancel`);
+  if (!error && data) return { job: data, error: null };
+  return { job: null, error };
+}
