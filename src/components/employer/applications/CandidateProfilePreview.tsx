@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Award,
   Briefcase,
@@ -9,7 +9,12 @@ import {
   MapPin,
   Wallet,
 } from "lucide-react";
-import { getPublicFreelancerProfile } from "@/services/freelancer-dashboard";
+import {
+  getPublicFreelancerFromBackend,
+  getPublicFreelancerProfile,
+  type PublicFreelancerProfile,
+} from "@/services/freelancer-dashboard";
+import { isBackendId } from "@/lib/job-api-mapping";
 import { formatNaira } from "@/lib/utils";
 import { isSafeExternalUrl, sanitizeExternalUrl } from "@/lib/contract-utils";
 import { Avatar } from "@/components/ui";
@@ -21,10 +26,35 @@ import { Avatar } from "@/components/ui";
  * details, internal notes and documents are never rendered.
  */
 export function CandidateProfilePreview({ candidateId }: { candidateId: string }) {
-  const profile = useMemo(
-    () => getPublicFreelancerProfile(candidateId),
-    [candidateId]
+  // Real candidates are addressed by freelancer profile id and loaded from the
+  // backend; legacy demo candidates (short ids) come from the local store.
+  const backend = isBackendId(candidateId);
+  const local = useMemo(
+    () => (backend ? null : getPublicFreelancerProfile(candidateId)),
+    [backend, candidateId]
   );
+  const [remote, setRemote] = useState<PublicFreelancerProfile | null>(null);
+  const [loading, setLoading] = useState(backend);
+
+  useEffect(() => {
+    if (!backend) return;
+    let cancelled = false;
+    setLoading(true);
+    void getPublicFreelancerFromBackend(candidateId).then((p) => {
+      if (cancelled) return;
+      setRemote(p);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [backend, candidateId]);
+
+  const profile = backend ? remote : local;
+
+  if (loading) {
+    return <div className="p-5 text-sm text-neutral-500">Loading candidate…</div>;
+  }
 
   if (!profile) {
     return (

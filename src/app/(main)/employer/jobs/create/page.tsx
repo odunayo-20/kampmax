@@ -1,14 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { OpportunityInput } from "@/types/opportunity";
 import { useAuth } from "@/lib/auth-context";
-import {
-  getEmployerDashboardAccess,
-  getEmployerOnboardingDraftForUser,
-  getEmployerPublicPreview,
-} from "@/services/employer";
+import { getEmployerProfileApi } from "@/services/employer";
 import { useCreateJob, usePublishJob } from "@/hooks/use-jobs";
 import { JobForm, emptyJobFormValues } from "@/components/employer/jobs/JobForm";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
@@ -18,14 +14,21 @@ export default function CreateJobPage() {
   const { user } = useAuth();
   const [submissionError, setSubmissionError] = useState<string | null>(null);
 
-  const access = user ? getEmployerDashboardAccess() : null;
-
-  const employerName = useMemo(() => {
-    if (!user) return undefined;
-    const draft = getEmployerOnboardingDraftForUser();
-    return draft ? getEmployerPublicPreview(draft)?.name : undefined;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  // The backend is the authority: any employer profile may post jobs.
+  const [employer, setEmployer] = useState<{ name: string } | null | undefined>(undefined);
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    void getEmployerProfileApi().then(({ profile }) => {
+      if (!cancelled) {
+        setEmployer(profile ? { name: String(profile.companyName || profile.displayName || "") } : null);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+  const employerName = employer?.name;
 
   const createMutation = useCreateJob();
   const publishMutation = usePublishJob();
@@ -48,10 +51,13 @@ export default function CreateJobPage() {
     }
   };
 
-  if (!access?.canUseDashboard) {
+  if (employer === undefined) {
+    return <div className="pt-8 text-center text-sm text-neutral-500">Loading…</div>;
+  }
+  if (employer === null) {
     return (
       <div className="rounded-xl border border-neutral-200 bg-white p-10 text-center text-sm text-neutral-500">
-        Only approved employers can create jobs.
+        Create an employer profile before posting jobs.
       </div>
     );
   }

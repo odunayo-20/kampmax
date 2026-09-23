@@ -1,8 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { cn } from "@/lib/utils";
-import { getFreelancerContracts } from "@/services/contract";
+import { useCallback, useEffect, useState } from "react";
+import { cn, formatNaira } from "@/lib/utils";
+import {
+  engagementToContract,
+  getFreelancerContracts,
+  getFreelancerEngagementsApi,
+} from "@/services/contract";
+import type { Engagement } from "@/services/jobs";
+import { ContractStatusBadge } from "@/components/contracts/ContractStatusBadge";
+import { EngagementActions } from "@/components/engagements/EngagementActions";
 import { ContractCard } from "@/components/contracts/ContractCard";
 import { ContractEmptyState } from "@/components/contracts/ContractEmptyState";
 import type { Contract, ContractStatus } from "@/types/contract";
@@ -26,7 +33,25 @@ const FILTERS: { key: FilterKey; label: string; match: (c: Contract) => boolean 
 
 export default function FreelancerContractsPage() {
   const [activeFilter, setActiveFilter] = useState<FilterKey>("ALL");
-  const [contracts] = useState(() => getFreelancerContracts());
+  // Real engagements from the backend, plus any legacy demo contracts.
+  const [engagements, setEngagements] = useState<Engagement[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [legacy] = useState(() => getFreelancerContracts());
+
+  const loadEngagements = useCallback(async () => {
+    try {
+      setEngagements(await getFreelancerEngagementsApi());
+      setLoadError(null);
+    } catch (e) {
+      setLoadError((e as { message?: string }).message ?? "We couldn't load your contracts.");
+    }
+  }, []);
+  useEffect(() => {
+    void loadEngagements();
+  }, [loadEngagements]);
+
+  const contracts = [...engagements.map(engagementToContract), ...legacy];
+  const engagementById = new Map(engagements.map((e) => [e.id, e]));
 
   const activeContractCount = contracts.filter(
     (c) => c.status !== CONTRACT_STATUS.COMPLETED && c.status !== CONTRACT_STATUS.CANCELLED
@@ -44,6 +69,12 @@ export default function FreelancerContractsPage() {
             : "Your freelance contracts and projects."}
         </p>
       </header>
+
+      {loadError && (
+        <div role="alert" className="rounded-lg border border-error-100 bg-error-50 p-3 text-sm text-error-700">
+          {loadError}
+        </div>
+      )}
 
       {/* Status filter */}
       <div className="flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Filter contracts by status">
@@ -86,9 +117,33 @@ export default function FreelancerContractsPage() {
         />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((contract) => (
-            <ContractCard key={contract.id} contract={contract} />
-          ))}
+          {filtered.map((contract) => {
+            const engagement = engagementById.get(contract.id);
+            // Real engagements have no detail workspace; the card's actions live here.
+            return engagement ? (
+              <div key={contract.id} className="rounded-xl border border-kampmax-border bg-white p-4">
+                <h2 className="text-sm font-bold text-kampmax-text">{contract.projectTitle}</h2>
+                <p className="mt-0.5 text-xs text-kampmax-text-secondary">
+                  {contract.client.displayName}
+                  {contract.agreedAmount ? ` · ${formatNaira(contract.agreedAmount)}` : ""}
+                </p>
+                <div className="mt-2">
+                  <ContractStatusBadge status={contract.status} />
+                </div>
+                <p className="mt-3 rounded-lg bg-kampmax-bg px-3 py-2 text-xs text-kampmax-text-secondary">
+                  {contract.nextAction}
+                </p>
+                <EngagementActions
+                  engagementId={engagement.id}
+                  status={engagement.status}
+                  role="freelancer"
+                  onChanged={() => void loadEngagements()}
+                />
+              </div>
+            ) : (
+              <ContractCard key={contract.id} contract={contract} />
+            );
+          })}
         </div>
       )}
     </div>

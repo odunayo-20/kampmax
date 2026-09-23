@@ -4,16 +4,12 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { dashboardKeys } from "@/lib/query-keys";
 import {
-  getEmployerContracts,
-  getEmployerDashboardSummary,
+  getEmployerContractsApi,
+  getEmployerDashboardApi,
 } from "@/services/employer-dashboard";
 import type { EmployerDashboardContract, EmployerDashboardSummary } from "@/services/employer-dashboard";
 
-function delay(ms = 250): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/** Backend-style summary for the employer command center (owner-scoped). */
+/** Employer command center, composed from the real owner-scoped endpoints. */
 export function useEmployerDashboardSummary() {
   const { status, user } = useAuth();
   const userId = user?.id ?? null;
@@ -22,14 +18,11 @@ export function useEmployerDashboardSummary() {
   return useQuery({
     queryKey: dashboardKeys.summary(userId ?? ""),
     enabled,
-    queryFn: async (): Promise<EmployerDashboardSummary | null> => {
-      await delay();
-      return getEmployerDashboardSummary();
-    },
+    queryFn: async (): Promise<EmployerDashboardSummary | null> => getEmployerDashboardApi(),
   });
 }
 
-/** Full employer contract list for /employer/contracts (owner-scoped). */
+/** The employer's engagements for /employer/contracts. */
 export function useEmployerContracts() {
   const { status, user } = useAuth();
   const userId = user?.id ?? null;
@@ -38,9 +31,6 @@ export function useEmployerContracts() {
   return useQuery({
     queryKey: dashboardKeys.contracts(userId ?? ""),
     enabled,
-    queryFn: async (): Promise<EmployerDashboardContract[]> => {
-      await delay(0);
-      return getEmployerContracts();
-    },
+    queryFn: async (): Promise<EmployerDashboardContract[]> => getEmployerContractsApi(),
   });
 }

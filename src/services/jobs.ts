@@ -212,13 +212,15 @@ export interface EngagementPartySummary {
   avatar: string | null;
 }
 
+/** Backend EngagementStatus enum, exactly as the API returns it. */
 export type EngagementStatus =
-  | "pending_funding"
-  | "funded"
-  | "in_progress"
-  | "work_submitted"
-  | "completed"
-  | "cancelled";
+  | "PENDING_PAYMENT"
+  | "FUNDED"
+  | "IN_PROGRESS"
+  | "SUBMITTED"
+  | "COMPLETED"
+  | "DISPUTED"
+  | "CANCELLED";
 
 export interface Engagement {
   id: string;

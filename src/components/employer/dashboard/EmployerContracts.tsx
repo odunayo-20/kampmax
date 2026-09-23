@@ -1,6 +1,9 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { ContractStatusBadge } from "@/components/contracts/ContractStatusBadge";
+import { EngagementActions } from "@/components/engagements/EngagementActions";
+import { dashboardKeys } from "@/lib/query-keys";
 import { useEmployerContracts } from "@/hooks/use-employer-dashboard";
 import { formatDate, formatNaira } from "@/lib/utils";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
@@ -12,7 +15,13 @@ import {
 
 export function EmployerContracts() {
   const query = useEmployerContracts();
+  const queryClient = useQueryClient();
   const contracts = query.data ?? [];
+  // A step changes the contract list and the dashboard counts/prompts.
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
+    void queryClient.invalidateQueries({ queryKey: ["wallet"] });
+  };
 
   return (
     <div className="space-y-6">
@@ -34,7 +43,7 @@ export function EmployerContracts() {
       ) : contracts.length === 0 ? (
         <EmployerDashboardEmpty
           title="No contracts yet"
-          detail="Accepting an application automatically creates a contract for the hired freelancer."
+          detail="Hiring a freelancer starts a contract here. Fund it to start work, then approve the delivered work to release payment."
           action={{ href: "/employer/applications", label: "Review applications" }}
         />
       ) : (
@@ -59,6 +68,13 @@ export function EmployerContracts() {
                     {contract.nextAction}
                   </p>
                 )}
+
+                <EngagementActions
+                  engagementId={contract.id}
+                  status={contract.engagementStatus}
+                  role="employer"
+                  onChanged={refresh}
+                />
 
                 {contract.outstandingDeliverables > 0 && (
                   <p className="mt-2 text-xs font-medium text-info-700">

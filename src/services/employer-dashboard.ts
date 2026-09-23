@@ -12,24 +12,17 @@
 // module. This facade adds nothing client-trustable: no ids, roles,
 // financial figures or ownership flags are accepted from the UI.
 
-import { apiClient } from "@/lib/api-client";
-import { getCurrentUser, getUserById } from "@/services/users";
 import {
-  getEmployerJobsPage,
-  getEmployerJobsSummary,
-  getEmployerApplicationsPage,
-  getEmployerApplicationsSummary,
+  getMyJobCountsApi,
+  getMyJobsApi,
 } from "@/services/opportunity";
+import { getReceivedApplicationsApi } from "@/services/proposals";
+import { listMyEmployerEngagements, type Engagement, type EngagementStatus } from "@/services/jobs";
 import {
-  computeEmployerCompletion,
-  getEmployerOnboardingDraftForUser,
-  getEmployerPublicPreview,
+  getEmployerProfileApi,
 } from "@/services/employer";
-import { getContractsForEmployer } from "@/data/contracts";
-import { getProposalById } from "@/data/opportunity";
 import { CONTRACT_STATUS } from "@/types/contract";
 import type { ContractStatus } from "@/types/contract";
-import type { Contract } from "@/types/contract";
 import type {
   EmployerApplicationStatus,
   EmployerApplicationSummary,
@@ -58,6 +51,8 @@ export interface EmployerDashboardContract {
   nextAction: string;
   outstandingDeliverables: number;
   amount?: number;
+  /** Backend engagement status, so the right next-step actions can be offered. */
+  engagementStatus: EngagementStatus;
 }
 
 export interface EmployerAttentionItem {
@@ -93,26 +88,9 @@ export interface EmployerDashboardSummary {
 
 // ── Mapping helpers ──────────────────────────────────────────
 
-function toDashboardContract(contract: Contract): EmployerDashboardContract {
-  const proposal = contract.proposalId ? getProposalById(contract.proposalId) : undefined;
-  const freelancerName = proposal
-    ? (getUserById(proposal.freelancerId)?.name ?? "Freelancer")
-    : "Freelancer";
-  return {
-    id: contract.id,
-    projectTitle: contract.projectTitle,
-    status: contract.status,
-    freelancerName,
-    deadline: contract.deadline,
-    nextAction: contract.nextAction,
-    outstandingDeliverables: contract.outstandingDeliverables,
-    amount: contract.agreedAmount,
-  };
-}
-
-function buildAttention(
+function buildAttentionFrom(
   appCounts: Record<EmployerApplicationStatus | "all", number>,
-  contracts: Contract[],
+  contracts: { status: ContractStatus }[],
   jobCounts: Record<OpportunityStatus, number> & { all: number },
   profileCompletion: number
 ): EmployerAttentionItem[] {
@@ -174,97 +152,124 @@ function buildAttention(
   return items;
 }
 
-// ── Public API ───────────────────────────────────────────────
+// Engagement -> the dashboard's contract vocabulary. An accepted proposal
+// starts as PENDING_PAYMENT; the employer funds it, work runs, the freelancer
+// submits, and the employer reviews.
+const ENGAGEMENT_TO_CONTRACT: Record<EngagementStatus, ContractStatus> = {
+  PENDING_PAYMENT: CONTRACT_STATUS.PENDING_ACCEPTANCE,
+  FUNDED: CONTRACT_STATUS.ACTIVE,
+  IN_PROGRESS: CONTRACT_STATUS.ACTIVE,
+  SUBMITTED: CONTRACT_STATUS.AWAITING_CLIENT_REVIEW,
+  COMPLETED: CONTRACT_STATUS.COMPLETED,
+  DISPUTED: CONTRACT_STATUS.DISPUTED,
+  CANCELLED: CONTRACT_STATUS.CANCELLED,
+};
+
+const ENGAGEMENT_NEXT_ACTION: Record<EngagementStatus, string> = {
+  PENDING_PAYMENT: "Fund the engagement to start work",
+  FUNDED: "Waiting for the freelancer to start",
+  IN_PROGRESS: "Work in progress",
+  SUBMITTED: "Review the submitted work",
+  COMPLETED: "Completed",
+  DISPUTED: "Under dispute",
+  CANCELLED: "Cancelled",
+};
+
+export function engagementToDashboardContract(e: Engagement): EmployerDashboardContract {
+  return {
+    id: e.id,
+    projectTitle: e.job?.title ?? "Project",
+    status: ENGAGEMENT_TO_CONTRACT[e.status] ?? CONTRACT_STATUS.ACTIVE,
+    freelancerName: e.freelancer?.fullName || e.freelancer?.username || "Freelancer",
+    deadline: e.expectedCompletionDate ?? "",
+    nextAction: ENGAGEMENT_NEXT_ACTION[e.status] ?? "",
+    outstandingDeliverables: 0,
+    amount: Number(e.agreedAmount),
+    engagementStatus: e.status,
+  };
+}
+
+/** The employer's engagements (hires), newest first. Endpoint: GET /engagements/employer/me */
+export async function getEmployerContractsApi(): Promise<EmployerDashboardContract[]> {
+  const { engagements, error } = await listMyEmployerEngagements({ limit: 100 });
+  if (error) throw error;
+  return engagements
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .map(engagementToDashboardContract);
+}
 
 /**
- * Single backend-style summary for the employer dashboard. Returns null
- * when the current user has no employer profile (the shell gate already
- * blocks this, but the read stays defensive).
+ * The employer dashboard, composed from the real owner-scoped endpoints:
+ * profile, my jobs (+counts), received applications (+counts) and my
+ * engagements. Returns null when the user has no employer profile.
  */
-export function getEmployerDashboardSummary(): EmployerDashboardSummary | null {
-  const user = getCurrentUser();
-  if (!user) return null;
+export async function getEmployerDashboardApi(): Promise<EmployerDashboardSummary | null> {
+  const { profile, error: profileError } = await getEmployerProfileApi();
+  if (profileError) {
+    if (profileError.status === 404) return null;
+    throw profileError;
+  }
+  if (!profile) return null;
 
-  const draft = getEmployerOnboardingDraftForUser();
-  const preview = getEmployerPublicPreview(draft);
-  if (!preview) return null;
+  const [jobs, apps, jobCounts, contracts] = await Promise.all([
+    getMyJobsApi(1, 5),
+    getReceivedApplicationsApi({ page: 1, size: 5, sort: "newest" }),
+    getMyJobCountsApi(),
+    getEmployerContractsApi(),
+  ]);
+  for (const { error } of [jobs, apps, jobCounts]) if (error) throw error;
 
-  const jobCounts = getEmployerJobsSummary();
-  const appCounts = getEmployerApplicationsSummary();
-  const jobsPage = getEmployerJobsPage({ status: "all", sort: "newest", page: 1, size: 5 });
-  const appsPage = getEmployerApplicationsPage({ status: "all", sort: "newest", page: 1, size: 5 });
-  const employerContracts = getContractsForEmployer(user.id);
-  const profileCompletion = computeEmployerCompletion(draft);
-
-  const recentJobs: EmployerDashboardJob[] = jobsPage.items.map((job) => ({
-    id: job.id,
-    title: job.title,
-    status: job.status,
-    applications: job.proposalCount,
-    postedAt: job.postedAt,
-    deadline: job.deadline,
-    budgetMin: job.budget.min,
-    budgetMax: job.budget.max,
-  }));
-
-  const sortedContracts = [...employerContracts].sort((a, b) =>
-    b.updatedAt.localeCompare(a.updatedAt)
+  const appCounts = apps.page.counts;
+  // Profile completion from the fields the backend stores.
+  const fields = [
+    profile.displayName,
+    profile.companyName,
+    profile.companyDescription,
+    profile.industry,
+    profile.location,
+    profile.websiteUrl,
+  ];
+  const profileCompletion = Math.round(
+    (fields.filter((f) => typeof f === "string" && f.trim()).length / fields.length) * 100
   );
 
-  const attention = buildAttention(appCounts, employerContracts, jobCounts, profileCompletion);
+  const attention = buildAttentionFrom(appCounts, contracts, jobCounts.counts, profileCompletion);
 
   return {
     company: {
-      name: preview.name,
-      descriptor: preview.descriptor,
-      location: preview.location,
-      verified: preview.verified,
+      name: String(profile.companyName || profile.displayName || "Your company"),
+      descriptor: String(profile.industry ?? ""),
+      location: String(profile.location ?? ""),
+      verified: String(profile.verificationStatus).toUpperCase() === "VERIFIED",
       profileCompletion,
     },
-    jobCounts,
+    jobCounts: jobCounts.counts,
     appCounts,
-    recentJobs,
-    recentApplications: appsPage.items,
+    recentJobs: jobs.page.items.map((job) => ({
+      id: job.id,
+      title: job.title,
+      status: job.status,
+      applications: job.proposalCount,
+      postedAt: job.postedAt,
+      deadline: job.deadline,
+      budgetMin: job.budget.min,
+      budgetMax: job.budget.max,
+    })),
+    recentApplications: apps.page.items,
     contracts: {
-      total: employerContracts.length,
-      active: employerContracts.filter((c) => c.status === CONTRACT_STATUS.ACTIVE).length,
-      awaitingClientReview: employerContracts.filter(
+      total: contracts.length,
+      active: contracts.filter((c) => c.status === CONTRACT_STATUS.ACTIVE).length,
+      awaitingClientReview: contracts.filter(
         (c) => c.status === CONTRACT_STATUS.AWAITING_CLIENT_REVIEW
       ).length,
-      pendingAcceptance: employerContracts.filter(
+      pendingAcceptance: contracts.filter(
         (c) => c.status === CONTRACT_STATUS.PENDING_ACCEPTANCE
       ).length,
-      recent: sortedContracts.slice(0, 5).map(toDashboardContract),
+      recent: contracts.slice(0, 5),
     },
     pendingActions: attention.length,
     attention,
   };
-}
-
-/**
- * Full employer contract read (owner-scoped) for the /employer/contracts
- * page. Sorted newest-first by last activity.
- */
-export function getEmployerContracts(): EmployerDashboardContract[] {
-  const user = getCurrentUser();
-  if (!user) return [];
-  return getContractsForEmployer(user.id)
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .map(toDashboardContract);
-}
-
-// ═══════════════════════════════════════════════════════════
-// ASYNC BACKEND API — EMPLOYER DASHBOARD
-// ═══════════════════════════════════════════════════════════
-
-/**
- * Fetch employer dashboard summary from the backend.
- * Endpoint: GET /api/v1/employers/me/dashboard
- */
-export async function getEmployerDashboardApi(): Promise<EmployerDashboardSummary | null> {
-  const { data, error } = await apiClient.get<EmployerDashboardSummary>("/employers/me/dashboard");
-  if (error) throw error;
-  return data;
 }
 
 // getEmployerDashboardAccessApi lives in services/employer.ts (the single
