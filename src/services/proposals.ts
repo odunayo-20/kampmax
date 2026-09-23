@@ -30,8 +30,12 @@ import { getCurrentAuthUser } from "@/lib/current-user-store";
 import { getMyFreelancerProfile } from "@/services/freelancer";
 import { getProposalsByFreelancer } from "@/data/opportunity";
 import type {
+  EmployerApplicationStatus,
+  EmployerApplicationsPage,
+  EmployerApplicationSummary,
   JobEligibility,
   Opportunity,
+  OpportunityStatus,
   Proposal,
   ProposalInput,
   ProposalStatus,
@@ -44,13 +48,23 @@ import { ELIGIBILITY_CODE, OPPORTUNITY_STATUS, PROPOSAL_STATUS } from "@/types/o
 export interface ProposalResponse {
   id: string;
   jobId: string;
-  job?: { id: string; title: string; slug: string };
+  job?: { id: string; title: string; slug: string; status?: string };
   freelancerId: string;
+  freelancer?: {
+    id: string;
+    userId: string;
+    username: string;
+    fullName: string;
+    avatar: string | null;
+    headline: string | null;
+  };
   coverLetter: string;
   proposedAmount: number | string;
   currency: string;
   estimatedDeliveryDays: number | null;
-  /** Backend enum: SUBMITTED | VIEWED | SHORTLISTED | ACCEPTED | REJECTED | WITHDRAWN | EXPIRED */
+  screeningAnswers?: { questionId: string; answer: string }[];
+  attachments?: { id: string; filename: string; sizeBytes: number; mimeType: string; url: string | null }[];
+  /** Backend enum: DRAFT | SUBMITTED | VIEWED | SHORTLISTED | ACCEPTED | REJECTED | WITHDRAWN | EXPIRED */
   status: string;
   submittedAt: string | null;
   withdrawnAt: string | null;
@@ -62,9 +76,12 @@ export interface ProposalResponse {
 export interface PaginatedProposalResult {
   items: ProposalResponse[];
   meta: { total: number; page: number; limit: number; totalPages: number };
+  /** Only on GET /proposals/received: per-status totals (backend enum keys + "all"). */
+  counts?: Record<string, number>;
 }
 
 const STATUS_FROM_BACKEND: Record<string, ProposalStatus> = {
+  DRAFT: PROPOSAL_STATUS.DRAFT,
   SUBMITTED: PROPOSAL_STATUS.SUBMITTED,
   VIEWED: PROPOSAL_STATUS.UNDER_REVIEW,
   SHORTLISTED: PROPOSAL_STATUS.SHORTLISTED,
@@ -76,6 +93,7 @@ const STATUS_FROM_BACKEND: Record<string, ProposalStatus> = {
 };
 
 const STATUS_TO_BACKEND: Partial<Record<ProposalStatus, string>> = {
+  draft: "DRAFT",
   submitted: "SUBMITTED",
   under_review: "VIEWED",
   shortlisted: "SHORTLISTED",
@@ -108,17 +126,25 @@ function deliveryToDays(delivery: ProposalInput["delivery"]): number | undefined
 }
 
 /**
- * Maps a backend proposal to the frontend Proposal model. The backend has no
- * drafts, screening answers or attachments, so those are empty; the timeline
- * is derived from the timestamps the backend does record.
+ * Maps a backend proposal to the frontend Proposal model. The timeline is
+ * derived from the timestamps the backend records (submitted / reviewed /
+ * withdrawn); a draft has no submission yet, so its timeline is empty.
  */
 export function mapBackendProposal(p: ProposalResponse): Proposal {
   const status = STATUS_FROM_BACKEND[p.status] ?? PROPOSAL_STATUS.SUBMITTED;
-  const submittedAt = p.submittedAt ?? p.createdAt;
-  const timeline: Proposal["timeline"] = [
-    { id: `${p.id}-submitted`, status: PROPOSAL_STATUS.SUBMITTED, label: STATUS_LABEL.submitted, at: submittedAt },
-  ];
-  if (status !== PROPOSAL_STATUS.SUBMITTED) {
+  const isDraft = status === PROPOSAL_STATUS.DRAFT;
+  const submittedAt = isDraft ? undefined : p.submittedAt ?? p.createdAt;
+  const timeline: Proposal["timeline"] = isDraft
+    ? []
+    : [
+        {
+          id: `${p.id}-submitted`,
+          status: PROPOSAL_STATUS.SUBMITTED,
+          label: STATUS_LABEL.submitted,
+          at: submittedAt as string,
+        },
+      ];
+  if (!isDraft && status !== PROPOSAL_STATUS.SUBMITTED) {
     timeline.push({
       id: `${p.id}-${status}`,
       status,
@@ -135,8 +161,16 @@ export function mapBackendProposal(p: ProposalResponse): Proposal {
     coverLetter: p.coverLetter,
     proposedAmount: Number(p.proposedAmount),
     delivery: deliveryFromDays(p.estimatedDeliveryDays),
-    screeningAnswers: [],
-    attachments: [],
+    screeningAnswers: (p.screeningAnswers ?? []).map((a) => ({
+      questionId: a.questionId,
+      answer: a.answer,
+    })),
+    attachments: (p.attachments ?? []).map((a) => ({
+      id: a.id,
+      filename: a.filename,
+      sizeBytes: a.sizeBytes,
+      mimeType: a.mimeType,
+    })),
     status,
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
@@ -147,6 +181,20 @@ export function mapBackendProposal(p: ProposalResponse): Proposal {
 
 function toBackendStatus(status: ProposalQuery["status"]): string | undefined {
   return status && status !== "all" ? STATUS_TO_BACKEND[status] : undefined;
+}
+
+/** The body fields shared by submit and draft-save (ids only for real questions/files). */
+function proposalBody(input: ProposalInput) {
+  return {
+    coverLetter: input.coverLetter,
+    proposedAmount: input.proposedAmount,
+    estimatedDeliveryDays: deliveryToDays(input.delivery),
+    screeningAnswers: input.screeningAnswers.map((a) => ({
+      questionId: a.questionId,
+      answer: a.answer,
+    })),
+    mediaIds: input.attachments.map((a) => a.id),
+  };
 }
 
 export interface ProposalQuery {
@@ -181,15 +229,57 @@ export async function submitProposalApi(
   }
   const { data, error } = await apiClient.post<Record<string, unknown>, ProposalResponse>(
     "/proposals",
-    {
-      jobId: input.opportunityId,
-      coverLetter: input.coverLetter,
-      proposedAmount: input.proposedAmount,
-      estimatedDeliveryDays: deliveryToDays(input.delivery),
-    }
+    { jobId: input.opportunityId, ...proposalBody(input) }
   );
   if (!error && data) return { proposal: mapBackendProposal(data), error: null };
   return { proposal: null, error };
+}
+
+/**
+ * Save (create or update) my private draft for a job. One draft per job; it
+ * can be half-written. Submitting later reuses it.
+ * Endpoint: POST /api/v1/proposals/drafts
+ */
+export async function saveProposalDraftApi(
+  input: ProposalInput
+): Promise<{ proposal: Proposal | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.post<Record<string, unknown>, ProposalResponse>(
+    "/proposals/drafts",
+    { jobId: input.opportunityId, ...proposalBody(input) }
+  );
+  if (!error && data) return { proposal: mapBackendProposal(data), error: null };
+  return { proposal: null, error };
+}
+
+/**
+ * Submit an existing draft as it is stored.
+ * Endpoint: POST /api/v1/proposals/:id/submit
+ */
+export async function submitProposalDraftApi(
+  proposalId: string
+): Promise<{ proposal: Proposal | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.post<undefined, ProposalResponse>(
+    `/proposals/${proposalId}/submit`
+  );
+  if (!error && data) return { proposal: mapBackendProposal(data), error: null };
+  return { proposal: null, error };
+}
+
+/** Endpoint: DELETE /api/v1/proposals/:id (drafts only) */
+export async function discardProposalDraftApi(
+  proposalId: string
+): Promise<{ error: ApiError | null }> {
+  const { error } = await apiClient.delete<{ success: true }>(`/proposals/${proposalId}`);
+  return { error };
+}
+
+/** My saved draft for a job, if any (drafts appear in my proposals list). */
+export async function getMyDraftForJobApi(
+  jobId: string
+): Promise<{ draft: Proposal | null; error: ApiError | null }> {
+  const { proposals, error } = await getMyProposalsApi({ status: "draft", limit: 100 });
+  if (error) return { draft: null, error };
+  return { draft: proposals.find((p) => p.opportunityId === jobId) ?? null, error: null };
 }
 
 /**
@@ -283,17 +373,19 @@ export async function withdrawProposalApi(
   return { proposal: null, error };
 }
 
+// ── Employer actions ──────────────────────────────────────────
+
+type ProposalResult = { proposal: Proposal | null; error: ApiError | null };
+
 /**
  * Shortlist a proposal (employer / job owner only).
  * Endpoint: POST /api/v1/proposals/:proposalId/shortlist
  */
-export async function shortlistProposalApi(
-  proposalId: string
-): Promise<{ proposal: ProposalResponse | null; error: ApiError | null }> {
+export async function shortlistProposalApi(proposalId: string): Promise<ProposalResult> {
   const { data, error } = await apiClient.post<undefined, ProposalResponse>(
     `/proposals/${proposalId}/shortlist`
   );
-  if (!error && data) return { proposal: data, error: null };
+  if (!error && data) return { proposal: mapBackendProposal(data), error: null };
   return { proposal: null, error };
 }
 
@@ -304,35 +396,147 @@ export async function shortlistProposalApi(
 export async function rejectProposalApi(
   proposalId: string,
   reason?: string
-): Promise<{ proposal: ProposalResponse | null; error: ApiError | null }> {
+): Promise<ProposalResult> {
   const { data, error } = await apiClient.post<{ reason?: string }, ProposalResponse>(
     `/proposals/${proposalId}/reject`,
     reason ? { reason } : {}
   );
-  if (!error && data) return { proposal: data, error: null };
+  if (!error && data) return { proposal: mapBackendProposal(data), error: null };
   return { proposal: null, error };
 }
 
 /**
- * Accept a proposal and create an engagement (employer / job owner only).
+ * Accept (hire) a proposal and create the engagement (employer only). Allowed
+ * straight from submitted/viewed or after shortlisting.
  * Endpoint: POST /api/v1/proposals/:proposalId/accept
- * Returns both the updated proposal and the new engagementId.
  */
 export async function acceptProposalApi(
   proposalId: string
-): Promise<{
-  proposal: ProposalResponse | null;
-  engagementId: string | null;
-  error: ApiError | null;
-}> {
+): Promise<{ proposal: Proposal | null; engagementId: string | null; error: ApiError | null }> {
   const { data, error } = await apiClient.post<
     undefined,
     { proposal: ProposalResponse; engagementId: string }
   >(`/proposals/${proposalId}/accept`);
   if (!error && data) {
-    return { proposal: data.proposal, engagementId: data.engagementId, error: null };
+    return {
+      proposal: mapBackendProposal(data.proposal),
+      engagementId: data.engagementId,
+      error: null,
+    };
   }
   return { proposal: null, engagementId: null, error };
+}
+
+// ── Employer application read-models ──────────────────────────
+
+const ZERO_COUNTS: Record<EmployerApplicationStatus | "all", number> = {
+  submitted: 0,
+  under_review: 0,
+  shortlisted: 0,
+  accepted: 0,
+  rejected: 0,
+  withdrawn: 0,
+  all: 0,
+};
+
+const JOB_STATUS_FROM_BACKEND: Record<string, OpportunityStatus> = {
+  DRAFT: OPPORTUNITY_STATUS.DRAFT,
+  PUBLISHED: OPPORTUNITY_STATUS.OPEN,
+  PAUSED: OPPORTUNITY_STATUS.CLOSED,
+  CLOSED: OPPORTUNITY_STATUS.CLOSED,
+  CANCELLED: OPPORTUNITY_STATUS.CANCELLED,
+  EXPIRED: OPPORTUNITY_STATUS.EXPIRED,
+};
+
+/** A proposal as the employer sees it: + its job and a public candidate preview. */
+export function mapBackendApplication(p: ProposalResponse): EmployerApplicationSummary {
+  return {
+    proposal: mapBackendProposal(p),
+    job: {
+      id: p.jobId,
+      title: p.job?.title ?? "",
+      status: JOB_STATUS_FROM_BACKEND[p.job?.status ?? ""] ?? OPPORTUNITY_STATUS.OPEN,
+    },
+    candidate: {
+      // The freelancer *profile* id: it addresses /freelancers/:id.
+      id: p.freelancerId,
+      name: p.freelancer?.fullName || p.freelancer?.username || "Freelancer",
+      headline: p.freelancer?.headline ?? "",
+      avatar: p.freelancer?.avatar ?? undefined,
+    },
+  };
+}
+
+export interface ReceivedApplicationsQuery {
+  jobId?: string;
+  status?: EmployerApplicationStatus | "all";
+  search?: string;
+  sort?: string;
+  page?: number;
+  size?: number;
+}
+
+const APPLICATION_SORTS = new Set(["newest", "oldest", "amount_high", "amount_low", "delivery_fast"]);
+
+/**
+ * Applications received across my jobs (search, sort and pagination run on
+ * the server), plus per-status counts for the filter tabs.
+ * Endpoint: GET /api/v1/proposals/received
+ */
+export async function getReceivedApplicationsApi(
+  query: ReceivedApplicationsQuery = {}
+): Promise<{ page: EmployerApplicationsPage; error: ApiError | null }> {
+  const size = query.size ?? 20;
+  const params = new URLSearchParams();
+  if (query.jobId) params.set("jobId", query.jobId);
+  const status = toBackendStatus(query.status);
+  if (status) params.set("status", status);
+  if (query.search?.trim()) params.set("search", query.search.trim());
+  if (query.sort && APPLICATION_SORTS.has(query.sort)) params.set("sort", query.sort);
+  if (query.page) params.set("page", String(query.page));
+  params.set("limit", String(size));
+
+  const { data, error } = await apiClient.get<PaginatedProposalResult>(
+    `/proposals/received?${params.toString()}`
+  );
+  if (error || !data) {
+    return {
+      page: { items: [], total: 0, page: 1, size, totalPages: 1, counts: { ...ZERO_COUNTS } },
+      error,
+    };
+  }
+
+  const counts = { ...ZERO_COUNTS, all: data.counts?.all ?? 0 };
+  for (const [backendStatus, n] of Object.entries(data.counts ?? {})) {
+    const mapped = STATUS_FROM_BACKEND[backendStatus];
+    // EXPIRED folds into "withdrawn" on the frontend, so counts add up.
+    if (mapped && mapped !== PROPOSAL_STATUS.DRAFT) counts[mapped] += n;
+  }
+
+  return {
+    page: {
+      items: (data.items ?? []).map(mapBackendApplication),
+      total: data.meta?.total ?? 0,
+      page: data.meta?.page ?? 1,
+      size,
+      totalPages: data.meta?.totalPages ?? 1,
+      counts,
+    },
+    error: null,
+  };
+}
+
+/**
+ * One application on one of my jobs. Fetching it as the employer also marks a
+ * new proposal as viewed (backend-owned, SUBMITTED -> VIEWED).
+ * Endpoint: GET /api/v1/proposals/:proposalId
+ */
+export async function getApplicationApi(
+  proposalId: string
+): Promise<{ application: EmployerApplicationSummary | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.get<ProposalResponse>(`/proposals/${proposalId}`);
+  if (!error && data) return { application: mapBackendApplication(data), error: null };
+  return { application: null, error };
 }
 
 /**
@@ -368,8 +572,12 @@ export async function getJobEligibilityApi(job: Opportunity): Promise<JobEligibi
       reasons: ["Create your freelancer profile before applying."],
     };
   }
+  // A private draft is not an application; only submitted ones count.
   const existing = mine.proposals.find(
-    (p) => p.opportunityId === job.id && p.status !== PROPOSAL_STATUS.WITHDRAWN
+    (p) =>
+      p.opportunityId === job.id &&
+      p.status !== PROPOSAL_STATUS.WITHDRAWN &&
+      p.status !== PROPOSAL_STATUS.DRAFT
   );
   if (existing) {
     return {

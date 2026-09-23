@@ -135,6 +135,7 @@ export const PROPOSAL_FILTER_TABS: {
   label: string;
 }[] = [
   { value: "all", label: "All" },
+  { value: PROPOSAL_STATUS.DRAFT, label: "Drafts" },
   { value: PROPOSAL_STATUS.SUBMITTED, label: "Submitted" },
   { value: PROPOSAL_STATUS.UNDER_REVIEW, label: "Under Review" },
   { value: PROPOSAL_STATUS.SHORTLISTED, label: "Shortlisted" },

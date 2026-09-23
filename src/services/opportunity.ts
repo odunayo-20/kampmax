@@ -15,8 +15,28 @@
 //     error/eligibility results, never invented records.
 
 import { getCurrentUser, getUserById } from "@/services/users";
-import { apiClient } from "@/lib/api-client";
 import type { ApiError } from "@/lib/api-client";
+import {
+  cancelJob,
+  closeJob,
+  createJob,
+  getJobById,
+  getMyJobById,
+  listMyJobs,
+  listPublicJobs,
+  pauseJob,
+  publishJob,
+  updateJob,
+  type Job,
+} from "@/services/jobs";
+import {
+  isBackendId,
+  jobListFiltersToQuery,
+  jobToOpportunity,
+  opportunityInputToJobDto,
+  opportunityInputToUpdateDto,
+  opportunityStatusToBackend,
+} from "@/lib/job-api-mapping";
 import {
   closeOpportunityRecord,
   countEmployerApplicationStatuses,
@@ -979,310 +999,148 @@ export { isSafeExternalUrl, currentUserId };
 // ASYNC BACKEND API — JOBS (NestJS /jobs)
 // ═══════════════════════════════════════════════════════════
 //
-// All functions call apiClient and fall back to the local sync helpers
-// so the UI never breaks offline / during beta with partial backend.
+// Thin adapters: services/jobs.ts is the typed backend client and
+// lib/job-api-mapping.ts translates to/from the Opportunity vocabulary, so
+// there is exactly one implementation of each mapping.
 
-export interface JobResponse {
-  id: string;
-  title: string;
-  slug: string;
-  status: OpportunityStatus;
-  description: string | null;
-  budgetMin: number | null;
-  budgetMax: number | null;
-  currency: string;
-  deadline: string | null;
-  postedAt: string;
-  createdAt: string;
-  updatedAt: string;
-  [key: string]: unknown;
-}
-
-export interface PaginatedJobResult {
-  data: JobResponse[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
+export { isBackendId };
 
 /**
  * Browse published jobs with search and filters.
  * Endpoint: GET /api/v1/jobs
  */
-const EXPERIENCE_LEVEL_QUERY_MAP: Record<string, string> = {
-  any_level: "",
-  entry_level: "JUNIOR",
-  beginner: "JUNIOR",
-  junior: "JUNIOR",
-  intermediate: "MIDLEVEL",
-  midlevel: "MIDLEVEL",
-  experienced: "SENIOR",
-  senior: "SENIOR",
-  expert: "EXPERT",
-  "": "",
-};
-
-const WORK_ARRANGEMENT_QUERY_MAP: Record<string, string> = {
-  remote: "REMOTE",
-  on_site: "ONSITE",
-  on_campus: "ONSITE",
-  hybrid: "HYBRID",
-};
-
 export async function getOpportunitiesPageApi(
   query: OpportunityQuery = {}
 ): Promise<{ page: OpportunityPage; error: ApiError | null }> {
-  const params = new URLSearchParams();
-
-  if (query.search) params.set("search", query.search);
-  if (query.categoryId) params.set("categoryId", query.categoryId);
-  if (query.campusId) params.set("campusId", query.campusId);
-
-  const normalizedExperience = query.experience?.trim();
-  if (normalizedExperience) {
-    const experienceLevel = EXPERIENCE_LEVEL_QUERY_MAP[normalizedExperience.toLowerCase()];
-    if (experienceLevel) params.set("experienceLevel", experienceLevel);
-  }
-
-  const normalizedArrangement = query.arrangement?.trim();
-  if (normalizedArrangement) {
-    const locationType = WORK_ARRANGEMENT_QUERY_MAP[normalizedArrangement.toLowerCase()];
-    if (locationType) params.set("locationType", locationType);
-  }
-
-  if (query.sort) params.set("sort", query.sort);
-  if (query.page) params.set("page", String(query.page));
-  if (query.size) params.set("limit", String(query.size));
-
-  const qs = params.toString();
-  // Backend shape: { items, meta: { total, page, limit, totalPages } }
-  const { data, error } = await apiClient.get<{
-    items: BackendJob[];
-    meta: { total: number; page: number; limit: number; totalPages: number };
-  }>(`/jobs${qs ? `?${qs}` : ""}`);
-  if (!error && data) {
-    return {
-      page: {
-        items: (data.items ?? []).map(mapBackendJob),
-        total: data.meta?.total ?? 0,
-        page: data.meta?.page ?? 1,
-        size: data.meta?.limit ?? query.size ?? 9,
-        totalPages: data.meta?.totalPages ?? 1,
-      },
-      error: null,
-    };
-  }
-  return { page: emptyJobPage(query.size ?? 9), error };
-}
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/** Real backend records use UUIDs; legacy demo records use short ids like "j1". */
-export function isBackendId(id: string): boolean {
-  return UUID_RE.test(id);
-}
-
-/** Backend job payload (modules/jobs JobResponse). */
-export interface BackendJob {
-  id: string;
-  employer: { id: string; userId: string; displayName: string };
-  title: string;
-  description: string | null;
-  category: { id: string; name: string } | null;
-  campus: { id: string; name: string } | null;
-  budgetType: string;
-  budgetMin: number | null;
-  budgetMax: number | null;
-  experienceLevel: string | null;
-  estimatedDuration: string | null;
-  locationType: string;
-  state: string | null;
-  city: string | null;
-  applicationDeadline: string | null;
-  status: string;
-  publishedAt: string | null;
-  skills: { name: string }[];
-  proposalCount?: number;
-  createdAt: string;
-}
-
-const JOB_STATUS_MAP: Record<string, OpportunityStatus> = {
-  PUBLISHED: OPPORTUNITY_STATUS.OPEN,
-  PAUSED: OPPORTUNITY_STATUS.CLOSED,
-  CLOSED: OPPORTUNITY_STATUS.CLOSED,
-  EXPIRED: OPPORTUNITY_STATUS.EXPIRED,
-  CANCELLED: OPPORTUNITY_STATUS.CANCELLED,
-  DRAFT: OPPORTUNITY_STATUS.DRAFT,
-};
-
-const JOB_ARRANGEMENT_MAP: Record<string, OpportunityWorkArrangement> = {
-  REMOTE: OPPORTUNITY_WORK_ARRANGEMENT.REMOTE,
-  ONSITE: OPPORTUNITY_WORK_ARRANGEMENT.ON_SITE,
-  HYBRID: OPPORTUNITY_WORK_ARRANGEMENT.HYBRID,
-};
-
-/**
- * Maps a backend job to the frontend Opportunity model. Fields the backend
- * doesn't store (requirements, screening questions, attachments, view count,
- * employer descriptor/verified flag) are left empty rather than invented;
- * the free-text estimatedDuration is bucketed into the closest duration key.
- */
-export function mapBackendJob(job: BackendJob): Opportunity {
-  const description = job.description ?? "";
-  const duration = (job.estimatedDuration ?? "").toLowerCase();
-  const workArrangement =
-    JOB_ARRANGEMENT_MAP[job.locationType] ?? OPPORTUNITY_WORK_ARRANGEMENT.ON_SITE;
-
+  const size = query.size ?? 9;
+  const { jobs, total, page, totalPages, error } = await listPublicJobs(
+    jobListFiltersToQuery({
+      search: query.search,
+      categoryId: query.categoryId,
+      campusId: query.campusId,
+      experience: query.experience,
+      arrangement: query.arrangement,
+      sort: query.sort,
+      page: query.page,
+      size,
+    })
+  );
+  if (error) return { page: emptyJobPage(size), error };
   return {
-    id: job.id,
-    title: job.title,
-    categoryId: job.category?.id ?? "",
-    summary: description.length > 160 ? `${description.slice(0, 157)}...` : description,
-    description,
-    requirements: "",
-    skills: (job.skills ?? []).map((s) => s.name),
-    workArrangement,
-    location: {
-      city: job.city ?? undefined,
-      state: job.state ?? undefined,
-      campusId: job.campus?.id,
-      remote: workArrangement === OPPORTUNITY_WORK_ARRANGEMENT.REMOTE,
-    },
-    budget: {
-      type:
-        job.budgetType === "HOURLY"
-          ? OPPORTUNITY_BUDGET_TYPE.HOURLY
-          : OPPORTUNITY_BUDGET_TYPE.PROJECT,
-      min: job.budgetMin != null ? Number(job.budgetMin) : undefined,
-      max: job.budgetMax != null ? Number(job.budgetMax) : undefined,
-      currency: "NGN",
-    },
-    duration: /long|6|year/.test(duration)
-      ? OPPORTUNITY_DURATION.LONG_TERM
-      : /month/.test(duration)
-      ? OPPORTUNITY_DURATION.ONE_TO_THREE_MONTHS
-      : /week/.test(duration)
-      ? OPPORTUNITY_DURATION.FEW_WEEKS
-      : OPPORTUNITY_DURATION.SHORT_TERM,
-    experienceLevel: (job.experienceLevel ?? "").toLowerCase(),
-    postedAt: job.publishedAt ?? job.createdAt,
-    deadline: job.applicationDeadline ?? "",
-    status: JOB_STATUS_MAP[job.status] ?? OPPORTUNITY_STATUS.DRAFT,
-    employer: {
-      id: job.employer.id,
-      name: job.employer.displayName,
-      descriptor: "",
-      location: [job.city, job.state].filter(Boolean).join(", "),
-      verified: false,
-    },
-    employerUserId: job.employer.userId,
-    screeningQuestions: [],
-    attachments: [],
-    viewCount: 0,
-    proposalCount: job.proposalCount ?? 0,
+    page: { items: jobs.map(jobToOpportunity), total, page, size, totalPages },
+    error: null,
   };
 }
 
-/**
- * Get a single published job by ID.
- * Endpoint: GET /api/v1/jobs/:id
- */
-export async function getJobByIdApi(
-  id: string
-): Promise<{ job: Opportunity | null; error: ApiError | null }> {
-  const { data, error } = await apiClient.get<BackendJob>(`/jobs/${id}`);
-  if (!error && data) return { job: mapBackendJob(data), error: null };
-  return { job: null, error };
+type JobResult = { job: Opportunity | null; error: ApiError | null };
+
+function toJobResult({ job, error }: { job: Job | null; error: ApiError | null }): JobResult {
+  return job ? { job: jobToOpportunity(job), error: null } : { job: null, error };
 }
 
 /**
- * List jobs created by the authenticated employer.
+ * A published job by id (public).
+ * Endpoint: GET /api/v1/jobs/:id
+ */
+export async function getJobByIdApi(id: string): Promise<JobResult> {
+  return toJobResult(await getJobById(id));
+}
+
+/**
+ * One of the employer's own jobs, in any status.
+ * Endpoint: GET /api/v1/jobs/me/:id
+ */
+export async function getMyJobByIdApi(id: string): Promise<JobResult> {
+  return toJobResult(await getMyJobById(id));
+}
+
+/**
+ * The employer's own jobs, optionally limited to one UI status tab.
  * Endpoint: GET /api/v1/jobs/me
  */
 export async function getMyJobsApi(
   page = 1,
-  limit = 20
-): Promise<{ result: PaginatedJobResult | null; error: ApiError | null }> {
-  const { data, error } = await apiClient.get<PaginatedJobResult>(
-    `/jobs/me?page=${page}&limit=${limit}`
-  );
-  if (!error && data) return { result: data, error: null };
-  return { result: null, error };
+  size = 20,
+  status?: OpportunityStatus | "all"
+): Promise<{ page: OpportunityPage; error: ApiError | null }> {
+  const res = await listMyJobs({
+    page,
+    limit: size,
+    statuses: opportunityStatusToBackend(status),
+  });
+  if (res.error) return { page: emptyJobPage(size), error: res.error };
+  return {
+    page: {
+      items: res.jobs.map(jobToOpportunity),
+      total: res.total,
+      page: res.page,
+      size,
+      totalPages: res.totalPages,
+    },
+    error: null,
+  };
+}
+
+/** Per-status counts of the employer's jobs (for the filter tabs). */
+export async function getMyJobCountsApi(): Promise<{
+  counts: Record<OpportunityStatus, number> & { all: number };
+  error: ApiError | null;
+}> {
+  const counts = {
+    draft: 0,
+    pending_review: 0,
+    open: 0,
+    closed: 0,
+    expired: 0,
+    cancelled: 0,
+    all: 0,
+  };
+  const res = await listMyJobs({ page: 1, limit: 100 });
+  if (res.error) return { counts, error: res.error };
+  for (const job of res.jobs.map(jobToOpportunity)) counts[job.status] += 1;
+  counts.all = res.total;
+  return { counts, error: null };
 }
 
 /**
- * Create a new job as a DRAFT.
+ * Create a job as a draft. `mediaIds` are attachments already uploaded.
  * Endpoint: POST /api/v1/jobs
  */
 export async function createJobApi(
-  input: OpportunityInput
-): Promise<{ job: JobResponse | null; error: ApiError | null }> {
-  const { data, error } = await apiClient.post<OpportunityInput, JobResponse>("/jobs", input);
-  if (!error && data) return { job: data, error: null };
-  return { job: null, error };
+  input: OpportunityInput,
+  mediaIds?: string[]
+): Promise<JobResult> {
+  return toJobResult(await createJob(opportunityInputToJobDto(input, mediaIds)));
 }
 
 /**
- * Update a DRAFT job.
+ * Update a draft job.
  * Endpoint: PATCH /api/v1/jobs/:id
  */
 export async function updateJobApi(
   id: string,
-  input: Partial<OpportunityInput>
-): Promise<{ job: JobResponse | null; error: ApiError | null }> {
-  const { data, error } = await apiClient.patch<Partial<OpportunityInput>, JobResponse>(
-    `/jobs/${id}`,
-    input
-  );
-  if (!error && data) return { job: data, error: null };
-  return { job: null, error };
+  input: OpportunityInput,
+  mediaIds?: string[]
+): Promise<JobResult> {
+  return toJobResult(await updateJob(id, opportunityInputToUpdateDto(input, mediaIds)));
 }
 
-/**
- * Publish a DRAFT job (DRAFT → OPEN after moderation).
- * Endpoint: POST /api/v1/jobs/:id/publish
- */
-export async function publishJobApi(
-  id: string
-): Promise<{ job: JobResponse | null; error: ApiError | null }> {
-  const { data, error } = await apiClient.post<undefined, JobResponse>(`/jobs/${id}/publish`);
-  if (!error && data) return { job: data, error: null };
-  return { job: null, error };
+/** Endpoint: POST /api/v1/jobs/:id/publish */
+export async function publishJobApi(id: string): Promise<JobResult> {
+  return toJobResult(await publishJob(id));
 }
 
-/**
- * Pause a live job posting.
- * Endpoint: POST /api/v1/jobs/:id/pause
- */
-export async function pauseJobApi(
-  id: string
-): Promise<{ job: JobResponse | null; error: ApiError | null }> {
-  const { data, error } = await apiClient.post<undefined, JobResponse>(`/jobs/${id}/pause`);
-  if (!error && data) return { job: data, error: null };
-  return { job: null, error };
+/** Endpoint: POST /api/v1/jobs/:id/pause */
+export async function pauseJobApi(id: string): Promise<JobResult> {
+  return toJobResult(await pauseJob(id));
 }
 
-/**
- * Close a live job posting.
- * Endpoint: POST /api/v1/jobs/:id/close
- */
-export async function closeJobApi(
-  id: string
-): Promise<{ job: JobResponse | null; error: ApiError | null }> {
-  const { data, error } = await apiClient.post<undefined, JobResponse>(`/jobs/${id}/close`);
-  if (!error && data) return { job: data, error: null };
-  return { job: null, error };
+/** Endpoint: POST /api/v1/jobs/:id/close */
+export async function closeJobApi(id: string): Promise<JobResult> {
+  return toJobResult(await closeJob(id));
 }
 
-/**
- * Cancel a job.
- * Endpoint: POST /api/v1/jobs/:id/cancel
- */
-export async function cancelJobApi(
-  id: string
-): Promise<{ job: JobResponse | null; error: ApiError | null }> {
-  const { data, error } = await apiClient.post<undefined, JobResponse>(`/jobs/${id}/cancel`);
-  if (!error && data) return { job: data, error: null };
-  return { job: null, error };
+/** Endpoint: POST /api/v1/jobs/:id/cancel */
+export async function cancelJobApi(id: string): Promise<JobResult> {
+  return toJobResult(await cancelJob(id));
 }

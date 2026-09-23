@@ -158,6 +158,8 @@ export interface OpportunityInput {
   experienceLevel: string;
   deadline: string;
   screeningQuestions: OpportunityScreeningQuestion[];
+  /** Documents already uploaded via the media service (their ids are what gets attached). */
+  attachments?: OpportunityAttachment[];
 }
 
 // ── Query / pagination ──────────────────────────────────────

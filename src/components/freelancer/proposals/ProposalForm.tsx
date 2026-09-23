@@ -1,17 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { Paperclip, X } from "lucide-react";
+import { useState } from "react";
 import { Button, Input, Select } from "@/components/ui";
+import { AttachmentPicker } from "@/components/uploads/AttachmentPicker";
 import type {
   Opportunity,
   ProposalDeliveryUnit,
 } from "@/types/opportunity";
-import {
-  PROPOSAL_ATTACHMENT_ALLOWED,
-  PROPOSAL_ATTACHMENT_MAX_BYTES,
-  PROPOSAL_COVER_LETTER_MAX,
-} from "@/config/opportunity";
+import { PROPOSAL_COVER_LETTER_MAX } from "@/config/opportunity";
 import { formatNaira } from "@/lib/utils";
 import {
   ProposalFormValues,
@@ -26,6 +22,8 @@ interface ProposalFormProps {
   onSaveDraft?: () => void;
   submitting?: boolean;
   saving?: boolean;
+  /** The backend requires a proposed amount; legacy demo jobs treat it as optional. */
+  requireAmount?: boolean;
 }
 
 export function ProposalForm({
@@ -36,38 +34,13 @@ export function ProposalForm({
   onSaveDraft,
   submitting,
   saving,
+  requireAmount,
 }: ProposalFormProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [fileError, setFileError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const update = <K extends keyof ProposalFormValues>(key: K, value: ProposalFormValues[K]) => {
     onChange({ ...values, [key]: value });
   };
-
-  function handleFile(files: FileList | null) {
-    if (!files || files.length === 0) return;
-    setFileError(null);
-    const added: typeof values.attachments = [];
-    for (const file of Array.from(files)) {
-      if (!PROPOSAL_ATTACHMENT_ALLOWED.includes(file.type as (typeof PROPOSAL_ATTACHMENT_ALLOWED)[number])) {
-        setFileError(`"${file.name}" isn't a supported file type (PDF, DOC/DOCX, PNG, JPG).`);
-        continue;
-      }
-      if (file.size > PROPOSAL_ATTACHMENT_MAX_BYTES) {
-        setFileError(`"${file.name}" is larger than 5MB.`);
-        continue;
-      }
-      added.push({
-        id: `fl_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
-        filename: file.name,
-        sizeBytes: file.size,
-        mimeType: file.type,
-      });
-    }
-    if (added.length) update("attachments", [...values.attachments, ...added]);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  }
 
   function validate(): boolean {
     const e: Record<string, string> = {};
@@ -76,7 +49,9 @@ export function ProposalForm({
       e.coverLetter = `Cover letter must be ${PROPOSAL_COVER_LETTER_MAX} characters or fewer.`;
 
     const amount = Number(values.proposedAmount);
-    if (values.proposedAmount.trim() && (!Number.isFinite(amount) || amount < 0))
+    if (requireAmount && !values.proposedAmount.trim())
+      e.proposedAmount = "Enter the amount you want to charge for this job.";
+    else if (values.proposedAmount.trim() && (!Number.isFinite(amount) || amount < 0))
       e.proposedAmount = "Enter a valid non-negative amount.";
 
     const delivery = Number(values.deliveryValue);
@@ -239,54 +214,14 @@ export function ProposalForm({
         <p className="mt-1 text-xs text-neutral-500">
           PDF, DOC/DOCX, PNG or JPG · up to 5MB each.
         </p>
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept=".pdf,.doc,.docx,image/png,image/jpeg"
-          onChange={(e) => handleFile(e.target.files)}
-          className="hidden"
-          id="proposal-attachments"
-        />
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="mt-3"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <Paperclip className="mr-1.5 h-4 w-4" aria-hidden />
-          Add file
-        </Button>
-        {fileError && <p className="mt-2 text-xs text-error-600">{fileError}</p>}
-        {values.attachments.length > 0 && (
-          <ul className="mt-3 space-y-2">
-            {values.attachments.map((a) => (
-              <li
-                key={a.id}
-                className="flex items-center justify-between rounded-md border border-neutral-200 px-3 py-2 text-sm"
-              >
-                <span className="truncate text-neutral-700">
-                  <Paperclip className="mr-1.5 inline h-3.5 w-3.5 text-neutral-400" aria-hidden />
-                  {a.filename}
-                  <span className="ml-2 text-xs text-neutral-400">
-                    {(a.sizeBytes / 1024 / 1024).toFixed(2)}MB
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  aria-label={`Remove ${a.filename}`}
-                  onClick={() =>
-                    update("attachments", values.attachments.filter((x) => x.id !== a.id))
-                  }
-                  className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-error-600"
-                >
-                  <X className="h-4 w-4" aria-hidden />
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+        <div className="mt-3">
+          <AttachmentPicker
+            category="proposalAttachment"
+            value={values.attachments}
+            onChange={(next) => update("attachments", next)}
+            disabled={submitting || saving}
+          />
+        </div>
       </section>
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">

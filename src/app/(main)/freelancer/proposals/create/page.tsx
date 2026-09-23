@@ -10,7 +10,12 @@ import {
   getJobEligibility,
   isBackendId,
 } from "@/services/opportunity";
-import { getJobEligibilityApi, submitProposalApi } from "@/services/proposals";
+import {
+  getJobEligibilityApi,
+  getMyDraftForJobApi,
+  saveProposalDraftApi,
+  submitProposalApi,
+} from "@/services/proposals";
 import { ELIGIBILITY_CODE, OPPORTUNITY_STATUS } from "@/types/opportunity";
 import type { JobEligibility, Opportunity, Proposal, ProposalInput } from "@/types/opportunity";
 import {
@@ -52,8 +57,26 @@ function CreateProposalContent() {
       setOpportunity(visible);
       setLoading(false);
       if (visible) {
-        const result = await getJobEligibilityApi(visible);
-        if (!cancelled) setRemoteEligibility(result);
+        const [result, { draft }] = await Promise.all([
+          getJobEligibilityApi(visible),
+          getMyDraftForJobApi(visible.id),
+        ]);
+        if (cancelled) return;
+        setRemoteEligibility(result);
+        // Pick up where the freelancer left off.
+        if (draft) {
+          setValues({
+            coverLetter: draft.coverLetter,
+            proposedAmount:
+              draft.proposedAmount && draft.proposedAmount > 0 ? String(draft.proposedAmount) : "",
+            deliveryValue: draft.delivery.value > 0 ? String(draft.delivery.value) : "",
+            deliveryUnit: draft.delivery.unit,
+            screeningAnswers: Object.fromEntries(
+              draft.screeningAnswers.map((a) => [a.questionId, a.answer])
+            ),
+            attachments: draft.attachments,
+          });
+        }
       }
     })();
     return () => {
@@ -96,9 +119,19 @@ function CreateProposalContent() {
     };
   }
 
-  function handleSaveDraft() {
+  async function handleSaveDraft() {
     setBusy(true);
     setError(null);
+    if (backend) {
+      const res = await saveProposalDraftApi(buildInput(values));
+      setBusy(false);
+      if (res.error || !res.proposal) {
+        setError(res.error?.message ?? "We couldn't save your draft.");
+        return;
+      }
+      router.push("/freelancer/proposals?status=draft");
+      return;
+    }
     const res = createProposalDraft(buildInput(values));
     setBusy(false);
     if (!res.ok) {
@@ -207,7 +240,8 @@ function CreateProposalContent() {
             setError(null);
             setStep("review");
           }}
-          onSaveDraft={canApply && !backend ? handleSaveDraft : undefined}
+          requireAmount={backend}
+          onSaveDraft={canApply ? () => void handleSaveDraft() : undefined}
           submitting={busy}
         />
       )}

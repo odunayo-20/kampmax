@@ -19,6 +19,7 @@ import {
 import type { JobEligibility, Opportunity } from "@/types/opportunity";
 import { ELIGIBILITY_CODE, OPPORTUNITY_STATUS } from "@/types/opportunity";
 import { getJobEligibilityApi } from "@/services/proposals";
+import { listSavedJobIds, saveJob, unsaveJob } from "@/services/jobs";
 import {
   getDiscoverableOpportunity,
   getJobByIdApi,
@@ -71,8 +72,13 @@ export default function JobDetailPage() {
       setOpportunity(visible);
       setLoading(false);
       if (visible) {
-        const result = await getJobEligibilityApi(visible);
-        if (!cancelled) setRemoteEligibility(result);
+        const [result, savedIds] = await Promise.all([
+          getJobEligibilityApi(visible),
+          listSavedJobIds(),
+        ]);
+        if (cancelled) return;
+        setRemoteEligibility(result);
+        setSaved(savedIds.ids.includes(visible.id));
       }
     })();
     return () => {
@@ -122,7 +128,16 @@ export default function JobDetailPage() {
   const canApply = eligibility.eligible;
   const alreadyApplied = eligibility.code === ELIGIBILITY_CODE.ALREADY_APPLIED;
 
-  function toggleSave() {
+  async function toggleSave() {
+    if (backend) {
+      const { error: saveError } = saved ? await unsaveJob(o.id) : await saveJob(o.id);
+      if (saveError) setError(saveError.message ?? "Couldn't update your saved jobs.");
+      else {
+        setError(null);
+        setSaved(!saved);
+      }
+      return;
+    }
     if (saved) {
       const res = unsaveJobForUser(o.id);
       if (!res.ok) setError(res.message);
@@ -169,19 +184,17 @@ export default function JobDetailPage() {
           </div>
           <div className="flex items-center gap-2">
             <OpportunityStatusBadge status={o.status} />
-            {!backend && (
-              <Button variant="outline" size="sm" onClick={toggleSave} aria-pressed={saved}>
-                {saved ? (
-                  <>
-                    <BookmarkCheck className="mr-1.5 h-4 w-4" aria-hidden /> Saved
-                  </>
-                ) : (
-                  <>
-                    <Bookmark className="mr-1.5 h-4 w-4" aria-hidden /> Save
-                  </>
-                )}
-              </Button>
-            )}
+            <Button variant="outline" size="sm" onClick={() => void toggleSave()} aria-pressed={saved}>
+              {saved ? (
+                <>
+                  <BookmarkCheck className="mr-1.5 h-4 w-4" aria-hidden /> Saved
+                </>
+              ) : (
+                <>
+                  <Bookmark className="mr-1.5 h-4 w-4" aria-hidden /> Save
+                </>
+              )}
+            </Button>
           </div>
         </div>
 

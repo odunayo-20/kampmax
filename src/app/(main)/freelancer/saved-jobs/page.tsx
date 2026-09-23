@@ -1,7 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getSavedJobsForUser } from "@/services/opportunity";
+import { listSavedJobs } from "@/services/jobs";
+import { jobToOpportunity } from "@/lib/job-api-mapping";
+import type { Opportunity } from "@/types/opportunity";
 import {
   SavedJobsHeader,
   OpportunityList,
@@ -9,13 +12,40 @@ import {
 } from "@/components/freelancer/opportunities";
 
 export default function SavedJobsPage() {
-  const jobs = useMemo(() => getSavedJobsForUser(), []);
+  // Legacy demo jobs saved in the local store, plus real jobs saved on the backend.
+  const localJobs = useMemo(() => getSavedJobsForUser(), []);
+  const [backendJobs, setBackendJobs] = useState<Opportunity[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void listSavedJobs({ limit: 100 }).then(({ jobs, error: loadError }) => {
+      if (cancelled) return;
+      if (loadError) setError(loadError.message ?? "We couldn't load your saved jobs.");
+      else setBackendJobs(jobs.map(jobToOpportunity));
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const jobs = [...backendJobs, ...localJobs];
 
   return (
     <div className="space-y-6">
       <SavedJobsHeader count={jobs.length} />
 
-      {jobs.length === 0 ? (
+      {error && (
+        <div role="alert" className="rounded-lg border border-error-100 bg-error-50 p-3 text-sm text-error-700">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="pt-4 text-center text-sm text-neutral-500">Loading…</div>
+      ) : jobs.length === 0 ? (
         <OpportunityEmptyState hasFilters={false} saved />
       ) : (
         <>

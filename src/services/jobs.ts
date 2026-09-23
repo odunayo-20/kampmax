@@ -1,5 +1,5 @@
 // ============================================================
-// JOBS, PROPOSALS & ENGAGEMENTS SERVICE
+// JOBS & ENGAGEMENTS SERVICE
 // ============================================================
 //
 // Async wrappers over the NestJS backend for the freelancer
@@ -16,17 +16,12 @@
 //    POST   /jobs/:id/pause          → pause a published job (owner)
 //    POST   /jobs/:id/close          → close a job (owner)
 //    POST   /jobs/:id/cancel         → cancel a job (owner)
+//    GET    /jobs/me/:id             → one of my jobs, any status (owner)
+//    GET    /jobs/saved[/ids]        → my saved jobs
+//    POST   /jobs/:id/save           → save a job
+//    DELETE /jobs/:id/save           → unsave a job
 //
-//  PROPOSALS
-//    POST   /proposals               → submit a proposal
-//    GET    /proposals/me            → list current freelancer's proposals
-//    GET    /proposals/jobs/:jobId   → list proposals for a job (employer)
-//    GET    /proposals/:id           → get a proposal
-//    PATCH  /proposals/:id           → update an editable proposal
-//    POST   /proposals/:id/withdraw  → withdraw a proposal (freelancer)
-//    POST   /proposals/:id/shortlist → shortlist a proposal (employer)
-//    POST   /proposals/:id/reject    → reject a proposal (employer)
-//    POST   /proposals/:id/accept    → accept a proposal (employer)
+//  Proposals live in services/proposals.ts.
 //
 //  ENGAGEMENTS
 //    POST   /engagements/accept          → accept proposal + create engagement
@@ -52,12 +47,10 @@ import type { ApiError } from "@/lib/api-client";
 
 // ── Shared paginated result ──────────────────────────────────
 
+/** Backend list envelope (already unwrapped from { success, data }). */
 export interface PaginatedResult<T> {
-  data: T[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
+  items: T[];
+  meta: { total: number; page: number; limit: number; totalPages: number };
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -86,7 +79,22 @@ export interface JobEmployerSummary {
   displayName: string;
 }
 
-export type JobStatus = "draft" | "published" | "paused" | "closed" | "cancelled" | "expired";
+/** Backend JobStatus enum (uppercase, as returned by the API). */
+export type JobStatus = "DRAFT" | "PUBLISHED" | "PAUSED" | "CLOSED" | "CANCELLED" | "EXPIRED";
+
+export interface JobScreeningQuestion {
+  id: string;
+  question: string;
+  optional: boolean;
+}
+
+export interface JobAttachment {
+  id: string;
+  filename: string;
+  sizeBytes: number;
+  mimeType: string;
+  url: string | null;
+}
 
 export interface Job {
   id: string;
@@ -95,6 +103,9 @@ export interface Job {
   title: string;
   slug: string;
   description: string | null;
+  summary: string | null;
+  requirements: string | null;
+  categoryKey: string | null;
   category: JobCategorySummary | null;
   campus: JobCampusSummary | null;
   budgetType: string;
@@ -112,112 +123,75 @@ export interface Job {
   visibility: string;
   publishedAt: string | null;
   skills: JobSkillSummary[];
-  proposalCount?: number;
+  screeningQuestions: JobScreeningQuestion[];
+  attachments: JobAttachment[];
+  proposalCount: number;
   createdAt: string;
   updatedAt: string;
 }
 
+/** Exact body accepted by POST /jobs (the backend rejects unknown fields). */
 export interface CreateJobDto {
   title: string;
   description?: string;
-  categoryId?: string;
+  summary?: string;
+  requirements?: string;
+  categoryKey?: string;
   campusId?: string;
-  budgetType: "fixed" | "hourly" | "negotiable";
+  budgetType?: "FIXED" | "HOURLY";
   budgetMin?: number;
   budgetMax?: number;
   currency?: string;
-  experienceLevel?: string;
+  experienceLevel?: "JUNIOR" | "MIDLEVEL" | "SENIOR" | "EXPERT";
   estimatedDuration?: string;
-  locationType?: string;
+  locationType?: "REMOTE" | "ONSITE" | "HYBRID";
   country?: string;
   state?: string;
   city?: string;
   applicationDeadline?: string;
-  skillIds?: string[];
+  /** Skill names; the backend resolves (or creates) them. */
+  skills?: string[];
+  screeningQuestions?: { id?: string; question: string; optional?: boolean }[];
+  /** Uploaded media ids to attach. */
+  mediaIds?: string[];
 }
 
-export interface UpdateJobDto extends Partial<CreateJobDto> {}
+/** PATCH /jobs/:id — drafts only; null clears a clearable field. */
+export interface UpdateJobDto {
+  title?: string;
+  description?: string | null;
+  summary?: string | null;
+  requirements?: string | null;
+  categoryKey?: string | null;
+  campusId?: string | null;
+  budgetType?: "FIXED" | "HOURLY";
+  budgetMin?: number | null;
+  budgetMax?: number | null;
+  currency?: string;
+  experienceLevel?: "JUNIOR" | "MIDLEVEL" | "SENIOR" | "EXPERT" | null;
+  estimatedDuration?: string | null;
+  locationType?: "REMOTE" | "ONSITE" | "HYBRID";
+  country?: string | null;
+  state?: string | null;
+  city?: string | null;
+  applicationDeadline?: string | null;
+  skills?: string[];
+  screeningQuestions?: { id?: string; question: string; optional?: boolean }[];
+  mediaIds?: string[];
+}
 
+/** Query params GET /jobs accepts (anything else is a 400). */
 export interface JobBrowseQuery {
   page?: number;
   limit?: number;
-  q?: string;
-  categoryId?: string;
+  search?: string;
+  categoryKey?: string;
   campusId?: string;
   budgetType?: string;
   experienceLevel?: string;
   locationType?: string;
-  minBudget?: number;
-  maxBudget?: number;
+  /** newest | oldest | deadline */
   sort?: string;
-}
-
-// ═══════════════════════════════════════════════════════════
-// PROPOSALS — response shapes & DTOs
-// ═══════════════════════════════════════════════════════════
-
-export interface ProposalJobSummary {
-  id: string;
-  title: string;
-  slug: string;
-}
-
-export interface ProposalFreelancerSummary {
-  id: string;
-  userId: string;
-  username: string;
-  fullName: string;
-  avatar: string | null;
-}
-
-export type ProposalStatus =
-  | "draft"
-  | "submitted"
-  | "under_review"
-  | "shortlisted"
-  | "accepted"
-  | "rejected"
-  | "withdrawn";
-
-export interface Proposal {
-  id: string;
-  jobId: string;
-  job: ProposalJobSummary;
-  freelancerId: string;
-  freelancer: ProposalFreelancerSummary;
-  coverLetter: string;
-  /**
-   * DISPLAY ONLY — backend recalculates and confirms the agreed amount at
-   * acceptance. Do NOT treat this as the authoritative payment figure.
-   */
-  proposedAmount: number;
-  currency: string;
-  estimatedDeliveryDays: number | null;
-  status: ProposalStatus;
-  submittedAt: string | null;
-  withdrawnAt: string | null;
-  reviewedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface SubmitProposalDto {
-  jobId: string;
-  coverLetter: string;
-  proposedAmount: number;
-  currency?: string;
-  estimatedDeliveryDays?: number;
-}
-
-export interface UpdateProposalDto {
-  coverLetter?: string;
-  proposedAmount?: number;
-  estimatedDeliveryDays?: number;
-}
-
-export interface AcceptProposalResult {
-  proposal: Proposal;
-  engagementId: string;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -288,29 +262,36 @@ export async function listPublicJobs(query: JobBrowseQuery = {}): Promise<{
   error: ApiError | null;
 }> {
   const params = new URLSearchParams();
-  if (query.page) params.set("page", String(query.page));
-  if (query.limit) params.set("limit", String(query.limit));
-  if (query.q) params.set("q", query.q);
-  if (query.categoryId) params.set("categoryId", query.categoryId);
+  if (query.search) params.set("search", query.search);
+  if (query.categoryKey) params.set("categoryKey", query.categoryKey);
   if (query.campusId) params.set("campusId", query.campusId);
   if (query.budgetType) params.set("budgetType", query.budgetType);
   if (query.experienceLevel) params.set("experienceLevel", query.experienceLevel);
   if (query.locationType) params.set("locationType", query.locationType);
-  if (query.minBudget !== undefined) params.set("minBudget", String(query.minBudget));
-  if (query.maxBudget !== undefined) params.set("maxBudget", String(query.maxBudget));
   if (query.sort) params.set("sort", query.sort);
+  if (query.page) params.set("page", String(query.page));
+  if (query.limit) params.set("limit", String(query.limit));
 
   const qs = params.toString();
   const { data, error } = await apiClient.get<PaginatedResult<Job>>(
     `/jobs${qs ? `?${qs}` : ""}`
   );
   if (error) return { jobs: [], total: 0, page: 1, totalPages: 1, error };
+  return fromPage(data);
+}
 
+function fromPage<T>(data: PaginatedResult<T> | null | undefined): {
+  jobs: T[];
+  total: number;
+  page: number;
+  totalPages: number;
+  error: null;
+} {
   return {
-    jobs: data.data ?? [],
-    total: data.total ?? 0,
-    page: data.page ?? 1,
-    totalPages: data.totalPages ?? 1,
+    jobs: data?.items ?? [],
+    total: data?.meta?.total ?? 0,
+    page: data?.meta?.page ?? 1,
+    totalPages: data?.meta?.totalPages ?? 1,
     error: null,
   };
 }
@@ -345,7 +326,9 @@ export async function getJobBySlug(slug: string): Promise<{
  * List jobs created by the current (authenticated) user.
  * Endpoint: GET /jobs/me
  */
-export async function listMyJobs(query: { page?: number; limit?: number } = {}): Promise<{
+export async function listMyJobs(
+  query: { page?: number; limit?: number; statuses?: JobStatus[] } = {}
+): Promise<{
   jobs: Job[];
   total: number;
   page: number;
@@ -355,20 +338,64 @@ export async function listMyJobs(query: { page?: number; limit?: number } = {}):
   const params = new URLSearchParams();
   if (query.page) params.set("page", String(query.page));
   if (query.limit) params.set("limit", String(query.limit));
+  if (query.statuses?.length) params.set("status", query.statuses.join(","));
   const qs = params.toString();
 
   const { data, error } = await apiClient.get<PaginatedResult<Job>>(
     `/jobs/me${qs ? `?${qs}` : ""}`
   );
   if (error) return { jobs: [], total: 0, page: 1, totalPages: 1, error };
+  return fromPage(data);
+}
 
-  return {
-    jobs: data.data ?? [],
-    total: data.total ?? 0,
-    page: data.page ?? 1,
-    totalPages: data.totalPages ?? 1,
-    error: null,
-  };
+/**
+ * One of my own jobs in any status (drafts/closed jobs aren't public).
+ * Endpoint: GET /jobs/me/:id
+ */
+export async function getMyJobById(id: string): Promise<{
+  job: Job | null;
+  error: ApiError | null;
+}> {
+  const { data, error } = await apiClient.get<Job>(`/jobs/me/${id}`);
+  if (error) return { job: null, error };
+  return { job: data, error: null };
+}
+
+// ── Saved jobs ──────────────────────────────────────────────
+
+/** Endpoint: POST /jobs/:id/save */
+export async function saveJob(id: string): Promise<{ error: ApiError | null }> {
+  const { error } = await apiClient.post<undefined, { saved: true }>(`/jobs/${id}/save`);
+  return { error };
+}
+
+/** Endpoint: DELETE /jobs/:id/save */
+export async function unsaveJob(id: string): Promise<{ error: ApiError | null }> {
+  const { error } = await apiClient.delete<{ saved: false }>(`/jobs/${id}/save`);
+  return { error };
+}
+
+/** Ids of every job the current user has saved. Endpoint: GET /jobs/saved/ids */
+export async function listSavedJobIds(): Promise<{ ids: string[]; error: ApiError | null }> {
+  const { data, error } = await apiClient.get<string[]>("/jobs/saved/ids");
+  if (error) return { ids: [], error };
+  return { ids: data ?? [], error: null };
+}
+
+/** Saved jobs, newest bookmark first (closed jobs included). Endpoint: GET /jobs/saved */
+export async function listSavedJobs(
+  query: { page?: number; limit?: number } = {}
+): Promise<{ jobs: Job[]; total: number; page: number; totalPages: number; error: ApiError | null }> {
+  const params = new URLSearchParams();
+  if (query.page) params.set("page", String(query.page));
+  if (query.limit) params.set("limit", String(query.limit));
+  const qs = params.toString();
+
+  const { data, error } = await apiClient.get<PaginatedResult<Job>>(
+    `/jobs/saved${qs ? `?${qs}` : ""}`
+  );
+  if (error) return { jobs: [], total: 0, page: 1, totalPages: 1, error };
+  return fromPage(data);
 }
 
 /**
@@ -450,183 +477,6 @@ export async function cancelJob(id: string): Promise<{
 }
 
 // ═══════════════════════════════════════════════════════════
-// PROPOSAL API FUNCTIONS
-// ═══════════════════════════════════════════════════════════
-
-/**
- * Submit a proposal for a job (authenticated freelancer).
- * Endpoint: POST /proposals
- */
-export async function submitProposal(dto: SubmitProposalDto): Promise<{
-  proposal: Proposal | null;
-  error: ApiError | null;
-}> {
-  const { data, error } = await apiClient.post<SubmitProposalDto, Proposal>("/proposals", dto);
-  if (error) return { proposal: null, error };
-  return { proposal: data, error: null };
-}
-
-/**
- * List proposals submitted by the current freelancer.
- * Endpoint: GET /proposals/me
- */
-export async function listMyProposals(query: {
-  page?: number;
-  limit?: number;
-  status?: ProposalStatus;
-} = {}): Promise<{
-  proposals: Proposal[];
-  total: number;
-  page: number;
-  totalPages: number;
-  error: ApiError | null;
-}> {
-  const params = new URLSearchParams();
-  if (query.page) params.set("page", String(query.page));
-  if (query.limit) params.set("limit", String(query.limit));
-  if (query.status) params.set("status", query.status);
-  const qs = params.toString();
-
-  const { data, error } = await apiClient.get<PaginatedResult<Proposal>>(
-    `/proposals/me${qs ? `?${qs}` : ""}`
-  );
-  if (error) return { proposals: [], total: 0, page: 1, totalPages: 1, error };
-
-  return {
-    proposals: data.data ?? [],
-    total: data.total ?? 0,
-    page: data.page ?? 1,
-    totalPages: data.totalPages ?? 1,
-    error: null,
-  };
-}
-
-/**
- * List proposals received for a job (job owner / employer).
- * Endpoint: GET /proposals/jobs/:jobId
- */
-export async function listProposalsForJob(
-  jobId: string,
-  query: { page?: number; limit?: number; status?: ProposalStatus } = {}
-): Promise<{
-  proposals: Proposal[];
-  total: number;
-  page: number;
-  totalPages: number;
-  error: ApiError | null;
-}> {
-  const params = new URLSearchParams();
-  if (query.page) params.set("page", String(query.page));
-  if (query.limit) params.set("limit", String(query.limit));
-  if (query.status) params.set("status", query.status);
-  const qs = params.toString();
-
-  const { data, error } = await apiClient.get<PaginatedResult<Proposal>>(
-    `/proposals/jobs/${jobId}${qs ? `?${qs}` : ""}`
-  );
-  if (error) return { proposals: [], total: 0, page: 1, totalPages: 1, error };
-
-  return {
-    proposals: data.data ?? [],
-    total: data.total ?? 0,
-    page: data.page ?? 1,
-    totalPages: data.totalPages ?? 1,
-    error: null,
-  };
-}
-
-/**
- * Get a single proposal (freelancer owner or job owner).
- * Endpoint: GET /proposals/:id
- */
-export async function getProposalById(id: string): Promise<{
-  proposal: Proposal | null;
-  error: ApiError | null;
-}> {
-  const { data, error } = await apiClient.get<Proposal>(`/proposals/${id}`);
-  if (error) return { proposal: null, error };
-  return { proposal: data, error: null };
-}
-
-/**
- * Update an editable proposal (freelancer only, while in draft/submitted).
- * Endpoint: PATCH /proposals/:id
- */
-export async function updateProposal(
-  id: string,
-  dto: UpdateProposalDto
-): Promise<{ proposal: Proposal | null; error: ApiError | null }> {
-  const { data, error } = await apiClient.patch<UpdateProposalDto, Proposal>(
-    `/proposals/${id}`,
-    dto
-  );
-  if (error) return { proposal: null, error };
-  return { proposal: data, error: null };
-}
-
-/**
- * Withdraw a proposal (freelancer only).
- * Endpoint: POST /proposals/:id/withdraw
- */
-export async function withdrawProposal(id: string): Promise<{
-  proposal: Proposal | null;
-  error: ApiError | null;
-}> {
-  const { data, error } = await apiClient.post<undefined, Proposal>(
-    `/proposals/${id}/withdraw`
-  );
-  if (error) return { proposal: null, error };
-  return { proposal: data, error: null };
-}
-
-/**
- * Shortlist a proposal (job owner / employer only).
- * Endpoint: POST /proposals/:id/shortlist
- */
-export async function shortlistProposal(id: string): Promise<{
-  proposal: Proposal | null;
-  error: ApiError | null;
-}> {
-  const { data, error } = await apiClient.post<undefined, Proposal>(
-    `/proposals/${id}/shortlist`
-  );
-  if (error) return { proposal: null, error };
-  return { proposal: data, error: null };
-}
-
-/**
- * Reject a proposal (job owner / employer only).
- * Endpoint: POST /proposals/:id/reject
- */
-export async function rejectProposal(id: string, reason?: string): Promise<{
-  proposal: Proposal | null;
-  error: ApiError | null;
-}> {
-  const { data, error } = await apiClient.post<{ reason?: string }, Proposal>(
-    `/proposals/${id}/reject`,
-    { reason }
-  );
-  if (error) return { proposal: null, error };
-  return { proposal: data, error: null };
-}
-
-/**
- * Accept a proposal (job owner / employer only).
- * Creates an engagement record on the backend.
- * Endpoint: POST /proposals/:id/accept
- */
-export async function acceptProposal(id: string): Promise<{
-  result: AcceptProposalResult | null;
-  error: ApiError | null;
-}> {
-  const { data, error } = await apiClient.post<undefined, AcceptProposalResult>(
-    `/proposals/${id}/accept`
-  );
-  if (error) return { result: null, error };
-  return { result: data, error: null };
-}
-
-// ═══════════════════════════════════════════════════════════
 // ENGAGEMENT API FUNCTIONS
 // ═══════════════════════════════════════════════════════════
 
@@ -657,10 +507,10 @@ export async function listMyEngagements(query: {
   if (error) return { engagements: [], total: 0, page: 1, totalPages: 1, error };
 
   return {
-    engagements: data.data ?? [],
-    total: data.total ?? 0,
-    page: data.page ?? 1,
-    totalPages: data.totalPages ?? 1,
+    engagements: data.items ?? [],
+    total: data.meta?.total ?? 0,
+    page: data.meta?.page ?? 1,
+    totalPages: data.meta?.totalPages ?? 1,
     error: null,
   };
 }
@@ -692,10 +542,10 @@ export async function listMyEmployerEngagements(query: {
   if (error) return { engagements: [], total: 0, page: 1, totalPages: 1, error };
 
   return {
-    engagements: data.data ?? [],
-    total: data.total ?? 0,
-    page: data.page ?? 1,
-    totalPages: data.totalPages ?? 1,
+    engagements: data.items ?? [],
+    total: data.meta?.total ?? 0,
+    page: data.meta?.page ?? 1,
+    totalPages: data.meta?.totalPages ?? 1,
     error: null,
   };
 }

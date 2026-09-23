@@ -338,7 +338,7 @@ export function KycVerificationModal({
                       if (file) {
                         setUploadingDoc(true);
                         setDocumentFileName(file.name);
-                        const res = await uploadFileDirect(file, "document");
+                        const res = await uploadFileDirect(file, "kyc");
                         if (res.data?.url) {
                           setUploadedDocUrl(res.data.url);
                         }

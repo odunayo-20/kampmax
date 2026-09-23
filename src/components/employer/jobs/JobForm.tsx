@@ -27,6 +27,7 @@ import {
   JOB_WORK_ARRANGEMENT_OPTIONS,
 } from "@/config/opportunity";
 import { Button, Input, Select } from "@/components/ui";
+import { AttachmentPicker } from "@/components/uploads/AttachmentPicker";
 import { getCampuses } from "@/services/campus";
 import { JobPreview } from "./JobPreview";
 
@@ -57,6 +58,7 @@ export function emptyJobFormValues(): OpportunityInput {
     experienceLevel: "intermediate",
     deadline: "",
     screeningQuestions: [],
+    attachments: [],
   };
 }
 
@@ -76,6 +78,7 @@ export function opportunityToInput(o: Opportunity): OpportunityInput {
     experienceLevel: o.experienceLevel,
     deadline: o.deadline.slice(0, 10),
     screeningQuestions: o.screeningQuestions.map((q) => ({ ...q })),
+    attachments: o.attachments.map((a) => ({ ...a })),
   };
 }
 
@@ -665,6 +668,18 @@ export function JobForm({
         </div>
       </Section>
 
+      <Section title="Documents">
+        <p className="mb-3 text-xs text-neutral-500">
+          Optional briefs or specs for candidates (PDF, DOC/DOCX, PNG or JPG · up to 5MB each).
+        </p>
+        <AttachmentPicker
+          category="jobAttachment"
+          value={values.attachments ?? []}
+          onChange={(next) => set("attachments", next)}
+          disabled={isSaving || isPublishing}
+        />
+      </Section>
+
       <div className="flex flex-wrap items-center justify-end gap-2 border-t border-neutral-200 pt-4">
         <Button
           variant="outline"
@@ -682,7 +697,8 @@ export function JobForm({
 
       <p className="flex items-center gap-1.5 text-[11px] text-neutral-400">
         <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
-        Publishing submits the job to moderation (Draft → Pending Review) before it goes live.
+        Publishing makes the job visible to freelancers right away. Drafts stay private, and you can
+        edit a job only while it is a draft.
       </p>
     </div>
   );

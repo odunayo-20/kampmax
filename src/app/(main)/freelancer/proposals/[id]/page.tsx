@@ -11,7 +11,11 @@ import {
   withdrawProposal,
   categoryLabelFor,
 } from "@/services/opportunity";
-import { getProposalByIdApi, withdrawProposalApi } from "@/services/proposals";
+import {
+  discardProposalDraftApi,
+  getProposalByIdApi,
+  withdrawProposalApi,
+} from "@/services/proposals";
 import type { Opportunity, Proposal } from "@/types/opportunity";
 import { PROPOSAL_STATUS } from "@/types/opportunity";
 import { PROPOSAL_STATUS_META } from "@/config/opportunity";
@@ -94,6 +98,19 @@ export default function ProposalDetailPage() {
     } else {
       setError(res.message);
     }
+  }
+
+  async function discardDraft() {
+    if (busy || !window.confirm("Discard this draft? This can't be undone.")) return;
+    setBusy(true);
+    setError(null);
+    const { error: discardError } = await discardProposalDraftApi(proposalId);
+    setBusy(false);
+    if (discardError) {
+      setError(discardError.message ?? "We couldn't discard your draft.");
+      return;
+    }
+    router.push("/freelancer/proposals");
   }
 
   if (loading) {
@@ -210,7 +227,7 @@ export default function ProposalDetailPage() {
                   return (
                     <div key={a.questionId}>
                       <p className="text-sm font-medium text-neutral-800">
-                        {question?.question ?? a.questionId}
+                        {question?.question ?? "Screening question"}
                       </p>
                       <p className="mt-1 whitespace-pre-line text-sm text-neutral-700">{a.answer}</p>
                     </div>
@@ -248,17 +265,29 @@ export default function ProposalDetailPage() {
               )}
               {/* Draft proposals can still be completed elsewhere; direct edit link */}
               {p.status === PROPOSAL_STATUS.DRAFT && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    router.push(
-                      `/freelancer/proposals/create?jobId=${encodeURIComponent(p.opportunityId)}`
-                    )
-                  }
-                >
-                  Continue editing
-                </Button>
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      router.push(
+                        `/freelancer/proposals/create?jobId=${encodeURIComponent(p.opportunityId)}`
+                      )
+                    }
+                  >
+                    Continue editing
+                  </Button>
+                  {backend && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      disabled={busy}
+                      onClick={() => void discardDraft()}
+                    >
+                      Discard draft
+                    </Button>
+                  )}
+                </>
               )}
             </div>
           )}

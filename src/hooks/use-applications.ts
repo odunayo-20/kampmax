@@ -10,48 +10,30 @@ import {
   jobKeys,
 } from "@/lib/query-keys";
 import {
-  acceptApplication,
-  getEmployerApplication,
-  getEmployerApplicationsPage,
-  getEmployerApplicationsSummary,
-  rejectApplication,
-  reviewApplication,
-  shortlistApplication,
-} from "@/services/opportunity";
+  acceptProposalApi,
+  getApplicationApi,
+  getReceivedApplicationsApi,
+  rejectProposalApi,
+  shortlistProposalApi,
+} from "@/services/proposals";
 import { getOrCreateDirectConversation } from "@/services/messages";
 import type {
   EmployerApplicationStatus,
   EmployerApplicationsPage,
   EmployerApplicationSummary,
-  OpportunityResult,
 } from "@/types/opportunity";
 import { APPLICATIONS_PAGE_SIZE } from "@/config/applications";
 
-/**
- * Simulates network latency for the sync, in-memory store so the UI
- * exercises the same loading states it will against the real API.
- */
-function delay(ms = 250): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * Service calls return backend-style results. Mutations must THROW on a
- * non-ok result so TanStack Query's error/retry machinery works and the
- * friendly error mapper can translate the backend `code`.
- */
-function throwIfNotOk(res: OpportunityResult, returnValue?: unknown): unknown {
-  if (!res.ok) {
-    throw Object.assign(new Error(res.message), { code: res.code });
-  }
-  return returnValue ?? res;
+/** Mutations must THROW so TanStack Query's error/retry machinery works. */
+function throwIfError(error: { message?: string; status?: number } | null): void {
+  if (error) throw Object.assign(new Error(error.message ?? "Something went wrong."), error);
 }
 
 // ────────────────────────────────────────────────────────────────
-// Employer reads (owner-scoped)
+// Employer reads (owner-scoped by the backend)
 // ────────────────────────────────────────────────────────────────
 
-/** Employer application list — proposals on the owner's own jobs only. */
+/** Applications received across the employer's jobs (GET /proposals/received). */
 export function useEmployerApplications(filters: EmployerApplicationListQuery) {
   const { status, user } = useAuth();
   const userId = user?.id ?? null;
@@ -61,22 +43,24 @@ export function useEmployerApplications(filters: EmployerApplicationListQuery) {
     queryKey: applicationKeys.list(userId ?? "", filters),
     enabled,
     queryFn: async (): Promise<EmployerApplicationsPage> => {
-      await delay();
-      return getEmployerApplicationsPage({
+      const { page, error } = await getReceivedApplicationsApi({
         jobId: filters.jobId,
         status: filters.status,
-        sort: filters.sort as never,
+        sort: filters.sort,
         search: filters.search,
         page: filters.page,
         size: filters.size ?? APPLICATIONS_PAGE_SIZE,
       });
+      throwIfError(error);
+      return page;
     },
   });
 }
 
 /**
- * Owner-scoped single application. Non-existent and non-owned are identical
- * (NOT_FOUND) so the detail route never reveals other employers' candidates.
+ * One application. Non-existent and non-owned are indistinguishable (the
+ * backend answers 404 for both), so this never reveals other employers'
+ * candidates. Opening it also marks a new application as viewed.
  */
 export function useEmployerApplication(id: string) {
   const { status, user } = useAuth();
@@ -87,12 +71,9 @@ export function useEmployerApplication(id: string) {
     queryKey: applicationKeys.detail(userId ?? "", id),
     enabled,
     queryFn: async (): Promise<EmployerApplicationSummary> => {
-      await delay(0);
-      const application = getEmployerApplication(id);
-      if (!application) {
-        throw Object.assign(new Error("Application not found"), {
-          code: "NOT_FOUND",
-        });
+      const { application, error } = await getApplicationApi(id);
+      if (error || !application) {
+        throw Object.assign(new Error("Application not found"), { code: "NOT_FOUND" });
       }
       return application;
     },
@@ -108,17 +89,16 @@ export function useEmployerApplicationsSummary() {
   return useQuery({
     queryKey: applicationKeys.summary(userId ?? ""),
     enabled,
-    queryFn: async (): Promise<
-      Record<EmployerApplicationStatus | "all", number>
-    > => {
-      await delay(0);
-      return getEmployerApplicationsSummary();
+    queryFn: async (): Promise<Record<EmployerApplicationStatus | "all", number>> => {
+      const { page, error } = await getReceivedApplicationsApi({ size: 1 });
+      throwIfError(error);
+      return page.counts;
     },
   });
 }
 
 // ────────────────────────────────────────────────────────────────
-// Employer mutations (owner-scoped, store-owned transitions)
+// Employer mutations (status transitions are backend-owned)
 // ────────────────────────────────────────────────────────────────
 
 function invalidateApplicationData(queryClient: ReturnType<typeof useQueryClient>) {
@@ -126,20 +106,20 @@ function invalidateApplicationData(queryClient: ReturnType<typeof useQueryClient
   queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
 }
 
-function invalidateApplicationAndJobs(
-  queryClient: ReturnType<typeof useQueryClient>
-) {
+function invalidateApplicationAndJobs(queryClient: ReturnType<typeof useQueryClient>) {
   invalidateApplicationData(queryClient);
   queryClient.invalidateQueries({ queryKey: jobKeys.all });
 }
 
-/** SUBMITTED → UNDER_REVIEW */
+/**
+ * SUBMITTED → UNDER_REVIEW. The backend does this itself the first time the
+ * employer opens an application, so this simply (re)fetches it.
+ */
 export function useReviewApplication() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string): Promise<void> => {
-      await delay();
-      throwIfNotOk(reviewApplication(id));
+      throwIfError((await getApplicationApi(id)).error);
     },
     onSuccess: () => invalidateApplicationData(queryClient),
   });
@@ -150,8 +130,7 @@ export function useShortlistApplication() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string): Promise<void> => {
-      await delay();
-      throwIfNotOk(shortlistApplication(id));
+      throwIfError((await shortlistProposalApi(id)).error);
     },
     onSuccess: () => invalidateApplicationData(queryClient),
   });
@@ -161,30 +140,22 @@ export function useShortlistApplication() {
 export function useRejectApplication() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({
-      id,
-      reason,
-    }: {
-      id: string;
-      reason?: string;
-    }): Promise<void> => {
-      await delay();
-      throwIfNotOk(rejectApplication(id, reason));
+    mutationFn: async ({ id, reason }: { id: string; reason?: string }): Promise<void> => {
+      throwIfError((await rejectProposalApi(id, reason)).error);
     },
     onSuccess: () => invalidateApplicationData(queryClient),
   });
 }
 
 /**
- * Hire: → ACCEPTED + job closed + PENDING_ACCEPTANCE contract created
- * (store-owned). Invalidates applications AND jobs (status/count changes).
+ * Hire: → ACCEPTED, which also creates the engagement and expires the job's
+ * other active proposals. Invalidates applications AND jobs.
  */
 export function useAcceptApplication() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string): Promise<void> => {
-      await delay();
-      throwIfNotOk(acceptApplication(id));
+      throwIfError((await acceptProposalApi(id)).error);
     },
     onSuccess: () => invalidateApplicationAndJobs(queryClient),
   });
@@ -196,8 +167,7 @@ export function useAcceptApplication() {
 
 /**
  * Resolves the direct conversation between the authenticated employer and a
- * candidate, creating it first if needed (sync store, no artificial delay so
- * navigation into /chat/[id] isn't blocked). Returns null when the candidate
+ * candidate, creating it first if needed. Returns null when the candidate
  * can't be messaged (unauthenticated or an unknown user id).
  */
 export function useCandidateConversation() {

@@ -1,20 +1,12 @@
-import { apiClient, ApiError } from "@/lib/api-client";
+import type { ApiError } from "@/lib/api-client";
+import { getApiBaseUrl } from "@/lib/api-config";
+import { getAccessToken } from "@/lib/auth-storage";
 
 // ============================================================
 // MEDIA UPLOAD SERVICE
 // ============================================================
 
-export interface UploadMediaResponse {
-  id: string;
-  url: string;
-  originalName: string;
-  mimeType: string;
-  sizeBytes: number;
-  category: string;
-  status: "PENDING" | "UPLOADED" | "FAILED";
-  createdAt: string;
-}
-
+/** Categories the backend accepts (it validates size and MIME type per category). */
 export type MediaUploadCategory =
   | "avatar"
   | "logo"
@@ -25,57 +17,75 @@ export type MediaUploadCategory =
   | "message"
   | "campus"
   | "category"
-  | "document";
+  | "kyc"
+  | "portfolio"
+  | "jobAttachment"
+  | "proposalAttachment";
+
+export interface UploadedMedia {
+  id: string;
+  url: string | null;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+}
+
+interface BackendMedia {
+  id: string;
+  url: string | null;
+  originalFilename: string;
+  mimeType: string;
+  sizeBytes: number | string;
+}
+
+function uploadError(status: number, message: string): ApiError {
+  return { name: "ApiError", message, status, code: "UPLOAD_FAILED" } as ApiError;
+}
 
 /**
- * Direct multipart/form-data upload to POST /api/v1/media/upload
+ * Multipart upload to POST /api/v1/media/upload. The browser must set the
+ * multipart boundary itself, so this bypasses the JSON api client. A failed
+ * upload is reported as an error — never faked as a success, because callers
+ * attach the returned media id to jobs/proposals.
  */
 export async function uploadFileDirect(
   file: File,
-  category: MediaUploadCategory = "document"
-): Promise<{ data: UploadMediaResponse | null; error: ApiError | null }> {
+  category: MediaUploadCategory
+): Promise<{ data: UploadedMedia | null; error: ApiError | null }> {
   try {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("category", category);
 
-    // Call fetch directly with FormData so the browser automatically sets multipart boundaries
-    const token = typeof window !== "undefined" ? localStorage.getItem("kampmax_access_token") : null;
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
-
-    const res = await fetch(`${baseUrl}/media/upload`, {
+    const token = getAccessToken();
+    const res = await fetch(new URL("/api/v1/media/upload", getApiBaseUrl()).toString(), {
       method: "POST",
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: formData,
     });
 
+    const json = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const errJson = await res.json().catch(() => ({}));
-      const apiError: ApiError = {
-        name: "ApiError",
-        message: errJson.message || `Upload failed with status ${res.status}`,
-        status: res.status,
-        code: errJson.code || "UPLOAD_FAILED",
+      const raw = json?.message;
+      const message = Array.isArray(raw) ? raw.join(", ") : raw;
+      return {
+        data: null,
+        error: uploadError(res.status, message || `Upload failed with status ${res.status}`),
       };
-      return { data: null, error: apiError };
     }
 
-    const data = await res.json();
-    return { data, error: null };
-  } catch (err: any) {
-    // Graceful offline mock fallback
-    const mockUploaded: UploadMediaResponse = {
-      id: `media_${Date.now()}`,
-      url: URL.createObjectURL(file),
-      originalName: file.name,
-      mimeType: file.type || "application/octet-stream",
-      sizeBytes: file.size,
-      category,
-      status: "UPLOADED",
-      createdAt: new Date().toISOString(),
+    const media = (json?.data ?? json) as BackendMedia;
+    return {
+      data: {
+        id: media.id,
+        url: media.url ?? null,
+        filename: media.originalFilename,
+        mimeType: media.mimeType,
+        sizeBytes: Number(media.sizeBytes),
+      },
+      error: null,
     };
-    return { data: mockUploaded, error: null };
+  } catch {
+    return { data: null, error: uploadError(0, "Couldn't reach the server. Check your connection and try again.") };
   }
 }
