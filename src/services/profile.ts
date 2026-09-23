@@ -56,10 +56,13 @@ export interface PublicUserProfile {
   createdAt: string;
 }
 
+// Note: the backend's UpdateProfileDto has no `phone`/`email`/`campusId`
+// fields — phone/email changes require separate verification flows, and
+// campus is a CampusMembership relation, not a User column. Sending them
+// here would 400 (the global ValidationPipe uses forbidNonWhitelisted).
 export interface UpdateProfilePayload {
   firstName?: string;
   lastName?: string;
-  phone?: string;
   bio?: string;
   gender?: string;
   department?: string;
