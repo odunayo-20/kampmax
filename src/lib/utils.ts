@@ -18,6 +18,7 @@ export function cn(...inputs: ClassValue[]) {
 const SERVICE_PROVIDER_DASHBOARD_SECTIONS = [
   "/service-provider",
   "/service-provider/profile",
+  "/service-provider/verification",
   "/service-provider/services",
   "/service-provider/availability",
   "/service-provider/portfolio",

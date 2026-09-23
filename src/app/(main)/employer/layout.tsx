@@ -14,6 +14,7 @@ import {
 import { EmployerAccessGate } from "@/components/employer/EmployerAccessGate";
 import { EmployerSidebar } from "@/components/employer/EmployerSidebar";
 import { EmployerOnboardingStatus } from "@/types/employer";
+import { ProfileSwitcher } from "@/components/vendor-dashboard/ProfileSwitcher";
 
 /**
  * Employer module shell.
@@ -100,7 +101,9 @@ export default function EmployerLayout({ children }: { children: React.ReactNode
           <Menu className="h-5 w-5" aria-hidden />
         </button>
         <span className="truncate text-sm font-bold text-white">{displayName}</span>
-        <span className="w-8" aria-hidden />
+        <div className="[&_button]:text-white [&_button:hover]:bg-white/10">
+          <ProfileSwitcher />
+        </div>
       </div>
 
       {mobileOpen && (
@@ -131,6 +134,9 @@ export default function EmployerLayout({ children }: { children: React.ReactNode
 
       {/* Main column */}
       <div className="lg:pl-64">
+        <div className="hidden items-center justify-end border-b border-kampmax-border bg-white px-4 py-2 lg:flex lg:px-8">
+          <ProfileSwitcher />
+        </div>
         <main className="mx-auto max-w-6xl px-4 py-6 lg:px-8">
           <div key={pathname}>{children}</div>
         </main>

@@ -1,11 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { isServiceProviderDashboardPath } from "@/lib/utils";
-import { getServiceProviderAccess, getSpProfileRecord } from "@/services/service-provider-dashboard";
+import {
+  getServiceProviderDashboardAccessApi,
+  getSpProfileRecord,
+  SERVICE_PROVIDER_DASHBOARD_GATE,
+  type ServiceProviderAccess,
+} from "@/services/service-provider-dashboard";
 import { ServiceProviderAccessGate } from "@/components/service-provider/dashboard/ServiceProviderAccessGate";
 import { ServiceProviderSidebar } from "@/components/service-provider/dashboard/ServiceProviderSidebar";
 import { ServiceProviderTopbar } from "@/components/service-provider/dashboard/ServiceProviderTopbar";
@@ -15,21 +20,36 @@ import { ServiceProviderTopbar } from "@/components/service-provider/dashboard/S
  *
  * - Public profile (/service-provider/[slug]) passes through untouched — it
  *   renders inside the (main) layout, not the dashboard shell.
- * - Every dashboard path is gated. The gate is backend-authoritative; this UI
- *   never grants access on its own.
+ * - Every dashboard path is gated. The gate is backend-authoritative (reads
+ *   GET /service-provider/profile/me) — this UI never grants access on its
+ *   own.
  */
 export default function ServiceProviderLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { status } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [access, setAccess] = useState<ServiceProviderAccess | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
   // Static dashboard sub-routes take precedence over the dynamic [slug] route.
   const isPublicProfile = !isServiceProviderDashboardPath(pathname);
+
+  useEffect(() => {
+    if (isPublicProfile || status !== "authenticated") return;
+    let cancelled = false;
+    setAccess(null);
+    setLoadError(false);
+    getServiceProviderDashboardAccessApi()
+      .then((result) => { if (!cancelled) setAccess(result); })
+      .catch(() => { if (!cancelled) setLoadError(true); });
+    return () => { cancelled = true; };
+  }, [isPublicProfile, status, pathname]);
+
   if (isPublicProfile) {
     return <>{children}</>;
   }
 
-  if (status === "loading") {
+  if (status === "loading" || (status === "authenticated" && !access && !loadError)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-kampmax-bg">
         <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-kampmax-blue/20 border-t-kampmax-blue" />
@@ -37,7 +57,20 @@ export default function ServiceProviderLayout({ children }: { children: React.Re
     );
   }
 
-  const access = getServiceProviderAccess();
+  if (loadError || !access) {
+    return (
+      <ServiceProviderAccessGate
+        access={{
+          kind: SERVICE_PROVIDER_DASHBOARD_GATE.NO_PROVIDER,
+          status: null,
+          canUseDashboard: false,
+          message: "We couldn't load your service provider profile. Please try again.",
+        }}
+      >
+        {children}
+      </ServiceProviderAccessGate>
+    );
+  }
 
   if (!access.canUseDashboard) {
     return <ServiceProviderAccessGate access={access}>{children}</ServiceProviderAccessGate>;

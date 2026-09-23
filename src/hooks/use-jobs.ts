@@ -13,9 +13,9 @@ function throwIfNotOk(result: OpportunityResult): void {
   if (!result.ok) throw Object.assign(new Error(result.message), { code: result.code });
 }
 
-function throwIfApiError<T>(result: { data: T | null; error: Error | null }): T {
-  if (result.error || result.data === null) throw result.error ?? new Error("The backend returned no data.");
-  return result.data;
+function throwIfJobError<T>(result: { job: T | null; error: Error | null }): T {
+  if (result.error || result.job === null) throw result.error ?? new Error("The backend returned no data.");
+  return result.job;
 }
 
 /**
@@ -67,13 +67,13 @@ export function useSavedJobIds() {
 export function useSaveJob() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  return useMutation({ mutationFn: (jobId: string) => { const result = saveJobForUser(jobId); throwIfNotOk(result); }, onSuccess: () => { if (user?.id) void queryClient.invalidateQueries({ queryKey: jobKeys.saved(user.id) }); } });
+  return useMutation({ mutationFn: async (jobId: string): Promise<void> => { const result = saveJobForUser(jobId); throwIfNotOk(result); }, onSuccess: () => { if (user?.id) void queryClient.invalidateQueries({ queryKey: jobKeys.saved(user.id) }); } });
 }
 
 export function useUnsaveJob() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  return useMutation({ mutationFn: (jobId: string) => { const result = unsaveJobForUser(jobId); throwIfNotOk(result); }, onSuccess: () => { if (user?.id) void queryClient.invalidateQueries({ queryKey: jobKeys.saved(user.id) }); } });
+  return useMutation({ mutationFn: async (jobId: string): Promise<void> => { const result = unsaveJobForUser(jobId); throwIfNotOk(result); }, onSuccess: () => { if (user?.id) void queryClient.invalidateQueries({ queryKey: jobKeys.saved(user.id) }); } });
 }
 
 export function useEmployerJobs(filters: EmployerJobListQuery) {
@@ -93,7 +93,7 @@ export function useEmployerJobs(filters: EmployerJobListQuery) {
 export function useEmployerJob(id: string) {
   const { status, user } = useAuth();
   const userId = user?.id ?? "";
-  return useQuery({ queryKey: jobKeys.employerDetail(userId, id), enabled: status === "authenticated" && !!userId && !!id, queryFn: async (): Promise<Opportunity> => throwIfApiError(await getJobByIdApi(id)) as unknown as Opportunity });
+  return useQuery({ queryKey: jobKeys.employerDetail(userId, id), enabled: status === "authenticated" && !!userId && !!id, queryFn: async (): Promise<Opportunity> => throwIfJobError(await getJobByIdApi(id)) as unknown as Opportunity });
 }
 
 export function useEmployerJobsSummary() {
@@ -119,20 +119,20 @@ function invalidateAllJobs(queryClient: ReturnType<typeof useQueryClient>) {
 
 export function useCreateJob() {
   const queryClient = useQueryClient();
-  return useMutation({ mutationFn: async (input: OpportunityInput) => throwIfApiError(await createJobApi(input)) as unknown as Opportunity, onSuccess: () => invalidateAllJobs(queryClient) });
+  return useMutation({ mutationFn: async (input: OpportunityInput) => throwIfJobError(await createJobApi(input)) as unknown as Opportunity, onSuccess: () => invalidateAllJobs(queryClient) });
 }
 
 export function useUpdateJob() {
   const queryClient = useQueryClient();
-  return useMutation({ mutationFn: async ({ id, input }: { id: string; input: OpportunityInput }) => throwIfApiError(await updateJobApi(id, input)) as unknown as Opportunity, onSuccess: () => invalidateAllJobs(queryClient) });
+  return useMutation({ mutationFn: async ({ id, input }: { id: string; input: OpportunityInput }) => throwIfJobError(await updateJobApi(id, input)) as unknown as Opportunity, onSuccess: () => invalidateAllJobs(queryClient) });
 }
 
 export function usePublishJob() {
   const queryClient = useQueryClient();
-  return useMutation({ mutationFn: async (id: string) => throwIfApiError(await publishJobApi(id)) as unknown as Opportunity, onSuccess: () => invalidateAllJobs(queryClient) });
+  return useMutation({ mutationFn: async (id: string) => throwIfJobError(await publishJobApi(id)) as unknown as Opportunity, onSuccess: () => invalidateAllJobs(queryClient) });
 }
 
 export function useCloseJob() {
   const queryClient = useQueryClient();
-  return useMutation({ mutationFn: async (id: string) => throwIfApiError(await closeJobApi(id)) as unknown as Opportunity, onSuccess: () => invalidateAllJobs(queryClient) });
+  return useMutation({ mutationFn: async (id: string) => throwIfJobError(await closeJobApi(id)) as unknown as Opportunity, onSuccess: () => invalidateAllJobs(queryClient) });
 }

@@ -34,7 +34,7 @@ export function VendorAccessGate({ access }: { access: VendorAccess }) {
             "Your vendor application is being reviewed by the Kampmax team. You'll get full access once approved."
           }
           actionLabel="View application status"
-          actionHref="/account/profiles/vendor/onboarding"
+          actionHref="/onboarding/vendor"
           tone="info"
         />
       );
@@ -48,7 +48,7 @@ export function VendorAccessGate({ access }: { access: VendorAccess }) {
             "We need a little more information before we can approve your store."
           }
           actionLabel="Resume onboarding"
-          actionHref={`/account/profiles/vendor/onboarding?step=${access.resumeStep ?? 1}`}
+          actionHref="/onboarding/vendor"
           tone="warning"
         />
       );
@@ -117,7 +117,7 @@ function NoVendor() {
         </p>
         <div className="space-y-2">
           <button
-            onClick={() => router.push("/account/profiles/vendor/onboarding")}
+            onClick={() => router.push("/onboarding/vendor")}
             className="w-full py-3 rounded-xl bg-primary-600 text-white text-sm font-semibold hover:bg-primary-700"
           >
             Start vendor onboarding

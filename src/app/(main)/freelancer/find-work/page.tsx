@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { getOpportunitiesPageApi } from "@/services/opportunity";
-import type { OpportunitySortKey, OpportunityWorkArrangement } from "@/types/opportunity";
+import type { OpportunityPage, OpportunitySortKey, OpportunityWorkArrangement } from "@/types/opportunity";
 import { useDebounce } from "@/hooks";
 import {
   FindWorkHeader,
@@ -85,7 +85,7 @@ function FindWorkContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch]);
 
-  const [result, setResult] = useState({ items: [], total: 0, page: 1, size: PAGE_SIZE, totalPages: 1 });
+  const [result, setResult] = useState<OpportunityPage>({ items: [], total: 0, page: 1, size: PAGE_SIZE, totalPages: 1 });
 
   const query = useMemo(
     () => ({

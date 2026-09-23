@@ -26,7 +26,7 @@ import {
   recentOrders as mockRecentOrders,
 } from "@/data/vendor-dashboard";
 
-import { apiClient } from "@/lib/api-client";
+import { apiClient, type ApiError } from "@/lib/api-client";
 
 // ============================================================
 // VENDOR DASHBOARD SERVICE LAYER  (Module 10)
@@ -93,6 +93,99 @@ export function getVendorAccess(): VendorAccess {
   }
 
   return base;
+}
+
+/** Minimal shape actually returned by GET /vendors/me — see VendorPrivateProfile
+ * on the backend (modules/vendors). Deliberately not the full `VendorStore`
+ * type, which models a different (mock) nested shape that the real endpoint
+ * never returns. */
+export interface VendorBackendProfile {
+  id: string;
+  storeName: string;
+  slug: string;
+  status: "ACTIVE" | "INACTIVE";
+  verificationStatus: "PENDING" | "SUBMITTED" | "UNDER_REVIEW" | "VERIFIED" | "REJECTED" | "SUSPENDED";
+  [key: string]: unknown;
+}
+
+/**
+ * Determine dashboard access gate state from the live backend.
+ *
+ * The gate is profile EXISTENCE (+ platform-level status), not KYC
+ * verification: a Vendor row (POST /vendors) is ACTIVE and sellable
+ * immediately on creation — verificationStatus (PENDING/SUBMITTED/
+ * UNDER_REVIEW/VERIFIED/REJECTED/SUSPENDED) is a separate, optional KYC
+ * flow surfaced via the profile's /vendor/verification page, not an
+ * onboarding or dashboard-access requirement. A 404 on GET /vendors/me
+ * means the Vendor capability was never activated (NO_VENDOR); `status:
+ * INACTIVE` is the only backend state that actually blocks dashboard use.
+ */
+export async function getVendorDashboardAccessApi(): Promise<VendorAccess> {
+  const { data, error } = await apiClient.get<VendorBackendProfile>("/vendors/me");
+
+  if (error) {
+    if (error.status === 404) {
+      return {
+        kind: VENDOR_DASHBOARD_GATE.NO_VENDOR,
+        status: null,
+        canUseDashboard: false,
+        message: "You don't have a vendor profile yet. Complete vendor onboarding to start selling.",
+        resumeStep: null,
+      };
+    }
+    throw error;
+  }
+  if (!data) {
+    throw new Error("Unable to load vendor profile.");
+  }
+
+  if (data.status === "INACTIVE") {
+    return {
+      kind: VENDOR_DASHBOARD_GATE.SUSPENDED,
+      status: VENDOR_ONBOARDING_STATUS.PENDING_REVIEW,
+      canUseDashboard: false,
+      message: "Your vendor store is currently inactive. Contact support if you believe this is in error.",
+      resumeStep: null,
+      storeName: data.storeName,
+      storeSlug: data.slug,
+    };
+  }
+
+  return {
+    kind: VENDOR_DASHBOARD_GATE.APPROVED,
+    status: VENDOR_ONBOARDING_STATUS.APPROVED,
+    canUseDashboard: true,
+    message: null,
+    resumeStep: null,
+    storeName: data.storeName,
+    storeSlug: data.slug,
+  };
+}
+
+export interface CreateVendorProfileDto {
+  storeName: string;
+  campusId: string;
+  description?: string;
+  phone?: string;
+  businessAddress?: string;
+}
+
+/**
+ * Activate the Vendor capability for the current user.
+ * Endpoint: POST /vendors — this IS the onboarding completion step; there is
+ * no separate "activation" call. No NIN/BVN/CAC document is required here —
+ * that KYC flow lives on the profile at /vendor/verification, entirely
+ * decoupled from store creation (see vendors-kyc module on the backend).
+ */
+export async function createVendorProfileApi(
+  dto: CreateVendorProfileDto
+): Promise<{ profile: VendorBackendProfile | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.post<CreateVendorProfileDto, VendorBackendProfile>(
+    "/vendors",
+    dto
+  );
+  if (!error && data) return { profile: data, error: null };
+  return { profile: null, error };
 }
 
 /**

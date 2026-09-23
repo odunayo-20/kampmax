@@ -267,26 +267,6 @@ export async function getEmployerDashboardApi(): Promise<EmployerDashboardSummar
   return data;
 }
 
-/**
- * Fetch employer's own profile from the backend to determine access gate state.
- * Endpoint: GET /api/v1/employers/me
- */
-export async function getEmployerDashboardAccessApi() {
-  const { profile, error } = await getEmployerProfileApi();
-  if (!error && profile) {
-    const vs = profile.verificationStatus;
-    const user = getCurrentUser();
-    const displayName = user?.name;
-    if (vs === "verified" || vs === "APPROVED") {
-      return { kind: "approved" as const, status: "APPROVED" as any, canUseDashboard: true, message: null, displayName };
-    }
-    if (vs === "pending" || vs === "PENDING_REVIEW") {
-      return { kind: "pending_review" as const, status: "PENDING_REVIEW" as any, canUseDashboard: false, message: "Your employer profile is under review.", displayName };
-    }
-    if (vs === "rejected" || vs === "REJECTED") {
-      return { kind: "rejected" as const, status: "REJECTED" as any, canUseDashboard: false, message: "Your employer profile requires changes before going live.", displayName };
-    }
-    return { kind: "in_progress" as const, status: "DRAFT" as any, canUseDashboard: false, message: "Complete your employer profile to start hiring.", displayName };
-  }
-  throw error ?? new Error("Unable to load employer profile.");
-}
+// getEmployerDashboardAccessApi lives in services/employer.ts (the single
+// backend-authoritative access-gate check, used by app/(main)/employer/
+// layout.tsx) — it is not duplicated here.

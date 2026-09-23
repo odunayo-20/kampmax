@@ -165,6 +165,7 @@ export interface OpportunityInput {
 export interface OpportunityQuery {
   search?: string;
   categoryId?: string;
+  campusId?: string;
   experience?: string;
   arrangement?: OpportunityWorkArrangement;
   budgetType?: OpportunityBudgetType;

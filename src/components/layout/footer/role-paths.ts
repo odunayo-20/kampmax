@@ -63,7 +63,7 @@ export const KAMPMAX_ROLE_PATHS: Record<KampmaxRoleId, KampmaxRolePath> = {
     title: "Vendor",
     description: "Sell products and manage your store.",
     joinLabel: "Become a Vendor",
-    guestHref: "/register",
+    guestHref: "/onboarding/vendor",
     memberHref: "/vendor",
   },
   freelancer: {

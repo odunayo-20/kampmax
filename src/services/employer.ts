@@ -162,19 +162,50 @@ export interface EmployerBackendProfile {
   [key: string]: unknown;
 }
 
+/** Flat shape the backend's CreateEmployerProfileDto actually expects —
+ * NOT the nested EmployerOnboardingDraft shape used by the onboarding UI. */
+export interface CreateEmployerProfileDto {
+  displayName: string;
+  companyName?: string;
+  companyDescription?: string;
+  industry?: string;
+  websiteUrl?: string;
+  location?: string;
+  country?: string;
+  state?: string;
+  city?: string;
+  campusId?: string;
+}
+
 /**
- * Create employer profile on the backend.
- * Endpoint: POST /employers/me
+ * Create employer profile on the backend — this IS the onboarding
+ * completion step (POST /employers/me). No NIN/BVN/CAC document is
+ * required here; verification is a separate, optional flow.
  */
 export async function createEmployerProfileApi(
-  dto: Partial<EmployerOnboardingDraft>
+  dto: CreateEmployerProfileDto
 ): Promise<{ profile: EmployerBackendProfile | null; error: ApiError | null }> {
   const { data, error } = await apiClient.post<
-    Partial<EmployerOnboardingDraft>,
+    CreateEmployerProfileDto,
     EmployerBackendProfile
   >("/employers/me", dto);
   if (!error && data) return { profile: data, error: null };
   return { profile: null, error };
+}
+
+/** Maps the onboarding wizard's nested draft into the flat backend DTO. */
+export function employerDraftToCreateDto(
+  draft: EmployerOnboardingDraft
+): CreateEmployerProfileDto {
+  return {
+    displayName: draft.profile?.displayName?.trim() || draft.organization?.name?.trim() || "Employer",
+    companyName: draft.organization?.name?.trim() || undefined,
+    companyDescription: draft.organization?.description?.trim() || draft.profile?.about?.trim() || undefined,
+    industry: draft.organization?.industry?.trim() || draft.profile?.industry?.trim() || undefined,
+    websiteUrl: draft.organization?.website?.trim() || draft.profile?.website?.trim() || undefined,
+    city: draft.location?.city?.trim() || undefined,
+    campusId: draft.location?.campusId || undefined,
+  };
 }
 
 /**

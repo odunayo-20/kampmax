@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import {
-  getVendorAccess,
+  getVendorDashboardAccessApi,
   getVendorPermissions,
 } from "@/services/vendor-dashboard";
-import { VENDOR_DASHBOARD_GATE } from "@/types/vendor-dashboard";
+import { VENDOR_DASHBOARD_GATE, type VendorAccess } from "@/types/vendor-dashboard";
 import { VendorAccessGate } from "@/components/vendor-dashboard/VendorAccessGate";
 import { VendorSidebar } from "@/components/vendor-dashboard/VendorSidebar";
 import { VendorTopbar } from "@/components/vendor-dashboard/VendorTopbar";
@@ -20,15 +20,41 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
   const pathname = usePathname();
   const { status } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const access = getVendorAccess();
+  const [access, setAccess] = useState<VendorAccess | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const permissions = getVendorPermissions();
   const kycState = getVendorKycState();
 
-  if (status === "loading") {
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    let cancelled = false;
+    setAccess(null);
+    setLoadError(false);
+    getVendorDashboardAccessApi()
+      .then((result) => { if (!cancelled) setAccess(result); })
+      .catch(() => { if (!cancelled) setLoadError(true); });
+    return () => { cancelled = true; };
+  }, [status, pathname]);
+
+  if (status === "loading" || (status === "authenticated" && !access && !loadError)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-kampmax-bg">
         <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-kampmax-blue/20 border-t-kampmax-blue" />
       </div>
+    );
+  }
+
+  if (loadError || !access) {
+    return (
+      <VendorAccessGate
+        access={{
+          kind: VENDOR_DASHBOARD_GATE.NO_VENDOR,
+          status: null,
+          canUseDashboard: false,
+          message: "We couldn't load your vendor profile. Please try again.",
+          resumeStep: null,
+        }}
+      />
     );
   }
 

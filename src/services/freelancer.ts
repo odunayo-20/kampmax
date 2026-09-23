@@ -313,23 +313,54 @@ export async function getFreelancerServiceBySlug(
 // These async helpers call the real NestJS freelancer endpoints
 // for the onboarding wizard. Backend failures are returned to the caller.
 
+/** Flat shape the backend's CreateFreelancerProfileDto accepts — every
+ * field is optional, but we still forward what the wizard collected so
+ * the activated profile isn't blank. */
+export interface CreateFreelancerProfileDto {
+  professionalTitle?: string;
+  bio?: string;
+  hourlyRate?: number;
+  campusId?: string;
+  city?: string;
+  websiteUrl?: string;
+  skills?: string[];
+}
+
 /**
- * Create a new freelancer profile on the backend.
+ * Create a new freelancer profile on the backend — this IS the onboarding
+ * completion step (POST /freelancers). No NIN/BVN/certificate is required
+ * here; verification is a separate, optional flow.
  * Endpoint: POST /freelancers
  */
-export async function createFlApplicationApi(): Promise<{
+export async function createFlApplicationApi(
+  dto: CreateFreelancerProfileDto = {}
+): Promise<{
   created: boolean;
   profile: FreelancerPrivateProfile | null;
   error: ApiError | null;
 }> {
-  const { data, error } = await apiClient.post<Record<string, never>, FreelancerPrivateProfile>(
+  const { data, error } = await apiClient.post<CreateFreelancerProfileDto, FreelancerPrivateProfile>(
     "/freelancers",
-    {}
+    dto
   );
   if (!error && data) {
     return { created: true, profile: data, error: null };
   }
   return { created: false, profile: null, error };
+}
+
+/** Maps the onboarding wizard's draft into the flat backend DTO. */
+export function freelancerDraftToCreateDto(
+  draft: FreelancerOnboardingDraft
+): CreateFreelancerProfileDto {
+  return {
+    professionalTitle: draft.profile?.headline?.trim() || undefined,
+    bio: draft.profile?.bio?.trim() || undefined,
+    hourlyRate: draft.rates?.hourlyRate,
+    campusId: draft.profile?.campusId || undefined,
+    city: draft.profile?.city?.trim() || undefined,
+    skills: draft.skills?.length ? draft.skills : undefined,
+  };
 }
 
 /**

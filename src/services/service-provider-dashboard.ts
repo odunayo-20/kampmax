@@ -1,4 +1,5 @@
 import { getCurrentUser } from "@/services/users";
+import { apiClient } from "@/lib/api-client";
 import { getSpProfileByUserId } from "@/data/service-provider";
 import { ensureSpDashboardContext } from "@/data/service-provider-dashboard";
 import { getProviderBookingStats } from "@/data/booking";
@@ -148,6 +149,69 @@ export function getServiceProviderAccess(): ServiceProviderAccess {
     message: "Complete your application to activate your service provider profile.",
     displayName: profile.displayName,
     slug: profile.slug,
+  };
+}
+
+/** Minimal shape actually returned by GET /service-provider/profile/me
+ * (modules/service-provider). */
+interface ServiceProviderBackendProfile {
+  id: string;
+  displayName: string;
+  slug: string;
+  isActive: boolean;
+  verificationStatus: "PENDING" | "VERIFIED" | "SUSPENDED" | "DEACTIVATED";
+  [key: string]: unknown;
+}
+
+/**
+ * Determine dashboard access gate state from the live backend.
+ *
+ * Gate is profile EXISTENCE (+ isActive), not verificationStatus — nothing
+ * on the backend blocks a PENDING (unverified) service provider from using
+ * their dashboard; identity/business verification is a separate, optional
+ * flow surfaced from the profile (/service-provider/verification), not an
+ * onboarding or dashboard-access requirement. A 404 on GET
+ * /service-provider/profile/me means the capability was never activated.
+ */
+export async function getServiceProviderDashboardAccessApi(): Promise<ServiceProviderAccess> {
+  const { data, error } = await apiClient.get<ServiceProviderBackendProfile>(
+    "/service-provider/profile/me"
+  );
+
+  if (error) {
+    if (error.status === 404) {
+      return {
+        kind: SERVICE_PROVIDER_DASHBOARD_GATE.NO_PROVIDER,
+        status: null,
+        canUseDashboard: false,
+        message: "You don't have a service provider profile yet.",
+        displayName: getCurrentUser().name,
+      };
+    }
+    throw error;
+  }
+  if (!data) {
+    throw new Error("Unable to load service provider profile.");
+  }
+
+  if (!data.isActive || data.verificationStatus === "SUSPENDED" || data.verificationStatus === "DEACTIVATED") {
+    return {
+      kind: SERVICE_PROVIDER_DASHBOARD_GATE.SUSPENDED,
+      status: "SUSPENDED",
+      canUseDashboard: false,
+      message: "Your service provider profile is currently unavailable.",
+      displayName: data.displayName,
+      slug: data.slug,
+    };
+  }
+
+  return {
+    kind: SERVICE_PROVIDER_DASHBOARD_GATE.APPROVED,
+    status: "APPROVED",
+    canUseDashboard: true,
+    message: null,
+    displayName: data.displayName,
+    slug: data.slug,
   };
 }
 

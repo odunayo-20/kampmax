@@ -348,6 +348,50 @@ export function submitSpVerification(type: "identity" | "business" | "profession
   return { ok: true, status: SERVICE_PROVIDER_VERIFICATION_STATUS.PENDING, message: "Verification submitted for review." };
 }
 
+// ── Real backend activation (onboarding completion) ──────────
+
+export interface CreateServiceProviderProfileDto {
+  displayName: string;
+  slug: string;
+  bio?: string;
+  providerType?: string;
+}
+
+function slugifyLocal(input: string): string {
+  const base = input
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  const suffix = Math.random().toString(36).slice(2, 8);
+  return `${base || "provider"}-${suffix}`;
+}
+
+/**
+ * Activate the Service Provider capability on the backend — this IS the
+ * onboarding completion step (POST /service-provider/profile). No NIN/BVN/
+ * certificate is required here; verification is a separate, optional flow
+ * available from /service-provider/verification after activation.
+ */
+export async function createSpProfileApi(
+  draft: ServiceProviderOnboardingDraft
+): Promise<{ created: boolean; error: import("@/lib/api-client").ApiError | null }> {
+  const displayName =
+    draft.profile?.displayName?.trim() || draft.provider?.displayName?.trim() || "Service Provider";
+  const dto: CreateServiceProviderProfileDto = {
+    displayName,
+    slug: slugifyLocal(displayName),
+    bio: draft.profile?.description?.trim() || draft.provider?.bio?.trim() || undefined,
+    providerType: draft.provider?.type || undefined,
+  };
+  const { error } = await apiClient.post<CreateServiceProviderProfileDto, unknown>(
+    "/service-provider/profile",
+    dto
+  );
+  if (error) return { created: false, error };
+  return { created: true, error: null };
+}
+
 // ── Submit for review ────────────────────────────────────────
 
 export function submitSpApplication(): {

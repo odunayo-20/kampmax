@@ -13,7 +13,7 @@ import { StepPricing } from "@/components/service-provider/StepPricing";
 import { StepPortfolio } from "@/components/service-provider/StepPortfolio";
 import { StepVerification } from "@/components/service-provider/StepVerification";
 import { StepReview } from "@/components/service-provider/StepReview";
-import { createSpApplication, getSpOnboardingDraft, getSpOnboardingStatus, saveSpDraft, submitSpApplication } from "@/services/service-provider";
+import { createSpApplication, createSpProfileApi, getSpOnboardingDraft, getSpOnboardingStatus, saveSpDraft, submitSpApplication } from "@/services/service-provider";
 import { SERVICE_PROVIDER_ONBOARDING_STATUS, SERVICE_PROVIDER_ONBOARDING_STEPS, SERVICE_PROVIDER_ONBOARDING_STEP, isSpBlockingStatus } from "@/types/service-provider";
 import type { ServiceProviderOnboardingDraft, ServiceProviderOnboardingStepId } from "@/types/service-provider";
 
@@ -90,13 +90,10 @@ const STEP_VALIDATION: Record<number, (draft: ServiceProviderOnboardingDraft | n
   6: (d) => d?.availability?.days?.some((day) => day.isAvailable) ?? false,
   7: (d) => true, // pricing is optional
   8: (d) => true, // portfolio is optional
-  9: (d) => {
-    if (!d) return false;
-    const status = d.verification?.status;
-    if (status === "pending" || status === "action_required") return false;
-    const requiredMissing = d.documents?.some((doc) => doc.required && doc.status !== "uploaded" && doc.status !== "approved");
-    return !requiredMissing;
-  },
+  // Verification (NIN/BVN/business documents) is intentionally NOT required
+  // to complete onboarding — it's an optional, profile-level flow available
+  // from the dashboard at /service-provider/verification after activation.
+  9: () => true,
   10: (d) => true, // handled in review
 };
 
@@ -221,6 +218,14 @@ export default function ServiceProviderOnboardingStepPage() {
     setSubmitting(true);
     setError(null);
     try {
+      // Activate the Service Provider capability on the backend — this is
+      // the real onboarding completion step.
+      const { error: apiError } = await createSpProfileApi(draft);
+      if (apiError) {
+        setError(apiError.message || "We couldn't activate your service provider profile. Please try again.");
+        return;
+      }
+
       const res = submitSpApplication();
       if (res.success) {
         const allSteps: ServiceProviderOnboardingStepId[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];

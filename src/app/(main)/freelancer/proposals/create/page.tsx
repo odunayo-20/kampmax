@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, ShieldAlert, ArrowLeft } from "lucide-react";
 import {
+  createProposalDraft,
   getDiscoverableOpportunity,
   getJobEligibility,
 } from "@/services/opportunity";

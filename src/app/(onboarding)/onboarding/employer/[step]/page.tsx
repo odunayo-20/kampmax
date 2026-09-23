@@ -10,6 +10,8 @@ import { StepPreferences } from "@/components/employer/StepPreferences";
 import { StepReview } from "@/components/employer/StepReview";
 import {
   createEmployerApplicationForUser,
+  createEmployerProfileApi,
+  employerDraftToCreateDto,
   getEmployerOnboardingDraftForUser,
   getEmployerOnboardingStatusForUser,
   saveEmployerDraftForUser,
@@ -215,13 +217,24 @@ export default function EmployerOnboardingStepPage() {
     setSubmitting(true);
     setError(null);
     try {
+      // Activate the Employer capability on the backend — this is the real
+      // onboarding completion step. The mock submitEmployerProfileForUser()
+      // call afterward just keeps the local draft/status UI consistent.
+      const { error: apiError } = await createEmployerProfileApi(
+        employerDraftToCreateDto(draft)
+      );
+      if (apiError) {
+        setError(apiError.message || "We couldn't activate your employer profile. Please try again.");
+        return;
+      }
+
       const res = submitEmployerProfileForUser();
       if (res.success) {
         const allSteps: EmployerOnboardingStepId[] = [1, 2, 3, 4, 5];
         setCompletedSteps(allSteps);
         persistProgress(allSteps);
         persistDraft(draft);
-        router.push("/onboarding/employer");
+        router.push("/employer/dashboard");
       } else {
         setError(res.message);
       }

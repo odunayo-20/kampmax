@@ -16,6 +16,7 @@ import {
   BarChart3,
   Wallet,
   MessageSquare,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ServiceProviderStatusBadge } from "./ServiceProviderStatusBadge";
@@ -50,6 +51,7 @@ export function ServiceProviderSidebar({
       items: [
         { href: "/service-provider", label: "Overview", icon: LayoutDashboard },
         { href: "/service-provider/profile", label: "Profile", icon: User },
+        { href: "/service-provider/verification", label: "Verification", icon: ShieldCheck },
       ],
     },
     {

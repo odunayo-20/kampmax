@@ -15,6 +15,8 @@ import { StepPreferences } from "@/components/freelancer/StepPreferences";
 import { StepReview } from "@/components/freelancer/StepReview";
 import {
   createFlApplication,
+  createFlApplicationApi,
+  freelancerDraftToCreateDto,
   getFlOnboardingDraft,
   getFlOnboardingStatus,
   saveFlDraft,
@@ -222,6 +224,16 @@ export default function FreelancerOnboardingStepPage() {
     setSubmitting(true);
     setError(null);
     try {
+      // Activate the Freelancer capability on the backend — this is the
+      // real onboarding completion step.
+      const { error: apiError } = await createFlApplicationApi(
+        freelancerDraftToCreateDto(draft)
+      );
+      if (apiError) {
+        setError(apiError.message || "We couldn't activate your freelancer profile. Please try again.");
+        return;
+      }
+
       const res = submitFlApplication();
       if (res.success) {
         const allSteps: FreelancerOnboardingStepId[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
