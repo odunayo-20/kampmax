@@ -103,8 +103,6 @@ const STEP_VALIDATION: Record<number, (draft: FreelancerOnboardingDraft | null) 
   10: (d) => true, // handled in review
 };
 
-const BLOCKING_STATUSES = ["PENDING_REVIEW", "APPROVED", "REJECTED", "SUSPENDED"];
-
 export default function FreelancerOnboardingStepPage() {
   const router = useRouter();
   const params = useParams();
@@ -127,13 +125,18 @@ export default function FreelancerOnboardingStepPage() {
         const saved = loadStoredDraft();
 
         if (saved && saved.userId === fresh?.userId) {
-          if (BLOCKING_STATUSES.includes(saved.status)) {
-            setDraft(saved);
-          } else {
-            syncStoreWithDraft(saved);
-            setDraft(getFlOnboardingDraft() ?? saved);
-            persistDraft(getFlOnboardingDraft() ?? saved);
-          }
+          // The wizard itself never blocks on a locally-cached status —
+          // the backend has already decided (via the intro page's real
+          // access check) that this person belongs here. A stale
+          // "APPROVED"/"PENDING_REVIEW" from a previous local session
+          // must not disable the Next/Submit buttons, so normalize it
+          // back to an editable state before syncing.
+          const normalized = ["PENDING_REVIEW", "APPROVED", "REJECTED", "SUSPENDED"].includes(saved.status)
+            ? { ...saved, status: FREELANCER_ONBOARDING_STATUS.IN_PROGRESS }
+            : saved;
+          syncStoreWithDraft(normalized);
+          setDraft(getFlOnboardingDraft() ?? normalized);
+          persistDraft(getFlOnboardingDraft() ?? normalized);
         } else {
           setDraft(fresh);
           persistDraft(fresh);

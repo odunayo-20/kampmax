@@ -64,7 +64,6 @@ export interface ApiError extends Error {
 }
 
 // -- Refresh token management --
-let isRefreshing = false;
 let refreshPromise: Promise<string | null> | null = null;
 
 async function refreshAuth(): Promise<string | null> {
@@ -250,26 +249,26 @@ async function fetchApi(
   const response = await fetch(url, reqOptions);
 
   // -- 401 refresh-retry mechanism --
-  // Only attempt refresh if the response is 401 and we haven't already refreshed
-  if (response.status === 401 && !isRefreshing) {
-    isRefreshing = true;
-    try {
-      const newAccessToken = await refreshAuth();
-      if (newAccessToken) {
-        // Retry the original request with the new access token
-        const retryResponse = await fetch(url, {
-          ...reqOptions,
-          headers: {
-            ...reqOptions.headers,
-            Authorization: `Bearer ${newAccessToken}`,
-          },
-        });
-        return retryResponse;
-      }
-      // Refresh failed — fall through to clear auth below
-    } finally {
-      isRefreshing = false;
+  // refreshAuth() itself dedupes concurrent callers via the shared
+  // refreshPromise, so every 401 can safely ask for a refresh — a second
+  // request that 401s while a refresh is already in flight just awaits
+  // the same promise instead of returning its raw 401 to the caller
+  // (which previously surfaced as a bare "Invalid or expired token" error
+  // on any page that fires more than one authenticated request at once).
+  if (response.status === 401) {
+    const newAccessToken = await refreshAuth();
+    if (newAccessToken) {
+      // Retry the original request with the new access token
+      const retryResponse = await fetch(url, {
+        ...reqOptions,
+        headers: {
+          ...reqOptions.headers,
+          Authorization: `Bearer ${newAccessToken}`,
+        },
+      });
+      return retryResponse;
     }
+    // Refresh failed — fall through to return the original 401 response
   }
 
   return response;

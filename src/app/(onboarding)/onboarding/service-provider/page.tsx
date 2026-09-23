@@ -1,9 +1,15 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Store, Wrench, Briefcase, Users, Shield, Star, ArrowRight, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth-context";
+import {
+  getServiceProviderDashboardAccessApi,
+  SERVICE_PROVIDER_DASHBOARD_GATE,
+} from "@/services/service-provider-dashboard";
 
 const features = [
   {
@@ -53,6 +59,39 @@ const steps = [
 
 export default function ServiceProviderIntroPage() {
   const router = useRouter();
+  const { status } = useAuth();
+  const [checking, setChecking] = useState(true);
+
+  // Someone can land here already having an active Service Provider
+  // profile — e.g. an existing customer sent straight here from /register
+  // instead of re-signing-up. Don't show the marketing/start page again;
+  // take them straight to the dashboard they already have.
+  useEffect(() => {
+    if (status !== "authenticated") {
+      setChecking(false);
+      return;
+    }
+    let cancelled = false;
+    getServiceProviderDashboardAccessApi()
+      .then((access) => {
+        if (cancelled) return;
+        if (access.kind === SERVICE_PROVIDER_DASHBOARD_GATE.APPROVED) {
+          router.replace("/service-provider");
+          return;
+        }
+        setChecking(false);
+      })
+      .catch(() => { if (!cancelled) setChecking(false); });
+    return () => { cancelled = true; };
+  }, [status, router]);
+
+  if (status === "loading" || (status === "authenticated" && checking)) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-4 border-primary-600 border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white">

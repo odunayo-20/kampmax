@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Store, ShieldCheck, PackageSearch, Wallet, ArrowRight } from "lucide-react";
 import { Button, Input, Select } from "@/components/ui";
 import { useAuth } from "@/lib/auth-context";
 import { fetchCampuses } from "@/services/campus";
-import { createVendorProfileApi } from "@/services/vendor-dashboard";
+import { createVendorProfileApi, getVendorDashboardAccessApi } from "@/services/vendor-dashboard";
+import { VENDOR_DASHBOARD_GATE } from "@/types/vendor-dashboard";
 import type { Campus } from "@/types";
 
 const features = [
@@ -36,15 +37,18 @@ const features = [
  * here — that lives on the profile at /vendor/verification, decoupled from
  * store creation on the backend (see vendors-kyc module).
  */
-export default function VendorOnboardingPage() {
+function VendorOnboardingForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const campusParam = searchParams.get("campus");
   const { status } = useAuth();
 
   const [campuses, setCampuses] = useState<Campus[]>([]);
   const [campusesLoading, setCampusesLoading] = useState(true);
+  const [checkingExisting, setCheckingExisting] = useState(true);
 
   const [storeName, setStoreName] = useState("");
-  const [campusId, setCampusId] = useState("");
+  const [campusId, setCampusId] = useState(campusParam ?? "");
   const [description, setDescription] = useState("");
   const [phone, setPhone] = useState("");
   const [businessAddress, setBusinessAddress] = useState("");
@@ -63,7 +67,30 @@ export default function VendorOnboardingPage() {
     return () => { cancelled = true; };
   }, []);
 
-  if (status === "loading") {
+  // Someone can land here already having an active Vendor store — e.g. an
+  // existing customer sent straight here from /register instead of
+  // re-signing-up. Don't ask them to create a second one; take them
+  // straight to the dashboard they already have.
+  useEffect(() => {
+    if (status !== "authenticated") {
+      setCheckingExisting(false);
+      return;
+    }
+    let cancelled = false;
+    getVendorDashboardAccessApi()
+      .then((access) => {
+        if (cancelled) return;
+        if (access.kind === VENDOR_DASHBOARD_GATE.APPROVED) {
+          router.replace("/vendor");
+          return;
+        }
+        setCheckingExisting(false);
+      })
+      .catch(() => { if (!cancelled) setCheckingExisting(false); });
+    return () => { cancelled = true; };
+  }, [status, router]);
+
+  if (status === "loading" || (status === "authenticated" && checkingExisting)) {
     return (
       <div className="min-h-screen bg-kampmax-bg flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-4 border-primary-600 border-t-transparent" />
@@ -227,5 +254,19 @@ export default function VendorOnboardingPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function VendorOnboardingPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-kampmax-bg flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-4 border-primary-600 border-t-transparent" />
+        </div>
+      }
+    >
+      <VendorOnboardingForm />
+    </Suspense>
   );
 }

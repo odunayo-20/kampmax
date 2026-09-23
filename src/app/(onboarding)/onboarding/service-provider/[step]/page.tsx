@@ -120,13 +120,18 @@ export default function ServiceProviderOnboardingStepPage() {
         const saved = loadStoredDraft();
 
         if (saved && saved.userId === fresh?.userId) {
-          if (isSpBlockingStatus(saved.status)) {
-            setDraft(saved);
-          } else {
-            syncStoreWithDraft(saved);
-            setDraft(getSpOnboardingDraft() ?? saved);
-            persistDraft(getSpOnboardingDraft() ?? saved);
-          }
+          // The wizard itself never blocks on a locally-cached status —
+          // the backend has already decided (via the intro page's real
+          // access check) that this person belongs here. A stale
+          // "APPROVED"/"PENDING_REVIEW" from a previous local session
+          // must not disable the Next/Submit buttons, so normalize it
+          // back to an editable state before syncing.
+          const normalized = isSpBlockingStatus(saved.status)
+            ? { ...saved, status: SERVICE_PROVIDER_ONBOARDING_STATUS.IN_PROGRESS }
+            : saved;
+          syncStoreWithDraft(normalized);
+          setDraft(getSpOnboardingDraft() ?? normalized);
+          persistDraft(getSpOnboardingDraft() ?? normalized);
         } else {
           setDraft(fresh);
           persistDraft(fresh);
@@ -272,12 +277,6 @@ export default function ServiceProviderOnboardingStepPage() {
         </div>
       </div>
     );
-  }
-
-  // Status-based redirect for blocking statuses
-  if (draft && ["PENDING_REVIEW", "APPROVED", "REJECTED", "SUSPENDED"].includes(draft.status)) {
-    router.push("/service-provider");
-    return null;
   }
 
   const renderStepContent = () => {

@@ -19,6 +19,7 @@ import {
 } from "@/services/employer";
 import {
   BLOCKING_EMPLOYER_STATUSES,
+  EMPLOYER_ONBOARDING_STATUS,
   EMPLOYER_ONBOARDING_STEPS,
 } from "@/types/employer";
 import { isOrganizationLikeClientType } from "@/config/employer";
@@ -120,13 +121,18 @@ export default function EmployerOnboardingStepPage() {
         const saved = loadStoredDraft();
 
         if (saved && saved.userId === fresh?.userId) {
-          if (BLOCKING_EMPLOYER_STATUSES.includes(saved.status as any)) {
-            setDraft(saved);
-          } else {
-            syncStoreWithDraft(saved);
-            setDraft(getEmployerOnboardingDraftForUser() ?? saved);
-            persistDraft(getEmployerOnboardingDraftForUser() ?? saved);
-          }
+          // The wizard itself never blocks on a locally-cached status —
+          // the backend has already decided (via the intro page's real
+          // access check) that this person belongs here. A stale
+          // "APPROVED"/"PENDING_REVIEW" from a previous local session
+          // must not disable the Next/Submit buttons, so normalize it
+          // back to an editable state before syncing.
+          const normalized = BLOCKING_EMPLOYER_STATUSES.includes(saved.status as any)
+            ? { ...saved, status: EMPLOYER_ONBOARDING_STATUS.IN_PROGRESS }
+            : saved;
+          syncStoreWithDraft(normalized);
+          setDraft(getEmployerOnboardingDraftForUser() ?? normalized);
+          persistDraft(getEmployerOnboardingDraftForUser() ?? normalized);
         } else {
           setDraft(fresh);
           persistDraft(fresh);

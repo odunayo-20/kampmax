@@ -51,16 +51,6 @@ export function OnboardingLayout({
           return seed;
         })();
 
-  const isBlocking = status && ["PENDING_REVIEW", "APPROVED", "REJECTED", "SUSPENDED"].includes(status);
-
-  if (isBlocking) {
-    return (
-      <div className="min-h-screen bg-white">
-        <div className="max-w-3xl mx-auto px-6 py-12">{children}</div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-kampmax-bg">
       <div className="max-w-3xl mx-auto px-6 py-8">

@@ -23,7 +23,7 @@ interface RoleChoice {
 
 const ROLE_CHOICES: RoleChoice[] = [
   { id: "customer", role: "student", next: null, cta: "Continue as Customer" },
-  { id: "vendor", role: "vendor", next: null, cta: "Become a Vendor" },
+  { id: "vendor", role: "vendor", next: "/onboarding/vendor", cta: "Become a Vendor" },
   { id: "freelancer", role: "student", next: "/onboarding/freelancer", cta: "Become a Freelancer" },
   { id: "service_provider", role: "student", next: "/onboarding/service-provider", cta: "Become a Service Provider" },
   { id: "employer", role: "student", next: "/onboarding/employer", cta: "Hire Talent" },
@@ -49,11 +49,21 @@ function validatePassword(password: string): string | null {
 function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { register } = useAuth();
+  const { register, status: authStatus } = useAuth();
+  const campusParam = searchParams.get("campus");
 
   const [step, setStep] = useState<"role" | "form">("role");
   const [choiceId, setChoiceId] = useState<KampmaxRoleId>("customer");
   const choice = choiceById(choiceId);
+
+  /** Where a role choice should land once we already have a session for
+   * this person — the onboarding route for that capability (customer has
+   * none, since they already are one), carrying the campus pick forward
+   * so they don't have to make it twice. */
+  function destinationForExistingAccount(c: RoleChoice): string {
+    if (!c.next) return "/home";
+    return campusParam ? `${c.next}?campus=${encodeURIComponent(campusParam)}` : c.next;
+  }
 
   // Form fields — mapped 1-to-1 with backend RegisterDto
   const [firstName, setFirstName] = useState("");
@@ -108,6 +118,13 @@ function RegisterForm() {
   }
 
   function choose(id: KampmaxRoleId) {
+    const c = choiceById(id);
+    if (authStatus === "authenticated") {
+      // Already signed in — activate the chosen capability on the existing
+      // account instead of walking them through creating a second one.
+      router.push(destinationForExistingAccount(c));
+      return;
+    }
     setChoiceId(id);
     setStep("form");
   }
@@ -141,8 +158,20 @@ function RegisterForm() {
     }
   }
 
+  // Avoid flashing the "create account" choices before we know whether a
+  // session already exists — an authenticated visitor gets a different
+  // set of destinations (see choose()/destinationForExistingAccount()).
+  if (authStatus === "loading") {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="h-6 w-6 border-2 border-kampmax-blue/20 border-t-kampmax-blue rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   // Step 1: Role/pathway selection
   if (step === "role") {
+    const alreadySignedIn = authStatus === "authenticated";
     return (
       <div className="space-y-6">
         <div>
@@ -154,11 +183,12 @@ function RegisterForm() {
             Back
           </Link>
           <h1 className="text-2xl font-bold text-kampmax-text">
-            Create your Kampmax account
+            {alreadySignedIn ? "You're already signed in" : "Create your Kampmax account"}
           </h1>
           <p className="text-sm text-kampmax-text-secondary mt-1">
-            Choose how you plan to use Kampmax. You can explore other
-            opportunities after creating your account.
+            {alreadySignedIn
+              ? "Pick what you'd like to activate on your existing account — no need to sign up again."
+              : "Choose how you plan to use Kampmax. You can explore other opportunities after creating your account."}
           </p>
         </div>
 
@@ -200,21 +230,23 @@ function RegisterForm() {
             <span className="font-semibold text-kampmax-text">
               One account, many roles.
             </span>{" "}
-            Your Kampmax account is the starting point — after signing in you
-            can also activate a freelancer, service provider or employer
-            profile on the same account.
+            {alreadySignedIn
+              ? "Whatever you pick is added to your current account — your existing profiles stay exactly as they are."
+              : "Your Kampmax account is the starting point — after signing in you can also activate a freelancer, service provider or employer profile on the same account."}
           </p>
         </div>
 
-        <p className="text-center text-sm text-kampmax-text-secondary">
-          Already have an account?{" "}
-          <Link
-            href="/login"
-            className="font-medium text-kampmax-blue hover:text-kampmax-blue-dark transition-colors"
-          >
-            Sign in
-          </Link>
-        </p>
+        {!alreadySignedIn && (
+          <p className="text-center text-sm text-kampmax-text-secondary">
+            Already have an account?{" "}
+            <Link
+              href="/login"
+              className="font-medium text-kampmax-blue hover:text-kampmax-blue-dark transition-colors"
+            >
+              Sign in
+            </Link>
+          </p>
+        )}
       </div>
     );
   }

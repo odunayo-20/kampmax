@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { Users, Code, Palette, BookOpen, Star, ArrowRight, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import { createFlApplication, getFlOnboardingDraft, computeFlCompletion } from "@/services/freelancer";
-import type { FreelancerOnboardingStatus } from "@/types/freelancer";
+import { useAuth } from "@/lib/auth-context";
+import { FREELANCER_DASHBOARD_GATE, getFreelancerDashboardAccessApi } from "@/services/freelancer-dashboard";
+import { getFlOnboardingDraft, computeFlCompletion } from "@/services/freelancer";
 
 const features = [
   {
@@ -54,55 +55,50 @@ const steps = [
   { number: 10, title: "Review & Submit", description: "Final review and submit" },
 ];
 
-const STATUS_COPY: Record<string, { title: string; body: string; cta: string }> = {
-  PENDING_REVIEW: {
-    title: "Your freelancer profile is under review",
-    body: "Our team is reviewing your profile. You can check back later for updates.",
-    cta: "Go to Dashboard",
-  },
-  APPROVED: {
-    title: "Your freelancer profile is live!",
-    body: "Your profile is approved and visible to clients. Start accepting projects!",
-    cta: "View Profile",
-  },
-  REJECTED: {
-    title: "Profile review needed",
-    body: "Your profile was not approved. Please review the feedback and update your profile.",
-    cta: "Update Profile",
-  },
-  SUSPENDED: {
-    title: "Profile suspended",
-    body: "Your freelancer profile has been suspended. Please contact support.",
-    cta: "Contact Support",
-  },
-};
-
 export default function FreelancerIntroPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [draftStatus, setDraftStatus] = useState<FreelancerOnboardingStatus | null>(null);
+  const { status: authStatus } = useAuth();
+  const [checking, setChecking] = useState(true);
   const [completion, setCompletion] = useState(0);
 
+  // Gate on the real backend, not a local mock draft: nothing on the
+  // backend blocks a Freelancer capability on verification/review status —
+  // the only real state is "has a profile" (→ dashboard) vs "doesn't yet"
+  // (→ show this page). A stale local draft must never strand someone on
+  // a dead-end "under review" screen with no way back to the form.
   useEffect(() => {
-    createFlApplication();
-    const draft = getFlOnboardingDraft();
-    if (draft) {
-      setDraftStatus(draft.status);
-      setCompletion(computeFlCompletion(draft));
+    if (authStatus !== "authenticated") {
+      setChecking(false);
+      return;
     }
-    setLoading(false);
+    let cancelled = false;
+    getFreelancerDashboardAccessApi()
+      .then((access) => {
+        if (cancelled) return;
+        if (access.kind === FREELANCER_DASHBOARD_GATE.APPROVED) {
+          router.replace("/freelancer/dashboard");
+          return;
+        }
+        setChecking(false);
+      })
+      .catch(() => { if (!cancelled) setChecking(false); });
+    return () => { cancelled = true; };
+  }, [authStatus, router]);
+
+  // Purely a local-progress nudge ("you're 60% done, continue") — never
+  // used to decide whether this page is reachable.
+  useEffect(() => {
+    const draft = getFlOnboardingDraft();
+    if (draft) setCompletion(computeFlCompletion(draft));
   }, []);
 
-  if (loading) {
+  if (authStatus === "loading" || (authStatus === "authenticated" && checking)) {
     return (
       <div className="min-h-screen bg-kampmax-bg flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-4 border-primary-600 border-t-transparent" />
       </div>
     );
   }
-
-  const isBlocking = draftStatus && ["PENDING_REVIEW", "APPROVED", "REJECTED", "SUSPENDED"].includes(draftStatus);
-  const isInProgress = draftStatus === "DRAFT" || draftStatus === "IN_PROGRESS";
 
   return (
     <div className="min-h-screen bg-white">
@@ -113,16 +109,14 @@ export default function FreelancerIntroPage() {
             <Users className="h-10 w-10 text-kampmax-blue" />
           </div>
           <h1 className="text-3xl lg:text-4xl font-bold text-kampmax-text mb-4">
-            {isBlocking ? STATUS_COPY[draftStatus!]?.title : "Become a Freelancer"}
+            Become a Freelancer
           </h1>
           <p className="text-lg text-kampmax-text-secondary max-w-2xl mx-auto">
-            {isBlocking
-              ? STATUS_COPY[draftStatus!]?.body
-              : "Turn your skills into income. Join thousands of freelancers on Kampmax and connect with clients who need your expertise."}
+            Turn your skills into income. Join thousands of freelancers on Kampmax and connect
+            with clients who need your expertise.
           </p>
 
-          {/* In-progress CTA */}
-          {isInProgress && completion > 0 && (
+          {completion > 0 ? (
             <div className="mt-8 max-w-sm mx-auto">
               <p className="text-sm text-kampmax-text-secondary mb-3">
                 You&apos;re {completion}% done. Continue where you left off.
@@ -135,10 +129,7 @@ export default function FreelancerIntroPage() {
                 <ArrowRight className="h-5 w-5 ml-2" />
               </Button>
             </div>
-          )}
-
-          {/* Fresh start CTA */}
-          {!isBlocking && !isInProgress && (
+          ) : (
             <div className="mt-8">
               <Button size="lg" className="w-full sm:w-auto px-12 py-4 text-lg" onClick={() => router.push("/onboarding/freelancer/1")}>
                 Start Your Application
@@ -147,16 +138,6 @@ export default function FreelancerIntroPage() {
               <p className="mt-4 text-sm text-kampmax-text-secondary">
                 Free to apply · No commitment · Cancel anytime
               </p>
-            </div>
-          )}
-
-          {/* Blocking CTA */}
-          {isBlocking && (
-            <div className="mt-8">
-              <Button size="lg" className="w-full sm:w-auto px-12 py-4 text-lg" onClick={() => router.push("/freelancer/dashboard")}>
-                {STATUS_COPY[draftStatus!]?.cta}
-                <ArrowRight className="h-5 w-5 ml-2" />
-              </Button>
             </div>
           )}
         </div>

@@ -5,13 +5,8 @@ import { useRouter } from "next/navigation";
 import { Briefcase, Users, ShieldCheck, Coins, TrendingUp, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import {
-  createEmployerApplicationForUser,
-  getEmployerOnboardingDraftForUser,
-  computeEmployerCompletion,
-} from "@/services/employer";
-import { EmployerSubmissionStatus } from "@/components/employer/EmployerSubmissionStatus";
-import type { EmployerOnboardingStatus } from "@/types/employer";
+import { useAuth } from "@/lib/auth-context";
+import { EMPLOYER_DASHBOARD_GATE, getEmployerDashboardAccessApi } from "@/services/employer";
 
 const features = [
   {
@@ -56,44 +51,38 @@ const introSteps = [
 
 export default function EmployerIntroPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [draftStatus, setDraftStatus] = useState<EmployerOnboardingStatus | null>(null);
-  const [completion, setCompletion] = useState(0);
-  const [reviewReason, setReviewReason] = useState<string | undefined>(undefined);
+  const { status: authStatus } = useAuth();
+  const [checking, setChecking] = useState(true);
 
+  // Gate on the real backend, not a local mock draft: nothing on the
+  // backend blocks an Employer capability on verification/review status —
+  // the only real state is "has a profile" (→ dashboard) vs "doesn't yet"
+  // (→ show this page). A stale local draft must never strand someone on
+  // a dead-end "under review" screen with no way back to the form.
   useEffect(() => {
-    createEmployerApplicationForUser();
-    const draft = getEmployerOnboardingDraftForUser();
-    if (draft) {
-      setDraftStatus(draft.status);
-      setCompletion(computeEmployerCompletion(draft));
-      setReviewReason(draft.reviewReason);
+    if (authStatus !== "authenticated") {
+      setChecking(false);
+      return;
     }
-    setLoading(false);
-  }, []);
+    let cancelled = false;
+    getEmployerDashboardAccessApi()
+      .then((access) => {
+        if (cancelled) return;
+        if (access.kind === EMPLOYER_DASHBOARD_GATE.APPROVED) {
+          router.replace("/employer/dashboard");
+          return;
+        }
+        setChecking(false);
+      })
+      .catch(() => { if (!cancelled) setChecking(false); });
+    return () => { cancelled = true; };
+  }, [authStatus, router]);
 
-  if (loading) {
+  if (authStatus === "loading" || (authStatus === "authenticated" && checking)) {
     return (
       <div className="min-h-screen bg-kampmax-bg flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-4 border-primary-600 border-t-transparent" />
       </div>
-    );
-  }
-
-  const isBlocking =
-    draftStatus === "PENDING_REVIEW" ||
-    draftStatus === "APPROVED" ||
-    draftStatus === "REJECTED" ||
-    draftStatus === "SUSPENDED";
-
-  // Blocking / in-progress / fresh states render through the status screen.
-  if (isBlocking || draftStatus === "DRAFT" || draftStatus === "IN_PROGRESS") {
-    return (
-      <EmployerSubmissionStatus
-        status={draftStatus ?? "DRAFT"}
-        completion={completion}
-        reviewReason={reviewReason}
-      />
     );
   }
 
