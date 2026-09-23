@@ -191,6 +191,48 @@ export async function getEmployerProfileApi(): Promise<{
 }
 
 /**
+ * Determine dashboard access gate state from the live backend.
+ *
+ * The gate is profile EXISTENCE, not verification status: an EmployerProfile
+ * (POST /employers/me) is the explicit activation step for the Employer
+ * capability — the backend never blocks job creation on verification, so
+ * "unverified" must not lock the dashboard. A 404 on GET /employers/me means
+ * the capability was never activated (NO_EMPLOYER); the profile's real
+ * verificationStatus enum (UNVERIFIED/PENDING/VERIFIED/REJECTED) is only
+ * used to label the badge shown inside the dashboard.
+ */
+export async function getEmployerDashboardAccessApi(): Promise<EmployerAccess> {
+  const user = getCurrentUser();
+  const displayName = user?.name;
+  const { profile, error } = await getEmployerProfileApi();
+
+  if (error) {
+    if (error.status === 404) {
+      return {
+        kind: EMPLOYER_DASHBOARD_GATE.NO_EMPLOYER,
+        status: null,
+        canUseDashboard: false,
+        message: "You don't have an employer profile yet.",
+        displayName,
+      };
+    }
+    throw error;
+  }
+  if (!profile) {
+    throw new Error("Unable to load employer profile.");
+  }
+
+  const vs = String(profile.verificationStatus).toUpperCase();
+  if (vs === "REJECTED") {
+    return { kind: EMPLOYER_DASHBOARD_GATE.REJECTED, status: "REJECTED" as any, canUseDashboard: true, message: "Your employer verification requires changes.", displayName };
+  }
+  if (vs === "PENDING") {
+    return { kind: EMPLOYER_DASHBOARD_GATE.PENDING_REVIEW, status: "PENDING_REVIEW" as any, canUseDashboard: true, message: "Your employer verification is under review.", displayName };
+  }
+  return { kind: EMPLOYER_DASHBOARD_GATE.APPROVED, status: "APPROVED" as any, canUseDashboard: true, message: null, displayName };
+}
+
+/**
  * Update the authenticated user's employer profile.
  * Endpoint: PATCH /employers/me
  */

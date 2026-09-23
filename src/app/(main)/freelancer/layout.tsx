@@ -1,11 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { isFreelancerDashboardPath } from "@/services/freelancer-dashboard";
-import { getFreelancerDashboardAccess } from "@/services/freelancer-dashboard";
+import {
+  FREELANCER_DASHBOARD_GATE,
+  getFreelancerDashboardAccessApi,
+  isFreelancerDashboardPath,
+  type FreelancerAccess,
+} from "@/services/freelancer-dashboard";
 import { FreelancerAccessGate } from "@/components/freelancer/dashboard/FreelancerAccessGate";
 import { FreelancerSidebar } from "@/components/freelancer/dashboard/FreelancerSidebar";
 import { FreelancerTopbar } from "@/components/freelancer/dashboard/FreelancerTopbar";
@@ -16,7 +20,8 @@ import { getFreelancerKycState } from "@/services/verification";
 /**
  * Freelancer module shell.
  *
- * - The dashboard path is gated. The gate is backend-authoritative; this UI
+ * - The dashboard path is gated. The gate is backend-authoritative (reads
+ *   GET /freelancers/me via getFreelancerDashboardAccessApi) — this UI
  *   never grants access on its own.
  * - Multi-role: the affirmed authenticated identity decides the freelancer
  *   record served. ProfileSwitcher in the topbar lets the user move between
@@ -26,12 +31,27 @@ export default function FreelancerLayout({ children }: { children: React.ReactNo
   const pathname = usePathname();
   const { status } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [access, setAccess] = useState<FreelancerAccess | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
-  if (!isFreelancerDashboardPath(pathname)) {
+  const dashboardPath = isFreelancerDashboardPath(pathname);
+
+  useEffect(() => {
+    if (!dashboardPath || status !== "authenticated") return;
+    let cancelled = false;
+    setAccess(null);
+    setLoadError(false);
+    getFreelancerDashboardAccessApi()
+      .then((result) => { if (!cancelled) setAccess(result); })
+      .catch(() => { if (!cancelled) setLoadError(true); });
+    return () => { cancelled = true; };
+  }, [dashboardPath, status, pathname]);
+
+  if (!dashboardPath) {
     return <>{children}</>;
   }
 
-  if (status === "loading") {
+  if (status === "loading" || (status === "authenticated" && !access && !loadError)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-kampmax-bg">
         <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-kampmax-blue/20 border-t-kampmax-blue" />
@@ -39,7 +59,20 @@ export default function FreelancerLayout({ children }: { children: React.ReactNo
     );
   }
 
-  const access = getFreelancerDashboardAccess();
+  if (loadError || !access) {
+    return (
+      <FreelancerAccessGate
+        access={{
+          kind: FREELANCER_DASHBOARD_GATE.NO_FREELANCER,
+          status: null,
+          canUseDashboard: false,
+          message: "We couldn't load your freelancer profile. Please try again.",
+        }}
+      >
+        {children}
+      </FreelancerAccessGate>
+    );
+  }
 
   if (!access.canUseDashboard) {
     return <FreelancerAccessGate access={access}>{children}</FreelancerAccessGate>;

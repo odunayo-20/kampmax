@@ -449,29 +449,45 @@ import { getMyProposalsApi } from "@/services/proposals";
 
 /**
  * Determine dashboard access gate state from the live backend.
- * Reads verificationStatus from GET /freelancers/me to determine approval gate.
+ *
+ * The gate is profile EXISTENCE, not verification status: a
+ * FreelancerProfile (POST /freelancers) is the explicit activation step —
+ * nothing on the backend blocks an unverified freelancer from browsing or
+ * applying to jobs, so "unverified" must not lock the dashboard. Reads
+ * GET /freelancers/me: a 404 means the capability was never activated
+ * (NO_FREELANCER); any other error is surfaced to the caller; otherwise the
+ * profile's real verificationStatus enum (UNVERIFIED/PENDING/VERIFIED/
+ * REJECTED) is only used to label the badge shown inside the dashboard.
  */
 export async function getFreelancerDashboardAccessApi(): Promise<FreelancerAccess> {
+  const user = getCurrentUser();
+  const displayName = user?.name;
   const { profile, error } = await getMyFreelancerProfile();
-  if (!error && profile) {
-    const vs = profile.verificationStatus;
-    const user = getCurrentUser();
-    const displayName = user?.name;
-    if (vs === "approved" || vs === "APPROVED") {
-      return { kind: FREELANCER_DASHBOARD_GATE.APPROVED, status: "APPROVED" as any, canUseDashboard: true, message: null, displayName };
+
+  if (error) {
+    if (error.status === 404) {
+      return {
+        kind: FREELANCER_DASHBOARD_GATE.NO_FREELANCER,
+        status: null,
+        canUseDashboard: false,
+        message: "You don't have a freelancer profile yet.",
+        displayName,
+      };
     }
-    if (vs === "pending" || vs === "PENDING_REVIEW") {
-      return { kind: FREELANCER_DASHBOARD_GATE.PENDING_REVIEW, status: "PENDING_REVIEW" as any, canUseDashboard: false, message: "Your freelancer profile is under review.", displayName };
-    }
-    if (vs === "rejected" || vs === "REJECTED") {
-      return { kind: FREELANCER_DASHBOARD_GATE.REJECTED, status: "REJECTED" as any, canUseDashboard: false, message: "Your freelancer profile requires changes before it can go live.", displayName };
-    }
-    if (vs === "suspended" || vs === "SUSPENDED") {
-      return { kind: FREELANCER_DASHBOARD_GATE.SUSPENDED, status: "SUSPENDED" as any, canUseDashboard: false, message: "Your freelancer profile is currently unavailable.", displayName };
-    }
-    return { kind: FREELANCER_DASHBOARD_GATE.IN_PROGRESS, status: "DRAFT" as any, canUseDashboard: false, message: "Complete your freelancer profile to go live.", displayName };
+    throw error;
   }
-  throw error ?? new Error("Unable to load freelancer profile.");
+  if (!profile) {
+    throw new Error("Unable to load freelancer profile.");
+  }
+
+  const vs = profile.verificationStatus?.toUpperCase();
+  if (vs === "REJECTED") {
+    return { kind: FREELANCER_DASHBOARD_GATE.REJECTED, status: "REJECTED" as any, canUseDashboard: true, message: "Your freelancer verification requires changes.", displayName };
+  }
+  if (vs === "PENDING") {
+    return { kind: FREELANCER_DASHBOARD_GATE.PENDING_REVIEW, status: "PENDING_REVIEW" as any, canUseDashboard: true, message: "Your freelancer verification is under review.", displayName };
+  }
+  return { kind: FREELANCER_DASHBOARD_GATE.APPROVED, status: "APPROVED" as any, canUseDashboard: true, message: null, displayName };
 }
 
 /**

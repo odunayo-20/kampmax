@@ -1,11 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { getEmployerDashboardAccess, isEmployerDashboardPath } from "@/services/employer";
-import { isEmployerGateExemptPath } from "@/services/employer";
+import {
+  EMPLOYER_DASHBOARD_GATE,
+  getEmployerDashboardAccessApi,
+  isEmployerDashboardPath,
+  isEmployerGateExemptPath,
+  type EmployerAccess,
+} from "@/services/employer";
 import { EmployerAccessGate } from "@/components/employer/EmployerAccessGate";
 import { EmployerSidebar } from "@/components/employer/EmployerSidebar";
 import { EmployerOnboardingStatus } from "@/types/employer";
@@ -13,20 +18,36 @@ import { EmployerOnboardingStatus } from "@/types/employer";
 /**
  * Employer module shell.
  *
- * - The dashboard path is gated. The gate is backend-authoritative; this UI
- *   never grants access on its own.
+ * - The dashboard path is gated. The gate is backend-authoritative (reads
+ *   GET /employers/me via getEmployerDashboardAccessApi) — this UI never
+ *   grants access on its own.
  * - Mirrors the freelancer dashboard shell pattern (Module 26A/B).
  */
 export default function EmployerLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { status } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [access, setAccess] = useState<EmployerAccess | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
-  if (!isEmployerDashboardPath(pathname)) {
+  const dashboardPath = isEmployerDashboardPath(pathname);
+
+  useEffect(() => {
+    if (!dashboardPath || status !== "authenticated") return;
+    let cancelled = false;
+    setAccess(null);
+    setLoadError(false);
+    getEmployerDashboardAccessApi()
+      .then((result) => { if (!cancelled) setAccess(result); })
+      .catch(() => { if (!cancelled) setLoadError(true); });
+    return () => { cancelled = true; };
+  }, [dashboardPath, status, pathname]);
+
+  if (!dashboardPath) {
     return <>{children}</>;
   }
 
-  if (status === "loading") {
+  if (status === "loading" || (status === "authenticated" && !access && !loadError)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-kampmax-bg">
         <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-kampmax-blue/20 border-t-kampmax-blue" />
@@ -34,7 +55,21 @@ export default function EmployerLayout({ children }: { children: React.ReactNode
     );
   }
 
-  const access = getEmployerDashboardAccess();
+  if (loadError || !access) {
+    return (
+      <EmployerAccessGate
+        access={{
+          kind: EMPLOYER_DASHBOARD_GATE.NO_EMPLOYER,
+          status: null,
+          canUseDashboard: false,
+          message: "We couldn't load your employer profile. Please try again.",
+        }}
+      >
+        {children}
+      </EmployerAccessGate>
+    );
+  }
+
   const gateExempt = isEmployerGateExemptPath(pathname);
 
   // The profile page is exempt from the approval gate so an employer can view /
