@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, X, Eye, PencilLine, Send, Save, AlertCircle, CheckCircle2 } from "lucide-react";
 import type {
   Opportunity,
@@ -28,7 +28,7 @@ import {
 } from "@/config/opportunity";
 import { Button, Input, Select } from "@/components/ui";
 import { AttachmentPicker } from "@/components/uploads/AttachmentPicker";
-import { getCampuses } from "@/services/campus";
+import { fetchCampuses, getCampuses } from "@/services/campus";
 import { JobPreview } from "./JobPreview";
 
 const fieldClass =
@@ -157,7 +157,18 @@ export function JobForm({
   const [preview, setPreview] = useState(false);
   const [skillDraft, setSkillDraft] = useState("");
 
-  const campuses = useMemo(() => getCampuses(), []);
+  const [campuses, setCampuses] = useState(() => getCampuses());
+
+  // Load real campuses (UUID ids) — the sync cache starts with mock slug ids.
+  useEffect(() => {
+    let active = true;
+    fetchCampuses({ limit: 100 }).then((res) => {
+      if (active && !res.error && res.data.length > 0) setCampuses(res.data);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const set = <K extends keyof OpportunityInput>(key: K, value: OpportunityInput[K]) => {
     setValues((v) => ({ ...v, [key]: value }));

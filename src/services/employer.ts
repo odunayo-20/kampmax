@@ -193,6 +193,8 @@ export async function createEmployerProfileApi(
   return { profile: null, error };
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /** Maps the onboarding wizard's nested draft into the flat backend DTO. */
 export function employerDraftToCreateDto(
   draft: EmployerOnboardingDraft
@@ -204,7 +206,8 @@ export function employerDraftToCreateDto(
     industry: draft.organization?.industry?.trim() || draft.profile?.industry?.trim() || undefined,
     websiteUrl: draft.organization?.website?.trim() || draft.profile?.website?.trim() || undefined,
     city: draft.location?.city?.trim() || undefined,
-    campusId: draft.location?.campusId || undefined,
+    // Backend requires a UUID; ignore mock slug ids (e.g. "rugipo").
+    campusId: UUID_RE.test(draft.location?.campusId ?? "") ? draft.location.campusId : undefined,
   };
 }
 
@@ -361,6 +364,8 @@ export function getEmployerVerificationStatusForUser(): EmployerVerificationStat
 export function submitEmployerProfileForUser(): { success: boolean; message: string } {
   const uid = currentUserId();
   if (!uid) return { success: false, message: "Not authenticated." };
+  // The in-memory store resets on reload/HMR; make sure a record exists.
+  createEmployerApplication(uid);
   const res = submitEmployerApplication(uid);
   if (res.success) {
     pushUserNotification({

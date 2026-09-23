@@ -2,6 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { ContractStatusBadge } from "@/components/contracts/ContractStatusBadge";
+import { EmployerWalletCard } from "./EmployerWalletCard";
 import { EngagementActions } from "@/components/engagements/EngagementActions";
 import { dashboardKeys } from "@/lib/query-keys";
 import { useEmployerContracts } from "@/hooks/use-employer-dashboard";
@@ -31,6 +32,8 @@ export function EmployerContracts() {
           Work that started from the applications you hired.
         </p>
       </div>
+
+      <EmployerWalletCard />
 
       {query.isPending ? (
         <div className="rounded-xl border border-kampmax-border bg-white p-5">

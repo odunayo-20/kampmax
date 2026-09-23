@@ -21,6 +21,7 @@ import {
   isOrganizationLikeClientType,
 } from "@/config/employer";
 import { getEmployerCampusOptions } from "@/services/employer";
+import { fetchCampuses } from "@/services/campus";
 
 const MAX_LOGO_BYTES = 5 * 1024 * 1024;
 
@@ -159,6 +160,18 @@ export function EmployerProfileEditForm({
   const [form, setForm] = useState<EditFormState>(() => toFormState(draft));
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [logoError, setLogoError] = useState<string | null>(null);
+  const [campuses, setCampuses] = useState(getEmployerCampusOptions());
+
+  // Load real campuses (UUID ids) — the sync cache starts with mock slug ids.
+  useEffect(() => {
+    let active = true;
+    fetchCampuses({ limit: 100 }).then((res) => {
+      if (active && !res.error && res.data.length > 0) setCampuses(res.data);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!isPending) {
@@ -453,7 +466,7 @@ export function EmployerProfileEditForm({
               onChange={(e) => set("campusId", e.target.value)}
               placeholder="Select a campus"
             >
-              {getEmployerCampusOptions().map((c) => (
+              {campuses.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>

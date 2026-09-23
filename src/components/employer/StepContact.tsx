@@ -7,6 +7,7 @@ import {
   EMPLOYER_WORK_PREFERENCES,
 } from "@/config/employer";
 import { getEmployerCampusOptions } from "@/services/employer";
+import { fetchCampuses } from "@/services/campus";
 import { getCurrentUser } from "@/services/users";
 import { isValidEmail } from "@/lib/utils";
 import type { EmployerOnboardingDraft, EmployerWorkPreference } from "@/types/employer";
@@ -17,9 +18,20 @@ interface StepContactProps {
 }
 
 export function StepContact({ draft, onUpdate }: StepContactProps) {
-  const campuses = getEmployerCampusOptions();
+  const [campuses, setCampuses] = useState(getEmployerCampusOptions());
   const [emailError, setEmailError] = useState<string | undefined>(undefined);
   const userEmail = getCurrentUser().email;
+
+  // Load real campuses (UUID ids) — the sync cache starts with mock slug ids.
+  useEffect(() => {
+    let active = true;
+    fetchCampuses({ limit: 100 }).then((res) => {
+      if (active && !res.error && res.data.length > 0) setCampuses(res.data);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     const email = draft?.contact.email;

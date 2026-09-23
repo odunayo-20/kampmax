@@ -229,21 +229,23 @@ export default function EmployerOnboardingStepPage() {
       const { error: apiError } = await createEmployerProfileApi(
         employerDraftToCreateDto(draft)
       );
-      if (apiError) {
+      // A profile already exists (e.g. an earlier submit succeeded) — the
+      // capability is active, so treat it as done rather than an error.
+      const alreadyExists =
+        apiError?.status === 409 || /already has an employer profile/i.test(apiError?.message ?? "");
+      if (apiError && !alreadyExists) {
         setError(apiError.message || "We couldn't activate your employer profile. Please try again.");
         return;
       }
 
-      const res = submitEmployerProfileForUser();
-      if (res.success) {
-        const allSteps: EmployerOnboardingStepId[] = [1, 2, 3, 4, 5];
-        setCompletedSteps(allSteps);
-        persistProgress(allSteps);
-        persistDraft(draft);
-        router.push("/employer/dashboard");
-      } else {
-        setError(res.message);
-      }
+      // The backend already activated the profile; the local mock result
+      // is cosmetic and must not block completion.
+      submitEmployerProfileForUser();
+      const allSteps: EmployerOnboardingStepId[] = [1, 2, 3, 4, 5];
+      setCompletedSteps(allSteps);
+      persistProgress(allSteps);
+      persistDraft(draft);
+      router.push("/employer/dashboard");
     } catch {
       setError("Submission failed. Please try again.");
     } finally {

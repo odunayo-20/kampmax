@@ -399,3 +399,57 @@ export function getDebitedTotal(walletId: string): number {
     .filter((t) => t.direction === "debit" && t.status === "completed")
     .reduce((sum, t) => sum + t.amount, 0);
 }
+
+// ============================================================
+// REAL WALLET BALANCE + TOP-UP (never falls back to mock data)
+// ============================================================
+
+export interface WalletTopup {
+  id: string;
+  reference: string;
+  amount: number;
+  currency: string;
+  status: "PENDING" | "SUCCESS" | "FAILED";
+  paidAt: string | null;
+  createdAt: string;
+  authorizationUrl?: string;
+}
+
+function toFailure(error: ApiError | null, fallback: string): Error {
+  return new Error(error?.message || fallback);
+}
+
+/** The signed-in user's real wallet balance; throws instead of showing a fake one. */
+export async function fetchMyWalletBalance(): Promise<{ balance: number; currency: string }> {
+  const { data, error } = await apiClient.get<BackendWalletResponse>("/wallet");
+  if (error || !data) throw toFailure(error, "Could not load your wallet.");
+  return { balance: Number(data.balance || 0), currency: data.currency || "NGN" };
+}
+
+/** Starts a Paystack charge; the caller redirects to `authorizationUrl`. */
+export async function startWalletTopup(amount: number, callbackUrl: string): Promise<WalletTopup> {
+  const { data, error } = await apiClient.post<{ amount: number; callbackUrl: string }, WalletTopup>(
+    "/wallet/topups",
+    { amount, callbackUrl },
+  );
+  if (error || !data) throw toFailure(error, "Could not start the payment.");
+  return data;
+}
+
+/** Confirms a returned charge with the gateway; the wallet is credited once, server-side. */
+export async function verifyWalletTopup(reference: string): Promise<WalletTopup> {
+  const { data, error } = await apiClient.get<WalletTopup>(
+    `/wallet/topups/${encodeURIComponent(reference)}`,
+  );
+  if (error || !data) throw toFailure(error, "Could not confirm the payment.");
+  return data;
+}
+
+/** Development-only credit; the backend answers 404 unless explicitly enabled. */
+export async function devCreditWallet(amount: number): Promise<void> {
+  const { error } = await apiClient.post<{ amount: number }, BackendWalletResponse>(
+    "/wallet/dev-credit",
+    { amount },
+  );
+  if (error) throw toFailure(error, "Development credit is not available.");
+}
