@@ -18,8 +18,12 @@ import {
   createFlApplicationApi,
   freelancerDraftToCreateDto,
   getFlOnboardingDraft,
+  getFlOnboardingDraftApi,
+  loadProfileSections,
+  saveProfileSections,
   getFlOnboardingStatus,
   saveFlDraft,
+  saveFlDraftApi,
   submitFlApplication,
   computeFlCompletion,
 } from "@/services/freelancer";
@@ -115,6 +119,7 @@ export default function FreelancerOnboardingStepPage() {
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasBackendProfile, setHasBackendProfile] = useState(false);
 
   useEffect(() => {
     const loadDraft = async () => {
@@ -124,6 +129,17 @@ export default function FreelancerOnboardingStepPage() {
         const fresh = getFlOnboardingDraft();
         const saved = loadStoredDraft();
 
+        // The wizard's local draft store is a separate, purely client-side
+        // cache — it knows nothing about a profile already created on the
+        // backend in an earlier session. Without this, re-entering the
+        // wizard for an existing profile looks blank, and re-submitting
+        // hits POST /freelancers again, which 409s ("already has a
+        // profile"). Prefill from the real profile when one exists.
+        const { profile: backendProfile } = await getFlOnboardingDraftApi();
+        setHasBackendProfile(!!backendProfile);
+        const sections = backendProfile ? await loadProfileSections() : null;
+
+        let base: FreelancerOnboardingDraft | null;
         if (saved && saved.userId === fresh?.userId) {
           // The wizard itself never blocks on a locally-cached status —
           // the backend has already decided (via the intro page's real
@@ -135,12 +151,41 @@ export default function FreelancerOnboardingStepPage() {
             ? { ...saved, status: FREELANCER_ONBOARDING_STATUS.IN_PROGRESS }
             : saved;
           syncStoreWithDraft(normalized);
-          setDraft(getFlOnboardingDraft() ?? normalized);
-          persistDraft(getFlOnboardingDraft() ?? normalized);
+          base = getFlOnboardingDraft() ?? normalized;
         } else {
-          setDraft(fresh);
-          persistDraft(fresh);
+          base = fresh;
         }
+
+        // Overlay real backend fields onto the local draft wherever the
+        // local copy is still empty, so an existing profile's data shows
+        // up instead of a blank form.
+        const merged: FreelancerOnboardingDraft | null = base && backendProfile
+          ? {
+              ...base,
+              profile: {
+                ...base.profile,
+                headline: base.profile?.headline || backendProfile.professionalTitle || undefined,
+                bio: base.profile?.bio || backendProfile.bio || undefined,
+                city: base.profile?.city || backendProfile.city || undefined,
+                campusId: base.profile?.campusId || backendProfile.campusId || undefined,
+              },
+              skills: base.skills?.length ? base.skills : backendProfile.skills?.map((s) => s.name) ?? base.skills,
+              rates: {
+                ...base.rates,
+                hourlyRate: base.rates?.hourlyRate ?? backendProfile.hourlyRate ?? undefined,
+              },
+              // Server rows are authoritative once they exist.
+              experience: sections?.experience.length ? sections.experience : base.experience,
+              education: sections?.education.length ? sections.education : base.education,
+              certifications: sections?.certifications.length
+                ? sections.certifications
+                : base.certifications,
+            }
+          : base;
+
+        if (merged) syncStoreWithDraft(merged);
+        setDraft(merged);
+        persistDraft(merged);
 
         const savedProgress = loadStoredProgress();
         if (savedProgress.length > 0) {
@@ -228,12 +273,26 @@ export default function FreelancerOnboardingStepPage() {
     setError(null);
     try {
       // Activate the Freelancer capability on the backend — this is the
-      // real onboarding completion step.
-      const { error: apiError } = await createFlApplicationApi(
-        freelancerDraftToCreateDto(draft)
-      );
+      // real onboarding completion step. A profile already existing
+      // (detected on load, or discovered here via a 409 race) means this
+      // is an edit: update instead of trying to create a second one.
+      const dto = freelancerDraftToCreateDto(draft);
+      let apiError = hasBackendProfile
+        ? (await saveFlDraftApi(dto)).error
+        : (await createFlApplicationApi(dto)).error;
+
+      if (apiError && apiError.status === 409) {
+        apiError = (await saveFlDraftApi(dto)).error;
+      }
+
       if (apiError) {
         setError(apiError.message || "We couldn't activate your freelancer profile. Please try again.");
+        return;
+      }
+
+      const sectionsError = await saveProfileSections(draft);
+      if (sectionsError) {
+        setError(sectionsError.message || "Your profile saved, but experience/education/certifications didn't. Please try again.");
         return;
       }
 

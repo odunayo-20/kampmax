@@ -4,10 +4,10 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Pencil, ExternalLink } from "lucide-react";
 import Image from "next/image";
-import { useState } from "react";
-import { getMyPortfolioItem, setMyPortfolioItemVisibility, deleteMyPortfolioItem } from "@/services/freelancer-services";
+import { useEffect, useState } from "react";
+import { fetchMyPortfolioItem, setMyPortfolioItemVisibility, deleteMyPortfolioItem } from "@/services/freelancer-services";
 import type { FreelancerPortfolioItem } from "@/types/freelancer";
-import { PortfolioActionMenu, PortfolioErrorState } from "@/components/freelancer/portfolio";
+import { PortfolioActionMenu, PortfolioErrorState, PortfolioGridSkeleton } from "@/components/freelancer/portfolio";
 import type { PortfolioAction } from "@/components/freelancer/portfolio";
 import { categoryLabel } from "@/components/freelancer/services";
 import { Button } from "@/components/ui";
@@ -16,13 +16,26 @@ export default function PortfolioDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const id = params.id;
-  const [item, setItem] = useState<FreelancerPortfolioItem | null>(() => getMyPortfolioItem(id));
+  const [item, setItem] = useState<FreelancerPortfolioItem | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  function runAction(kind: PortfolioAction) {
+  useEffect(() => {
+    let cancelled = false;
+    void fetchMyPortfolioItem(id).then((found) => {
+      if (cancelled) return;
+      setItem(found);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  async function runAction(kind: PortfolioAction) {
     if (!item) return;
     if (kind === "delete") {
-      const result = deleteMyPortfolioItem(item.id);
+      const result = await deleteMyPortfolioItem(item.id);
       if (result.ok) {
         router.push("/freelancer/portfolio");
       } else {
@@ -30,14 +43,16 @@ export default function PortfolioDetailPage() {
       }
       return;
     }
-    const result = setMyPortfolioItemVisibility(item.id, !item.visible);
+    const result = await setMyPortfolioItemVisibility(item.id, !item.visible);
     if (result.ok) {
-      setItem(getMyPortfolioItem(id));
+      setItem(await fetchMyPortfolioItem(id));
       setError(null);
     } else {
       setError(result.message);
     }
   }
+
+  if (loading) return <PortfolioGridSkeleton />;
 
   if (!item) {
     return (

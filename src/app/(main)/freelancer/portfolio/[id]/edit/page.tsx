@@ -1,23 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { getMyPortfolioItem, updateMyPortfolioItem } from "@/services/freelancer-services";
+import { fetchMyPortfolioItem, updateMyPortfolioItem } from "@/services/freelancer-services";
+import type { FreelancerPortfolioItem } from "@/types/freelancer";
 import {
   PortfolioForm,
   PortfolioFormValues,
   PortfolioErrorState,
+  PortfolioGridSkeleton,
 } from "@/components/freelancer/portfolio";
 
 export default function EditPortfolioPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const id = params.id;
-  const [item] = useState(() => getMyPortfolioItem(id));
+  const [item, setItem] = useState<FreelancerPortfolioItem | null>(null);
+  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchMyPortfolioItem(id).then((found) => {
+      if (cancelled) return;
+      setItem(found);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  if (loading) return <PortfolioGridSkeleton />;
 
   if (!item) {
     return (
@@ -28,10 +45,10 @@ export default function EditPortfolioPage() {
     );
   }
 
-  function handleSubmit(values: PortfolioFormValues) {
+  async function handleSubmit(values: PortfolioFormValues) {
     setSubmitting(true);
     setError(null);
-    const result = updateMyPortfolioItem(id, values);
+    const result = await updateMyPortfolioItem(id, values);
     setSubmitting(false);
     if (result.ok) {
       router.push(`/freelancer/portfolio/${id}`);

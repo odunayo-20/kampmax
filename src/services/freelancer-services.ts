@@ -16,6 +16,7 @@
 //     validates for UX but never trusts the input blindly.
 
 import { getCurrentUser } from "@/services/users";
+import { apiClient } from "@/lib/api-client";
 import {
   approveServiceRecord,
   archiveServiceRecord,
@@ -256,91 +257,100 @@ export function deleteMyService(serviceId: string): FreelancerServiceResult {
   return ok("Service deleted.");
 }
 
-// ── Portfolio API (reuses the freelancer draft's portfolio store) ──
-// The portfolio lives in the same FreelancerPortfolioItem[] as the onboarding
-// draft so there is ONE source of truth shared with the public profile preview.
+// ── Portfolio API (backend: /portfolio) ─────────────────────
+// Real persistence via the NestJS portfolio module. The backend stores a
+// full date and has no category/cover-image URL, so:
+//   - completionDate is sent as YYYY-MM-01 and read back as YYYY-MM
+//   - categoryId / imageUrl are not persisted server-side yet
 
-export function getMyPortfolio(): FreelancerPortfolioItem[] {
-  const uid = currentUserId();
-  if (!uid) return [];
-  const draft = getFreelancerOnboardingDraft(uid);
-  if (!draft) return [];
-  return draft.portfolio;
+interface BackendPortfolioItem {
+  id: string;
+  title: string;
+  description: string | null;
+  projectUrl: string | null;
+  technologies: string[] | null;
+  completionDate: string | null;
+  isPublic: boolean;
 }
 
-export function getMyPortfolioItem(itemId: string): FreelancerPortfolioItem | null {
-  const uid = currentUserId();
-  if (!uid) return null;
-  const draft = getFreelancerOnboardingDraft(uid);
-  if (!draft) return null;
-  return draft.portfolio.find((p) => p.id === itemId) ?? null;
-}
-
-function clonePortfolioItem(p: Omit<FreelancerPortfolioItem, "id">): Omit<FreelancerPortfolioItem, "id"> {
-  return { ...p, skills: [...p.skills] };
-}
-
-export function createMyPortfolioItem(
-  input: Omit<FreelancerPortfolioItem, "id">
-): FreelancerServiceResult {
-  const uid = currentUserId();
-  if (!uid) return fail(FREELANCER_SERVICE_RESULT.UNAUTHORIZED, "Not authenticated.");
-  const draft = getFreelancerOnboardingDraft(uid);
-  if (!draft) return fail(FREELANCER_SERVICE_RESULT.NOT_FOUND, "No freelancer profile found.");
-  const item: FreelancerPortfolioItem = {
-    ...clonePortfolioItem(input),
-    id: `flp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+function fromBackendPortfolio(p: BackendPortfolioItem): FreelancerPortfolioItem {
+  return {
+    id: p.id,
+    title: p.title,
+    description: p.description ?? "",
+    skills: p.technologies ?? [],
+    externalUrl: p.projectUrl ?? undefined,
+    completionDate: p.completionDate ? p.completionDate.slice(0, 7) : undefined,
+    visible: p.isPublic,
   };
-  draft.portfolio = [item, ...draft.portfolio];
-  saveFreelancerDraft(draft);
-  return ok("Portfolio project created.");
 }
 
-export function updateMyPortfolioItem(
+function toBackendPortfolio(input: Partial<Omit<FreelancerPortfolioItem, "id">>) {
+  return {
+    title: input.title,
+    description: input.description || undefined,
+    projectUrl: input.externalUrl || undefined,
+    technologies: input.skills,
+    completionDate: input.completionDate ? `${input.completionDate}-01` : undefined,
+    isPublic: input.visible,
+  };
+}
+
+function apiFail(error: { status?: number; message?: string }): FreelancerServiceResult {
+  if (error.status === 401) return fail(FREELANCER_SERVICE_RESULT.UNAUTHORIZED, "Not authenticated.");
+  if (error.status === 404) return fail(FREELANCER_SERVICE_RESULT.NOT_FOUND, error.message || "Portfolio project not found.");
+  return fail(FREELANCER_SERVICE_RESULT.NOT_FOUND, error.message || "Something went wrong. Please try again.");
+}
+
+export async function fetchMyPortfolio(): Promise<{
+  items: FreelancerPortfolioItem[];
+  error: string | null;
+}> {
+  const { data, error } = await apiClient.get<{ items: BackendPortfolioItem[] }>("/portfolio/me?limit=100");
+  if (error) return { items: [], error: error.message || "Couldn't load your portfolio." };
+  return { items: (data?.items ?? []).map(fromBackendPortfolio), error: null };
+}
+
+export async function fetchMyPortfolioItem(itemId: string): Promise<FreelancerPortfolioItem | null> {
+  const { items } = await fetchMyPortfolio();
+  return items.find((p) => p.id === itemId) ?? null;
+}
+
+export async function createMyPortfolioItem(
+  input: Omit<FreelancerPortfolioItem, "id">
+): Promise<FreelancerServiceResult> {
+  const { error } = await apiClient.post("/portfolio", toBackendPortfolio(input));
+  return error ? apiFail(error) : ok("Portfolio project created.");
+}
+
+export async function updateMyPortfolioItem(
   itemId: string,
   input: Omit<FreelancerPortfolioItem, "id">
-): FreelancerServiceResult {
-  const uid = currentUserId();
-  if (!uid) return fail(FREELANCER_SERVICE_RESULT.UNAUTHORIZED, "Not authenticated.");
-  const draft = getFreelancerOnboardingDraft(uid);
-  if (!draft) return fail(FREELANCER_SERVICE_RESULT.NOT_FOUND, "No freelancer profile found.");
-  const idx = draft.portfolio.findIndex((p) => p.id === itemId);
-  if (idx === -1) return fail(FREELANCER_SERVICE_RESULT.NOT_FOUND, "Portfolio project not found.");
-  draft.portfolio[idx] = { ...clonePortfolioItem(input), id: itemId };
-  saveFreelancerDraft(draft);
-  return ok("Portfolio project updated.");
+): Promise<FreelancerServiceResult> {
+  const { error } = await apiClient.patch(`/portfolio/${itemId}`, toBackendPortfolio(input));
+  return error ? apiFail(error) : ok("Portfolio project updated.");
 }
 
-/** Toggles a portfolio item's public visibility (backend-owned persistence). */
-export function setMyPortfolioItemVisibility(
+/** Toggles a portfolio item's public visibility. */
+export async function setMyPortfolioItemVisibility(
   itemId: string,
   visible: boolean
-): FreelancerServiceResult {
-  const existing = getMyPortfolioItem(itemId);
-  if (!existing) return fail(FREELANCER_SERVICE_RESULT.NOT_FOUND, "Portfolio project not found.");
-  return updateMyPortfolioItem(itemId, { ...existing, visible });
+): Promise<FreelancerServiceResult> {
+  const { error } = await apiClient.patch(`/portfolio/${itemId}`, { isPublic: visible });
+  return error ? apiFail(error) : ok("Portfolio visibility updated.");
 }
 
-export function deleteMyPortfolioItem(itemId: string): FreelancerServiceResult {
-  const uid = currentUserId();
-  if (!uid) return fail(FREELANCER_SERVICE_RESULT.UNAUTHORIZED, "Not authenticated.");
-  const draft = getFreelancerOnboardingDraft(uid);
-  if (!draft) return fail(FREELANCER_SERVICE_RESULT.NOT_FOUND, "No freelancer profile found.");
-  const idx = draft.portfolio.findIndex((p) => p.id === itemId);
-  if (idx === -1) return fail(FREELANCER_SERVICE_RESULT.NOT_FOUND, "Portfolio project not found.");
-  draft.portfolio.splice(idx, 1);
-  saveFreelancerDraft(draft);
-  return ok("Portfolio project deleted.");
+export async function deleteMyPortfolioItem(itemId: string): Promise<FreelancerServiceResult> {
+  const { error } = await apiClient.delete(`/portfolio/${itemId}`);
+  return error ? apiFail(error) : ok("Portfolio project deleted.");
 }
 
 // ── Aggregate (dashboard integration) ───────────────────────
 
 export function getFreelancerContentSummary(): {
   services: { total: number; published: number; draft: number };
-  portfolio: { total: number; visible: number };
 } {
   const services = getMyServices();
-  const portfolio = getMyPortfolio();
   return {
     services: {
       total: services.length,
@@ -350,10 +360,6 @@ export function getFreelancerContentSummary(): {
           s.status === FREELANCER_SERVICE_STATUS.DRAFT ||
           s.status === FREELANCER_SERVICE_STATUS.REJECTED
       ).length,
-    },
-    portfolio: {
-      total: portfolio.length,
-      visible: portfolio.filter((p) => p.visible).length,
     },
   };
 }

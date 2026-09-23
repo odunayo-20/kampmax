@@ -226,10 +226,10 @@ export async function getMyFreelancerProfile(): Promise<{
  * Endpoint: PATCH /freelancers/me
  */
 export async function updateMyFreelancerProfile(
-  patch: Partial<FreelancerPrivateProfile>
+  patch: Partial<CreateFreelancerProfileDto>
 ): Promise<{ profile: FreelancerPrivateProfile | null; error: ApiError | null }> {
   const { data, error } = await apiClient.patch<
-    Partial<FreelancerPrivateProfile>,
+    Partial<CreateFreelancerProfileDto>,
     FreelancerPrivateProfile
   >("/freelancers/me", patch);
   if (error) return { profile: null, error };
@@ -323,6 +323,7 @@ export interface CreateFreelancerProfileDto {
   campusId?: string;
   city?: string;
   websiteUrl?: string;
+  availabilityStatus?: "AVAILABLE" | "BUSY" | "UNAVAILABLE";
   skills?: string[];
 }
 
@@ -381,14 +382,9 @@ export async function getFlOnboardingDraftApi(): Promise<{
  * Endpoint: PATCH /freelancers/me
  */
 export async function saveFlDraftApi(
-  patch: Partial<FreelancerPrivateProfile>
+  patch: Partial<CreateFreelancerProfileDto>
 ): Promise<{ profile: FreelancerPrivateProfile | null; error: ApiError | null }> {
-  const { data, error } = await apiClient.patch<
-    Partial<FreelancerPrivateProfile>,
-    FreelancerPrivateProfile
-  >("/freelancers/me", patch);
-  if (!error && data) return { profile: data, error: null };
-  return { profile: null, error };
+  return updateMyFreelancerProfile(patch);
 }
 
 /**
@@ -405,6 +401,129 @@ export async function submitFlApplicationApi(): Promise<{
   );
   if (!error && data) return { success: true, profile: data, error: null };
   return { success: false, profile: null, error };
+}
+
+// ═══════════════════════════════════════════════════════════
+// PROFILE SECTIONS (experience / education / certifications)
+// Endpoints: /freelancers/me/{experience,education,certifications}
+// ═══════════════════════════════════════════════════════════
+
+type ProfileSections = Pick<
+  FreelancerOnboardingDraft,
+  "experience" | "education" | "certifications"
+>;
+
+/** Loads the authenticated freelancer's saved sections, mapped to draft shapes. */
+export async function loadProfileSections(): Promise<ProfileSections | null> {
+  const [exp, edu, cert] = await Promise.all([
+    apiClient.get<any[]>("/freelancers/me/experience"),
+    apiClient.get<any[]>("/freelancers/me/education"),
+    apiClient.get<any[]>("/freelancers/me/certifications"),
+  ]);
+  if (exp.error || edu.error || cert.error) return null;
+
+  return {
+    experience: (exp.data ?? []).map((e) => ({
+      id: e.id,
+      jobTitle: e.jobTitle,
+      company: e.company,
+      startDate: e.startDate,
+      endDate: e.endDate ?? undefined,
+      currentlyWorking: e.currentlyWorking,
+      location: e.location ?? undefined,
+      employmentType: e.employmentType,
+      description: e.description ?? "",
+    })),
+    education: (edu.data ?? []).map((e) => ({
+      id: e.id,
+      institution: e.institution,
+      qualification: e.qualification,
+      fieldOfStudy: e.fieldOfStudy,
+      startYear: e.startYear,
+      endYear: e.endYear ?? undefined,
+      description: e.description ?? undefined,
+    })),
+    certifications: (cert.data ?? []).map((c) => ({
+      id: c.id,
+      name: c.name,
+      issuingOrganization: c.issuingOrganization,
+      issueDate: c.issueDate,
+      expirationDate: c.expirationDate ?? undefined,
+      credentialId: c.credentialId ?? undefined,
+      credentialUrl: c.credentialUrl ?? undefined,
+    })),
+  };
+}
+
+async function replaceSection(
+  path: string,
+  bodies: Record<string, unknown>[]
+): Promise<ApiError | null> {
+  const existing = await apiClient.get<{ id: string }[]>(path);
+  if (existing.error) return existing.error;
+  for (const row of existing.data ?? []) {
+    const { error } = await apiClient.delete(`${path}/${row.id}`);
+    if (error) return error;
+  }
+  for (const [index, body] of bodies.entries()) {
+    const { error } = await apiClient.post(path, { ...body, sortOrder: index });
+    if (error) return error;
+  }
+  return null;
+}
+
+const clean = <T extends Record<string, unknown>>(o: T) =>
+  Object.fromEntries(
+    Object.entries(o).filter(([, v]) => v !== undefined && v !== "")
+  );
+
+/** Persists the wizard's sections to the backend (draft is source of truth). */
+export async function saveProfileSections(
+  draft: FreelancerOnboardingDraft
+): Promise<ApiError | null> {
+  return (
+    (await replaceSection(
+      "/freelancers/me/experience",
+      (draft.experience ?? []).map((e) =>
+        clean({
+          jobTitle: e.jobTitle,
+          company: e.company,
+          startDate: e.startDate,
+          endDate: e.currentlyWorking ? undefined : e.endDate,
+          currentlyWorking: e.currentlyWorking,
+          location: e.location,
+          employmentType: e.employmentType,
+          description: e.description,
+        })
+      )
+    )) ??
+    (await replaceSection(
+      "/freelancers/me/education",
+      (draft.education ?? []).map((e) =>
+        clean({
+          institution: e.institution,
+          qualification: e.qualification,
+          fieldOfStudy: e.fieldOfStudy,
+          startYear: e.startYear,
+          endYear: e.endYear,
+          description: e.description,
+        })
+      )
+    )) ??
+    (await replaceSection(
+      "/freelancers/me/certifications",
+      (draft.certifications ?? []).map((c) =>
+        clean({
+          name: c.name,
+          issuingOrganization: c.issuingOrganization,
+          issueDate: c.issueDate,
+          expirationDate: c.expirationDate,
+          credentialId: c.credentialId,
+          credentialUrl: c.credentialUrl,
+        })
+      )
+    ))
+  );
 }
 
 // ═══════════════════════════════════════════════════════════

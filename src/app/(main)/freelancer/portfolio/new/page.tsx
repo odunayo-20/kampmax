@@ -15,10 +15,10 @@ export default function NewPortfolioPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function handleSubmit(values: PortfolioFormValues) {
+  async function handleSubmit(values: PortfolioFormValues) {
     setSubmitting(true);
     setError(null);
-    const result = createMyPortfolioItem(values);
+    const result = await createMyPortfolioItem(values);
     setSubmitting(false);
     if (result.ok) {
       router.push("/freelancer/portfolio");

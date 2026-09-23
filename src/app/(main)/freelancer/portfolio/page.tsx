@@ -1,30 +1,39 @@
 "use client";
 
-import { useMemo, useState, Suspense } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
 import { useRouter } from "next/navigation";
-import { getMyPortfolio } from "@/services/freelancer-services";
+import { fetchMyPortfolio } from "@/services/freelancer-services";
 import type { FreelancerPortfolioItem } from "@/types/freelancer";
 import {
   PortfolioHeader,
   PortfolioGrid,
   PortfolioEmptyState,
+  PortfolioErrorState,
   PortfolioGridSkeleton,
-  PortfolioActionMenu,
-  type PortfolioAction,
 } from "@/components/freelancer/portfolio";
-import {
-  deleteMyPortfolioItem,
-  setMyPortfolioItemVisibility,
-} from "@/services/freelancer-services";
 import { cn } from "@/lib/utils";
 
 type VisibilityFilter = "all" | "public" | "private";
 
 function PortfolioContent() {
   const router = useRouter();
-  const [items, setItems] = useState<FreelancerPortfolioItem[]>(() => getMyPortfolio());
+  const [items, setItems] = useState<FreelancerPortfolioItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [filter, setFilter] = useState<VisibilityFilter>("all");
-  const [busy, setBusy] = useState<PortfolioAction | null>(null);
+
+  async function load() {
+    setLoading(true);
+    setLoadError(null);
+    const { items: loaded, error } = await fetchMyPortfolio();
+    setItems(loaded);
+    setLoadError(error);
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    void load();
+  }, []);
 
   const counts = useMemo(() => {
     return {
@@ -40,25 +49,14 @@ function PortfolioContent() {
     return items;
   }, [items, filter]);
 
-  function runAction(item: FreelancerPortfolioItem, kind: PortfolioAction) {
-    setBusy(kind);
-    let result;
-    if (kind === "delete") {
-      result = deleteMyPortfolioItem(item.id);
-    } else {
-      result = setMyPortfolioItemVisibility(item.id, !item.visible);
-    }
-    setBusy(null);
-    if (result.ok) {
-      setItems(getMyPortfolio());
-    }
-  }
-
   const tabs: { value: VisibilityFilter; label: string; count: number }[] = [
     { value: "all", label: "All", count: counts.all },
     { value: "public", label: "Public", count: counts.public },
     { value: "private", label: "Private", count: counts.private },
   ];
+
+  if (loading) return <PortfolioGridSkeleton />;
+  if (loadError) return <PortfolioErrorState message={loadError} onRetry={() => void load()} />;
 
   return (
     <div className="space-y-6">

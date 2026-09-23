@@ -507,11 +507,9 @@ export async function getFreelancerDashboardApi(): Promise<FreelancerDashboard |
 
   if (!profile) return null;
 
-  const vs = profile.verificationStatus;
-  const isApproved = vs === "approved" || vs === "APPROVED";
-  if (!isApproved) return null;
-
-  // Build access gate from live profile
+  // Access (profile existence vs. verification state) is already gated by
+  // FreelancerLayout via getFreelancerDashboardAccessApi — any existing
+  // profile may load dashboard data here regardless of verificationStatus.
   const user = getCurrentUser();
   const draft = user ? getFreelancerOnboardingDraft(user.id) : null;
 

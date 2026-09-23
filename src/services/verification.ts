@@ -179,11 +179,21 @@ export async function fetchFreelancerKycStatus(): Promise<{
     return { data: mockVerificationStates.freelancer_default, error };
   }
 
-  const isApproved = data.status === "APPROVED" || data.verificationStatus === "APPROVED";
+  // Real backend enum (FreelancerVerificationStatus): UNVERIFIED | PENDING | VERIFIED | REJECTED
+  const vs = String(data.verificationStatus || "").toUpperCase();
+  const isApproved = vs === "VERIFIED";
+  const isRejected = vs === "REJECTED";
+  const isPending = vs === "PENDING";
   const mapped: KycVerificationState = {
     userId: data.userId || "u1",
     role: "freelancer",
-    status: isApproved ? "verified" : data.status === "PENDING_REVIEW" ? "pending_review" : "unverified",
+    status: isApproved
+      ? "verified"
+      : isRejected
+      ? "rejected"
+      : isPending
+      ? "pending_review"
+      : "unverified",
     ninVerified: Boolean(data.ninVerified || isApproved),
     bvnVerified: Boolean(data.bvnVerified || isApproved),
     phoneVerified: true,
