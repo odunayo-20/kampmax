@@ -149,6 +149,7 @@ export interface JobBrowseQuery {
   locationType?: string;
   minBudget?: number;
   maxBudget?: number;
+  sort?: string;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -297,6 +298,7 @@ export async function listPublicJobs(query: JobBrowseQuery = {}): Promise<{
   if (query.locationType) params.set("locationType", query.locationType);
   if (query.minBudget !== undefined) params.set("minBudget", String(query.minBudget));
   if (query.maxBudget !== undefined) params.set("maxBudget", String(query.maxBudget));
+  if (query.sort) params.set("sort", query.sort);
 
   const qs = params.toString();
   const { data, error } = await apiClient.get<PaginatedResult<Job>>(

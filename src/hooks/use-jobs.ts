@@ -3,7 +3,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { EmployerJobListQuery, JobListQuery, dashboardKeys, jobKeys } from "@/lib/query-keys";
-import { closeJobApi, createJobApi, getJobByIdApi, getMyJobsApi, getOpportunitiesPageApi, getSavedJobsForUser, publishJobApi, saveJobForUser, unsaveJobForUser, updateJobApi } from "@/services/opportunity";
+import { closeJobApi, createJobApi, getJobByIdApi, getMyJobsApi, getSavedJobsForUser, publishJobApi, saveJobForUser, unsaveJobForUser, updateJobApi } from "@/services/opportunity";
+import { getJobById, listPublicJobs } from "@/services/jobs";
+import { jobListFiltersToQuery, jobToOpportunity } from "@/lib/job-api-mapping";
 import type { Opportunity, OpportunityInput, OpportunityPage, OpportunityResult, OpportunityStatus } from "@/types/opportunity";
 import { JOBS_PAGE_SIZE } from "@/config/jobs";
 
@@ -16,15 +18,29 @@ function throwIfApiError<T>(result: { data: T | null; error: Error | null }): T 
   return result.data;
 }
 
+/**
+ * Public job browsing/detail hit the real backend (GET /jobs, GET
+ * /jobs/:id) via services/jobs.ts + lib/job-api-mapping.ts. Employer job
+ * authoring (below) still targets the mock store — see the module header
+ * of lib/job-api-mapping.ts for why the write side isn't wired yet
+ * (skill-id resolution, budget/experience vocabulary reconciliation).
+ */
 export function useJobs(filters: JobListQuery) {
   const { status } = useAuth();
   return useQuery({
     queryKey: jobKeys.list(filters),
     enabled: status === "authenticated",
     queryFn: async (): Promise<OpportunityPage> => {
-      const response = await getOpportunitiesPageApi({ search: filters.search, categoryId: filters.categoryId, experience: filters.experience, arrangement: filters.arrangement as never, sort: filters.sort as never, page: filters.page, size: filters.size ?? JOBS_PAGE_SIZE });
-      if (response.error) throw response.error;
-      return response.page;
+      const query = jobListFiltersToQuery({ ...filters, size: filters.size ?? JOBS_PAGE_SIZE });
+      const { jobs, total, page, totalPages, error } = await listPublicJobs(query);
+      if (error) throw error;
+      return {
+        items: jobs.map(jobToOpportunity),
+        total,
+        page,
+        size: filters.size ?? JOBS_PAGE_SIZE,
+        totalPages,
+      };
     },
   });
 }
@@ -34,7 +50,11 @@ export function useJob(id: string) {
   return useQuery({
     queryKey: jobKeys.detail(id),
     enabled: status === "authenticated" && !!id,
-    queryFn: async (): Promise<Opportunity> => throwIfApiError(await getJobByIdApi(id)) as unknown as Opportunity,
+    queryFn: async (): Promise<Opportunity> => {
+      const { job, error } = await getJobById(id);
+      if (error || !job) throw error ?? new Error("Job not found");
+      return jobToOpportunity(job);
+    },
   });
 }
 
