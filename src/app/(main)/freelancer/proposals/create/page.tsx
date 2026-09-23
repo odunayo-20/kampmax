@@ -6,11 +6,13 @@ import { CheckCircle2, ShieldAlert, ArrowLeft } from "lucide-react";
 import {
   createProposalDraft,
   getDiscoverableOpportunity,
+  getJobByIdApi,
   getJobEligibility,
+  isBackendId,
 } from "@/services/opportunity";
-import { submitProposalApi } from "@/services/proposals";
-import { ELIGIBILITY_CODE } from "@/types/opportunity";
-import type { Proposal, ProposalInput } from "@/types/opportunity";
+import { getJobEligibilityApi, submitProposalApi } from "@/services/proposals";
+import { ELIGIBILITY_CODE, OPPORTUNITY_STATUS } from "@/types/opportunity";
+import type { JobEligibility, Opportunity, Proposal, ProposalInput } from "@/types/opportunity";
 import {
   ProposalForm,
   ProposalReview,
@@ -26,10 +28,13 @@ function CreateProposalContent() {
   const searchParams = useSearchParams();
   const jobId = searchParams.get("jobId");
 
-  const opportunity = useMemo(
-    () => (jobId ? getDiscoverableOpportunity(jobId) : null),
-    [jobId]
+  // Real jobs (UUID ids) load from the backend; legacy demo ids use the local store.
+  const backend = !!jobId && isBackendId(jobId);
+  const [opportunity, setOpportunity] = useState<Opportunity | null>(() =>
+    jobId && !backend ? getDiscoverableOpportunity(jobId) : null
   );
+  const [loading, setLoading] = useState(backend);
+  const [remoteEligibility, setRemoteEligibility] = useState<JobEligibility | null>(null);
 
   const [step, setStep] = useState<Step>("form");
   const [values, setValues] = useState<ProposalFormValues>(emptyProposalFormValues());
@@ -37,22 +42,37 @@ function CreateProposalContent() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const eligibility = useMemo(() => (jobId ? getJobEligibility(jobId) : null), [jobId]);
-
   useEffect(() => {
-    if (!jobId || !getDiscoverableOpportunity(jobId)) {
-      setError("We couldn't find that opportunity. It may have closed or expired.");
-      return;
-    }
-    setError(null);
-  }, [jobId]);
+    if (!jobId || !backend) return;
+    let cancelled = false;
+    void (async () => {
+      const { job } = await getJobByIdApi(jobId);
+      if (cancelled) return;
+      const visible = job && job.status === OPPORTUNITY_STATUS.OPEN ? job : null;
+      setOpportunity(visible);
+      setLoading(false);
+      if (visible) {
+        const result = await getJobEligibilityApi(visible);
+        if (!cancelled) setRemoteEligibility(result);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [jobId, backend]);
 
-  if (!jobId) {
+  const localEligibility = useMemo(
+    () => (jobId && !backend ? getJobEligibility(jobId) : null),
+    [jobId, backend]
+  );
+  const eligibility = backend ? remoteEligibility : localEligibility;
+
+  if (!jobId || (!loading && !opportunity)) {
     return <MissingJob />;
   }
 
-  if (!opportunity) {
-    return <MissingJob />;
+  if (loading || !opportunity) {
+    return <div className="pt-8 text-center text-sm text-neutral-500">Loading…</div>;
   }
 
   const canApply = eligibility?.eligible ?? false;
@@ -92,15 +112,13 @@ function CreateProposalContent() {
     if (busy) return;
     setBusy(true);
     setError(null);
-    // Ensure a draft record exists, then submit it. This is the only path
-    // that transitions DRAFT → SUBMITTED (backend/status-owned).
     const res = await submitProposalApi(buildInput(values));
     setBusy(false);
     if (res.error || !res.proposal) {
       setError(res.error?.message ?? "We couldn't submit your proposal.");
       return;
     }
-    setSubmittedProposal(res.proposal as unknown as Proposal);
+    setSubmittedProposal(res.proposal);
     setStep("success");
   }
 
@@ -189,7 +207,7 @@ function CreateProposalContent() {
             setError(null);
             setStep("review");
           }}
-          onSaveDraft={canApply ? handleSaveDraft : undefined}
+          onSaveDraft={canApply && !backend ? handleSaveDraft : undefined}
           submitting={busy}
         />
       )}

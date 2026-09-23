@@ -245,6 +245,8 @@ export interface ProposalAttachment {
 export interface Proposal {
   id: string;
   opportunityId: string;
+  /** Job title as returned with backend proposals (local mock proposals omit it). */
+  jobTitle?: string;
   freelancerId: string;
   coverLetter: string;
   proposedAmount?: number;

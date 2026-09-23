@@ -23,7 +23,7 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
             {category}
           </span>
           <h3 className="mt-1 line-clamp-2 text-base font-semibold text-neutral-900 group-hover:text-primary-700">
-            {job?.title ?? "Opportunity"}
+            {job?.title ?? proposal.jobTitle ?? "Opportunity"}
           </h3>
         </div>
         <ProposalStatusBadge status={proposal.status} />
@@ -37,7 +37,9 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
         <div className="flex items-center gap-1.5">
           <Clock className="h-3.5 w-3.5 text-neutral-400" aria-hidden />
           <span>
-            {proposal.delivery.value} {proposal.delivery.unit}
+            {proposal.delivery.value > 0
+              ? `${proposal.delivery.value} ${proposal.delivery.unit}`
+              : "No estimate"}
           </span>
         </div>
         <div className="flex items-center gap-1.5">

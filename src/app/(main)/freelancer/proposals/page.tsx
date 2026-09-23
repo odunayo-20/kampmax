@@ -46,7 +46,7 @@ function ProposalsContent() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    void getMyProposalsApi({ status: status === "all" ? "all" : status }).then((response) => {
+    void getMyProposalsApi({ limit: 100 }).then((response) => {
       if (cancelled) return;
       if (response.error || !response.result) {
         setError(response.error?.message ?? "We couldn't load your proposals.");
@@ -54,7 +54,7 @@ function ProposalsContent() {
         return;
       }
       setError(null);
-      setProposals(response.result.data as never);
+      setProposals(response.proposals);
     }).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [status]);

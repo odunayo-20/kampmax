@@ -68,6 +68,7 @@ import type {
   OpportunityResultCode,
   OpportunitySortKey,
   OpportunityStatus,
+  OpportunityWorkArrangement,
   Proposal,
   ProposalInput,
   ProposalStatus,
@@ -1055,21 +1056,132 @@ export async function getOpportunitiesPageApi(
   if (query.size) params.set("limit", String(query.size));
 
   const qs = params.toString();
-  const { data, error } = await apiClient.get<PaginatedJobResult>(`/jobs${qs ? `?${qs}` : ""}`);
+  // Backend shape: { items, meta: { total, page, limit, totalPages } }
+  const { data, error } = await apiClient.get<{
+    items: BackendJob[];
+    meta: { total: number; page: number; limit: number; totalPages: number };
+  }>(`/jobs${qs ? `?${qs}` : ""}`);
   if (!error && data) {
-    const items = (data.data ?? []) as unknown as Opportunity[];
     return {
       page: {
-        items,
-        total: data.total,
-        page: data.page,
-        size: data.limit,
-        totalPages: data.totalPages,
+        items: (data.items ?? []).map(mapBackendJob),
+        total: data.meta?.total ?? 0,
+        page: data.meta?.page ?? 1,
+        size: data.meta?.limit ?? query.size ?? 9,
+        totalPages: data.meta?.totalPages ?? 1,
       },
       error: null,
     };
   }
   return { page: emptyJobPage(query.size ?? 9), error };
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Real backend records use UUIDs; legacy demo records use short ids like "j1". */
+export function isBackendId(id: string): boolean {
+  return UUID_RE.test(id);
+}
+
+/** Backend job payload (modules/jobs JobResponse). */
+export interface BackendJob {
+  id: string;
+  employer: { id: string; userId: string; displayName: string };
+  title: string;
+  description: string | null;
+  category: { id: string; name: string } | null;
+  campus: { id: string; name: string } | null;
+  budgetType: string;
+  budgetMin: number | null;
+  budgetMax: number | null;
+  experienceLevel: string | null;
+  estimatedDuration: string | null;
+  locationType: string;
+  state: string | null;
+  city: string | null;
+  applicationDeadline: string | null;
+  status: string;
+  publishedAt: string | null;
+  skills: { name: string }[];
+  proposalCount?: number;
+  createdAt: string;
+}
+
+const JOB_STATUS_MAP: Record<string, OpportunityStatus> = {
+  PUBLISHED: OPPORTUNITY_STATUS.OPEN,
+  PAUSED: OPPORTUNITY_STATUS.CLOSED,
+  CLOSED: OPPORTUNITY_STATUS.CLOSED,
+  EXPIRED: OPPORTUNITY_STATUS.EXPIRED,
+  CANCELLED: OPPORTUNITY_STATUS.CANCELLED,
+  DRAFT: OPPORTUNITY_STATUS.DRAFT,
+};
+
+const JOB_ARRANGEMENT_MAP: Record<string, OpportunityWorkArrangement> = {
+  REMOTE: OPPORTUNITY_WORK_ARRANGEMENT.REMOTE,
+  ONSITE: OPPORTUNITY_WORK_ARRANGEMENT.ON_SITE,
+  HYBRID: OPPORTUNITY_WORK_ARRANGEMENT.HYBRID,
+};
+
+/**
+ * Maps a backend job to the frontend Opportunity model. Fields the backend
+ * doesn't store (requirements, screening questions, attachments, view count,
+ * employer descriptor/verified flag) are left empty rather than invented;
+ * the free-text estimatedDuration is bucketed into the closest duration key.
+ */
+export function mapBackendJob(job: BackendJob): Opportunity {
+  const description = job.description ?? "";
+  const duration = (job.estimatedDuration ?? "").toLowerCase();
+  const workArrangement =
+    JOB_ARRANGEMENT_MAP[job.locationType] ?? OPPORTUNITY_WORK_ARRANGEMENT.ON_SITE;
+
+  return {
+    id: job.id,
+    title: job.title,
+    categoryId: job.category?.id ?? "",
+    summary: description.length > 160 ? `${description.slice(0, 157)}...` : description,
+    description,
+    requirements: "",
+    skills: (job.skills ?? []).map((s) => s.name),
+    workArrangement,
+    location: {
+      city: job.city ?? undefined,
+      state: job.state ?? undefined,
+      campusId: job.campus?.id,
+      remote: workArrangement === OPPORTUNITY_WORK_ARRANGEMENT.REMOTE,
+    },
+    budget: {
+      type:
+        job.budgetType === "HOURLY"
+          ? OPPORTUNITY_BUDGET_TYPE.HOURLY
+          : OPPORTUNITY_BUDGET_TYPE.PROJECT,
+      min: job.budgetMin != null ? Number(job.budgetMin) : undefined,
+      max: job.budgetMax != null ? Number(job.budgetMax) : undefined,
+      currency: "NGN",
+    },
+    duration: /long|6|year/.test(duration)
+      ? OPPORTUNITY_DURATION.LONG_TERM
+      : /month/.test(duration)
+      ? OPPORTUNITY_DURATION.ONE_TO_THREE_MONTHS
+      : /week/.test(duration)
+      ? OPPORTUNITY_DURATION.FEW_WEEKS
+      : OPPORTUNITY_DURATION.SHORT_TERM,
+    experienceLevel: (job.experienceLevel ?? "").toLowerCase(),
+    postedAt: job.publishedAt ?? job.createdAt,
+    deadline: job.applicationDeadline ?? "",
+    status: JOB_STATUS_MAP[job.status] ?? OPPORTUNITY_STATUS.DRAFT,
+    employer: {
+      id: job.employer.id,
+      name: job.employer.displayName,
+      descriptor: "",
+      location: [job.city, job.state].filter(Boolean).join(", "),
+      verified: false,
+    },
+    employerUserId: job.employer.userId,
+    screeningQuestions: [],
+    attachments: [],
+    viewCount: 0,
+    proposalCount: job.proposalCount ?? 0,
+  };
 }
 
 /**
@@ -1079,8 +1191,8 @@ export async function getOpportunitiesPageApi(
 export async function getJobByIdApi(
   id: string
 ): Promise<{ job: Opportunity | null; error: ApiError | null }> {
-  const { data, error } = await apiClient.get<Opportunity>(`/jobs/${id}`);
-  if (!error && data) return { job: data, error: null };
+  const { data, error } = await apiClient.get<BackendJob>(`/jobs/${id}`);
+  if (!error && data) return { job: mapBackendJob(data), error: null };
   return { job: null, error };
 }
 

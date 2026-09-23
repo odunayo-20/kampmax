@@ -6,10 +6,13 @@ import { ArrowLeft, ShieldAlert, FileText, Paperclip } from "lucide-react";
 import {
   getProposal,
   getOpportunity,
+  getJobByIdApi,
+  isBackendId,
   withdrawProposal,
   categoryLabelFor,
 } from "@/services/opportunity";
-import type { Proposal } from "@/types/opportunity";
+import { getProposalByIdApi, withdrawProposalApi } from "@/services/proposals";
+import type { Opportunity, Proposal } from "@/types/opportunity";
 import { PROPOSAL_STATUS } from "@/types/opportunity";
 import { PROPOSAL_STATUS_META } from "@/config/opportunity";
 import { formatNaira, formatDate } from "@/lib/utils";
@@ -23,12 +26,20 @@ export default function ProposalDetailPage() {
   const params = useParams<{ id: string }>();
   const proposalId = String(params.id);
 
-  const [proposal, setProposal] = useState<Proposal | null>(() => getProposal(proposalId));
+  const backend = isBackendId(proposalId);
+  const [proposal, setProposal] = useState<Proposal | null>(() =>
+    backend ? null : getProposal(proposalId)
+  );
+  const [remoteJob, setRemoteJob] = useState<Opportunity | null>(null);
+  const [loading, setLoading] = useState(backend);
   const [showWithdraw, setShowWithdraw] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const job = useMemo(() => (proposal ? getOpportunity(proposal.opportunityId) : null), [proposal]);
+  const job = useMemo(
+    () => (proposal ? getOpportunity(proposal.opportunityId) ?? remoteJob : null),
+    [proposal, remoteJob]
+  );
 
   const canWithdraw =
     !!proposal &&
@@ -37,13 +48,44 @@ export default function ProposalDetailPage() {
       proposal.status === PROPOSAL_STATUS.SHORTLISTED);
 
   useEffect(() => {
-    if (!proposal) setError("This proposal could not be found or you don't have access to it.");
-  }, [proposal]);
+    if (!backend) return;
+    let cancelled = false;
+    void (async () => {
+      const { proposal: found } = await getProposalByIdApi(proposalId);
+      if (cancelled) return;
+      setProposal(found);
+      if (found) {
+        const { job: fetched } = await getJobByIdApi(found.opportunityId);
+        if (!cancelled) setRemoteJob(fetched);
+      }
+      if (!cancelled) setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [backend, proposalId]);
 
-  function runWithdraw() {
+  useEffect(() => {
+    if (!loading && !proposal) {
+      setError("This proposal could not be found or you don't have access to it.");
+    }
+  }, [loading, proposal]);
+
+  async function runWithdraw() {
     if (busy) return;
     setBusy(true);
     setError(null);
+    if (backend) {
+      const res = await withdrawProposalApi(proposalId);
+      setBusy(false);
+      if (res.proposal) {
+        setShowWithdraw(false);
+        setProposal(res.proposal);
+      } else {
+        setError(res.error?.message ?? "We couldn't withdraw your proposal.");
+      }
+      return;
+    }
     const res = withdrawProposal(proposalId);
     setBusy(false);
     if (res.ok && res.proposal) {
@@ -52,6 +94,10 @@ export default function ProposalDetailPage() {
     } else {
       setError(res.message);
     }
+  }
+
+  if (loading) {
+    return <div className="pt-8 text-center text-sm text-neutral-500">Loading…</div>;
   }
 
   if (!proposal) {
@@ -88,7 +134,9 @@ export default function ProposalDetailPage() {
         </button>
         <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-xl font-bold text-neutral-900">{job?.title ?? "Opportunity"}</h1>
+            <h1 className="text-xl font-bold text-neutral-900">
+              {job?.title ?? proposal.jobTitle ?? "Opportunity"}
+            </h1>
             {job && (
               <p className="mt-0.5 text-sm text-neutral-500">
                 {categoryLabelFor(job.categoryId)} · {job.employer.name}
@@ -137,7 +185,7 @@ export default function ProposalDetailPage() {
               <div>
                 <dt className="text-xs text-neutral-500">Delivery estimate</dt>
                 <dd className="mt-0.5 font-semibold text-neutral-900">
-                  {p.delivery.value} {p.delivery.unit}
+                  {p.delivery.value > 0 ? `${p.delivery.value} ${p.delivery.unit}` : "Not specified"}
                 </dd>
               </div>
               {p.submittedAt && (

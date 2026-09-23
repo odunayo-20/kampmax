@@ -16,10 +16,13 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
-import type { Opportunity } from "@/types/opportunity";
-import { ELIGIBILITY_CODE } from "@/types/opportunity";
+import type { JobEligibility, Opportunity } from "@/types/opportunity";
+import { ELIGIBILITY_CODE, OPPORTUNITY_STATUS } from "@/types/opportunity";
+import { getJobEligibilityApi } from "@/services/proposals";
 import {
   getDiscoverableOpportunity,
+  getJobByIdApi,
+  isBackendId,
   getJobEligibility,
   saveJobForUser,
   unsaveJobForUser,
@@ -42,22 +45,55 @@ export default function JobDetailPage() {
   const params = useParams<{ id: string }>();
   const jobId = String(params.id);
 
+  // Real jobs (UUID ids) come from the backend; legacy demo ids stay on the
+  // local mock store, including its save/view/eligibility behaviour.
+  const backend = isBackendId(jobId);
   const [opportunity, setOpportunity] = useState<Opportunity | null>(() =>
-    getDiscoverableOpportunity(jobId)
+    backend ? null : getDiscoverableOpportunity(jobId)
   );
-  const [saved, setSaved] = useState<boolean>(() => isJobSavedForUser(jobId));
+  const [loading, setLoading] = useState(backend);
+  const [remoteEligibility, setRemoteEligibility] = useState<JobEligibility | null>(null);
+  const [saved, setSaved] = useState<boolean>(() => (backend ? false : isJobSavedForUser(jobId)));
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Record a view exactly once per mount (backend-authoritative counter).
-    recordOpportunityView(jobId);
-  }, [jobId]);
+    if (!backend) {
+      // Record a view exactly once per mount (backend-authoritative counter).
+      recordOpportunityView(jobId);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const { job } = await getJobByIdApi(jobId);
+      if (cancelled) return;
+      // Only published jobs are discoverable.
+      const visible = job && job.status === OPPORTUNITY_STATUS.OPEN ? job : null;
+      setOpportunity(visible);
+      setLoading(false);
+      if (visible) {
+        const result = await getJobEligibilityApi(visible);
+        if (!cancelled) setRemoteEligibility(result);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [backend, jobId]);
 
-  const eligibility = useMemo(
-    () => getJobEligibility(jobId),
+  const localEligibility = useMemo(
+    () => (backend ? null : getJobEligibility(jobId)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [jobId, saved]
+    [backend, jobId, saved]
   );
+  const eligibility: JobEligibility = (backend ? remoteEligibility : localEligibility) ?? {
+    code: ELIGIBILITY_CODE.NOT_APPLICABLE,
+    eligible: false,
+    reasons: ["Checking your eligibility…"],
+  };
+
+  if (loading) {
+    return <div className="pt-8 text-center text-sm text-neutral-500">Loading…</div>;
+  }
 
   if (!opportunity) {
     return (
@@ -128,22 +164,24 @@ export default function JobDetailPage() {
             </span>
             <h1 className="mt-1 text-xl font-bold text-neutral-900">{o.title}</h1>
             <p className="mt-1 text-sm text-neutral-500">
-              {o.employer.name} · {o.employer.descriptor}
+              {[o.employer.name, o.employer.descriptor].filter(Boolean).join(" · ")}
             </p>
           </div>
           <div className="flex items-center gap-2">
             <OpportunityStatusBadge status={o.status} />
-            <Button variant="outline" size="sm" onClick={toggleSave} aria-pressed={saved}>
-              {saved ? (
-                <>
-                  <BookmarkCheck className="mr-1.5 h-4 w-4" aria-hidden /> Saved
-                </>
-              ) : (
-                <>
-                  <Bookmark className="mr-1.5 h-4 w-4" aria-hidden /> Save
-                </>
-              )}
-            </Button>
+            {!backend && (
+              <Button variant="outline" size="sm" onClick={toggleSave} aria-pressed={saved}>
+                {saved ? (
+                  <>
+                    <BookmarkCheck className="mr-1.5 h-4 w-4" aria-hidden /> Saved
+                  </>
+                ) : (
+                  <>
+                    <Bookmark className="mr-1.5 h-4 w-4" aria-hidden /> Save
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </div>
 
@@ -164,16 +202,20 @@ export default function JobDetailPage() {
           <span className="inline-flex items-center gap-1.5">
             <Clock className="h-4 w-4 text-neutral-400" aria-hidden /> {DURATION_LABEL[o.duration]}
           </span>
-          <span className="inline-flex items-center gap-1.5">
-            <Eye className="h-4 w-4 text-neutral-400" aria-hidden /> {o.viewCount} views
-          </span>
+          {!backend && (
+            <span className="inline-flex items-center gap-1.5">
+              <Eye className="h-4 w-4 text-neutral-400" aria-hidden /> {o.viewCount} views
+            </span>
+          )}
           <span className="inline-flex items-center gap-1.5">
             <Users className="h-4 w-4 text-neutral-400" aria-hidden /> {o.proposalCount} proposals
           </span>
-          <span className="inline-flex items-center gap-1.5">
-            <CalendarDays className="h-4 w-4 text-neutral-400" aria-hidden />
-            Closing {formatDate(o.deadline)}
-          </span>
+          {o.deadline && (
+            <span className="inline-flex items-center gap-1.5">
+              <CalendarDays className="h-4 w-4 text-neutral-400" aria-hidden />
+              Closing {formatDate(o.deadline)}
+            </span>
+          )}
         </div>
 
         <p className="mt-4 text-sm leading-relaxed text-neutral-700">{o.summary}</p>
@@ -237,12 +279,14 @@ export default function JobDetailPage() {
               {o.description}
             </p>
           </div>
-          <div>
-            <h3 className="text-sm font-medium text-neutral-800">Requirements</h3>
-            <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-neutral-700">
-              {o.requirements}
-            </p>
-          </div>
+          {o.requirements && (
+            <div>
+              <h3 className="text-sm font-medium text-neutral-800">Requirements</h3>
+              <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-neutral-700">
+                {o.requirements}
+              </p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -284,7 +328,7 @@ export default function JobDetailPage() {
         <div className="mt-2">
           <p className="text-sm font-medium text-neutral-800">{o.employer.name}</p>
           <p className="text-sm text-neutral-500">
-            {o.employer.descriptor} · {o.employer.location}
+            {[o.employer.descriptor, o.employer.location].filter(Boolean).join(" · ")}
           </p>
           <p className="mt-1 text-xs text-neutral-500">
             {o.employer.verified ? "Verified client account" : "Client account"}
