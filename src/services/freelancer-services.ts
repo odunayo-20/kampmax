@@ -263,7 +263,7 @@ export function deleteMyService(serviceId: string): FreelancerServiceResult {
 //   - completionDate is sent as YYYY-MM-01 and read back as YYYY-MM
 //   - categoryId / imageUrl are not persisted server-side yet
 
-interface BackendPortfolioItem {
+export interface BackendPortfolioItem {
   id: string;
   title: string;
   description: string | null;
@@ -273,7 +273,7 @@ interface BackendPortfolioItem {
   isPublic: boolean;
 }
 
-function fromBackendPortfolio(p: BackendPortfolioItem): FreelancerPortfolioItem {
+export function fromBackendPortfolio(p: BackendPortfolioItem): FreelancerPortfolioItem {
   return {
     id: p.id,
     title: p.title,

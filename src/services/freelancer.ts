@@ -142,9 +142,8 @@ export interface FreelancerBrowseQuery {
   skills?: string;
   campusId?: string;
   experienceLevel?: string;
+  /** Backend FreelancerAvailabilityStatus: AVAILABLE | BUSY | UNAVAILABLE */
   availability?: string;
-  minRate?: number;
-  maxRate?: number;
 }
 
 // ── Result types ─────────────────────────────────────────────
@@ -171,27 +170,29 @@ export async function listPublicFreelancers(
   const params = new URLSearchParams();
   if (query.page) params.set("page", String(query.page));
   if (query.limit) params.set("limit", String(query.limit));
-  if (query.q) params.set("q", query.q);
+  if (query.q) params.set("search", query.q);
   if (query.skills) params.set("skills", query.skills);
   if (query.campusId) params.set("campusId", query.campusId);
   if (query.experienceLevel) params.set("experienceLevel", query.experienceLevel);
-  if (query.availability) params.set("availability", query.availability);
-  if (query.minRate !== undefined) params.set("minRate", String(query.minRate));
-  if (query.maxRate !== undefined) params.set("maxRate", String(query.maxRate));
+  if (query.availability) params.set("availabilityStatus", query.availability);
 
   const qs = params.toString();
   const path = `/freelancers${qs ? `?${qs}` : ""}`;
 
-  const { data, error } = await apiClient.get<PaginatedResult<FreelancerPublicProfile>>(path);
+  // Backend shape: { items, meta: { total, page, limit, totalPages } }
+  const { data, error } = await apiClient.get<{
+    items: FreelancerPublicProfile[];
+    meta: { total: number; page: number; limit: number; totalPages: number };
+  }>(path);
   if (error) {
     return { profiles: [], total: 0, page: 1, totalPages: 1, error };
   }
 
   return {
-    profiles: data.data ?? [],
-    total: data.total ?? 0,
-    page: data.page ?? 1,
-    totalPages: data.totalPages ?? 1,
+    profiles: data.items ?? [],
+    total: data.meta?.total ?? 0,
+    page: data.meta?.page ?? 1,
+    totalPages: data.meta?.totalPages ?? 1,
     error: null,
   };
 }
@@ -413,12 +414,12 @@ type ProfileSections = Pick<
   "experience" | "education" | "certifications"
 >;
 
-/** Loads the authenticated freelancer's saved sections, mapped to draft shapes. */
-export async function loadProfileSections(): Promise<ProfileSections | null> {
+/** Loads sections for `owner` ("me") or a public freelancer profile id. */
+export async function loadProfileSections(owner = "me"): Promise<ProfileSections | null> {
   const [exp, edu, cert] = await Promise.all([
-    apiClient.get<any[]>("/freelancers/me/experience"),
-    apiClient.get<any[]>("/freelancers/me/education"),
-    apiClient.get<any[]>("/freelancers/me/certifications"),
+    apiClient.get<any[]>(`/freelancers/${owner}/experience`),
+    apiClient.get<any[]>(`/freelancers/${owner}/education`),
+    apiClient.get<any[]>(`/freelancers/${owner}/certifications`),
   ]);
   if (exp.error || edu.error || cert.error) return null;
 

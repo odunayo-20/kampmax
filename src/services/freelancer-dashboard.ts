@@ -28,7 +28,12 @@ import {
 } from "@/data/freelancer";
 import { FREELANCER_CATEGORIES } from "@/config/freelancer";
 import { getNotifications, getUnreadNotificationCount } from "@/services/notifications";
-import { computeFlCompletion } from "@/services/freelancer";
+import {
+  computeFlCompletion,
+  getPublicFreelancerById,
+  loadProfileSections,
+} from "@/services/freelancer";
+import { fromBackendPortfolio, type BackendPortfolioItem } from "@/services/freelancer-services";
 import { getFreelancerContracts } from "@/services/contract";
 import { CONTRACT_STATUS } from "@/types/contract";
 import type { FreelancerOnboardingDraft, FreelancerOnboardingStatus } from "@/types/freelancer";
@@ -257,6 +262,49 @@ export function getPublicFreelancerBySlug(
   return toPublicFreelancerProfile(draft);
 }
 
+/**
+ * Public freelancer profile from the real backend, keyed by profile id
+ * (GET /freelancers/:id plus its experience/education/certifications and
+ * public portfolio). Returns null when the profile is missing or private.
+ * Fields the backend doesn't model (categories, remote flag, project rate)
+ * are left empty rather than invented.
+ */
+export async function getPublicFreelancerFromBackend(
+  id: string
+): Promise<PublicFreelancerProfile | null> {
+  const { profile } = await getPublicFreelancerById(id);
+  if (!profile) return null;
+
+  const [sections, portfolio] = await Promise.all([
+    loadProfileSections(id),
+    apiClient.get<{ items: BackendPortfolioItem[] }>(
+      `/portfolio/public?freelancerId=${encodeURIComponent(id)}&limit=50`
+    ),
+  ]);
+
+  const hourlyRate = profile.hourlyRate != null ? Number(profile.hourlyRate) : undefined;
+
+  return {
+    id: profile.id,
+    name: profile.fullName,
+    avatar: profile.avatar ?? undefined,
+    approved: profile.verificationStatus === "VERIFIED",
+    slug: profile.id,
+    headline: profile.professionalTitle ?? undefined,
+    bio: profile.bio ?? undefined,
+    city: profile.city ?? undefined,
+    remoteAvailable: false,
+    categories: [],
+    skills: profile.skills.map((s) => s.name),
+    experience: sections?.experience ?? [],
+    education: sections?.education ?? [],
+    certifications: sections?.certifications ?? [],
+    portfolio: (portfolio.data?.items ?? []).map(fromBackendPortfolio),
+    rates: { hourlyRate, negotiable: hourlyRate == null },
+    availability: availabilityLabel(profile.availabilityStatus),
+  };
+}
+
 function toPublicFreelancerProfile(
   draft: FreelancerOnboardingDraft
 ): PublicFreelancerProfile {
@@ -424,6 +472,10 @@ const AVAILABILITY_ALIASES: Record<string, FreelancerDashAvailability | undefine
   available_now: "available",
   available_later: "available_later",
   not_available: "unavailable",
+  // Backend FreelancerAvailabilityStatus enum
+  AVAILABLE: "available",
+  BUSY: "available_later",
+  UNAVAILABLE: "unavailable",
 };
 
 function availabilityLabel(
