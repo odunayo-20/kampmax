@@ -12,6 +12,7 @@ import { AuthUser, AuthStatus, UserRole } from "@/types";
 import * as authService from "@/services/auth";
 import { onAuthFailure } from "@/lib/api-client";
 import { clearAuthTokens } from "@/lib/auth-storage";
+import { setCurrentAuthUser } from "@/lib/current-user-store";
 
 interface AuthState {
   status: AuthStatus;
@@ -95,6 +96,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
+
+  // Keep the synchronous current-user bridge (read by mock data services
+  // outside React) in lockstep with the real authenticated user.
+  useEffect(() => {
+    setCurrentAuthUser(user);
+  }, [user]);
 
   // Restore session on mount
   useEffect(() => {

@@ -9,6 +9,7 @@ import {
   getUserById as _getUserById,
 } from "@/data/users";
 import { apiClient, ApiError } from "@/lib/api-client";
+import { getCurrentAuthUser } from "@/lib/current-user-store";
 
 // ============================================================
 // BACKEND RESPONSE TYPES (from NestJS Vendors Module)
@@ -162,7 +163,28 @@ export async function fetchVendors(
   };
 }
 
+/**
+ * Returns the real authenticated user when a session is active, falling back
+ * to the demo mock user only when signed out. Mock data services key their
+ * per-user records off `.id`, so a real logged-in user with no seeded mock
+ * record simply sees empty/fresh state instead of another account's data.
+ */
 export function getCurrentUser(): User {
+  const authUser = getCurrentAuthUser();
+  if (authUser) {
+    return {
+      id: authUser.id,
+      name: authUser.name,
+      email: authUser.email,
+      phone: authUser.phone,
+      campusId: authUser.campusId,
+      role: authUser.role,
+      avatar: authUser.avatar,
+      bio: "",
+      joinedDate: "",
+      isVerified: authUser.isVerified,
+    };
+  }
   return mockCurrentUser;
 }
 
