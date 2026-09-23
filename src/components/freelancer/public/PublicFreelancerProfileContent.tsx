@@ -152,13 +152,22 @@ export function PublicFreelancerProfileContent({
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
-      <Link
-        href="/jobs"
-        className="inline-flex items-center gap-1.5 text-xs font-medium text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 rounded"
-      >
-        <Briefcase className="h-3.5 w-3.5" aria-hidden />
-        Back to jobs
-      </Link>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <Link
+          href="/jobs"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 rounded"
+        >
+          <Briefcase className="h-3.5 w-3.5" aria-hidden />
+          Back to jobs
+        </Link>
+        <Link
+          href="/freelancers"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 rounded"
+        >
+          <Sparkles className="h-3.5 w-3.5" aria-hidden />
+          Browse freelancers
+        </Link>
+      </div>
 
       <div className="mt-4 flex flex-col gap-4 rounded-xl border border-kampmax-border bg-white p-5 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-4">
