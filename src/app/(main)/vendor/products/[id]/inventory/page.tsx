@@ -1,28 +1,51 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { getVendorProductById, adjustInventory, getInventoryMovements, updateVendorProduct } from "@/services/vendor-products";
+import { getVendorProductByIdApi, adjustInventoryApi, getInventoryMovementsApi, updateVendorProductApi } from "@/services/vendor-products";
 import { ProductInventoryPanel } from "@/components/vendor-products/ProductInventoryPanel";
 import type { Product } from "@/types";
+import type { InventoryMovement } from "@/types/vendor-products";
 
 export default function ProductInventoryPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const product = getVendorProductById(id);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [movements, setMovements] = useState<InventoryMovement[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    try {
+      const p = await getVendorProductByIdApi(id);
+      setProduct(p);
+      setMovements(p ? await getInventoryMovementsApi(id) : []);
+    } catch {
+      setProduct(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => { load(); }, [load]);
 
   const handleAdjust = async (input: { type: "add" | "subtract" | "set"; quantity: number; reason: string; expectedStock?: number }) => {
-    await adjustInventory(id, input);
-    router.refresh();
+    await adjustInventoryApi(id, input);
+    await load();
   };
 
   const handleSetThreshold = async (threshold: number) => {
-    await updateVendorProduct(id, { lowStockThreshold: threshold });
-    router.refresh();
+    await updateVendorProductApi(id, { lowStockThreshold: threshold });
+    await load();
   };
 
-  const movements = getInventoryMovements(id);
+  if (loading) {
+    return (
+      <div className="flex justify-center py-16">
+        <div className="animate-spin rounded-full h-8 w-8 border-4 border-primary-600 border-t-transparent" />
+      </div>
+    );
+  }
 
   if (!product) {
     return (

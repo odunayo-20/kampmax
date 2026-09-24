@@ -59,7 +59,7 @@ export function VendorSidebar({ storeName, permissions, status }: VendorSidebarP
       title: "Selling",
       items: [
         { href: "/vendor/products", label: "Products", icon: Package, permission: "canManageProducts" },
-        { href: "/vendor/orders", label: "Orders", icon: ShoppingCart, permission: "canManageOrders", badge: "3" },
+        { href: "/vendor/orders", label: "Orders", icon: ShoppingCart, permission: "canManageOrders" },
         { href: "/vendor/customers", label: "Customers", icon: Users, permission: "canManageCustomers" },
         { href: "/vendor/reviews", label: "Reviews", icon: Star, permission: "canManageReviews" },
       ],

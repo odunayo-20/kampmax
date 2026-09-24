@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Store, ShieldCheck, PackageSearch, Wallet, ArrowRight } from "lucide-react";
 import { Button, Input, Select } from "@/components/ui";
 import { useAuth } from "@/lib/auth-context";
-import { fetchCampuses } from "@/services/campus";
+import { fetchCampuses, joinCampus } from "@/services/campus";
 import { createVendorProfileApi, getVendorDashboardAccessApi } from "@/services/vendor-dashboard";
 import { VENDOR_DASHBOARD_GATE } from "@/types/vendor-dashboard";
 import type { Campus } from "@/types";
@@ -137,6 +137,16 @@ function VendorOnboardingForm() {
     }
 
     setSubmitting(true);
+
+    // POST /vendors requires campus membership. Join the chosen campus first;
+    // a 409 just means the user is already a member.
+    const { error: joinError } = await joinCampus(campusId);
+    if (joinError && joinError.status !== 409) {
+      setSubmitting(false);
+      setError(joinError.message || "We couldn't add you to that campus. Please try again.");
+      return;
+    }
+
     const { error: apiError } = await createVendorProfileApi({
       storeName: storeName.trim(),
       campusId,

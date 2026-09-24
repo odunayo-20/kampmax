@@ -27,7 +27,8 @@ import { Button } from "@/components/ui";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { ProductVariantGroup, ProductVariant, ProductVariantOption } from "@/types";
-import { getCategoriesForVendor, getCampusesForVendor } from "@/services/vendor-products";
+import { uploadFileDirect } from "@/services/media";
+import { getCategoriesForVendorApi, getCampusesForVendorApi } from "@/services/vendor-products";
 import type { Product, ProductCondition } from "@/types";
 import { useUnsavedChangesWarning } from "./useUnsavedChanges";
 
@@ -157,9 +158,14 @@ export function ProductForm({ initialData, onSave, onCancel, isLoading }: Produc
 
   const [errors, setErrors] = useState<Partial<Record<keyof ProductFormData, string>>>({});
   const [touched, setTouched] = useState<Partial<Record<keyof ProductFormData, boolean>>>({});
-  const [categories] = useState(() => getCategoriesForVendor());
-  const [campuses] = useState(() => getCampusesForVendor());
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [campuses, setCampuses] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => {
+    getCategoriesForVendorApi().then(setCategories).catch(() => {});
+    getCampusesForVendorApi().then(setCampuses).catch(() => {});
+  }, []);
   const [imageErrors, setImageErrors] = useState<string[]>([]);
+  const [uploadingCount, setUploadingCount] = useState(0);
 
   const isDirty = useFormDirty(formData, initialData);
   useUnsavedChangesWarning(isDirty);
@@ -251,13 +257,30 @@ export function ProductForm({ initialData, onSave, onCancel, isLoading }: Produc
     setTouched((prev) => ({ ...prev, [field]: true }));
   };
 
-  const addImage = (url: string) => {
-    if (formData.images.length >= 10) {
-      setImageErrors(["Maximum 10 images allowed"]);
-      return;
-    }
-    handleChange("images", [...formData.images, url]);
-    setImageErrors([]);
+  const uploadImages = async (files: File[]) => {
+    const isPlaceholder = (src: string) => src.includes("placeholder-product");
+    const room = 10 - formData.images.filter((src) => !isPlaceholder(src)).length;
+    const batch = files.slice(0, Math.max(0, room));
+    if (files.length > batch.length) setImageErrors(["Maximum 10 images allowed"]);
+    else setImageErrors([]);
+    if (batch.length === 0) return;
+
+    setUploadingCount((n) => n + batch.length);
+    const failures: string[] = [];
+    await Promise.all(
+      batch.map(async (file) => {
+        const { data, error } = await uploadFileDirect(file, "product");
+        if (error || !data?.url) {
+          failures.push(`${file.name}: ${error?.message ?? "upload failed"}`);
+        } else {
+          const url = data.url;
+          setFormData((prev) => ({ ...prev, images: [...prev.images.filter((src) => !isPlaceholder(src)), url] }));
+          setTouched((prev) => ({ ...prev, images: true }));
+        }
+        setUploadingCount((n) => n - 1);
+      })
+    );
+    if (failures.length > 0) setImageErrors(failures);
   };
 
   const removeImage = (index: number) => {
@@ -596,19 +619,15 @@ export function ProductForm({ initialData, onSave, onCancel, isLoading }: Produc
               input.multiple = true;
               input.onchange = (e) => {
                 const files = Array.from((e.target as HTMLInputElement).files ?? []);
-                files.slice(0, 10 - formData.images.length).forEach((file) => {
-                  const reader = new FileReader();
-                  reader.onload = () => addImage(reader.result as string);
-                  reader.readAsDataURL(file);
-                });
+                void uploadImages(files);
               };
               input.click();
             }}
-            disabled={formData.images.length >= 10}
+            disabled={formData.images.length >= 10 || uploadingCount > 0}
             className="w-24 h-24 flex-shrink-0 rounded-lg border-2 border-dashed border-kampmax-border flex items-center justify-center flex-col gap-1 text-kampmax-text-secondary hover:border-kampmax-blue hover:text-kampmax-blue transition-colors"
           >
             <Upload className="h-6 w-6" />
-            <span className="text-xs">Add</span>
+            <span className="text-xs">{uploadingCount > 0 ? "Uploading..." : "Add"}</span>
           </button>
         </div>
 
@@ -878,7 +897,7 @@ export function ProductForm({ initialData, onSave, onCancel, isLoading }: Produc
         <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading} className="flex-1">
           Cancel
         </Button>
-        <Button type="submit" disabled={isLoading} className="flex-1">
+        <Button type="submit" disabled={isLoading || uploadingCount > 0} className="flex-1">
           {isLoading ? "Saving..." : isEditing ? "Save Changes" : "Create Product"}
         </Button>
       </div>

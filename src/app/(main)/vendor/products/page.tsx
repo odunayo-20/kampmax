@@ -4,14 +4,13 @@ import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { Suspense } from "react";
 import {
-  getVendorProducts,
-  getVendorProductCounts,
-  getCategoriesForVendor,
-  getCampusesForVendor,
-  setProductPublishedStatus,
-  archiveVendorProduct,
-  restoreVendorProduct,
-  deleteVendorProduct,
+  getVendorProductsApi,
+  getVendorProductCountsApi,
+  getCategoriesForVendorApi,
+  setProductPublishedStatusApi,
+  archiveVendorProductApi,
+  restoreVendorProductApi,
+  deleteVendorProductApi,
 } from "@/services/vendor-products";
 import { ProductHeader } from "@/components/vendor-products/ProductHeader";
 import { ProductToolbar } from "@/components/vendor-products/ProductToolbar";
@@ -51,94 +50,110 @@ export default function VendorProductsPage({ params }: { params: Promise<{}> }) 
     rejected: 0,
     archived: 0,
   });
-  const [categories] = useState(() => getCategoriesForVendor());
-  const [campuses] = useState(() => getCampusesForVendor());
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   useEffect(() => {
+    getCategoriesForVendorApi().then(setCategories).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
     setSelectedIds([]);
-    const selected = new Set(selectedIds);
     const fetchData = async () => {
       setLoading(true);
+      setLoadError(null);
       try {
-        const query = {
-          search,
-          status: statusFilter,
-          categoryId: categoryFilter === "all" ? undefined : categoryFilter,
-          stockStatus: stockFilter === "all" ? undefined : stockFilter,
-          minPrice: priceMin ? Number(priceMin) : undefined,
-          maxPrice: priceMax ? Number(priceMax) : undefined,
-          sort,
-          page,
-          pageSize: PAGE_SIZE,
-        };
-        const result = getVendorProducts(query);
+        const [result, counts] = await Promise.all([
+          getVendorProductsApi({
+            search,
+            status: statusFilter,
+            categoryId: categoryFilter === "all" ? undefined : categoryFilter,
+            stockStatus: stockFilter === "all" ? undefined : stockFilter,
+            minPrice: priceMin ? Number(priceMin) : undefined,
+            maxPrice: priceMax ? Number(priceMax) : undefined,
+            sort,
+            page,
+            pageSize: PAGE_SIZE,
+          }),
+          getVendorProductCountsApi(),
+        ]);
+        if (cancelled) return;
         setProducts(result.items);
         setTotal(result.total);
         setTotalPages(result.totalPages);
-
-        const counts = getVendorProductCounts();
         setStatusCounts(counts);
+      } catch (err) {
+        if (!cancelled) setLoadError(err instanceof Error ? err.message : "Couldn't load your products.");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     fetchData();
-  }, [page, search, sort, statusFilter, categoryFilter, stockFilter, priceMin, priceMax]);
+    return () => { cancelled = true; };
+  }, [page, search, sort, statusFilter, categoryFilter, stockFilter, priceMin, priceMax, reloadKey]);
 
-  const handleBulkPublish = async () => {
+  const runAction = async (fn: () => Promise<void>) => {
     setBulkActionLoading(true);
+    setLoadError(null);
     try {
-      for (const id of selectedIds) {
-        const product = products.find((p) => p.id === id);
-        if (product && product.publishedStatus !== "active") {
-          setProductPublishedStatus(id, "active");
-        }
-      }
-      setSelectedIds([]);
-      setPage(1);
+      await fn();
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "That action failed. Please try again.");
     } finally {
+      setSelectedIds([]);
       setBulkActionLoading(false);
+      setReloadKey((k) => k + 1);
     }
   };
 
-  const handleBulkUnpublish = async () => {
-    setBulkActionLoading(true);
-    try {
-      for (const id of selectedIds) {
-        const product = products.find((p) => p.id === id);
-        if (product && product.publishedStatus === "active") {
-          setProductPublishedStatus(id, "inactive");
-        }
-      }
-      setSelectedIds([]);
-      setPage(1);
-    } finally {
-      setBulkActionLoading(false);
-    }
-  };
+  const selectedProducts = () => products.filter((p) => selectedIds.includes(p.id));
 
-  const handleBulkArchive = async () => {
-    setBulkActionLoading(true);
-    try {
-      for (const id of selectedIds) {
-        const product = products.find((p) => p.id === id);
-        if (product && product.publishedStatus !== "archived") {
-          archiveVendorProduct(id);
-        }
+  const handleBulkPublish = () =>
+    runAction(async () => {
+      for (const p of selectedProducts()) {
+        if (p.publishedStatus === "active") continue;
+        const r = await setProductPublishedStatusApi(p.id, "active");
+        if (!r.success) throw new Error(`"${p.title}": ${r.reason ?? "could not publish"}`);
       }
-      setSelectedIds([]);
-      setPage(1);
-    } finally {
-      setBulkActionLoading(false);
-    }
+    });
+
+  const handleBulkUnpublish = () =>
+    runAction(async () => {
+      for (const p of selectedProducts()) {
+        if (p.publishedStatus === "active") await setProductPublishedStatusApi(p.id, "inactive");
+      }
+    });
+
+  const handleBulkArchive = () =>
+    runAction(async () => {
+      for (const p of selectedProducts()) {
+        if (p.publishedStatus !== "archived") await archiveVendorProductApi(p.id);
+      }
+    });
+
+  const rowActions = {
+    onPublish: (p: Product) =>
+      runAction(async () => {
+        const r = await setProductPublishedStatusApi(p.id, "active");
+        if (!r.success) throw new Error(r.reason ?? "Could not publish product");
+      }),
+    onArchive: (p: Product) => runAction(() => archiveVendorProductApi(p.id)),
+    onRestore: (p: Product) => runAction(() => restoreVendorProductApi(p.id)),
+    onDelete: (p: Product) => runAction(() => deleteVendorProductApi(p.id)),
   };
 
   return (
     <div className="space-y-4">
       <ProductHeader totalCount={total} onAddProduct={() => router.push("/vendor/products/new")} />
+
+      {loadError && (
+        <p className="text-sm text-error-600" role="alert">{loadError}</p>
+      )}
 
       <ProductToolbar
         searchValue={search}
@@ -182,22 +197,7 @@ export default function VendorProductsPage({ params }: { params: Promise<{}> }) 
           products={products}
           onView={(p) => router.push(`/vendor/products/${p.id}`)}
           onEdit={(p) => router.push(`/vendor/products/${p.id}/edit`)}
-          onPublish={(p) => {
-            setProductPublishedStatus(p.id, "active");
-            setPage(1);
-          }}
-          onArchive={(p) => {
-            archiveVendorProduct(p.id);
-            setPage(1);
-          }}
-          onRestore={(p) => {
-            restoreVendorProduct(p.id);
-            setPage(1);
-          }}
-          onDelete={(p) => {
-            deleteVendorProduct(p.id);
-            setPage(1);
-          }}
+          {...rowActions}
           bulkAction={{
             selectedIds,
             onSelectAll: (checked) => setSelectedIds(checked ? products.map((p) => p.id) : []),
@@ -214,22 +214,7 @@ export default function VendorProductsPage({ params }: { params: Promise<{}> }) 
           products={products}
           onView={(p) => router.push(`/vendor/products/${p.id}`)}
           onEdit={(p) => router.push(`/vendor/products/${p.id}/edit`)}
-          onPublish={(p) => {
-            setProductPublishedStatus(p.id, "active");
-            setPage(1);
-          }}
-          onArchive={(p) => {
-            archiveVendorProduct(p.id);
-            setPage(1);
-          }}
-          onRestore={(p) => {
-            restoreVendorProduct(p.id);
-            setPage(1);
-          }}
-          onDelete={(p) => {
-            deleteVendorProduct(p.id);
-            setPage(1);
-          }}
+          {...rowActions}
         />
       </div>
 

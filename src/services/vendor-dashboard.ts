@@ -53,7 +53,16 @@ import { apiClient, type ApiError } from "@/lib/api-client";
 // ── Access gate ──────────────────────────────────────────────
 // Reflects backend-authoritative vendor approval status.
 
+/**
+ * Last result of GET /vendors/me. Once the layout has resolved the real
+ * backend gate, every synchronous consumer (permissions, per-module gates)
+ * must agree with it — the mock lookup below only knows mock vendors and would
+ * report a real store as NO_VENDOR, disabling the whole management UI.
+ */
+let liveVendorAccess: VendorAccess | null = null;
+
 export function getVendorAccess(): VendorAccess {
+  if (liveVendorAccess) return liveVendorAccess;
   const user = getCurrentUser();
   const vendor = getVendorByUserId(user.id);
 
@@ -121,6 +130,12 @@ export interface VendorBackendProfile {
  * INACTIVE` is the only backend state that actually blocks dashboard use.
  */
 export async function getVendorDashboardAccessApi(): Promise<VendorAccess> {
+  const access = await fetchVendorDashboardAccess();
+  liveVendorAccess = access;
+  return access;
+}
+
+async function fetchVendorDashboardAccess(): Promise<VendorAccess> {
   const { data, error } = await apiClient.get<VendorBackendProfile>("/vendors/me");
 
   if (error) {

@@ -1,4 +1,11 @@
-import { Product, ProductCondition, ProductStatus } from "@/types";
+import {
+  Product,
+  ProductCondition,
+  ProductPublishStatus,
+  ProductStatus,
+  ProductVariant,
+  ProductVariantGroup,
+} from "@/types";
 import {
   products as mockProducts,
   getProductById as _getProductById,
@@ -39,6 +46,12 @@ export interface BackendProductListItem {
   sku: string | null;
   status: BackendProductStatus;
   images: string[];
+  lowStockThreshold?: number;
+  tags?: string[];
+  location?: string | null;
+  allowDelivery?: boolean;
+  allowPickup?: boolean;
+  deliveryFee?: number | string;
   createdAt: string | Date;
 }
 
@@ -54,6 +67,10 @@ export interface BackendProductDetail extends BackendProductListItem {
     }>;
   }>;
   updatedAt: string | Date;
+  /** Only present on the owner-only GET /products/:id/manage response. */
+  costPrice?: number | string | null;
+  hasVariants?: boolean;
+  variantConfig?: { variantGroups?: ProductVariantGroup[]; variants?: ProductVariant[] } | null;
 }
 
 export interface BackendPaginatedProducts {
@@ -94,6 +111,15 @@ export interface CreateProductPayload {
   images?: string[];
   attributes?: Record<string, string>;
   variations?: unknown[];
+  lowStockThreshold?: number;
+  costPrice?: number;
+  tags?: string[];
+  location?: string;
+  allowDelivery?: boolean;
+  allowPickup?: boolean;
+  deliveryFee?: number;
+  hasVariants?: boolean;
+  variantConfig?: Record<string, unknown>;
 }
 
 export interface UpdateProductPayload {
@@ -112,10 +138,28 @@ export interface UpdateProductPayload {
   status?: BackendProductStatus;
   attributes?: Record<string, string>;
   variations?: unknown[];
+  lowStockThreshold?: number;
+  costPrice?: number;
+  tags?: string[];
+  location?: string;
+  allowDelivery?: boolean;
+  allowPickup?: boolean;
+  deliveryFee?: number;
+  hasVariants?: boolean;
+  variantConfig?: Record<string, unknown>;
 }
 
 // In-memory cache for synchronous fallback access
 let cachedProducts: Product[] = [...mockProducts];
+
+const PUBLISHED_STATUS_FROM_BACKEND: Record<BackendProductStatus, ProductPublishStatus> = {
+  DRAFT: "draft",
+  PENDING_REVIEW: "pending_review",
+  ACTIVE: "active",
+  OUT_OF_STOCK: "active",
+  SUSPENDED: "rejected",
+  ARCHIVED: "archived",
+};
 
 /**
  * Maps a backend product entity into the frontend Product model.
@@ -162,19 +206,30 @@ export function mapBackendProductToFrontend(
     images: raw.images && raw.images.length > 0 ? raw.images : (existing?.images || []),
     condition,
     status,
+    publishedStatus: PUBLISHED_STATUS_FROM_BACKEND[raw.status],
+    updatedAt:
+      "updatedAt" in raw && raw.updatedAt
+        ? (typeof raw.updatedAt === "string" ? raw.updatedAt : raw.updatedAt.toISOString())
+        : undefined,
     stock: raw.stockQuantity ?? existing?.stock ?? 1,
     sku: raw.sku || existing?.sku,
     createdAt: typeof raw.createdAt === "string" ? raw.createdAt : (raw.createdAt?.toISOString?.() || existing?.createdAt || new Date().toISOString()),
-    location: existing?.location,
-    tags: existing?.tags || [],
+    location: raw.location ?? existing?.location,
+    tags: raw.tags ?? existing?.tags ?? [],
+    lowStockThreshold: raw.lowStockThreshold ?? existing?.lowStockThreshold,
+    costPrice:
+      "costPrice" in raw && raw.costPrice != null ? Number(raw.costPrice) : existing?.costPrice,
+    hasVariants: "hasVariants" in raw ? raw.hasVariants : existing?.hasVariants,
+    variantGroups: "variantConfig" in raw ? raw.variantConfig?.variantGroups : existing?.variantGroups,
+    variants: "variantConfig" in raw ? raw.variantConfig?.variants : existing?.variants,
     viewCount: existing?.viewCount || 0,
     saveCount: existing?.saveCount || 0,
     rating: existing?.rating || 4.5,
     ratingCount: existing?.ratingCount || 10,
     soldCount: existing?.soldCount || 0,
-    allowDelivery: existing?.allowDelivery ?? true,
-    allowPickup: existing?.allowPickup ?? true,
-    deliveryFee: existing?.deliveryFee ?? 0,
+    allowDelivery: raw.allowDelivery ?? existing?.allowDelivery ?? true,
+    allowPickup: raw.allowPickup ?? existing?.allowPickup ?? true,
+    deliveryFee: raw.deliveryFee != null ? Number(raw.deliveryFee) : existing?.deliveryFee ?? 0,
   };
 }
 

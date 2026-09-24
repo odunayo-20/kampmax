@@ -1,45 +1,60 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getVendorProductById, setProductPublishedStatus, archiveVendorProduct, restoreVendorProduct, deleteVendorProduct } from "@/services/vendor-products";
+import { getVendorProductByIdApi, setProductPublishedStatusApi, archiveVendorProductApi, restoreVendorProductApi, deleteVendorProductApi } from "@/services/vendor-products";
 import { ProductDetail } from "@/components/vendor-products/ProductDetail";
 import type { Product } from "@/types";
 
 export default function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const product = getVendorProductById(id);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const handlePublish = async () => {
-    await setProductPublishedStatus(id, "active");
-    router.refresh();
+  const load = () =>
+    getVendorProductByIdApi(id)
+      .then(setProduct)
+      .catch(() => setProduct(null))
+      .finally(() => setLoading(false));
+
+  useEffect(() => { load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const act = async (fn: () => Promise<void>, after?: () => void) => {
+    setError(null);
+    try {
+      await fn();
+      if (after) after(); else await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "That action failed. Please try again.");
+    }
   };
 
-  const handleUnpublish = async () => {
-    await setProductPublishedStatus(id, "inactive");
-    router.refresh();
-  };
+  const setStatus = (status: "active" | "inactive") =>
+    act(async () => {
+      const r = await setProductPublishedStatusApi(id, status);
+      if (!r.success) throw new Error(r.reason ?? "Could not update product status");
+    });
 
-  const handleArchive = async () => {
-    await archiveVendorProduct(id);
-    router.push("/vendor/products");
-  };
-
-  const handleRestore = async () => {
-    await restoreVendorProduct(id);
-    router.refresh();
-  };
-
-  const handleDelete = async () => {
-    await deleteVendorProduct(id);
-    router.push("/vendor/products");
-  };
+  const handlePublish = () => setStatus("active");
+  const handleUnpublish = () => setStatus("inactive");
+  const handleArchive = () => act(() => archiveVendorProductApi(id), () => router.push("/vendor/products"));
+  const handleRestore = () => act(() => restoreVendorProductApi(id));
+  const handleDelete = () => act(() => deleteVendorProductApi(id), () => router.push("/vendor/products"));
 
   const handleInventory = () => {
     router.push(`/vendor/products/${id}/inventory`);
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-16">
+        <div className="animate-spin rounded-full h-8 w-8 border-4 border-primary-600 border-t-transparent" />
+      </div>
+    );
+  }
 
   if (!product) {
     return (
@@ -62,6 +77,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="space-y-4 max-w-6xl">
+      {error && <p className="text-sm text-error-600" role="alert">{error}</p>}
       <ProductDetail
         product={product}
         onEdit={() => router.push(`/vendor/products/${id}/edit`)}

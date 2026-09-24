@@ -1,46 +1,50 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { getVendorProductById, updateVendorProduct, setProductPublishedStatus, archiveVendorProduct, restoreVendorProduct, deleteVendorProduct } from "@/services/vendor-products";
+import { getVendorProductByIdApi, updateVendorProductApi, setProductPublishedStatusApi } from "@/services/vendor-products";
 import { ProductForm } from "@/components/vendor-products/ProductForm";
 import type { Product } from "@/types";
 
 export default function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const product = getVendorProductById(id);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getVendorProductByIdApi(id)
+      .then((p) => { if (!cancelled) setProduct(p); })
+      .catch(() => { if (!cancelled) setProduct(null); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [id]);
 
   const handleSave = async (data: any) => {
-    await updateVendorProduct(id, data);
-    router.push(`/vendor/products/${id}`);
+    setError(null);
+    try {
+      const { publishedStatus, ...fields } = data;
+      await updateVendorProductApi(id, fields);
+      if (publishedStatus && publishedStatus !== product?.publishedStatus) {
+        const r = await setProductPublishedStatusApi(id, publishedStatus);
+        if (!r.success) throw new Error(r.reason ?? "Saved, but the status could not be changed.");
+      }
+      router.push(`/vendor/products/${id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save product. Please try again.");
+    }
   };
 
-  const handlePublish = async () => {
-    await setProductPublishedStatus(id, "active");
-    router.refresh();
-  };
-
-  const handleUnpublish = async () => {
-    await setProductPublishedStatus(id, "inactive");
-    router.refresh();
-  };
-
-  const handleArchive = async () => {
-    await archiveVendorProduct(id);
-    router.push("/vendor/products");
-  };
-
-  const handleRestore = async () => {
-    await restoreVendorProduct(id);
-    router.push(`/vendor/products/${id}`);
-  };
-
-  const handleDelete = async () => {
-    await deleteVendorProduct(id);
-    router.push("/vendor/products");
-  };
+  if (loading) {
+    return (
+      <div className="flex justify-center py-16">
+        <div className="animate-spin rounded-full h-8 w-8 border-4 border-primary-600 border-t-transparent" />
+      </div>
+    );
+  }
 
   if (!product) {
     return (
@@ -70,6 +74,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         <h1 className="text-xl font-bold text-kampmax-text">Edit Product</h1>
       </div>
 
+      {error && <p className="text-sm text-error-600" role="alert">{error}</p>}
       <ProductForm
         initialData={product}
         onSave={handleSave}

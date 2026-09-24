@@ -1,16 +1,24 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { ProductForm } from "@/components/vendor-products/ProductForm";
-import { createVendorProduct } from "@/services/vendor-products";
+import { createVendorProductApi } from "@/services/vendor-products";
 
 export default function AddProductPage() {
   const router = useRouter();
 
+  const [error, setError] = useState<string | null>(null);
+
   const handleSave = async (data: any) => {
-    await createVendorProduct(data);
-    router.push("/vendor/products");
+    setError(null);
+    try {
+      await createVendorProductApi(data);
+      router.push("/vendor/products");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create product. Please try again.");
+    }
   };
 
   return (
@@ -22,6 +30,7 @@ export default function AddProductPage() {
         <h1 className="text-xl font-bold text-kampmax-text">Add New Product</h1>
       </div>
 
+      {error && <p className="text-sm text-error-600" role="alert">{error}</p>}
       <ProductForm onSave={handleSave} onCancel={() => router.push("/vendor/products")} />
     </div>
   );

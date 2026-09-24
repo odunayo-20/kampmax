@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ChevronDown,
@@ -29,7 +28,13 @@ interface ProfileEntry {
   onboardHref: string;
   onboardLabel: string;
   sub?: string;
+  /** Live backend check: does this account already hold this profile? */
+  check: () => Promise<{ kind?: string } | null>;
 }
+
+/** Access kinds are "no_<vertical>" when the backend has no such profile. */
+const hasProfile = (a: { kind?: string } | null | undefined) =>
+  !!a?.kind && !String(a.kind).startsWith("no_");
 
 /**
  * Cross-vertical profile switcher shown in every activated dashboard's
@@ -45,6 +50,27 @@ export function ProfileSwitcher({ onClosed }: { onClosed?: () => void }) {
   const pathname = usePathname();
   const { status } = useAuth();
   const [profiles, setProfiles] = useState<ProfileEntry[] | null>(null);
+  const [checking, setChecking] = useState<ProfileEntry["id"] | null>(null);
+  const [switchError, setSwitchError] = useState<string | null>(null);
+
+  // Re-check the backend on click so a stale list never sends the user to
+  // the wrong place: existing profile -> dashboard, none -> onboarding.
+  const handleSwitch = async (p: ProfileEntry) => {
+    if (checking) return;
+    setChecking(p.id);
+    setSwitchError(null);
+    try {
+      const exists = hasProfile(await p.check());
+      setProfiles((prev) => prev && prev.map((x) => (x.id === p.id ? { ...x, active: exists } : x)));
+      setOpen(false);
+      onClosed?.();
+      router.push(exists ? p.activeHref : p.onboardHref);
+    } catch {
+      setSwitchError(`Couldn't check your ${p.label} profile. Please try again.`);
+    } finally {
+      setChecking(null);
+    }
+  };
 
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -68,39 +94,43 @@ export function ProfileSwitcher({ onClosed }: { onClosed?: () => void }) {
           id: "vendor",
           label: "Vendor",
           icon: Store,
-          active: v?.kind === "approved",
+          active: hasProfile(v),
           activeHref: "/vendor",
           onboardHref: "/onboarding/vendor",
           onboardLabel: "Become a Vendor",
+          check: getVendorDashboardAccessApi,
           sub: v?.storeName,
         },
         {
           id: "freelancer",
           label: "Freelancer",
           icon: Briefcase,
-          active: f?.kind === "approved",
+          active: hasProfile(f),
           activeHref: "/freelancer/dashboard",
           onboardHref: "/onboarding/freelancer",
           onboardLabel: "Become a Freelancer",
+          check: getFreelancerDashboardAccessApi,
         },
         {
           id: "service",
           label: "Service Provider",
           icon: Wrench,
-          active: s?.kind === "approved",
+          active: hasProfile(s),
           activeHref: "/service-provider",
           onboardHref: "/onboarding/service-provider",
           onboardLabel: "Offer Services",
+          check: getServiceProviderDashboardAccessApi,
           sub: s?.displayName,
         },
         {
           id: "employer",
           label: "Employer",
           icon: Building2,
-          active: e?.kind === "approved",
+          active: hasProfile(e),
           activeHref: "/employer/dashboard",
           onboardHref: "/onboarding/employer",
           onboardLabel: "Become an Employer",
+          check: getEmployerDashboardAccessApi,
         },
       ]);
     });
@@ -161,43 +191,40 @@ export function ProfileSwitcher({ onClosed }: { onClosed?: () => void }) {
                 {profiles.map((p) => {
                   const Icon = p.icon;
                   const isCurrent = currentLabel === p.label;
-
-                  if (p.active) {
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setOpen(false);
-                          onClosed?.();
-                          router.push(p.activeHref);
-                        }}
-                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
-                      >
-                        <Icon className="h-4 w-4 shrink-0 text-neutral-400" aria-hidden />
-                        <span className="flex-1 text-left truncate">{p.sub || p.label}</span>
-                        {isCurrent && <Check className="h-4 w-4 text-success-600 shrink-0" aria-hidden />}
-                      </button>
-                    );
-                  }
+                  const busy = checking === p.id;
 
                   return (
-                    <Link
+                    <button
                       key={p.id}
-                      href={p.onboardHref}
-                      onClick={() => {
-                        setOpen(false);
-                        onClosed?.();
-                      }}
+                      type="button"
                       role="menuitem"
-                      className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-neutral-500 hover:bg-neutral-50"
+                      disabled={checking !== null}
+                      onClick={() => void handleSwitch(p)}
+                      className={cn(
+                        "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm hover:bg-neutral-50 disabled:opacity-60",
+                        p.active ? "text-neutral-700" : "text-neutral-500"
+                      )}
                     >
-                      <Icon className="h-4 w-4 shrink-0 text-neutral-300" aria-hidden />
-                      <span className="flex-1 text-left">{p.onboardLabel}</span>
-                    </Link>
+                      <Icon
+                        className={cn("h-4 w-4 shrink-0", p.active ? "text-neutral-400" : "text-neutral-300")}
+                        aria-hidden
+                      />
+                      <span className="flex-1 text-left truncate">
+                        {p.active ? p.sub || p.label : p.onboardLabel}
+                      </span>
+                      {busy ? (
+                        <div className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-primary-600/30 border-t-primary-600" />
+                      ) : (
+                        isCurrent && <Check className="h-4 w-4 text-success-600 shrink-0" aria-hidden />
+                      )}
+                    </button>
                   );
                 })}
+                {switchError && (
+                  <p role="alert" className="px-3 py-1.5 text-xs text-red-600">
+                    {switchError}
+                  </p>
+                )}
               </div>
             )}
 
