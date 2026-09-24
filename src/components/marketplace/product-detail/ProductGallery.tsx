@@ -15,7 +15,12 @@ interface ProductGalleryProps {
   showBack?: boolean;
 }
 
-export function ProductGallery({ images, title, hasDiscount, discountPct, onImageClick, onBack, showBack }: ProductGalleryProps) {
+// Legacy uploads stored on the local backend (http://localhost:...) aren't served
+// and aren't an allowed next/image host, so they would crash the page.
+const isLegacyLocalUrl = (src: string) => /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(src);
+
+export function ProductGallery({ images: allImages, title, hasDiscount, discountPct, onImageClick, onBack, showBack }: ProductGalleryProps) {
+  const images = allImages.filter((src) => !isLegacyLocalUrl(src));
   const [activeImage, setActiveImage] = useState(0);
   const [lightbox, setLightbox] = useState(false);
 
