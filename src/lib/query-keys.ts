@@ -728,3 +728,12 @@ export const vendorOrderKeys = {
   detail: (id: string) => ["vendor-orders", "detail", id] as const,
   counts: () => ["vendor-orders", "counts"] as const,
 };
+
+/** Vendor product catalogue (owner-scoped). */
+export const vendorProductKeys = {
+  all: ["vendor-products"] as const,
+  list: (query: object) => ["vendor-products", "list", query] as const,
+  counts: () => ["vendor-products", "counts"] as const,
+  categories: () => ["vendor-products", "categories"] as const,
+  detail: (id: string) => ["vendor-products", "detail", id] as const,
+};

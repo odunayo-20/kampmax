@@ -1,17 +1,17 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { Suspense } from "react";
 import {
-  getVendorProductsApi,
-  getVendorProductCountsApi,
-  getCategoriesForVendorApi,
-  setProductPublishedStatusApi,
-  archiveVendorProductApi,
-  restoreVendorProductApi,
-  deleteVendorProductApi,
-} from "@/services/vendor-products";
+  useArchiveProduct,
+  useDeleteProduct,
+  usePublishProduct,
+  useRestoreProduct,
+  useVendorProductCategories,
+  useVendorProductCounts,
+  useVendorProductList,
+} from "@/hooks/use-vendor-products";
 import { ProductHeader } from "@/components/vendor-products/ProductHeader";
 import { ProductToolbar } from "@/components/vendor-products/ProductToolbar";
 import { ProductFilters } from "@/components/vendor-products/ProductFilters";
@@ -23,6 +23,16 @@ import type { Product } from "@/types";
 import type { ProductPublishStatus, ProductStockStatus, ProductSortField } from "@/types/vendor-products";
 
 const PAGE_SIZE = 20;
+
+const EMPTY_COUNTS: Record<ProductPublishStatus | "all", number> = {
+  all: 0,
+  draft: 0,
+  pending_review: 0,
+  active: 0,
+  inactive: 0,
+  rejected: 0,
+  archived: 0,
+};
 
 export default function VendorProductsPage({ params }: { params: Promise<{}> }) {
   use(params);
@@ -37,77 +47,46 @@ export default function VendorProductsPage({ params }: { params: Promise<{}> }) 
   const [priceMin, setPriceMin] = useState("");
   const [priceMax, setPriceMax] = useState("");
 
-  const [products, setProducts] = useState<Product[]>([]);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [statusCounts, setStatusCounts] = useState<Record<ProductPublishStatus | "all", number>>({
-    all: 0,
-    draft: 0,
-    pending_review: 0,
-    active: 0,
-    inactive: 0,
-    rejected: 0,
-    archived: 0,
-  });
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
-  const [reloadKey, setReloadKey] = useState(0);
-  const [loadError, setLoadError] = useState<string | null>(null);
-
+  const [actionError, setActionError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
-  useEffect(() => {
-    getCategoriesForVendorApi().then(setCategories).catch(() => {});
-  }, []);
+  const listQuery = useVendorProductList({
+    search,
+    status: statusFilter,
+    categoryId: categoryFilter === "all" ? undefined : categoryFilter,
+    stockStatus: stockFilter === "all" ? undefined : stockFilter,
+    minPrice: priceMin ? Number(priceMin) : undefined,
+    maxPrice: priceMax ? Number(priceMax) : undefined,
+    sort,
+    page,
+    pageSize: PAGE_SIZE,
+  });
+  const countsQuery = useVendorProductCounts();
+  const categoriesQuery = useVendorProductCategories();
 
-  useEffect(() => {
-    let cancelled = false;
-    setSelectedIds([]);
-    const fetchData = async () => {
-      setLoading(true);
-      setLoadError(null);
-      try {
-        const [result, counts] = await Promise.all([
-          getVendorProductsApi({
-            search,
-            status: statusFilter,
-            categoryId: categoryFilter === "all" ? undefined : categoryFilter,
-            stockStatus: stockFilter === "all" ? undefined : stockFilter,
-            minPrice: priceMin ? Number(priceMin) : undefined,
-            maxPrice: priceMax ? Number(priceMax) : undefined,
-            sort,
-            page,
-            pageSize: PAGE_SIZE,
-          }),
-          getVendorProductCountsApi(),
-        ]);
-        if (cancelled) return;
-        setProducts(result.items);
-        setTotal(result.total);
-        setTotalPages(result.totalPages);
-        setStatusCounts(counts);
-      } catch (err) {
-        if (!cancelled) setLoadError(err instanceof Error ? err.message : "Couldn't load your products.");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    fetchData();
-    return () => { cancelled = true; };
-  }, [page, search, sort, statusFilter, categoryFilter, stockFilter, priceMin, priceMax, reloadKey]);
+  const publish = usePublishProduct();
+  const archive = useArchiveProduct();
+  const restore = useRestoreProduct();
+  const remove = useDeleteProduct();
 
-  const runAction = async (fn: () => Promise<void>) => {
-    setBulkActionLoading(true);
-    setLoadError(null);
+  const products = listQuery.data?.items ?? [];
+  const total = listQuery.data?.total ?? 0;
+  const totalPages = listQuery.data?.totalPages ?? 1;
+  const categories = categoriesQuery.data ?? [];
+  const statusCounts = countsQuery.data ?? EMPTY_COUNTS;
+  const bulkActionLoading =
+    publish.isPending || archive.isPending || restore.isPending || remove.isPending;
+  const loadError =
+    actionError ?? (listQuery.isError ? "Couldn't load your products." : null);
+
+  const runAction = async (fn: () => Promise<unknown>) => {
+    setActionError(null);
     try {
       await fn();
     } catch (err) {
-      setLoadError(err instanceof Error ? err.message : "That action failed. Please try again.");
+      setActionError(err instanceof Error ? err.message : "That action failed. Please try again.");
     } finally {
       setSelectedIds([]);
-      setBulkActionLoading(false);
-      setReloadKey((k) => k + 1);
     }
   };
 
@@ -117,34 +96,29 @@ export default function VendorProductsPage({ params }: { params: Promise<{}> }) 
     runAction(async () => {
       for (const p of selectedProducts()) {
         if (p.publishedStatus === "active") continue;
-        const r = await setProductPublishedStatusApi(p.id, "active");
-        if (!r.success) throw new Error(`"${p.title}": ${r.reason ?? "could not publish"}`);
+        await publish.mutateAsync({ id: p.id, status: "active" });
       }
     });
 
   const handleBulkUnpublish = () =>
     runAction(async () => {
       for (const p of selectedProducts()) {
-        if (p.publishedStatus === "active") await setProductPublishedStatusApi(p.id, "inactive");
+        if (p.publishedStatus === "active") await publish.mutateAsync({ id: p.id, status: "inactive" });
       }
     });
 
   const handleBulkArchive = () =>
     runAction(async () => {
       for (const p of selectedProducts()) {
-        if (p.publishedStatus !== "archived") await archiveVendorProductApi(p.id);
+        if (p.publishedStatus !== "archived") await archive.mutateAsync(p);
       }
     });
 
   const rowActions = {
-    onPublish: (p: Product) =>
-      runAction(async () => {
-        const r = await setProductPublishedStatusApi(p.id, "active");
-        if (!r.success) throw new Error(r.reason ?? "Could not publish product");
-      }),
-    onArchive: (p: Product) => runAction(() => archiveVendorProductApi(p.id)),
-    onRestore: (p: Product) => runAction(() => restoreVendorProductApi(p.id)),
-    onDelete: (p: Product) => runAction(() => deleteVendorProductApi(p.id)),
+    onPublish: (p: Product) => runAction(() => publish.mutateAsync({ id: p.id, status: "active" })),
+    onArchive: (p: Product) => runAction(() => archive.mutateAsync(p)),
+    onRestore: (p: Product) => runAction(() => restore.mutateAsync(p)),
+    onDelete: (p: Product) => runAction(() => remove.mutateAsync(p)),
   };
 
   return (
