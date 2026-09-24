@@ -38,7 +38,7 @@ import {
 } from "@/components/marketplace";
 import { campuses } from "@/data/campus";
 import { getVendorById } from "@/services/users";
-import { getCategoryById } from "@/services/categories";
+import { getCategoryById, fetchCategories } from "@/services/categories";
 
 interface ProductDetailProps {
   product: Product;
@@ -67,6 +67,11 @@ export function ProductDetail({
 
   const vendor = getVendorById(product.vendorId);
   const campus = campuses.find((c) => c.id === product.campusId) || campuses[0];
+  // Category names live in a fetched cache; load it so the id never shows through.
+  const [, setCategoriesLoaded] = useState(false);
+  useEffect(() => {
+    fetchCategories({ limit: 100 }).then(() => setCategoriesLoaded(true));
+  }, []);
   const category = getCategoryById(product.categoryId);
 
   const gallery = product.images.length > 0
@@ -419,7 +424,7 @@ function ProductDetailsPanel({
         <dl className="space-y-2 text-sm">
           <DetailRow label="Product ID" value={product.id} />
           <DetailRow label="SKU" value={product.sku ?? "—"} />
-          <DetailRow label="Category" value={category?.name ?? product.categoryId} />
+          <DetailRow label="Category" value={category?.name ?? "—"} />
           <DetailRow label="Condition" value={product.condition} />
           <DetailRow label="Price" value={formatNaira(product.price)} />
           {product.originalPrice && product.originalPrice > product.price && (

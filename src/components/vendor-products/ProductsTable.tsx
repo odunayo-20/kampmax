@@ -19,6 +19,8 @@ import { getProductPublishAvailability } from "@/types/vendor-products";
 
 interface ProductsTableProps {
   products: Product[];
+  /** categoryId -> display name */
+  categoryNames?: Record<string, string>;
   onView: (product: Product) => void;
   onEdit: (product: Product) => void;
   onPublish: (product: Product) => void;
@@ -195,6 +197,7 @@ function MenuItem({
 
 export function ProductsTable({
   products,
+  categoryNames,
   onView,
   onEdit,
   onPublish,
@@ -293,7 +296,7 @@ export function ProductsTable({
 
                 {/* Category */}
                 <Td className={COLUMNS[3].width}>
-                  <span className="max-w-[140px] truncate text-kampmax-text-secondary">{product.categoryId}</span>
+                  <span className="max-w-[140px] truncate text-kampmax-text-secondary">{categoryNames?.[product.categoryId] ?? "—"}</span>
                 </Td>
 
                 {/* Price */}

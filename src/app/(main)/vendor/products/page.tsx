@@ -195,6 +195,7 @@ export default function VendorProductsPage({ params }: { params: Promise<{}> }) 
       <div className="hidden md:block">
         <ProductsTable
           products={products}
+          categoryNames={Object.fromEntries(categories.map((c) => [c.id, c.name]))}
           onView={(p) => router.push(`/vendor/products/${p.id}`)}
           onEdit={(p) => router.push(`/vendor/products/${p.id}/edit`)}
           {...rowActions}
