@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createMockSupportManagementService } from "@/services/admin/support-management.service";
 import { buildSupportDataset } from "@/data/admin/support-management";
 import { getNotificationsByUser } from "@/data/notifications";
@@ -17,6 +17,16 @@ import type { AdminActingContext } from "@/types/admin";
 // real notification that a support reply delivers to the customer
 // (actionUrl deep-links to /support/<ticketId>).
 // ------------------------------------------------------------
+
+// Orders now come only from the backend; supply the one order this suite needs.
+vi.mock("@/services/orders", async (importActual) => {
+  const actual = await importActual<typeof import("@/services/orders")>();
+  return {
+    ...actual,
+    getOrderById: (id: string) =>
+      id === "KMP-3847" ? ({ id, buyerId: "u1" } as never) : undefined,
+  };
+});
 
 type CombinedService = ReturnType<typeof createMockSupportManagementService>;
 

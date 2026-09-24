@@ -1,5 +1,4 @@
 import { Category } from "@/types";
-import { categories as mockCategories } from "@/data/categories";
 import { getProductsByCategory } from "./products";
 import { apiClient, ApiError } from "@/lib/api-client";
 
@@ -54,10 +53,7 @@ export interface BackendPaginatedCategories {
 }
 
 // In-memory cache for synchronous fallback access
-let cachedCategories: Category[] = mockCategories.map((cat) => ({
-  ...cat,
-  productCount: getProductsByCategory(cat.id).length,
-}));
+let cachedCategories: Category[] = [];
 
 /**
  * Fallback icon dictionary for categories based on name keywords.
@@ -80,15 +76,11 @@ function getIconForCategory(name: string, backendIcon: string | null): string {
  * Maps a backend category item to frontend Category model.
  */
 export function mapBackendCategoryToFrontend(raw: BackendCategoryTreeItem): Category {
-  const existing = mockCategories.find(
-    (c) => c.id === raw.id || c.name.toLowerCase() === raw.name.toLowerCase()
-  );
-
   return {
     id: raw.id,
     name: raw.name,
-    icon: getIconForCategory(raw.name, raw.icon || existing?.icon || null),
-    productCount: existing?.productCount ?? getProductsByCategory(raw.id).length,
+    icon: getIconForCategory(raw.name, raw.icon || null),
+    productCount: 0,
   };
 }
 

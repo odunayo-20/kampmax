@@ -6,14 +6,6 @@ import {
   ProductVariant,
   ProductVariantGroup,
 } from "@/types";
-import {
-  products as mockProducts,
-  getProductById as _getProductById,
-  getProductsByCategory as _getProductsByCategory,
-  getProductsByVendor as _getProductsByVendor,
-  getFeaturedProducts as _getFeaturedProducts,
-  getRecentProducts as _getRecentProducts,
-} from "@/data/products";
 import { apiClient, ApiError } from "@/lib/api-client";
 
 // ============================================================
@@ -150,7 +142,7 @@ export interface UpdateProductPayload {
 }
 
 // In-memory cache for synchronous fallback access
-let cachedProducts: Product[] = [...mockProducts];
+let cachedProducts: Product[] = [];
 
 const PUBLISHED_STATUS_FROM_BACKEND: Record<BackendProductStatus, ProductPublishStatus> = {
   DRAFT: "draft",
@@ -192,18 +184,16 @@ export function mapBackendProductToFrontend(
     status = "available";
   }
 
-  const existing = mockProducts.find((p) => p.id === raw.id);
-
   return {
     id: raw.id,
     title: raw.name,
-    description: raw.description || existing?.description || "",
+    description: raw.description || "",
     price: Number(raw.price),
-    originalPrice: raw.compareAtPrice ? Number(raw.compareAtPrice) : existing?.originalPrice,
-    categoryId: raw.categoryId || existing?.categoryId || "c1",
-    vendorId: raw.vendorId || existing?.vendorId || "v1",
-    campusId: raw.campusId || existing?.campusId || "unilag",
-    images: raw.images && raw.images.length > 0 ? raw.images : (existing?.images || []),
+    originalPrice: raw.compareAtPrice ? Number(raw.compareAtPrice) : undefined,
+    categoryId: raw.categoryId || "",
+    vendorId: raw.vendorId,
+    campusId: raw.campusId,
+    images: raw.images && raw.images.length > 0 ? raw.images : [],
     condition,
     status,
     publishedStatus: PUBLISHED_STATUS_FROM_BACKEND[raw.status],
@@ -211,25 +201,20 @@ export function mapBackendProductToFrontend(
       "updatedAt" in raw && raw.updatedAt
         ? (typeof raw.updatedAt === "string" ? raw.updatedAt : raw.updatedAt.toISOString())
         : undefined,
-    stock: raw.stockQuantity ?? existing?.stock ?? 1,
-    sku: raw.sku || existing?.sku,
-    createdAt: typeof raw.createdAt === "string" ? raw.createdAt : (raw.createdAt?.toISOString?.() || existing?.createdAt || new Date().toISOString()),
-    location: raw.location ?? existing?.location,
-    tags: raw.tags ?? existing?.tags ?? [],
-    lowStockThreshold: raw.lowStockThreshold ?? existing?.lowStockThreshold,
+    stock: raw.stockQuantity ?? 0,
+    sku: raw.sku || undefined,
+    createdAt: typeof raw.createdAt === "string" ? raw.createdAt : (raw.createdAt?.toISOString?.() || new Date().toISOString()),
+    location: raw.location ?? undefined,
+    tags: raw.tags ?? [],
+    lowStockThreshold: raw.lowStockThreshold,
     costPrice:
-      "costPrice" in raw && raw.costPrice != null ? Number(raw.costPrice) : existing?.costPrice,
-    hasVariants: "hasVariants" in raw ? raw.hasVariants : existing?.hasVariants,
-    variantGroups: "variantConfig" in raw ? raw.variantConfig?.variantGroups : existing?.variantGroups,
-    variants: "variantConfig" in raw ? raw.variantConfig?.variants : existing?.variants,
-    viewCount: existing?.viewCount || 0,
-    saveCount: existing?.saveCount || 0,
-    rating: existing?.rating || 4.5,
-    ratingCount: existing?.ratingCount || 10,
-    soldCount: existing?.soldCount || 0,
-    allowDelivery: raw.allowDelivery ?? existing?.allowDelivery ?? true,
-    allowPickup: raw.allowPickup ?? existing?.allowPickup ?? true,
-    deliveryFee: raw.deliveryFee != null ? Number(raw.deliveryFee) : existing?.deliveryFee ?? 0,
+      "costPrice" in raw && raw.costPrice != null ? Number(raw.costPrice) : undefined,
+    hasVariants: "hasVariants" in raw ? raw.hasVariants : undefined,
+    variantGroups: "variantConfig" in raw ? raw.variantConfig?.variantGroups : undefined,
+    variants: "variantConfig" in raw ? raw.variantConfig?.variants : undefined,
+    allowDelivery: raw.allowDelivery ?? true,
+    allowPickup: raw.allowPickup ?? true,
+    deliveryFee: raw.deliveryFee != null ? Number(raw.deliveryFee) : 0,
   };
 }
 
@@ -324,7 +309,7 @@ export async function fetchProductById(
   const { data, error } = await apiClient.get<BackendProductDetail>(`/products/${id}`);
 
   if (error || !data) {
-    const fallback = cachedProducts.find((p) => p.id === id) || _getProductById(id) || null;
+    const fallback = cachedProducts.find((p) => p.id === id) || null;
     return { data: fallback, error };
   }
 
@@ -428,34 +413,34 @@ export async function deleteProduct(
 // ============================================================
 
 export function getProducts(): Product[] {
-  return cachedProducts.length > 0 ? cachedProducts : mockProducts;
+  return cachedProducts;
 }
 
 export function getProductById(id: string): Product | undefined {
-  return cachedProducts.find((p) => p.id === id) || _getProductById(id);
+  return cachedProducts.find((p) => p.id === id);
 }
 
 export function getProductsByCategory(categoryId: string): Product[] {
-  const found = cachedProducts.filter((p) => p.categoryId === categoryId);
-  return found.length > 0 ? found : _getProductsByCategory(categoryId);
+  return cachedProducts.filter((p) => p.categoryId === categoryId);
 }
 
 export function getProductsByVendor(vendorId: string): Product[] {
-  const found = cachedProducts.filter((p) => p.vendorId === vendorId);
-  return found.length > 0 ? found : _getProductsByVendor(vendorId);
+  return cachedProducts.filter((p) => p.vendorId === vendorId);
 }
 
 export function getFeaturedProducts(): Product[] {
-  return _getFeaturedProducts();
+  return cachedProducts.filter((p) => p.originalPrice && p.originalPrice > p.price);
 }
 
 export function getRecentProducts(): Product[] {
-  return _getRecentProducts();
+  return [...cachedProducts].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
 }
 
 export function searchProducts(query: string): Product[] {
   const q = query.toLowerCase();
-  return (cachedProducts.length > 0 ? cachedProducts : mockProducts).filter(
+  return cachedProducts.filter(
     (p) =>
       p.title.toLowerCase().includes(q) ||
       p.description.toLowerCase().includes(q) ||
@@ -464,26 +449,26 @@ export function searchProducts(query: string): Product[] {
 }
 
 export function getProductsByCampus(campusId: string): Product[] {
-  const found = (cachedProducts.length > 0 ? cachedProducts : mockProducts).filter(
+  const found = cachedProducts.filter(
     (p) => p.campusId === campusId
   );
   return found;
 }
 
 export function getFeaturedProductsByCampus(campusId: string): Product[] {
-  return (cachedProducts.length > 0 ? cachedProducts : mockProducts).filter(
+  return cachedProducts.filter(
     (p) => p.campusId === campusId && p.originalPrice && p.originalPrice > p.price
   );
 }
 
 export function getPopularProductsByCampus(campusId: string): Product[] {
-  return (cachedProducts.length > 0 ? cachedProducts : mockProducts)
+  return cachedProducts
     .filter((p) => p.campusId === campusId)
     .sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0));
 }
 
 export function getRecentProductsByCampus(campusId: string): Product[] {
-  return (cachedProducts.length > 0 ? cachedProducts : mockProducts)
+  return cachedProducts
     .filter((p) => p.campusId === campusId)
     .sort(
       (a, b) =>
@@ -492,7 +477,7 @@ export function getRecentProductsByCampus(campusId: string): Product[] {
 }
 
 export function getRecommendedProductsByCampus(campusId: string): Product[] {
-  return (cachedProducts.length > 0 ? cachedProducts : mockProducts)
+  return cachedProducts
     .filter((p) => p.campusId === campusId)
     .sort((a, b) => (b.saveCount || 0) - (a.saveCount || 0));
 }

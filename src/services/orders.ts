@@ -1,12 +1,4 @@
 import { Order, OrderStatus, DeliveryMethod, PaymentMethod, PaymentStatus, OrderTimelineEntry, CartItem, Product } from "@/types";
-import {
-  mockOrders,
-  getOrderById as _getOrderById,
-  getOrdersByUser as _getOrdersByUser,
-  getActiveOrders as _getActiveOrders,
-  getCompletedOrders as _getCompletedOrders,
-  getCancelledOrders as _getCancelledOrders,
-} from "@/data/orders";
 import { getProductById } from "@/services/products";
 import { apiClient, ApiError } from "@/lib/api-client";
 
@@ -106,7 +98,7 @@ export interface CheckoutPayload {
 }
 
 // In-memory cache for fast lookups and sync fallbacks
-let cachedOrders: Order[] = [...mockOrders];
+let cachedOrders: Order[] = [];
 
 /**
  * Maps backend OrderStatus enum to frontend OrderStatus union.
@@ -224,7 +216,7 @@ export function mapBackendOrderToFrontend(
     id: raw.orderNumber || raw.id,
     buyerId: "", // authorized user
     vendorId: raw.vendorId,
-    items: items.length > 0 ? items : (mockOrders.find((m) => m.id === raw.id || m.id === raw.orderNumber)?.items || []),
+    items: items,
     subtotal,
     platformFee,
     deliveryFee,
@@ -302,7 +294,7 @@ export async function fetchOrderById(
   const { data, error } = await apiClient.get<BackendOrderDetail>(`/orders/${id}`);
 
   if (error || !data || !data.id) {
-    const fallback = cachedOrders.find((o) => o.id === id) || _getOrderById(id) || null;
+    const fallback = cachedOrders.find((o) => o.id === id) || null;
     return { data: fallback, error };
   }
 
@@ -373,19 +365,15 @@ export async function cancelOrderApi(
 // ============================================================
 
 export function getOrders(): Order[] {
-  return cachedOrders.length > 0 ? cachedOrders : mockOrders;
+  return cachedOrders;
 }
 
 export function getOrderById(id: string): Order | undefined {
-  return cachedOrders.find((o) => o.id === id) || _getOrderById(id);
+  return cachedOrders.find((o) => o.id === id);
 }
 
 export function getOrdersByUser(userId: string): Order[] {
-  if (cachedOrders.length > 0) {
-    const userOrders = cachedOrders.filter((o) => !o.buyerId || o.buyerId === userId);
-    if (userOrders.length > 0) return userOrders;
-  }
-  return _getOrdersByUser(userId);
+  return cachedOrders.filter((o) => !o.buyerId || o.buyerId === userId);
 }
 
 export function getActiveOrders(userId: string): Order[] {

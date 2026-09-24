@@ -4,19 +4,15 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { searchKeys } from "@/lib/query-keys";
 import { getSuggestions, search, SearchFiltersInput } from "@/services/search";
+import { fetchProducts } from "@/services/products";
+import { fetchVendors } from "@/services/users";
+import { fetchCategories } from "@/services/categories";
 import type { GlobalSearchQuery, SearchPage, SearchSuggestion } from "@/types";
 import {
   SEARCH_PAGE_SIZE,
   SEARCH_SUGGESTIONS_MIN_CHARS,
 } from "@/config/search";
 
-/**
- * Simulates network latency for the sync, in-memory store so the UI
- * exercises the same loading/error states it will against the real API.
- */
-function delay(ms = 250): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 /**
  * Unified global-search results (Module 31). Cache key embeds the FULL
@@ -36,7 +32,12 @@ export function useGlobalSearch(query: GlobalSearchQuery) {
     placeholderData: keepPreviousData,
     staleTime: 30_000,
     queryFn: async (): Promise<SearchPage> => {
-      await delay(250);
+      // Refresh the live caches the sync search reads from.
+      await Promise.all([
+        fetchProducts({ search: trimmedQuery, campusId: query.campusId, status: "ACTIVE", limit: 50 }),
+        fetchVendors({ search: trimmedQuery, campusId: query.campusId, limit: 20 }),
+        fetchCategories({ limit: 50 }),
+      ]);
       const filters: SearchFiltersInput = {
         type: query.type,
         sort: query.sort,
@@ -68,7 +69,11 @@ export function useSearchSuggestions(q: string) {
     queryKey: searchKeys.suggestions(trimmed),
     enabled,
     queryFn: async (): Promise<SearchSuggestion[]> => {
-      await delay(0);
+      await Promise.all([
+        fetchProducts({ search: trimmed, status: "ACTIVE", limit: 10 }),
+        fetchVendors({ search: trimmed, limit: 5 }),
+        fetchCategories({ limit: 50 }),
+      ]);
       return getSuggestions(trimmed);
     },
   });

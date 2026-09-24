@@ -14,7 +14,7 @@ import { isWishlisted, toggleWishlist } from "@/services/wishlist";
 import { addRecentlyViewed } from "@/services/recently-viewed";
 import { ProductReviewsSection } from "@/components/reviews";
 import { formatNaira, calculateDiscountPercentage } from "@/lib/utils";
-import { campuses } from "@/data/campus";
+import { EMPTY_CAMPUS, getCampuses } from "@/services/campus";
 import { Product } from "@/types";
 import {
   ProductGallery,
@@ -143,7 +143,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   }
 
   const vendor = getVendorById(product.vendorId);
-  const campus = campuses.find((c) => c.id === product.campusId) || campuses[0];
+  const campus = getCampuses().find((c) => c.id === product.campusId) ?? EMPTY_CAMPUS;
   const similar = getProductsByCategory(product.categoryId).filter((p) => p.id !== product.id).slice(0, 4);
 
 

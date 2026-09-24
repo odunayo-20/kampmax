@@ -2,29 +2,16 @@
 
 import Link from "next/link";
 import {
-  Search, TrendingUp, Star, Clock, Flame, Users, Zap,
-  Calendar, ShoppingBag, Wallet, MessageCircle,
+  Search, TrendingUp, Star, Clock, Zap,
+  ShoppingBag, Wallet, MessageCircle,
   MapPin, Store as StoreIcon
 } from "lucide-react";
 import { ProductCard, CategoryCard } from "@/components/marketplace";
-import { Button } from "@/components/ui";
 import { PageContainer, SectionHeader, HorizontalScroll } from "@/components/layout";
-import {
-  VendorCard, EventCard, QuickAction, EmptyState,
-  CampusHighlightCard, ProductCardHorizontal
-} from "@/components/home";
+import { VendorCard, QuickAction, ProductCardHorizontal } from "@/components/home";
 import { useApp } from "@/lib/app-context";
 import { useAuth } from "@/lib/auth-context";
-import {
-  getFeaturedProductsByCampus,
-  getPopularProductsByCampus,
-  getRecentProductsByCampus,
-  getRecommendedProductsByCampus,
-} from "@/services/products";
-import { getCategories } from "@/services/categories";
-import { getTopVendorsByCampus } from "@/services/users";
-import { getUpcomingEvents } from "@/services/events";
-import { getCampusPosts } from "@/services/posts";
+import { useHomeCategories, useHomeProducts, useHomeVendors } from "@/hooks/use-home";
 import { useUnreadMessageCount } from "@/hooks/use-messages";
 import { useCart } from "@/lib/cart-context";
 
@@ -34,14 +21,20 @@ export default function HomePage() {
   const campusId = selectedCampus.id;
   const unreadMessagesQuery = useUnreadMessageCount();
 
-  const featured = getFeaturedProductsByCampus(campusId).slice(0, 6);
-  const popular = getPopularProductsByCampus(campusId).slice(0, 8);
-  const recent = getRecentProductsByCampus(campusId).slice(0, 8);
-  const recommended = getRecommendedProductsByCampus(campusId).slice(0, 8);
-  const categories = getCategories();
-  const vendors = getTopVendorsByCampus(campusId);
-  const events = getUpcomingEvents(campusId).slice(0, 4);
-  const posts = getCampusPosts(campusId).slice(0, 6);
+  const productsQuery = useHomeProducts(campusId);
+  const categoriesQuery = useHomeCategories();
+  const vendorsQuery = useHomeVendors(campusId);
+
+  const products = productsQuery.data ?? [];
+  const categories = categoriesQuery.data ?? [];
+  const vendors = vendorsQuery.data ?? [];
+  const recommended = products.slice(0, 8);
+  const featured = products
+    .filter((p) => p.originalPrice && p.originalPrice > p.price)
+    .slice(0, 6);
+  const recent = [...products]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 8);
   const unreadMessages = unreadMessagesQuery.data ?? 0;
 
   const greeting = getGreeting();
@@ -63,7 +56,7 @@ export default function HomePage() {
             <span>{selectedCampus.location}</span>
             <span className="hidden sm:inline-flex items-center gap-1.5">
               <span className="h-1 w-1 rounded-full bg-neutral-300" aria-hidden />
-              <span>{popular.length + recommended.length + recent.length} products near you</span>
+              <span>{productsQuery.data ? `${productsQuery.data.length} products near you` : "Loading products…"}</span>
             </span>
           </div>
         </div>
@@ -146,36 +139,28 @@ export default function HomePage() {
             icon={<Star className="h-4 w-4 text-accent-500" aria-hidden />}
           />
           <div className="rounded-[10px] border border-dashed border-neutral-200 bg-white p-8 text-center">
-            <p className="text-sm font-medium text-neutral-900">No recommended products yet</p>
-            <p className="text-xs text-neutral-500 mt-1">Check back soon — we&apos;re curating picks for your campus.</p>
+            {productsQuery.isPending ? (
+              <p className="text-sm text-neutral-500">Loading products…</p>
+            ) : productsQuery.isError ? (
+              <>
+                <p className="text-sm font-medium text-neutral-900">Couldn&apos;t load products</p>
+                <button
+                  type="button"
+                  onClick={() => productsQuery.refetch()}
+                  className="text-xs text-primary-600 mt-1 hover:underline"
+                >
+                  Try again
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-medium text-neutral-900">No products listed yet</p>
+                <p className="text-xs text-neutral-500 mt-1">New listings from campus vendors will show up here.</p>
+              </>
+            )}
           </div>
         </section>
       )}
-
-      {/* 6. Popular around campus — campus-aware, uses location state */}
-      {popular.length > 0 ? (
-        <section aria-label={`Popular around ${selectedCampus.abbreviation}`}>
-          <SectionHeader
-            title={`Popular around ${selectedCampus.abbreviation}`}
-            subtitle="Most viewed at your school"
-            icon={<Flame className="h-4 w-4 text-error-600" aria-hidden />}
-            action={{ label: "See all", href: "/marketplace" }}
-          />
-          {/* Mobile: horizontal scroll, Desktop: 4-col grid for better use of width */}
-          <div className="lg:hidden">
-            <HorizontalScroll>
-              {popular.map((product) => (
-                <ProductCardHorizontal key={product.id} product={product} />
-              ))}
-            </HorizontalScroll>
-          </div>
-          <div className="hidden lg:grid lg:grid-cols-4 lg:gap-4">
-            {popular.slice(0, 4).map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
-        </section>
-      ) : null}
 
       {/* 7. Deals & Discounts — amber strategic: #FFFBEB / #F59E0B / #DC2626 */}
       {featured.length > 0 ? (
@@ -253,51 +238,6 @@ export default function HomePage() {
               <ProductCard key={product.id} product={product} />
             ))}
           </div>
-        </section>
-      )}
-
-      {/* Campus Highlights */}
-      <section aria-label="Campus highlights">
-        <SectionHeader
-          title="Campus highlights"
-          subtitle={`From ${selectedCampus.abbreviation} community`}
-          icon={<Users className="h-4 w-4 text-kampmax-blue" aria-hidden />}
-          action={{ label: "View all", href: "/community" }}
-        />
-        {posts.length > 0 ? (
-          <HorizontalScroll>
-            {posts.map((post) => (
-              <CampusHighlightCard key={post.id} post={post} />
-            ))}
-          </HorizontalScroll>
-        ) : (
-          <EmptyState
-            icon={<MessageCircle className="h-6 w-6" />}
-            title="No community posts yet"
-            description="Be the first to share something with your campus community"
-            action={
-              <Link href="/community">
-                <Button variant="outline" size="sm">Go to Community Feed</Button>
-              </Link>
-            }
-          />
-        )}
-      </section>
-
-      {/* Upcoming Events */}
-      {events.length > 0 && (
-        <section aria-label="Upcoming events">
-          <SectionHeader
-            title="Upcoming events"
-            subtitle={`At ${selectedCampus.abbreviation}`}
-            icon={<Calendar className="h-4 w-4 text-kampmax-success" aria-hidden />}
-            action={{ label: "View all", href: "/community" }}
-          />
-          <HorizontalScroll>
-            {events.map((event) => (
-              <EventCard key={event.id} event={event} />
-            ))}
-          </HorizontalScroll>
         </section>
       )}
     </PageContainer>

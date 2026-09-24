@@ -13,7 +13,7 @@ import {
   fetchProductsByCategory,
 } from "@/services/products";
 import { getVendorById } from "@/services/users";
-import { campuses } from "@/data/campus";
+import { getCampuses } from "@/services/campus";
 import { formatNaira } from "@/lib/utils";
 import { PageContainer } from "@/components/layout";
 import { 
@@ -269,7 +269,7 @@ function CategoryPageContent({ params }: CategoryPageProps) {
             onClear={clearFilters}
             activeCount={activeFilterCount}
             categories={categories}
-            campuses={campuses}
+            campuses={getCampuses()}
             categoryId={categoryId}
             definitions={filterDefinitions}
           />
@@ -325,7 +325,7 @@ function CategoryPageContent({ params }: CategoryPageProps) {
         onClear={clearFilters}
         activeCount={activeFilterCount}
         categories={categories}
-        campuses={campuses}
+        campuses={getCampuses()}
         categoryId={categoryId}
         definitions={filterDefinitions}
       />

@@ -11,7 +11,7 @@ import { SettingsGroup } from "@/components/profile/SettingsGroup";
 import { SavedAddress } from "@/types";
 import { getSavedAddresses, addAddress, deleteAddress, updateAddress } from "@/services/profile";
 import { useApp } from "@/lib/app-context";
-import { campuses } from "@/data/campus";
+import { getCampuses } from "@/services/campus";
 
 export default function AddressesPage() {
   const router = useRouter();
@@ -267,7 +267,7 @@ export default function AddressesPage() {
                   onChange={(e) => setFormCampusId(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-lg border border-kampmax-border text-sm text-kampmax-text bg-white focus:outline-none focus:border-kampmax-blue focus:ring-1 focus:ring-kampmax-blue/20"
                 >
-                  {campuses.map((c) => (
+                  {getCampuses().map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
                     </option>

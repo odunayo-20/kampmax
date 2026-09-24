@@ -24,15 +24,27 @@
 // counts, averages or verification status.
 
 import type { Review, ReviewSummary, ReviewReport, ReviewReportReason, ReviewSortOption } from "@/types";
-import {
-  reviews as mockReviews,
-  reviewReports as mockReports,
-  getReviewsByVendor as _getReviewsByVendor,
-  getReviewsByProduct as _getReviewsByProduct,
-  getReviewsByUser as _getReviewsByUser,
-  getAverageRating as _getAverageRating,
-  getReviewSummary as _getReviewSummary,
-} from "@/data/reviews";
+
+// Session-local store for reviews/reports created this session. Seeded empty:
+// real reviews come only from the backend (Tier 1 above).
+const mockReviews: Review[] = [];
+const mockReports: ReviewReport[] = [];
+
+function summarize(list: Review[]): ReviewSummary {
+  const breakdown: ReviewSummary["breakdown"] = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+  for (const r of list) {
+    const k = Math.min(5, Math.max(1, Math.round(r.rating))) as 1 | 2 | 3 | 4 | 5;
+    breakdown[k] += 1;
+  }
+  const total = list.length;
+  const average = total ? Math.round((list.reduce((a, r) => a + r.rating, 0) / total) * 10) / 10 : 0;
+  return {
+    averageRating: average,
+    totalReviews: total,
+    breakdown,
+    recommendPercentage: total ? Math.round(((breakdown[4] + breakdown[5]) / total) * 100) : 0,
+  };
+}
 import { apiClient } from "@/lib/api-client";
 import type { ApiError } from "@/lib/api-client";
 
@@ -324,23 +336,23 @@ export async function createReviewApi(dto: CreateReviewDto): Promise<{
 // ═══════════════════════════════════════════════════════════
 
 export function getReviewsByVendor(vendorId: string): Review[] {
-  return _getReviewsByVendor(vendorId);
+  return mockReviews.filter((r) => r.target === "vendor" && r.vendorId === vendorId);
 }
 
 export function getReviewsByProduct(productId: string): Review[] {
-  return _getReviewsByProduct(productId);
+  return mockReviews.filter((r) => r.target === "product" && r.productId === productId);
 }
 
 export function getReviewsByUser(userId: string): Review[] {
-  return _getReviewsByUser(userId);
+  return mockReviews.filter((r) => r.userId === userId);
 }
 
 export function getAverageRating(vendorId: string): number {
-  return _getAverageRating(vendorId);
+  return summarize(getReviewsByVendor(vendorId)).averageRating;
 }
 
 export function getReviewSummary(targetId: string, target: "product" | "vendor"): ReviewSummary {
-  return _getReviewSummary(targetId, target);
+  return summarize(mockReviews.filter((r) => r.targetId === targetId && r.target === target));
 }
 
 export function getAllReviews(targetId?: string, target?: "product" | "vendor"): Review[] {

@@ -9,8 +9,7 @@ import {
   ReactNode,
 } from "react";
 import { Campus } from "@/types";
-import { defaultCampus } from "@/data/campus";
-import { fetchCampuses, getCampuses } from "@/services/campus";
+import { EMPTY_CAMPUS, fetchCampuses, getCampuses } from "@/services/campus";
 
 const SELECTED_CAMPUS_KEY = "kampmax_selected_campus";
 const ONBOARDING_COMPLETED_KEY = "kampmax_onboarding_completed";
@@ -30,7 +29,7 @@ const AppContext = createContext<AppState | undefined>(undefined);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [hasCompletedOnboarding, setHasCompletedOnboardingState] = useState(false);
   const [campuses, setCampuses] = useState<Campus[]>(() => getCampuses());
-  const [selectedCampus, setSelectedCampusState] = useState<Campus>(defaultCampus);
+  const [selectedCampus, setSelectedCampusState] = useState<Campus>(EMPTY_CAMPUS);
   const [isLoadingCampuses, setIsLoadingCampuses] = useState(false);
 
   // Restore onboarding state and selected campus from localStorage on client mount
@@ -66,7 +65,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         // If currently selected campus matches one in the fresh list, keep it synchronized
         setSelectedCampusState((prev) => {
           const matched = res.data.find((c) => c.id === prev.id || c.abbreviation === prev.abbreviation);
-          return matched || prev;
+          // A stale/mock selection (e.g. a seed id) falls back to a real campus.
+          return matched || res.data[0];
         });
       }
     } catch {

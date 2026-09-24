@@ -1,5 +1,4 @@
 import { Campus } from "@/types";
-import { campuses as mockCampuses, defaultCampus as mockDefaultCampus } from "@/data/campus";
 import { apiClient, ApiError } from "@/lib/api-client";
 
 // ============================================================
@@ -59,7 +58,7 @@ export interface CampusMembershipInfo {
 }
 
 // In-memory cache for synchronous fallback access
-let cachedCampuses: Campus[] = [...mockCampuses];
+let cachedCampuses: Campus[] = [];
 
 /**
  * Maps a backend campus item (list item or detail) to the frontend Campus model.
@@ -71,18 +70,13 @@ export function mapBackendCampusToFrontend(
   const location = locationParts.length > 0 ? locationParts.join(", ") : (raw.country || "");
   const abbreviation = raw.slug ? raw.slug.toUpperCase() : raw.name?.slice(0, 6).toUpperCase() || "";
 
-  // Check if matching mock campus has preconfigured departments
-  const existing = mockCampuses.find(
-    (m) => m.id === raw.id || m.id === raw.slug || m.name.toLowerCase() === raw.name?.toLowerCase()
-  );
-
   return {
     id: raw.id || raw.slug || "",
     name: raw.name || "",
-    abbreviation: existing?.abbreviation || abbreviation,
-    location: existing?.location || location,
-    departments: existing?.departments || [],
-    imageUrl: raw.coverImage || raw.logo || existing?.imageUrl || undefined,
+    abbreviation,
+    location,
+    departments: [],
+    imageUrl: raw.coverImage || raw.logo || undefined,
   };
 }
 
@@ -205,8 +199,16 @@ export function getCampuses(): Campus[] {
   return cachedCampuses;
 }
 
+export const EMPTY_CAMPUS: Campus = {
+  id: "",
+  name: "",
+  abbreviation: "",
+  location: "",
+  departments: [],
+};
+
 export function getDefaultCampus(): Campus {
-  return cachedCampuses[0] || mockDefaultCampus;
+  return cachedCampuses[0] || EMPTY_CAMPUS;
 }
 
 export function getCampusById(id: string): Campus | undefined {

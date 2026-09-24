@@ -36,7 +36,7 @@ import {
   getPersonalizationFields,
   getSpecs,
 } from "@/components/marketplace";
-import { campuses } from "@/data/campus";
+import { EMPTY_CAMPUS, getCampuses } from "@/services/campus";
 import { getVendorById } from "@/services/users";
 import { getCategoryById, fetchCategories } from "@/services/categories";
 
@@ -66,7 +66,7 @@ export function ProductDetail({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const vendor = getVendorById(product.vendorId);
-  const campus = campuses.find((c) => c.id === product.campusId) || campuses[0];
+  const campus = getCampuses().find((c) => c.id === product.campusId) ?? EMPTY_CAMPUS;
   // Category names live in a fetched cache; load it so the id never shows through.
   const [, setCategoriesLoaded] = useState(false);
   useEffect(() => {

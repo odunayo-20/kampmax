@@ -21,7 +21,7 @@ import { cn, formatNaira } from "@/lib/utils";
 import { Avatar } from "@/components/ui";
 import type { SearchEntityType, SearchResultItem } from "@/types";
 import { getProductById } from "@/services/products";
-import { vendors } from "@/data/users";
+import { getVendorById } from "@/services/users";
 import { getDiscoverableOpportunity } from "@/services/opportunity";
 import {
   getMarketplaceProvider,
@@ -111,7 +111,7 @@ export function SearchResults({ items, query, savedJobIds, className }: SearchRe
                 {sectionItems.map((item) => {
                   const product = getProductById(item.id);
                   if (!product) return null;
-                  const store = vendors.find((v) => v.id === product.vendorId);
+                  const store = getVendorById(product.vendorId);
                   return (
                     <ProductCard
                       key={item.id}
@@ -198,7 +198,7 @@ export function SearchResults({ items, query, savedJobIds, className }: SearchRe
 }
 
 function VendorRow({ item }: { item: SearchResultItem }) {
-  const store = vendors.find((v) => v.id === item.id);
+  const store = getVendorById(item.id);
   return (
     <Link
       href={item.url}

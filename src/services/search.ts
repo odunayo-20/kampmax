@@ -32,11 +32,9 @@ import {
   SearchPage,
   TrendingSearch,
 } from "@/types";
-import { products } from "@/data/products";
-import { users, vendors } from "@/data/users";
-import { categories } from "@/data/categories";
-import { campusPosts } from "@/data/posts";
-import { events } from "@/data/events";
+import { getProducts } from "@/services/products";
+import { getVendors } from "@/services/users";
+import { getCategories } from "@/services/categories";
 import { getAllOpportunities } from "@/data/opportunity";
 import {
   marketplaceServices,
@@ -67,7 +65,7 @@ function scoreMatch(text: string, query: string): number {
 }
 
 function campusLabel(campusId?: string): string {
-  if (!campusId) return "RUGIPO";
+  if (!campusId) return "";
   return getCampusById(campusId)?.abbreviation ?? campusId.toUpperCase();
 }
 
@@ -92,18 +90,8 @@ function toTimestamp(value: string | number | undefined): number {
 
 // ── Trending ─────────────────────────────────────────────
 
-const trendingSearches: TrendingSearch[] = [
-  { query: "laptop", count: 234, category: "Electronics" },
-  { query: "textbook", count: 189, category: "Books" },
-  { query: "sneakers", count: 156, category: "Fashion" },
-  { query: "calculator", count: 143, category: "Electronics" },
-  { query: "jollof rice", count: 128, category: "Food" },
-  { query: "tutoring", count: 112, category: "Services" },
-  { query: "ankara", count: 98, category: "Fashion" },
-  { query: "power bank", count: 87, category: "Electronics" },
-  { query: "web design", count: 76, category: "Services" },
-  { query: "headphones", count: 61, category: "Electronics" },
-];
+// No trending-search endpoint exists yet; never fabricate counts.
+const trendingSearches: TrendingSearch[] = [];
 
 export function getTrendingSearches(): TrendingSearch[] {
   return trendingSearches;
@@ -167,14 +155,14 @@ export function getSuggestions(query: string): SearchSuggestion[] {
   const suggestions: SearchSuggestion[] = [];
   const seen = new Set<string>();
 
-  for (const cat of categories) {
+  for (const cat of getCategories()) {
     if (matchesQuery(cat.name, q) && !seen.has(cat.name)) {
       seen.add(cat.name);
       suggestions.push({ text: cat.name, type: "entity", entityType: "category", entityId: cat.id });
     }
   }
 
-  for (const p of products) {
+  for (const p of getProducts()) {
     if (p.status === "available" && matchesQuery(p.title, q) && !seen.has(p.title)) {
       seen.add(p.title);
       suggestions.push({ text: p.title, type: "entity", entityType: "product", entityId: p.id });
@@ -203,14 +191,14 @@ export function getSuggestions(query: string): SearchSuggestion[] {
     }
   }
 
-  for (const v of vendors) {
+  for (const v of getVendors()) {
     if (matchesQuery(v.storeName, q) && !seen.has(v.storeName)) {
       seen.add(v.storeName);
       suggestions.push({ text: v.storeName, type: "entity", entityType: "vendor", entityId: v.id });
     }
   }
 
-  for (const p of products) {
+  for (const p of getProducts()) {
     if (p.status === "available" && p.tags) {
       for (const tag of p.tags) {
         if (matchesQuery(tag, q) && !seen.has(tag)) {
@@ -267,7 +255,7 @@ export function search(query: string, filters: SearchFiltersInput = {}): SearchP
 
   // Products — available only (mirrors the marketplace list).
   if (typeFilter === "all" || typeFilter === "product") {
-    for (const p of products) {
+    for (const p of getProducts()) {
       if (p.status !== PUBLIC_PRODUCT_STATUS) continue;
       if (filters.campusId && p.campusId !== filters.campusId) continue;
       const score =
@@ -299,11 +287,10 @@ export function search(query: string, filters: SearchFiltersInput = {}): SearchP
 
   // Vendors (public storefront records).
   if (typeFilter === "all" || typeFilter === "vendor") {
-    for (const v of vendors) {
+    for (const v of getVendors()) {
       if (filters.campusId && v.campusId !== filters.campusId) continue;
       const score = scoreMatch(v.storeName, q) + scoreMatch(v.description, q);
       if (score <= 0) continue;
-      const owner = users.find((u) => u.id === v.userId);
       candidates.push({
         item: {
           id: v.id,
@@ -311,7 +298,7 @@ export function search(query: string, filters: SearchFiltersInput = {}): SearchP
           title: v.storeName,
           subtitle: `${v.specialties.join(" · ")} · ${campusLabel(v.campusId)}`,
           description: v.description.slice(0, 120),
-          image: owner?.avatar || undefined,
+          image: v.coverImage,
           url: v.slug ? `/store/${v.slug}` : `/marketplace?vendor=${v.id}`,
           rating: v.rating,
           ratingCount: undefined,
@@ -415,7 +402,7 @@ export function search(query: string, filters: SearchFiltersInput = {}): SearchP
 
   // Marketplace category taxonomy.
   if (typeFilter === "all" || typeFilter === "category") {
-    for (const c of categories) {
+    for (const c of getCategories()) {
       const score = scoreMatch(c.name, q);
       if (score <= 0) continue;
       candidates.push({
@@ -423,60 +410,11 @@ export function search(query: string, filters: SearchFiltersInput = {}): SearchP
           id: c.id,
           type: "category",
           title: c.name,
-          subtitle: `${c.productCount} products`,
+          subtitle: "Category",
           url: `/marketplace/category/${c.id}`,
         },
         score,
         date: 0,
-      });
-    }
-  }
-
-  // Campus posts.
-  if (typeFilter === "all" || typeFilter === "post") {
-    for (const post of campusPosts) {
-      if (filters.campusId && post.campusId !== filters.campusId) continue;
-      const score = scoreMatch(post.title, q) + scoreMatch(post.content, q);
-      if (score <= 0) continue;
-      const author = users.find((u) => u.id === post.userId);
-      candidates.push({
-        item: {
-          id: post.id,
-          type: "post",
-          title: post.title,
-          subtitle: `${post.type} · by ${author?.name || "Unknown"}`,
-          description: post.content.slice(0, 120),
-          image: post.images?.[0],
-          url: `/community/${post.id}`,
-          campusId: post.campusId,
-          tags: post.tags,
-        },
-        score,
-        date: toTimestamp(post.createdAt),
-      });
-    }
-  }
-
-  // Events.
-  if (typeFilter === "all" || typeFilter === "event") {
-    for (const event of events) {
-      if (filters.campusId && event.campusId !== filters.campusId) continue;
-      const score = scoreMatch(event.title, q) + scoreMatch(event.description, q);
-      if (score <= 0) continue;
-      candidates.push({
-        item: {
-          id: event.id,
-          type: "event",
-          title: event.title,
-          subtitle: `${event.location} · ${new Date(event.startDate).toLocaleDateString("en-NG", { month: "short", day: "numeric" })}`,
-          description: event.description.slice(0, 120),
-          image: event.imageUrl,
-          url: `/community/${event.id}`,
-          campusId: event.campusId,
-          tags: event.tags,
-        },
-        score,
-        date: toTimestamp(event.startDate),
       });
     }
   }

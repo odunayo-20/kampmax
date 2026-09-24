@@ -2,10 +2,6 @@ import { User, Vendor } from "@/types";
 import {
   users as mockUsers,
   currentUser as mockCurrentUser,
-  vendors as mockVendors,
-  getVendorByUserId as _getVendorByUserId,
-  getVendorById as _getVendorById,
-  getVendorBySlug as _getVendorBySlug,
   getUserById as _getUserById,
 } from "@/data/users";
 import { apiClient, ApiError } from "@/lib/api-client";
@@ -51,26 +47,25 @@ export interface BackendPaginatedVendors {
 
 // In-memory cache so sync callers (cart, storefront helpers) see live data
 // once it has been fetched at least once.
-let cachedVendors: Vendor[] = [...mockVendors];
+let cachedVendors: Vendor[] = [];
 
 /**
  * Maps a backend vendor public profile into the frontend Vendor model.
  */
 export function mapBackendVendorToFrontend(raw: BackendVendorPublicProfile): Vendor {
-  const existing = mockVendors.find((v) => v.id === raw.id);
   return {
     id: raw.id,
-    userId: existing?.userId || "",
+    userId: "",
     slug: raw.slug,
     storeName: raw.storeName,
-    description: raw.description || existing?.description || "",
+    description: raw.description || "",
     rating: Number(raw.rating) || 0,
     totalSales: Number(raw.totalSales) || 0,
     verified: raw.verificationStatus === "VERIFIED",
     campusId: raw.campusId,
-    specialties: existing?.specialties || [],
-    coverImage: raw.banner || existing?.coverImage,
-    responseTime: existing?.responseTime,
+    specialties: [],
+    coverImage: raw.banner || undefined,
+    responseTime: undefined,
     joinDate: raw.createdAt,
   };
 }
@@ -93,7 +88,7 @@ export async function fetchVendorBySlug(
   );
 
   if (error || !data || !data.id) {
-    const fallback = cachedVendors.find((v) => v.slug === slug) || _getVendorBySlug(slug) || null;
+    const fallback = cachedVendors.find((v) => v.slug === slug) || null;
     return { data: fallback, error };
   }
 
@@ -112,7 +107,7 @@ export async function fetchVendorById(
   const { data, error } = await apiClient.get<BackendVendorPublicProfile>(`/vendors/${id}`);
 
   if (error || !data || !data.id) {
-    const fallback = cachedVendors.find((v) => v.id === id) || _getVendorById(id) || null;
+    const fallback = cachedVendors.find((v) => v.id === id) || null;
     return { data: fallback, error };
   }
 
@@ -201,15 +196,15 @@ export function getVendors(): Vendor[] {
 }
 
 export function getVendorById(id: string): Vendor | undefined {
-  return cachedVendors.find((v) => v.id === id) || _getVendorById(id);
+  return cachedVendors.find((v) => v.id === id);
 }
 
 export function getVendorBySlug(slug: string): Vendor | undefined {
-  return cachedVendors.find((v) => v.slug === slug) || _getVendorBySlug(slug);
+  return cachedVendors.find((v) => v.slug === slug);
 }
 
 export function getVendorByUserId(userId: string): Vendor | undefined {
-  return _getVendorByUserId(userId);
+  return cachedVendors.find((v) => v.userId === userId);
 }
 
 export function getTopVendors(): Vendor[] {
