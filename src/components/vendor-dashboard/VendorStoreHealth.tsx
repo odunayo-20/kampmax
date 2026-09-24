@@ -2,10 +2,24 @@
 
 import { CheckCircle2, Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getStoreHealth } from "@/services/vendor-dashboard";
+import { useVendorStoreHealth } from "@/hooks/use-vendor-dashboard";
 
 export function VendorStoreHealth() {
-  const health = getStoreHealth();
+  const { data: health, isPending, isError } = useVendorStoreHealth();
+
+  if (isPending || isError || !health) {
+    return (
+      <div className="rounded-xl border border-kampmax-border bg-white p-4">
+        <h3 className="mb-3 text-sm font-semibold text-kampmax-text">Store Health</h3>
+        {isError ? (
+          <p className="text-sm text-error-700">Couldn&apos;t load store health.</p>
+        ) : (
+          <div className="h-24 animate-pulse rounded-lg bg-neutral-100" />
+        )}
+      </div>
+    );
+  }
+
   const score = Math.max(0, Math.min(100, health.score));
 
   return (
@@ -33,7 +47,6 @@ export function VendorStoreHealth() {
             style={{ width: `${score}%` }}
           />
         </div>
-        <p className="mt-1 text-[11px] text-kampmax-text-muted">Backend-authoritative score</p>
       </div>
 
       <ul className="space-y-2">

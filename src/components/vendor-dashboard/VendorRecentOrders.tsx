@@ -12,8 +12,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { cn, formatNaira } from "@/lib/utils";
-import { getRecentOrders } from "@/services/vendor-dashboard";
-import type { VendorRecentOrder } from "@/types/vendor-dashboard";
+import { useVendorRecentOrders } from "@/hooks/use-vendor-dashboard";
 
 const STATUS: Record<string, { label: string; icon: typeof Loader; cls: string }> = {
   pending: { label: "Pending", icon: CircleDashed, cls: "bg-neutral-100 text-neutral-700" },
@@ -29,7 +28,7 @@ const STATUS: Record<string, { label: string; icon: typeof Loader; cls: string }
 
 export function VendorRecentOrders() {
   const router = useRouter();
-  const orders = getRecentOrders();
+  const { data: orders = [], isPending, isError } = useVendorRecentOrders();
 
   return (
     <div className="rounded-xl border border-kampmax-border bg-white">
@@ -43,7 +42,15 @@ export function VendorRecentOrders() {
           View all
         </button>
       </div>
-      {orders.length === 0 ? (
+      {isPending ? (
+        <div className="space-y-2 px-4 pb-4">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-12 animate-pulse rounded-lg bg-neutral-100" />
+          ))}
+        </div>
+      ) : isError ? (
+        <p className="px-4 pb-4 text-sm text-error-700">Couldn&apos;t load your orders.</p>
+      ) : orders.length === 0 ? (
         <p className="px-4 pb-4 text-sm text-kampmax-text-secondary">
           You haven't received any orders yet.
         </p>

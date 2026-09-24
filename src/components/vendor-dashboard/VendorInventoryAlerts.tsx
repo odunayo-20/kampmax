@@ -1,49 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, Package, Plus, Check } from "lucide-react";
-import { getVendorProducts, adjustInventory } from "@/services/vendor-products";
-import { Product } from "@/types";
+import { useRestockProduct, useVendorLowStock } from "@/hooks/use-vendor-dashboard";
+import type { Product } from "@/types";
 import { formatNaira } from "@/lib/utils";
 
 export function VendorInventoryAlerts() {
-  const [lowStockProducts, setLowStockProducts] = useState<Product[]>([]);
+  const { data: lowStockProducts = [] } = useVendorLowStock();
+  const restock = useRestockProduct();
   const [updatedMap, setUpdatedMap] = useState<Record<string, boolean>>({});
-
-  function loadLowStockItems() {
-    try {
-      const res = getVendorProducts({ pageSize: 50 });
-      const lowOrOut = res.items.filter(
-        (p) => p.publishedStatus === "active" && (p.stock === undefined || p.stock <= 5)
-      );
-      setLowStockProducts(lowOrOut.slice(0, 5));
-    } catch (err) {
-      console.error("Failed to load inventory alerts:", err);
-    }
-  }
-
-  useEffect(() => {
-    loadLowStockItems();
-  }, []);
 
   if (lowStockProducts.length === 0) return null;
 
-  function handleAddStock(productId: string, qty: number) {
-    try {
-      adjustInventory(productId, {
-        type: "add",
-        quantity: qty,
-        reason: "Quick Dashboard Refill",
-      });
-      setUpdatedMap((prev) => ({ ...prev, [productId]: true }));
-      setTimeout(() => {
-        setUpdatedMap((prev) => ({ ...prev, [productId]: false }));
-        loadLowStockItems();
-      }, 1500);
-    } catch (err) {
-      console.error("Failed to adjust inventory:", err);
-    }
+  function handleAddStock(product: Product, qty: number) {
+    restock.mutate(
+      { product, quantity: qty },
+      {
+        onSuccess: () => {
+          setUpdatedMap((prev) => ({ ...prev, [product.id]: true }));
+          setTimeout(() => setUpdatedMap((prev) => ({ ...prev, [product.id]: false })), 1500);
+        },
+      }
+    );
   }
 
   return (
@@ -102,13 +82,15 @@ export function VendorInventoryAlerts() {
                 ) : (
                   <>
                     <button
-                      onClick={() => handleAddStock(p.id, 5)}
+                      disabled={restock.isPending}
+                      onClick={() => handleAddStock(p, 5)}
                       className="inline-flex items-center gap-1 px-2 py-1 rounded bg-neutral-100 hover:bg-neutral-200 text-[11px] font-semibold text-neutral-700 border border-neutral-200 transition-colors"
                     >
                       <Plus className="w-3 h-3" /> 5
                     </button>
                     <button
-                      onClick={() => handleAddStock(p.id, 10)}
+                      disabled={restock.isPending}
+                      onClick={() => handleAddStock(p, 10)}
                       className="inline-flex items-center gap-1 px-2 py-1 rounded bg-primary-50 hover:bg-primary-100 text-[11px] font-bold text-primary-700 border border-primary-200 transition-colors"
                     >
                       <Plus className="w-3 h-3" /> 10

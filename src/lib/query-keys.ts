@@ -710,3 +710,12 @@ export const adminKeys = {
       ["admin", "support", "detail", id, scopeCampusId ?? "platform"] as const,
   } as const,
 };
+/** Vendor dashboard (owner-scoped; identity comes from the JWT server-side). */
+export const vendorDashboardKeys = {
+  all: ["vendor-dashboard"] as const,
+  profile: () => ["vendor-dashboard", "profile"] as const,
+  analytics: () => ["vendor-dashboard", "analytics"] as const,
+  orderStatus: () => ["vendor-dashboard", "order-status"] as const,
+  recentOrders: (limit: number) => ["vendor-dashboard", "recent-orders", limit] as const,
+  lowStock: (vendorId: string) => ["vendor-dashboard", "low-stock", vendorId] as const,
+};

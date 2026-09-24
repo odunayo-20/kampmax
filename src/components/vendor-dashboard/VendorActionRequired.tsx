@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getActionRequired } from "@/services/vendor-dashboard";
+import { useVendorActionRequired } from "@/hooks/use-vendor-dashboard";
 import type { ActionRequiredItem } from "@/types/vendor-dashboard";
 
 const PRIORITY: Record<ActionRequiredItem["priority"], string> = {
@@ -14,16 +13,7 @@ const PRIORITY: Record<ActionRequiredItem["priority"], string> = {
 };
 
 export function VendorActionRequired() {
-  const [loading, setLoading] = useState(true);
-  const [items, setItems] = useState<ActionRequiredItem[]>([]);
-
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setItems(getActionRequired());
-      setLoading(false);
-    }, 500);
-    return () => clearTimeout(t);
-  }, []);
+  const { data: items = [], isPending: loading, isError } = useVendorActionRequired();
 
   return (
     <div className="rounded-xl border border-kampmax-border bg-white p-4">
@@ -37,6 +27,8 @@ export function VendorActionRequired() {
             <div key={i} className="h-16 animate-pulse rounded-lg bg-neutral-100" />
           ))}
         </div>
+      ) : isError ? (
+        <p className="text-sm text-error-700">Couldn't load your action items.</p>
       ) : items.length === 0 ? (
         <div className="flex items-center gap-2 text-sm text-kampmax-text-secondary">
           <CheckCircle2 className="h-4 w-4 text-success-600" aria-hidden /> You're all caught up.
