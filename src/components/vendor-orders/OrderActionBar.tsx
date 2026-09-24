@@ -21,7 +21,7 @@ export function OrderActionsBar({ order, actions, busy, onAction }: OrderActions
 
   const handleClick = (action: VendorOrderActionView) => {
     if (action.key === "cancel") setConfirmCancel(true);
-    else if (action.key === "ship") setConfirmShip(true);
+    else if (action.key === "ship" && action.requiresPayload) setConfirmShip(true);
     else onAction(action);
   };
 
@@ -48,7 +48,7 @@ export function OrderActionsBar({ order, actions, busy, onAction }: OrderActions
           ))}
         </div>
         <p className="mt-2 text-[11px] text-kampmax-text-secondary/80">
-          Order {order.id} · escrow disposition shown on this page.
+          Order {order.orderNumber ?? order.id} · escrow disposition shown on this page.
         </p>
       </div>
 
@@ -138,7 +138,7 @@ function CancelDialog({
   return (
     <DialogShell
       title="Cancel order"
-      subtitle={`Cancelling ${order.id} triggers a refund back to the buyer.`}
+      subtitle={`Cancelling ${order.orderNumber ?? order.id} triggers a refund back to the buyer.`}
       onClose={onCancel}
     >
       <p className="mb-2 text-xs font-medium text-kampmax-text-secondary">Reason</p>
@@ -206,7 +206,7 @@ function ShipDialog({
   return (
     <DialogShell
       title="Mark as shipped"
-      subtitle={`Record the shipment for ${order.id}. The buyer will see the tracking ID.`}
+      subtitle={`Record the shipment for ${order.orderNumber ?? order.id}. The buyer will see the tracking ID.`}
       onClose={onCancel}
     >
       <label className="mb-1 block text-xs font-medium text-kampmax-text-secondary" htmlFor="ship-carrier">

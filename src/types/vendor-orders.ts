@@ -265,6 +265,8 @@ export interface VendorParentOrder {
 
 export interface VendorOrder {
   id: string;
+  /** Human-readable order reference (e.g. KMP-1042); `id` is the route key. */
+  orderNumber?: string;
   parentOrderId: string;
   vendorId: string;
   storeName: string;

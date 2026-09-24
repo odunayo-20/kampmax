@@ -68,7 +68,7 @@ export function OrderReceiptModal({ order, isOpen, onClose }: OrderReceiptModalP
             </div>
             <div className="text-right">
               <span className="text-xs font-bold text-primary-700 bg-primary-50 px-2 py-0.5 rounded border border-primary-100">
-                {order.id}
+                {order.orderNumber ?? order.id}
               </span>
               <p className="text-[11px] text-neutral-500 mt-1">{orderDate}</p>
             </div>

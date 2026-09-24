@@ -24,7 +24,7 @@ export function OrdersGrid({ orders, onView }: OrdersGridProps) {
           >
             <div className="flex items-center justify-between gap-2 mb-2">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm font-bold text-kampmax-text">{order.id}</span>
+                <span className="text-sm font-bold text-kampmax-text">{order.orderNumber ?? order.id}</span>
                 {multiVendor && <ParentOrderTag label="Multi-vendor order" />}
               </div>
               <FulfillmentBadge status={order.fulfillmentStatus} />

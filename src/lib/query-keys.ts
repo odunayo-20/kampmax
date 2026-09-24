@@ -719,3 +719,12 @@ export const vendorDashboardKeys = {
   recentOrders: (limit: number) => ["vendor-dashboard", "recent-orders", limit] as const,
   lowStock: (vendorId: string) => ["vendor-dashboard", "low-stock", vendorId] as const,
 };
+
+/** Vendor orders (owner-scoped; identity comes from the JWT server-side). */
+export const vendorOrderKeys = {
+  all: ["vendor-orders"] as const,
+  list: (filters: { search?: string; status?: string; page: number }) =>
+    ["vendor-orders", "list", filters] as const,
+  detail: (id: string) => ["vendor-orders", "detail", id] as const,
+  counts: () => ["vendor-orders", "counts"] as const,
+};

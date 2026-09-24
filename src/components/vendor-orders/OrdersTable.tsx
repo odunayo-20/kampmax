@@ -32,7 +32,7 @@ export function OrdersTable({ orders, onView }: OrdersTableProps) {
             <tr key={order.id} className="transition-colors hover:bg-kampmax-muted/40">
               <td className="px-4 py-3">
                 <div className="flex flex-col gap-1">
-                  <span className="font-semibold text-kampmax-text">{order.id}</span>
+                  <span className="font-semibold text-kampmax-text">{order.orderNumber ?? order.id}</span>
                   <span className="text-[11px] text-kampmax-text-secondary">
                     Parent {order.parentOrderId}
                   </span>
