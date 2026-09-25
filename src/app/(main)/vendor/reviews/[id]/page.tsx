@@ -1,33 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState, use } from "react";
+import { useMemo, use } from "react";
 import Link from "next/link";
 import { ArrowLeft, MessageSquareX } from "lucide-react";
-import { getVendorReviewById, getVendorReviewPermissions } from "@/services/vendor-reviews";
+import { useVendorReview } from "@/hooks/use-vendor-reviews";
+import { getDefaultVendorReviewPermissions } from "@/types/vendor-reviews";
 import { VendorReviewListItem } from "@/components/vendor-reviews/VendorReviewListItem";
 import { ReviewsSkeleton } from "@/components/vendor-reviews/ReviewsSkeleton";
 
 export default function VendorReviewDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const [loading, setLoading] = useState(true);
-  const [tick, setTick] = useState(0);
+  const reviewQuery = useVendorReview(id);
+  const permissions = useMemo(() => getDefaultVendorReviewPermissions(), []);
 
-  const data = useMemo(() => {
-    const found = getVendorReviewById(id);
-    if (!found) return null;
-    return { ...found };
-  }, [id, tick]);
+  if (reviewQuery.isPending) return <ReviewsSkeleton />;
 
-  const permissions = useMemo(() => getVendorReviewPermissions(), []);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 250);
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (loading) return <ReviewsSkeleton />;
-
-  if (!data) {
+  const review = reviewQuery.data;
+  if (reviewQuery.isError || !review) {
     return (
       <div className="rounded-xl border border-kampmax-border bg-white p-10 text-center">
         <MessageSquareX className="mx-auto mb-3 h-10 w-10 text-kampmax-text-secondary" aria-hidden />
@@ -50,10 +39,10 @@ export default function VendorReviewDetailPage({ params }: { params: Promise<{ i
       </Link>
 
       <VendorReviewListItem
-        review={data.review}
-        productTitle={data.productTitle}
+        review={review}
+        productTitle={review.productTitle}
         permissions={permissions}
-        onChanged={() => setTick((t) => t + 1)}
+        onChanged={() => {}}
       />
 
       <p className="px-1 text-xs text-kampmax-text-secondary">

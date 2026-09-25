@@ -528,6 +528,10 @@ export interface Review {
   targetId: string;
   target: ReviewTarget;
   userId: string;
+  /** Display name supplied by the API (avoids a separate user lookup). */
+  authorName?: string;
+  /** Product name for product reviews, supplied by the API. */
+  productTitle?: string;
   rating: number;
   title?: string;
   comment: string;

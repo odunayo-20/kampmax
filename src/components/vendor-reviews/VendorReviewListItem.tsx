@@ -3,15 +3,19 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Flag, MessageSquare, Pencil, ShieldCheck, Star, Trash2, X, Check } from "lucide-react";
-import { getUserById } from "@/services/users";
-import { respondToReview, updateReviewResponse, deleteReviewResponse, reportVendorReview } from "@/services/vendor-reviews";
+import {
+  useDeleteReviewReply,
+  useReplyToReview,
+  useReportReview,
+  useUpdateReviewReply,
+} from "@/hooks/use-vendor-reviews";
 import { timeAgo } from "@/lib/utils";
 import { StarRating } from "@/components/reviews/StarRating";
 import { ReviewImageGallery } from "@/components/reviews/ReviewImageGallery";
 import { ReportReviewModal } from "@/components/reviews/ReportReviewModal";
 import { Button } from "@/components/ui";
 import type { Review } from "@/types";
-import type { VendorReviewPermissions, VendorReviewResult, VendorReviewReportInput } from "@/types/vendor-reviews";
+import type { VendorReviewPermissions, VendorReviewReportInput } from "@/types/vendor-reviews";
 
 interface VendorReviewListItemProps {
   review: Review;
@@ -21,7 +25,16 @@ interface VendorReviewListItemProps {
 }
 
 export function VendorReviewListItem({ review, productTitle, permissions, onChanged }: VendorReviewListItemProps) {
-  const author = getUserById(review.userId);
+  const authorName = review.authorName;
+  const replyMutation = useReplyToReview();
+  const updateMutation = useUpdateReviewReply();
+  const deleteMutation = useDeleteReviewReply();
+  const reportMutation = useReportReview();
+  const busy =
+    replyMutation.isPending ||
+    updateMutation.isPending ||
+    deleteMutation.isPending ||
+    reportMutation.isPending;
   const [respondOpen, setRespondOpen] = useState(false);
   const [respondText, setRespondText] = useState("");
   const [editOpen, setEditOpen] = useState(false);
@@ -32,36 +45,23 @@ export function VendorReviewListItem({ review, productTitle, permissions, onChan
   const isReported = Boolean(review.reportedBy && review.reportedBy.length > 0);
   const canRespond = permissions["reviews.respond"];
 
-  function handleResult(result: VendorReviewResult) {
-    if (result.ok) {
-      setError(null);
+  async function run(action: () => Promise<unknown>) {
+    setError(null);
+    try {
+      await action();
       setRespondOpen(false);
       setEditOpen(false);
       onChanged();
-    } else {
-      setError(result.error ?? "Something went wrong.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
     }
   }
 
-  function submitResponse() {
-    const result = respondToReview(review.id, respondText);
-    handleResult(result);
-  }
-
-  function submitEdit() {
-    const result = updateReviewResponse(review.id, editText);
-    handleResult(result);
-  }
-
-  function submitDelete() {
-    const result = deleteReviewResponse(review.id);
-    handleResult(result);
-  }
-
-  function submitReport(input: VendorReviewReportInput) {
-    const result = reportVendorReview(review.id, input);
-    handleResult(result);
-  }
+  const submitResponse = () => run(() => replyMutation.mutateAsync({ id: review.id, text: respondText }));
+  const submitEdit = () => run(() => updateMutation.mutateAsync({ id: review.id, text: editText }));
+  const submitDelete = () => run(() => deleteMutation.mutateAsync(review.id));
+  const submitReport = (input: VendorReviewReportInput) =>
+    run(() => reportMutation.mutateAsync({ id: review.id, reason: input.reason, details: input.details }));
 
   return (
     <div className="rounded-xl border border-kampmax-border bg-white p-4">
@@ -69,11 +69,11 @@ export function VendorReviewListItem({ review, productTitle, permissions, onChan
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2.5">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-kampmax-blue/10 text-xs font-bold text-kampmax-blue">
-            {author ? author.name.charAt(0) : "?"}
+            {authorName ? authorName.charAt(0) : "?"}
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="text-sm font-medium text-kampmax-text">{author?.name || "Anonymous"}</span>
+              <span className="text-sm font-medium text-kampmax-text">{authorName || "Anonymous"}</span>
               {review.verifiedPurchase && (
                 <span className="inline-flex items-center gap-0.5 rounded bg-kampmax-blue/5 px-1.5 py-0.5 text-[10px] font-medium text-kampmax-blue">
                   <ShieldCheck className="h-3 w-3" aria-hidden />
@@ -115,7 +115,7 @@ export function VendorReviewListItem({ review, productTitle, permissions, onChan
             href={`/vendor/products/${review.productId}`}
             className="font-medium text-kampmax-blue hover:underline"
           >
-            {productTitle ?? "a product"}
+            {productTitle ?? review.productTitle ?? "a product"}
           </Link>
         </p>
       )}
@@ -139,7 +139,7 @@ export function VendorReviewListItem({ review, productTitle, permissions, onChan
                 aria-label="Edit your response"
               />
               <div className="flex items-center gap-2">
-                <Button size="sm" onClick={submitEdit} disabled={!editText.trim()}>
+                <Button size="sm" onClick={submitEdit} disabled={busy || !editText.trim()}>
                   <Check className="mr-1 h-3.5 w-3.5" aria-hidden />
                   Save
                 </Button>
@@ -232,7 +232,7 @@ export function VendorReviewListItem({ review, productTitle, permissions, onChan
             aria-label="Response text"
           />
           <div className="flex items-center gap-2">
-            <Button size="sm" onClick={submitResponse} disabled={!respondText.trim()}>
+            <Button size="sm" onClick={submitResponse} disabled={busy || !respondText.trim()}>
               <Check className="mr-1 h-3.5 w-3.5" aria-hidden />
               Post response
             </Button>

@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState, use } from "react";
+import { useMemo, useState, use } from "react";
 import { MessageSquare } from "lucide-react";
-import { listVendorReviews, getVendorReviewCounts, getVendorReviewSummary, getVendorReviewPermissions } from "@/services/vendor-reviews";
-import { getProducts } from "@/services/products";
+import { useVendorReviewSummary, useVendorReviews } from "@/hooks/use-vendor-reviews";
+import { getDefaultVendorReviewPermissions } from "@/types/vendor-reviews";
 import { ReviewsHeader } from "@/components/vendor-reviews/ReviewsHeader";
 import { ReviewSummaryCard } from "@/components/vendor-reviews/ReviewSummaryCard";
 import { ReviewsToolbar } from "@/components/vendor-reviews/ReviewsToolbar";
@@ -24,37 +24,31 @@ export default function VendorReviewsPage({ params }: { params: Promise<{}> }) {
   const [ratingBand, setRatingBand] = useState<VendorReviewRatingBand>("all");
   const [star, setStar] = useState<number | null>(null);
   const [sort, setSort] = useState<VendorReviewSortField>("newest");
-  const [loading, setLoading] = useState(true);
-  const [tick, setTick] = useState(0);
 
-  const counts = useMemo(() => getVendorReviewCounts(), []);
-  const summary = useMemo(() => getVendorReviewSummary(), []);
+  const summaryQuery = useVendorReviewSummary();
+  const reviewsQuery = useVendorReviews({
+    search: search || undefined,
+    scope,
+    responseStatus,
+    ratingBand,
+    star: star ?? undefined,
+    sort,
+    page,
+    pageSize: PAGE_SIZE,
+  });
 
-  const result = useMemo(
-    () =>
-      listVendorReviews({
-        search: search || undefined,
-        scope,
-        responseStatus,
-        ratingBand,
-        star: star ?? undefined,
-        sort,
-        page,
-        pageSize: PAGE_SIZE,
-      }),
-    [search, scope, responseStatus, ratingBand, star, sort, page, tick]
-  );
+  const counts = summaryQuery.data?.counts ?? { all: 0, answered: 0, unanswered: 0, withImages: 0, reported: 0 };
+  const summary = summaryQuery.data?.summary ?? {
+    averageRating: 0,
+    totalReviews: 0,
+    breakdown: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
+    recommendPercentage: 0,
+  };
+  const result = reviewsQuery.data;
+  const permissions = useMemo(() => getDefaultVendorReviewPermissions(), []);
 
-  const permissions = useMemo(() => getVendorReviewPermissions(), []);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 250);
-    return () => clearTimeout(timer);
-  }, []);
-
-  function refresh() {
-    setTick((t) => t + 1);
-  }
+  // Mutations invalidate the vendor-reviews cache themselves.
+  const refresh = () => {};
 
   const hasActiveFilters =
     search !== "" || scope !== "all" || responseStatus !== "all" || ratingBand !== "all" || star !== null;
@@ -87,14 +81,21 @@ export default function VendorReviewsPage({ params }: { params: Promise<{}> }) {
           onRatingBandChange={(v) => { setRatingBand(v); setPage(1); }}
           sort={sort}
           onSortChange={(v) => { setSort(v); setPage(1); }}
-          total={result.total}
+          total={result?.total ?? 0}
           hasActiveFilters={hasActiveFilters}
           onClearFilters={clearFilters}
         />
 
         <div className="mt-4">
-          {loading ? (
+          {reviewsQuery.isPending ? (
             <ReviewsSkeleton />
+          ) : reviewsQuery.isError || !result ? (
+            <div className="rounded-xl border border-error-200 bg-error-50 p-6 text-center">
+              <p className="text-sm font-medium text-error-700">Couldn&apos;t load your reviews.</p>
+              <button type="button" onClick={() => reviewsQuery.refetch()} className="mt-2 text-xs font-semibold text-error-700 underline">
+                Try again
+              </button>
+            </div>
           ) : result.items.length === 0 ? (
             <div className="rounded-xl border border-kampmax-border bg-white p-10 text-center">
               <MessageSquare className="mx-auto mb-3 h-10 w-10 text-kampmax-text-secondary" aria-hidden />
@@ -109,7 +110,7 @@ export default function VendorReviewsPage({ params }: { params: Promise<{}> }) {
                 <VendorReviewListItem
                   key={review.id}
                   review={review}
-                  productTitle={review.target === "product" ? getProducts().find((p) => p.id === review.productId)?.title : undefined}
+                  productTitle={review.productTitle}
                   permissions={permissions}
                   onChanged={refresh}
                 />
@@ -119,10 +120,10 @@ export default function VendorReviewsPage({ params }: { params: Promise<{}> }) {
         </div>
 
         <VendorPagination
-          page={result.page}
-          totalPages={result.totalPages}
-          total={result.total}
-          pageSize={result.pageSize}
+          page={result?.page ?? 1}
+          totalPages={result?.totalPages ?? 1}
+          total={result?.total ?? 0}
+          pageSize={result?.pageSize ?? PAGE_SIZE}
           itemLabel="reviews"
           onPageChange={setPage}
         />

@@ -737,3 +737,11 @@ export const vendorProductKeys = {
   categories: () => ["vendor-products", "categories"] as const,
   detail: (id: string) => ["vendor-products", "detail", id] as const,
 };
+
+/** Vendor reviews (owner-scoped). */
+export const vendorReviewKeys = {
+  all: ["vendor-reviews"] as const,
+  list: (query: object) => ["vendor-reviews", "list", query] as const,
+  summary: () => ["vendor-reviews", "summary"] as const,
+  detail: (id: string) => ["vendor-reviews", "detail", id] as const,
+};
