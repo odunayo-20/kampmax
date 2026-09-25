@@ -160,14 +160,13 @@ export type {
   ProductStockFilter,
 } from "./product-management.service";
 
-import {
-  AdminCategoryManagementService,
-  createCategoryManagementService,
-} from "./category-management.service";
+import type { AdminCategoryManagementService } from "./category-management.service";
+import { createApiCategoryManagementService } from "./category-management.api";
 
-/** /admin/categories console (taxonomy + display order). */
+/** /admin/categories console: live taxonomy API (scope with setCategoryTaxonomy). */
 export const categoryManagementService: AdminCategoryManagementService =
-  createCategoryManagementService();
+  createApiCategoryManagementService();
+export { setCategoryTaxonomy } from "./category-management.api";
 
 import {
   AdminOrderManagementService,

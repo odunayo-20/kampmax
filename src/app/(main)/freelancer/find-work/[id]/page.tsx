@@ -123,7 +123,7 @@ export default function JobDetailPage() {
   }
 
   const o = opportunity;
-  const category = categoryLabelFor(o.categoryId);
+  const category = categoryLabelFor(o);
   const campus = campusNameFor(o.location.campusId);
   const canApply = eligibility.eligible;
   const alreadyApplied = eligibility.code === ELIGIBILITY_CODE.ALREADY_APPLIED;

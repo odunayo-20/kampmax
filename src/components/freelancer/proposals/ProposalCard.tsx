@@ -9,7 +9,7 @@ import { ProposalStatusBadge } from "../opportunities/StatusBadges";
 
 export function ProposalCard({ proposal }: { proposal: Proposal }) {
   const job = getOpportunity(proposal.opportunityId);
-  const category = job ? categoryLabelFor(job.categoryId) : "Opportunity";
+  const category = job ? categoryLabelFor(job) : "Opportunity";
   const hasAmount = proposal.proposedAmount !== undefined && proposal.proposedAmount > 0;
 
   return (

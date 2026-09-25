@@ -98,7 +98,7 @@ export default function EmployerJobDetailPage() {
             <ArrowLeft className="h-4 w-4" aria-hidden />
           </Link>
           <span className="text-xs font-medium uppercase tracking-wider text-primary-600">
-            {categoryLabelFor(o.categoryId)}
+            {categoryLabelFor(o)}
           </span>
         </div>
         <OpportunityStatusBadge status={o.status} />

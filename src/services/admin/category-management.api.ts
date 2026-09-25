@@ -1,5 +1,6 @@
 import { apiClient } from "@/lib/api-client";
 import type { ManagedCategory } from "@/types/admin";
+import type { TaxonomyType } from "@/services/taxonomy";
 import {
   createCategoryManagementService,
   type AdminCategoryManagementService,
@@ -16,7 +17,15 @@ import {
  * Backend gaps (shown as 0 in the UI): product counts per category.
  */
 
+/** Taxonomy the console is currently scoped to (set by the page's type tabs). */
+let activeTaxonomy: TaxonomyType = "PRODUCT";
+export function setCategoryTaxonomy(type: TaxonomyType): void {
+  activeTaxonomy = type;
+}
+
 interface BackendCategory {
+  taxonomy?: TaxonomyType;
+  usageCount?: number;
   id: string;
   name: string;
   slug: string;
@@ -39,7 +48,7 @@ async function fetchAll(): Promise<BackendCategory[]> {
     const { data, error } = await apiClient.get<{
       items: BackendCategory[];
       meta: { totalPages: number };
-    }>(`/categories?page=${page}&limit=100`);
+    }>(`/categories/manage?type=${activeTaxonomy}&page=${page}&limit=100`);
     if (error || !data) fail(error ?? {}, "Couldn't load categories.");
     out.push(...data.items);
     if (page >= data.meta.totalPages) break;
@@ -72,10 +81,10 @@ function toManaged(all: BackendCategory[]): ManagedCategory[] {
     icon: c.icon || "package",
     parentId: c.parentId,
     parentName: c.parentId ? byId.get(c.parentId)?.name ?? null : null,
-    productCount: 0,
+    productCount: c.usageCount ?? 0,
     activeListings: 0,
     subcategoryCount: childCount.get(c.id) ?? 0,
-    totalProductCount: 0,
+    totalProductCount: c.usageCount ?? 0,
     sortOrder: rank.get(c.id) ?? 1,
     status: c.isActive ? "active" : "inactive",
     createdAt: c.createdAt,
@@ -114,6 +123,7 @@ export function createApiCategoryManagementService(): AdminCategoryManagementSer
       }
       const last = siblingsOf(raw, input.parentId || null).at(-1);
       const { data, error } = await apiClient.post<Record<string, unknown>, BackendCategory>("/categories", {
+        taxonomy: activeTaxonomy,
         name,
         description: input.description.trim() || undefined,
         icon: input.icon || "package",
@@ -145,7 +155,7 @@ export function createApiCategoryManagementService(): AdminCategoryManagementSer
     },
 
     async setStatus(id, status) {
-      const { error } = await apiClient.patch<Record<string, unknown>, BackendCategory>(`/categories/${id}`, {
+      const { error } = await apiClient.patch<Record<string, unknown>, BackendCategory>(`/categories/${id}/status`, {
         isActive: status === "active",
       });
       if (error) fail(error, "Couldn't change the category status.");

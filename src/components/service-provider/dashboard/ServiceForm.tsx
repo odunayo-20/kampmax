@@ -4,10 +4,7 @@ import { useState } from "react";
 import { AlertCircle, Save } from "lucide-react";
 import { Button, Input, Select } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import {
-  SP_SERVICE_CATEGORIES,
-  SP_SERVICE_GROUP_NAMES,
-} from "@/data/service-categories";
+import { TaxonomySelect } from "@/components/taxonomy";
 import type {
   ServiceProviderLocationType,
   ServiceProviderPricingModel,
@@ -97,18 +94,12 @@ export function ServiceForm({
           <label className="mb-1.5 block text-sm font-medium text-kampmax-text">
             Category <span className="text-kampmax-error">*</span>
           </label>
-          <Select value={form.categoryId} onChange={(e) => set("categoryId", e.target.value)}>
-            <option value="">Select category</option>
-            {SP_SERVICE_GROUP_NAMES.map((g) => (
-              <optgroup key={g} label={g}>
-                {SP_SERVICE_CATEGORIES.filter((c) => c.group === g).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </Select>
+          <TaxonomySelect
+            type="SERVICE"
+            value={form.categoryId}
+            onChange={(id) => set("categoryId", id)}
+            placeholder="Select category"
+          />
         </div>
       </div>
 

@@ -12,6 +12,7 @@ import {
   setSpDashboardServiceStatus,
 } from "@/services/service-provider-dashboard";
 import { spServiceCategoryName } from "@/data/service-categories";
+import { useCategories } from "@/hooks/use-taxonomy";
 import { SERVICE_PROVIDER_SERVICE_STATUS } from "@/types/service-provider";
 import type { ServiceProviderDashboardService } from "@/types/service-provider-dashboard";
 
@@ -46,6 +47,8 @@ function priceLabel(service: ServiceProviderDashboardService): string {
 
 export default function ServicesPage() {
   const router = useRouter();
+  // Loads the SERVICE tree so category ids below resolve to names.
+  useCategories("SERVICE");
   const [services, setServices] = useState(() => getSpServices());
   const [error, setError] = useState<string | null>(null);
 

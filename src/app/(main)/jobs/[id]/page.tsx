@@ -129,7 +129,7 @@ export default function JobDetailPage() {
   }
 
   const o = jobQuery.data!;
-  const category = categoryLabelFor(o.categoryId);
+  const category = categoryLabelFor(o);
   const campus = campusNameFor(o.location.campusId);
   const isOwner = o.employerUserId === user?.id;
   const canApply = eligibility.eligible;

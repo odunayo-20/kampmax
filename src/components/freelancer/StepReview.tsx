@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui";
 import { FREELANCER_CATEGORIES } from "@/config/freelancer";
+import { useCategories } from "@/hooks/use-taxonomy";
 import { FREELANCER_EMPLOYMENT_TYPES, FREELANCER_QUALIFICATIONS } from "@/config/freelancer";
 import type { FreelancerOnboardingDraft } from "@/types/freelancer";
 import { CheckCircle, AlertCircle } from "lucide-react";
@@ -11,8 +12,11 @@ interface Props {
   onSubmit: () => void;
 }
 
-function categoryNames(ids: string[]): string {
-  return ids.map((id) => FREELANCER_CATEGORIES.find((c) => c.id === id)?.name ?? id).join(", ");
+/** Names come from the SKILL taxonomy; legacy drafts saved with static "fc" ids still resolve. */
+function categoryNames(ids: string[], nameById: Map<string, string>): string {
+  return ids
+    .map((id) => nameById.get(id) ?? FREELANCER_CATEGORIES.find((c) => c.id === id)?.name ?? id)
+    .join(", ");
 }
 
 function employmentLabel(value: string): string {
@@ -24,6 +28,7 @@ function qualificationLabel(value: string): string {
 }
 
 export function StepReview({ draft, onSubmit }: Props) {
+  const { nameById } = useCategories("SKILL");
   if (!draft) return null;
 
   const sections = [
@@ -70,7 +75,7 @@ export function StepReview({ draft, onSubmit }: Props) {
           <Row label="Bio" value={draft.profile.bio} />
           <Row label="City" value={draft.profile.city} />
           <Row label="Remote" value={draft.profile.remoteAvailable ? "Yes" : "No"} />
-          <Row label="Categories" value={categoryNames(draft.categories)} />
+          <Row label="Categories" value={categoryNames(draft.categories, nameById)} />
           <Row label="Skills" value={draft.skills.join(", ")} />
           <Row label="Experience" value={`${draft.experience.length} position(s)`} />
           <Row label="Education" value={`${draft.education.length} record(s)`} />

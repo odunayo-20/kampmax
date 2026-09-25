@@ -4,7 +4,6 @@ import { CalendarDays, Clock, Eye, Users, Wallet, Briefcase } from "lucide-react
 import type { Opportunity } from "@/types/opportunity";
 import {
   DURATION_LABEL,
-  JOB_CATEGORIES,
   WORK_ARRANGEMENT_LABEL,
 } from "@/config/opportunity";
 import { formatDate, timeAgo } from "@/lib/utils";
@@ -17,7 +16,7 @@ import { EmployerJobActions } from "./EmployerJobActions";
  * job meta and the actions valid for that status.
  */
 export function EmployerJobCard({ job }: { job: Opportunity }) {
-  const category = JOB_CATEGORIES.find((c) => c.id === job.categoryId)?.name ?? "Other";
+  const category = job.categoryName ?? "Other";
 
   return (
     <article className="rounded-xl border border-neutral-200 bg-white p-5">

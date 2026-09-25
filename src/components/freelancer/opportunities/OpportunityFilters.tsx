@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { Button, Select, Input } from "@/components/ui";
+import { TaxonomySelect } from "@/components/taxonomy";
 import {
-  JOB_CATEGORIES,
   JOB_EXPERIENCE_LEVELS,
   JOB_WORK_ARRANGEMENT_OPTIONS,
   OPPORTUNITY_SORT_OPTIONS,
@@ -42,17 +42,12 @@ function FilterFields({
     <>
       <div>
         <label className="mb-1 block text-xs font-medium text-neutral-700">Category</label>
-        <Select
+        <TaxonomySelect
+          type="JOB"
           value={values.categoryId}
-          onChange={(e) => onCategoryChange(e.target.value)}
+          onChange={onCategoryChange}
           placeholder="All categories"
-        >
-          {JOB_CATEGORIES.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </Select>
+        />
       </div>
       <div>
         <label className="mb-1 block text-xs font-medium text-neutral-700">Experience</label>

@@ -106,7 +106,6 @@ import {
   JOB_EXPERIENCE_LEVELS,
   OPPORTUNITY_SAFE_SCHEMES,
   PROPOSAL_COVER_LETTER_MAX,
-  JOB_CATEGORIES,
 } from "@/config/opportunity";
 import {
   APPLICATION_REJECT_REASON_MAX,
@@ -188,8 +187,9 @@ export function recordOpportunityView(id: string): void {
   incrementOpportunityViews(id);
 }
 
-export function categoryLabelFor(categoryId: string): string {
-  return JOB_CATEGORIES.find((c) => c.id === categoryId)?.name ?? "Other";
+/** Category label for a job; the name arrives with the job from the API. */
+export function categoryLabelFor(job: { categoryName?: string }): string {
+  return job.categoryName ?? "Other";
 }
 
 export function campusNameFor(campusId?: string): string | undefined {
@@ -909,7 +909,8 @@ export function validateJobInput(input: OpportunityInput): OpportunityResult | n
   if (input.title.trim().length > JOB_TITLE_MAX_CHARS) {
     return failVal(`Job title must be ${JOB_TITLE_MAX_CHARS} characters or fewer.`);
   }
-  if (!input.categoryId || !JOB_CATEGORIES.some((c) => c.id === input.categoryId)) {
+  // The id comes from the taxonomy API; the backend is the authority on validity.
+  if (!input.categoryId) {
     return failVal("Choose a valid job category.");
   }
   if (!input.summary?.trim()) return failVal("A short summary is required.");

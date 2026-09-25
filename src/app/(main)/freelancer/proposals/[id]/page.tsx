@@ -156,7 +156,7 @@ export default function ProposalDetailPage() {
             </h1>
             {job && (
               <p className="mt-0.5 text-sm text-neutral-500">
-                {categoryLabelFor(job.categoryId)} · {job.employer.name}
+                {categoryLabelFor(job)} · {job.employer.name}
               </p>
             )}
           </div>

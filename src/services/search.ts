@@ -43,7 +43,6 @@ import {
 import { OPPORTUNITY_STATUS } from "@/types/opportunity";
 import { getServiceCategoryName } from "@/services/service-marketplace";
 import { getCampusById } from "@/services/campus";
-import { JOB_CATEGORIES } from "@/config/opportunity";
 
 const RECENT_KEY = "kampmax_recent_searches";
 const MAX_RECENT = 10;
@@ -77,10 +76,6 @@ function providerMatchesCampus(
     provider.primaryCampusId === campusId ||
     provider.additionalCampusIds.includes(campusId)
   );
-}
-
-function jobCategoryName(categoryId: string): string {
-  return JOB_CATEGORIES.find((c) => c.id === categoryId)?.name ?? "Other";
 }
 
 function toTimestamp(value: string | number | undefined): number {
@@ -322,7 +317,7 @@ export function search(query: string, filters: SearchFiltersInput = {}): SearchP
           id: o.id,
           type: "job",
           title: o.title,
-          subtitle: `${jobCategoryName(o.categoryId)} · ${o.employer.name}${o.employer.verified ? " · Verified" : ""}`,
+          subtitle: `${o.categoryName ?? "Other"} · ${o.employer.name}${o.employer.verified ? " · Verified" : ""}`,
           description: o.summary.slice(0, 120),
           url: `/jobs/${o.id}`,
           campusId: o.location.campusId,

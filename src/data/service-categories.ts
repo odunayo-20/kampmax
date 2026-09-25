@@ -2,6 +2,8 @@
 // onboarding StepServices (cat1..cat12) so the dashboard, onboarding, and
 // display stay consistent.
 
+import { cachedTaxonomyName } from "@/services/taxonomy";
+
 export interface SpServiceCategory {
   id: string;
   name: string;
@@ -25,8 +27,17 @@ export const SP_SERVICE_CATEGORIES: SpServiceCategory[] = [
 
 export const SP_SERVICE_GROUP_NAMES = [...new Set(SP_SERVICE_CATEGORIES.map((c) => c.group))];
 
+/**
+ * Display name for a service category id. New ids come from the SERVICE
+ * taxonomy (resolved from the loaded tree); the static list only labels
+ * legacy ids on demo records.
+ */
 export function spServiceCategoryName(categoryId: string): string {
-  return SP_SERVICE_CATEGORIES.find((c) => c.id === categoryId)?.name ?? categoryId;
+  return (
+    cachedTaxonomyName(categoryId) ??
+    SP_SERVICE_CATEGORIES.find((c) => c.id === categoryId)?.name ??
+    categoryId
+  );
 }
 
 /** Remap legacy marketplace-style category ids to the service category set. */

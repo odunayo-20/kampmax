@@ -97,7 +97,10 @@ export interface OpportunityEmployer {
 export interface Opportunity {
   id: string;
   title: string;
+  /** JOB-taxonomy category id (from the API). */
   categoryId: string;
+  /** Category name as returned with the job, so cards need no lookup. */
+  categoryName?: string;
   summary: string;
   description: string;
   requirements: string;

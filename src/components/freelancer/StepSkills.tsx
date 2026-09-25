@@ -1,19 +1,22 @@
 "use client";
 
-import { useState } from "react";
-import { Button, Input } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import { FREELANCER_CATEGORIES, type FreelancerCategory } from "@/config/freelancer";
+import { useCategoryTree } from "@/hooks/use-taxonomy";
 import type { FreelancerOnboardingDraft } from "@/types/freelancer";
-import { X, ChevronDown, ChevronUp } from "lucide-react";
+import { X } from "lucide-react";
 
 interface Props {
   draft: FreelancerOnboardingDraft | null;
   onUpdate: (data: Partial<FreelancerOnboardingDraft>) => void;
 }
 
+/**
+ * Categories are the root nodes of the SKILL taxonomy and skills are their
+ * children, all served by the API. Skills are stored by name (the backend
+ * resolves names against the admin-managed list and rejects unknown ones).
+ */
 export function StepSkills({ draft, onUpdate }: Props) {
-  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const { data: tree = [], isLoading, isError } = useCategoryTree("SKILL");
 
   const selectedCategories = draft?.categories ?? [];
   const selectedSkills = draft?.skills ?? [];
@@ -32,9 +35,7 @@ export function StepSkills({ draft, onUpdate }: Props) {
     onUpdate({ skills: next });
   };
 
-  const visibleCategories = FREELANCER_CATEGORIES.filter((c) =>
-    selectedCategories.includes(c.id)
-  );
+  const visibleCategories = tree.filter((c) => selectedCategories.includes(c.id));
 
   return (
     <div className="space-y-8">
@@ -50,8 +51,12 @@ export function StepSkills({ draft, onUpdate }: Props) {
         <label className="block text-sm font-medium text-kampmax-text mb-3">
           Categories <span className="text-red-500">*</span>
         </label>
+        {isLoading && <p className="text-sm text-kampmax-text-secondary">Loading…</p>}
+        {isError && (
+          <p className="text-sm text-kampmax-error">Couldn&apos;t load categories. Refresh to retry.</p>
+        )}
         <div className="flex flex-wrap gap-2">
-          {FREELANCER_CATEGORIES.map((cat) => {
+          {tree.map((cat) => {
             const selected = selectedCategories.includes(cat.id);
             return (
               <button
@@ -83,36 +88,27 @@ export function StepSkills({ draft, onUpdate }: Props) {
           </label>
           {visibleCategories.map((cat) => (
             <div key={cat.id} className="border border-neutral-200 rounded-lg p-4">
-              <button
-                type="button"
-                className="flex items-center justify-between w-full text-left"
-                onClick={() => setExpandedCategory(expandedCategory === cat.id ? null : cat.id)}
-              >
-                <span className="text-sm font-medium text-kampmax-text">{cat.name}</span>
-                {expandedCategory === cat.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-              </button>
-              {(expandedCategory === cat.id || true) && (
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {cat.skills.map((skill) => {
-                    const selected = selectedSkills.includes(skill);
-                    return (
-                      <button
-                        key={skill}
-                        type="button"
-                        onClick={() => toggleSkill(skill)}
-                        className={cn(
-                          "px-2.5 py-1 rounded-md text-xs font-medium border transition-colors",
-                          selected
-                            ? "bg-primary-50 text-primary-700 border-primary-300"
-                            : "bg-neutral-50 text-neutral-600 border-neutral-200 hover:border-neutral-300"
-                        )}
-                      >
-                        {skill}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+              <span className="text-sm font-medium text-kampmax-text">{cat.name}</span>
+              <div className="flex flex-wrap gap-2 mt-3">
+                {cat.children.map((skill) => {
+                  const selected = selectedSkills.includes(skill.name);
+                  return (
+                    <button
+                      key={skill.id}
+                      type="button"
+                      onClick={() => toggleSkill(skill.name)}
+                      className={cn(
+                        "px-2.5 py-1 rounded-md text-xs font-medium border transition-colors",
+                        selected
+                          ? "bg-primary-50 text-primary-700 border-primary-300"
+                          : "bg-neutral-50 text-neutral-600 border-neutral-200 hover:border-neutral-300"
+                      )}
+                    >
+                      {skill.name}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           ))}
         </div>

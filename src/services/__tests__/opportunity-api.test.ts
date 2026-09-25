@@ -84,7 +84,7 @@ describe("getOpportunitiesPageApi", () => {
     });
 
     expect(getMock).toHaveBeenCalledWith(
-      "/jobs?search=figma&categoryKey=ec1&experienceLevel=MIDLEVEL&locationType=ONSITE&sort=newest&page=2&limit=9"
+      "/jobs?search=figma&categoryId=ec1&experienceLevel=MIDLEVEL&locationType=ONSITE&sort=newest&page=2&limit=9"
     );
   });
 
@@ -105,7 +105,7 @@ const backendJob = {
   description: "Landing page",
   requirements: "Must know React",
   categoryKey: "ec1",
-  category: null,
+  category: { id: "22222222-2222-4222-8222-222222222222", name: "Web Development", slug: "web-development" },
   campus: null,
   budgetType: "HOURLY",
   budgetMin: 5000,
@@ -148,7 +148,8 @@ describe("employer job API", () => {
     expect(getMock).toHaveBeenCalledWith(`/jobs/me/${backendJob.id}`);
     expect(job).toMatchObject({
       status: "draft",
-      categoryId: "ec1",
+      categoryId: "22222222-2222-4222-8222-222222222222",
+      categoryName: "Web Development",
       requirements: "Must know React",
       workArrangement: "hybrid",
       budget: { type: "hourly", min: 5000, max: 9000 },
@@ -214,7 +215,7 @@ describe("employer job API", () => {
       description: "Landing page",
       summary: "A landing page for a campus shop",
       requirements: "Must know React",
-      categoryKey: "ec1",
+      categoryId: "ec1",
       budgetType: "FIXED",
       budgetMin: 5000,
       budgetMax: 9000,
@@ -262,7 +263,7 @@ describe("employer job API", () => {
     expect(body).toMatchObject({
       description: null,
       requirements: null,
-      categoryKey: null,
+      categoryId: null,
       budgetMin: null,
       budgetMax: null,
       experienceLevel: null,

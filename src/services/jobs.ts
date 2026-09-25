@@ -136,7 +136,8 @@ export interface CreateJobDto {
   description?: string;
   summary?: string;
   requirements?: string;
-  categoryKey?: string;
+  /** JOB-taxonomy category id (GET /categories?type=JOB). */
+  categoryId?: string;
   campusId?: string;
   budgetType?: "FIXED" | "HOURLY";
   budgetMin?: number;
@@ -162,7 +163,7 @@ export interface UpdateJobDto {
   description?: string | null;
   summary?: string | null;
   requirements?: string | null;
-  categoryKey?: string | null;
+  categoryId?: string | null;
   campusId?: string | null;
   budgetType?: "FIXED" | "HOURLY";
   budgetMin?: number | null;
@@ -185,7 +186,7 @@ export interface JobBrowseQuery {
   page?: number;
   limit?: number;
   search?: string;
-  categoryKey?: string;
+  categoryId?: string;
   campusId?: string;
   budgetType?: string;
   experienceLevel?: string;
@@ -265,7 +266,7 @@ export async function listPublicJobs(query: JobBrowseQuery = {}): Promise<{
 }> {
   const params = new URLSearchParams();
   if (query.search) params.set("search", query.search);
-  if (query.categoryKey) params.set("categoryKey", query.categoryKey);
+  if (query.categoryId) params.set("categoryId", query.categoryId);
   if (query.campusId) params.set("campusId", query.campusId);
   if (query.budgetType) params.set("budgetType", query.budgetType);
   if (query.experienceLevel) params.set("experienceLevel", query.experienceLevel);

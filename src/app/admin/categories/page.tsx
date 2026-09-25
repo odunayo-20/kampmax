@@ -20,7 +20,10 @@ import { CategoriesTable } from "@/components/admin/categories/CategoriesTable";
 import { CategoryFormDialog } from "@/components/admin/categories/CategoryFormDialog";
 import { categoryStatusLabel } from "@/components/admin/categories/categories-meta";
 import type { CategoryReorderDirection } from "@/types/admin";
-import { categoryManagementService } from "@/services/admin";
+import { categoryManagementService, setCategoryTaxonomy } from "@/services/admin";
+import { useQueryClient } from "@tanstack/react-query";
+import { taxonomyKeys, useTaxonomyTypes } from "@/hooks/use-taxonomy";
+import type { TaxonomyType } from "@/services/taxonomy";
 import type {
   CategoryInput,
   CategoryParentOption,
@@ -68,6 +71,17 @@ function CategoriesConsole() {
     | ManagedCategoryStatus
     | "all";
 
+  // Which taxonomy the console manages (Product Categories, Skills, ...).
+  // The service reads it on every call, so it is set during render, before
+  // any effect below loads data.
+  const [taxonomy, setTaxonomy] = useState<TaxonomyType>(
+    (searchParams.get("type") as TaxonomyType | null) ?? "PRODUCT"
+  );
+  setCategoryTaxonomy(taxonomy);
+  const queryClient = useQueryClient();
+  const { data: taxonomyTypes } = useTaxonomyTypes();
+  const typeLabel = taxonomyTypes?.find((t) => t.key === taxonomy);
+
   const [searchInput, setSearchInput] = useState(initialQ);
   const [statusFilter, setStatusFilter] = useState(initialStatus);
   const search = useDebounce(searchInput, 350);
@@ -97,6 +111,8 @@ function CategoriesConsole() {
   }
 
   const loadMeta = useCallback(async () => {
+    // Runs after every mutation: make forms elsewhere refetch the taxonomy.
+    void queryClient.invalidateQueries({ queryKey: taxonomyKeys.all });
     try {
       const [c, p] = await Promise.all([
         categoryManagementService.getCounts(),
@@ -107,7 +123,7 @@ function CategoriesConsole() {
     } catch {
       /* counts are non-critical */
     }
-  }, []);
+  }, [queryClient, taxonomy]);
 
   const loadList = useCallback(async () => {
     setLoading(true);
@@ -127,7 +143,7 @@ function CategoriesConsole() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, page, pageSize]);
+  }, [search, statusFilter, page, pageSize, taxonomy]);
 
   useEffect(() => {
     void loadList();
@@ -144,8 +160,9 @@ function CategoriesConsole() {
     const status = next.status ?? statusFilter;
     if (q.trim()) params.set("q", q.trim());
     if (status !== "all") params.set("status", status);
-    const qs = params.toString();
-    router.replace(qs ? `/admin/categories?${qs}` : "/admin/categories", {
+    if (taxonomy !== "PRODUCT") params.set("type", taxonomy);
+    const qs2 = params.toString();
+    router.replace(qs2 ? `/admin/categories?${qs2}` : "/admin/categories", {
       scroll: false,
     });
   }
@@ -279,8 +296,11 @@ function CategoriesConsole() {
   return (
     <>
       <AdminPageHeader
-        title="Categories"
-        description="Marketplace taxonomy - top-level categories, subcategories, display order and lifecycle."
+        title={typeLabel?.label ?? "Categories"}
+        description={
+          typeLabel?.description ??
+          "Taxonomy - top-level categories, subcategories, display order and lifecycle."
+        }
         actions={
           <>
             {counts && (
@@ -301,6 +321,36 @@ function CategoriesConsole() {
           </>
         }
       />
+
+      {/* Taxonomy type tabs: one console manages every classification list */}
+      <div
+        role="tablist"
+        aria-label="Taxonomy type"
+        className="mb-3 flex gap-1 overflow-x-auto no-scrollbar"
+      >
+        {(taxonomyTypes ?? [{ key: "PRODUCT" as TaxonomyType, label: "Product Categories" }]).map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={taxonomy === t.key}
+            onClick={() => {
+              setTaxonomy(t.key);
+              setPage(1);
+              setStatusFilter("all");
+              setSearchInput("");
+            }}
+            className={cn(
+              "shrink-0 whitespace-nowrap rounded-md border px-3 py-1.5 text-[13px] font-medium transition-colors",
+              taxonomy === t.key
+                ? "border-kampmax-blue bg-kampmax-blue text-white"
+                : "border-kampmax-border bg-white text-kampmax-text-secondary hover:text-kampmax-text"
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
       {/* Status tabs + search */}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">

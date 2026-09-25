@@ -11,11 +11,8 @@ import {
   removeSpDashboardPortfolioItem,
   setSpDashboardPortfolioItemVisibility,
 } from "@/services/service-provider-dashboard";
-import {
-  SP_SERVICE_CATEGORIES,
-  SP_SERVICE_GROUP_NAMES,
-  spServiceCategoryName,
-} from "@/data/service-categories";
+import { spServiceCategoryName } from "@/data/service-categories";
+import { TaxonomySelect } from "@/components/taxonomy";
 import type { ServiceProviderDashboardPortfolioItem } from "@/types/service-provider-dashboard";
 
 /** Backend-moderation aware portfolio manager. Provider requests changes;
@@ -93,18 +90,12 @@ export function PortfolioManager() {
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-kampmax-text">Category</label>
-              <Select value={draft.categoryId} onChange={(e) => setDraft((d) => ({ ...d, categoryId: e.target.value }))}>
-                <option value="">Select category</option>
-                {SP_SERVICE_GROUP_NAMES.map((g) => (
-                  <optgroup key={g} label={g}>
-                    {SP_SERVICE_CATEGORIES.filter((c) => c.group === g).map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </Select>
+              <TaxonomySelect
+                type="SERVICE"
+                value={draft.categoryId}
+                onChange={(id) => setDraft((d) => ({ ...d, categoryId: id }))}
+                placeholder="Select category"
+              />
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-kampmax-text">Image URL</label>

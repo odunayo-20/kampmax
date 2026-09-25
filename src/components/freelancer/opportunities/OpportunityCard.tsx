@@ -13,7 +13,6 @@ import type { Opportunity } from "@/types/opportunity";
 import { OPPORTUNITY_STATUS } from "@/types/opportunity";
 import {
   DURATION_LABEL,
-  JOB_CATEGORIES,
   WORK_ARRANGEMENT_LABEL,
 } from "@/config/opportunity";
 import { formatNairaCompact, timeAgo } from "@/lib/utils";
@@ -28,7 +27,7 @@ export function OpportunityCard({
   saved?: boolean;
   href?: string;
 }) {
-  const category = JOB_CATEGORIES.find((c) => c.id === o.categoryId)?.name ?? "Other";
+  const category = o.categoryName ?? "Other";
   const budgetLabel = budgetText(o);
   const isOpen = o.status === OPPORTUNITY_STATUS.OPEN;
 

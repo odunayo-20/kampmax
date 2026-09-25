@@ -126,7 +126,8 @@ export function jobToOpportunity(job: Job): Opportunity {
   return {
     id: job.id,
     title: job.title,
-    categoryId: job.categoryKey ?? job.category?.id ?? "",
+    categoryId: job.category?.id ?? "",
+    categoryName: job.category?.name,
     summary: job.summary ?? (description.length > 160 ? `${description.slice(0, 157)}...` : description),
     description,
     requirements: job.requirements ?? "",
@@ -198,7 +199,7 @@ export function opportunityInputToJobDto(
     description: input.description.trim() || undefined,
     summary: input.summary.trim() || undefined,
     requirements: input.requirements.trim() || undefined,
-    categoryKey: input.categoryId || undefined,
+    categoryId: input.categoryId || undefined,
     campusId: input.location.campusId && isBackendId(input.location.campusId)
       ? input.location.campusId
       : undefined,
@@ -236,7 +237,7 @@ export function opportunityInputToUpdateDto(
     description: dto.description ?? null,
     summary: dto.summary ?? null,
     requirements: dto.requirements ?? null,
-    categoryKey: dto.categoryKey ?? null,
+    categoryId: dto.categoryId ?? null,
     budgetMin: dto.budgetMin ?? null,
     budgetMax: dto.budgetMax ?? null,
     experienceLevel: dto.experienceLevel ?? null,
@@ -264,7 +265,7 @@ export function jobListFiltersToQuery(filters: {
     page: filters.page,
     limit: filters.size,
     search: filters.search || undefined,
-    categoryKey: filters.categoryId || undefined,
+    categoryId: filters.categoryId || undefined,
     campusId: filters.campusId && isBackendId(filters.campusId) ? filters.campusId : undefined,
     experienceLevel: filters.experience
       ? EXPERIENCE_TO_BACKEND[filters.experience]

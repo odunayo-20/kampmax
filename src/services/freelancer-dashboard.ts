@@ -27,6 +27,7 @@ import {
   getFreelancerOnboardingStatus,
 } from "@/data/freelancer";
 import { FREELANCER_CATEGORIES } from "@/config/freelancer";
+import { cachedTaxonomyName } from "@/services/taxonomy";
 import { getNotifications, getUnreadNotificationCount } from "@/services/notifications";
 import {
   computeFlCompletion,
@@ -310,9 +311,12 @@ function toPublicFreelancerProfile(
 ): PublicFreelancerProfile {
   const userId = draft.userId;
   const user = getUserById(userId);
-  const categoryLookup = new Map(
-    FREELANCER_CATEGORIES.map((c) => [c.id, c.name])
-  );
+  // Onboarding now stores SKILL-taxonomy ids; legacy drafts hold static "fc" ids.
+  const legacyLookup = new Map(FREELANCER_CATEGORIES.map((c) => [c.id, c.name]));
+  const categoryLookup = {
+    get: (id: string) => cachedTaxonomyName(id) ?? legacyLookup.get(id),
+    has: (id: string) => cachedTaxonomyName(id) !== undefined || legacyLookup.has(id),
+  };
   return {
     id: userId,
     name: user?.name ?? userId,

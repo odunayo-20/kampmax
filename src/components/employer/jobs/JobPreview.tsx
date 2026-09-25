@@ -15,9 +15,9 @@ import type {
 } from "@/types/opportunity";
 import {
   DURATION_LABEL,
-  JOB_CATEGORIES,
   WORK_ARRANGEMENT_LABEL,
 } from "@/config/opportunity";
+import { useCategories } from "@/hooks/use-taxonomy";
 import { formatNairaCompact } from "@/lib/utils";
 
 function budgetLabel(input: OpportunityInput["budget"]): string {
@@ -47,7 +47,8 @@ export function JobPreview({
   values: OpportunityInput;
   employerName?: string;
 }) {
-  const category = JOB_CATEGORIES.find((c) => c.id === values.categoryId)?.name ?? "Other";
+  const { nameById } = useCategories("JOB");
+  const category = nameById.get(values.categoryId) ?? "Other";
   const arrangement = WORK_ARRANGEMENT_LABEL[
     values.workArrangement as OpportunityWorkArrangement
   ];

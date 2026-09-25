@@ -5,7 +5,7 @@ import { Button, Input } from "@/components/ui";
 import { Plus, Trash2, Eye, EyeOff } from "lucide-react";
 import { freshId } from "@/data/freelancer";
 import type { FreelancerPortfolioItem, FreelancerOnboardingDraft } from "@/types/freelancer";
-import { FREELANCER_CATEGORIES } from "@/config/freelancer";
+import { useCategories } from "@/hooks/use-taxonomy";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -38,8 +38,12 @@ export function StepPortfolio({ draft, onUpdate }: Props) {
     update(itemId, { skills: next });
   };
 
-  const allSkills = FREELANCER_CATEGORIES.flatMap((c) => c.skills).filter((s) => draft?.skills.includes(s));
-  const showSkills = allSkills.length > 0 ? allSkills : FREELANCER_CATEGORIES.flatMap((c) => c.skills.slice(0, 5));
+  const { categories: skillNodes } = useCategories("SKILL");
+  const allSkills = draft?.skills ?? [];
+  const showSkills =
+    allSkills.length > 0
+      ? allSkills
+      : skillNodes.filter((n) => !n.hasChildren).slice(0, 15).map((n) => n.name);
 
   return (
     <div className="space-y-6">

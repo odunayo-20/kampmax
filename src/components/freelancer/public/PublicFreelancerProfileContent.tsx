@@ -19,6 +19,7 @@ import {
   FREELANCER_QUALIFICATIONS,
 } from "@/config/freelancer";
 import { FREELANCER_SERVICE_PRICING_LABEL } from "@/config/freelancer-services";
+import { cachedTaxonomyName } from "@/services/taxonomy";
 import type { PublicFreelancerProfile } from "@/services/freelancer-dashboard";
 import type { FreelancerService } from "@/types/freelancer-services";
 import { FreelancerProfileActions } from "@/components/freelancer/public/FreelancerProfileActions";
@@ -63,7 +64,9 @@ function qualificationLabel(value: string): string {
 
 function serviceCategoryName(categoryId: string): string {
   return (
-    FREELANCER_CATEGORIES.find((c) => c.id === categoryId)?.name ?? categoryId
+    cachedTaxonomyName(categoryId) ??
+    FREELANCER_CATEGORIES.find((c) => c.id === categoryId)?.name ??
+    categoryId
   );
 }
 

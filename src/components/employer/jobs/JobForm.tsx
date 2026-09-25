@@ -22,11 +22,11 @@ import {
 } from "@/config/jobs";
 import {
   DURATION_LABEL,
-  JOB_CATEGORIES,
   JOB_EXPERIENCE_LEVELS,
   JOB_WORK_ARRANGEMENT_OPTIONS,
 } from "@/config/opportunity";
 import { Button, Input, Select } from "@/components/ui";
+import { TaxonomySelect } from "@/components/taxonomy";
 import { AttachmentPicker } from "@/components/uploads/AttachmentPicker";
 import { fetchCampuses, getCampuses } from "@/services/campus";
 import { JobPreview } from "./JobPreview";
@@ -327,18 +327,13 @@ export function JobForm({
             <label className="mb-1 block text-xs font-medium text-neutral-700" htmlFor="job-category">
               Category *
             </label>
-            <Select
+            <TaxonomySelect
+              type="JOB"
               id="job-category"
               value={values.categoryId}
-              onChange={(e) => set("categoryId", e.target.value)}
+              onChange={(id) => set("categoryId", id)}
               placeholder="Choose a category"
-            >
-              {JOB_CATEGORIES.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </Select>
+            />
             <FieldError message={errors.categoryId} />
           </div>
 
