@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import {
   Award,
@@ -20,6 +22,7 @@ import {
 } from "@/config/freelancer";
 import { FREELANCER_SERVICE_PRICING_LABEL } from "@/config/freelancer-services";
 import { cachedTaxonomyName } from "@/services/taxonomy";
+import { useCategories } from "@/hooks/use-taxonomy";
 import type { PublicFreelancerProfile } from "@/services/freelancer-dashboard";
 import type { FreelancerService } from "@/types/freelancer-services";
 import { FreelancerProfileActions } from "@/components/freelancer/public/FreelancerProfileActions";
@@ -148,6 +151,7 @@ export function PublicFreelancerProfileContent({
   profile: PublicFreelancerProfile;
   services: FreelancerService[];
 }) {
+  useCategories("SERVICE"); // warms id -> name for serviceCategoryName()
   const tone =
     profile.availability.status != null
       ? availabilityTone[profile.availability.status]
