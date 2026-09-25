@@ -745,3 +745,13 @@ export const vendorReviewKeys = {
   summary: () => ["vendor-reviews", "summary"] as const,
   detail: (id: string) => ["vendor-reviews", "detail", id] as const,
 };
+
+/** Vendor promotions (owner-scoped). */
+export const vendorPromotionKeys = {
+  all: ["vendor-promotions"] as const,
+  list: (query: object) => ["vendor-promotions", "list", query] as const,
+  counts: () => ["vendor-promotions", "counts"] as const,
+  detail: (id: string) => ["vendor-promotions", "detail", id] as const,
+  redemptions: (id: string) => ["vendor-promotions", "redemptions", id] as const,
+  formContext: () => ["vendor-promotions", "form-context"] as const,
+};

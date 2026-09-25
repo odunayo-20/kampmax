@@ -19,7 +19,7 @@ interface PromotionFormProps {
   initial?: VendorPromotion;
   title: string;
   submitLabel: string;
-  onSubmit: (input: VendorPromotionInput) => VendorPromotionResult;
+  onSubmit: (input: VendorPromotionInput) => VendorPromotionResult | Promise<VendorPromotionResult>;
 }
 
 const SCOPES = ["all_products", "products", "category", "minimum_order"] as const;
@@ -85,10 +85,10 @@ export function PromotionForm({ context, initial, title, submitLabel, onSubmit }
     });
   }
 
-  function submit() {
+  async function submit() {
     setNotice(null);
     setError(null);
-    const result = onSubmit(form);
+    const result = await onSubmit(form);
     if (result.ok) {
       setNotice("Saved. You can activate it from the promotions list whenever you're ready.");
     } else {

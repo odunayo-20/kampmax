@@ -4,12 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { Copy, MoreHorizontal, Pencil, Pause, Play, Power, XCircle } from "lucide-react";
 import {
-  activateVendorPromotion,
-  pauseVendorPromotion,
-  resumeVendorPromotion,
-  cancelVendorPromotion,
-  duplicateVendorPromotion,
-} from "@/services/vendor-promotions";
+  useActivatePromotion,
+  useCancelPromotion,
+  useDuplicatePromotion,
+  usePausePromotion,
+  useResumePromotion,
+} from "@/hooks/use-vendor-promotions";
 import type { VendorPromotion, VendorPromotionPermissions, VendorPromotionResult } from "@/types/vendor-promotions";
 
 interface PromotionRowActionsProps {
@@ -22,6 +22,11 @@ export function PromotionRowActions({ promotion, permissions, onChanged }: Promo
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
+  const activate = useActivatePromotion();
+  const pause = usePausePromotion();
+  const resume = useResumePromotion();
+  const cancel = useCancelPromotion();
+  const duplicate = useDuplicatePromotion();
   const [message, setMessage] = useState<string | null>(null);
 
   const canManage = permissions["promotions.manage"];
@@ -45,10 +50,17 @@ export function PromotionRowActions({ promotion, permissions, onChanged }: Promo
     setBusy(false);
   }
 
-  function run(fn: () => VendorPromotionResult, successText: string) {
+  async function run(fn: () => Promise<VendorPromotionResult>, successText: string) {
     setBusy(true);
     setMessage(null);
-    handleResult(fn(), successText);
+    try {
+      handleResult(await fn(), successText);
+    } catch (err) {
+      handleResult(
+        { ok: false, code: "validation_failed", error: err instanceof Error ? err.message : undefined },
+        successText
+      );
+    }
   }
 
   return (
@@ -67,13 +79,13 @@ export function PromotionRowActions({ promotion, permissions, onChanged }: Promo
           <div className="fixed inset-0 z-10" onClick={close} />
           <div className="absolute right-0 top-9 z-20 w-48 rounded-lg border border-kampmax-border bg-white py-1 shadow-lg">
             {canManage && status === "active" && (
-              <MenuButton onClick={() => run(() => pauseVendorPromotion(promotion.id), "Promotion paused.")} icon={Pause} label="Pause" />
+              <MenuButton onClick={() => run(() => pause.mutateAsync(promotion.id), "Promotion paused.")} icon={Pause} label="Pause" />
             )}
             {canManage && status === "paused" && (
-              <MenuButton onClick={() => run(() => resumeVendorPromotion(promotion.id), "Promotion resumed.")} icon={Play} label="Resume" />
+              <MenuButton onClick={() => run(() => resume.mutateAsync(promotion.id), "Promotion resumed.")} icon={Play} label="Resume" />
             )}
             {canManage && (status === "draft" || status === "scheduled") && (
-              <MenuButton onClick={() => run(() => activateVendorPromotion(promotion.id), "Promotion activated.")} icon={Power} label="Activate" />
+              <MenuButton onClick={() => run(() => activate.mutateAsync(promotion.id), "Promotion activated.")} icon={Power} label="Activate" />
             )}
             {editable && (
               <Link href={`/vendor/promotions/${promotion.id}/edit`} onClick={close} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-kampmax-text hover:bg-kampmax-muted">
@@ -82,14 +94,14 @@ export function PromotionRowActions({ promotion, permissions, onChanged }: Promo
               </Link>
             )}
             {canManage && (
-              <MenuButton onClick={() => run(() => duplicateVendorPromotion(promotion.id), "Draft copy created.")} icon={Copy} label="Duplicate" />
+              <MenuButton onClick={() => run(() => duplicate.mutateAsync(promotion.id), "Draft copy created.")} icon={Copy} label="Duplicate" />
             )}
             {canManage && !["expired", "cancelled"].includes(status) && (
               confirming ? (
                 <button
                   type="button"
                   disabled={busy}
-                  onClick={() => run(() => cancelVendorPromotion(promotion.id), "Promotion cancelled.")}
+                  onClick={() => run(() => cancel.mutateAsync(promotion.id), "Promotion cancelled.")}
                   className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-kampmax-error hover:bg-kampmax-muted"
                 >
                   <XCircle className="h-3.5 w-3.5" aria-hidden />

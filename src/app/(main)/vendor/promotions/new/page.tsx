@@ -1,27 +1,30 @@
 "use client";
 
-import { useEffect, useMemo, useState, use } from "react";
+import { use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { createVendorPromotion, getVendorPromotionFormContext, getVendorPromotionPermissions } from "@/services/vendor-promotions";
-import { PromotionForm, type VendorPromotionFormContext } from "@/components/vendor-promotions/PromotionForm";
+import { useCreatePromotion, useVendorPromotionFormContext } from "@/hooks/use-vendor-promotions";
+import { PromotionForm } from "@/components/vendor-promotions/PromotionForm";
 
 export default function VendorPromotionNewPage({ params }: { params: Promise<{}> }) {
   use(params);
   const router = useRouter();
+  const contextQuery = useVendorPromotionFormContext();
+  const create = useCreatePromotion();
 
-  const context = useMemo<VendorPromotionFormContext>(() => getVendorPromotionFormContext(), []);
-  const permissions = useMemo(() => getVendorPromotionPermissions(), []);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setReady(true), 100);
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (!ready) {
+  if (contextQuery.isPending) {
     return <div className="h-64 animate-pulse rounded-xl border border-kampmax-border bg-white" aria-hidden />;
+  }
+  if (contextQuery.isError || !contextQuery.data) {
+    return (
+      <div className="rounded-xl border border-error-200 bg-error-50 p-6 text-center">
+        <p className="text-sm font-medium text-error-700">Couldn&apos;t load your products and categories.</p>
+        <button type="button" onClick={() => contextQuery.refetch()} className="mt-2 text-xs font-semibold text-error-700 underline">
+          Try again
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -35,11 +38,11 @@ export default function VendorPromotionNewPage({ params }: { params: Promise<{}>
       </Link>
 
       <PromotionForm
-        context={context}
+        context={contextQuery.data}
         title="New promotion"
         submitLabel="Save draft"
-        onSubmit={(input) => {
-          const result = createVendorPromotion(input);
+        onSubmit={async (input) => {
+          const result = await create.mutateAsync(input);
           if (result.ok && result.promotion) {
             router.push(`/vendor/promotions/${result.promotion.id}`);
           }
