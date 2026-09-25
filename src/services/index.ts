@@ -106,8 +106,4 @@ export {
   checkoutFeatureFlags,
   estimateLoyaltyPointsEarned,
   couponStatusLabel,
-  getSavedAddresses,
-  addAddress,
-  updateAddress,
-  deleteAddress,
 } from "./checkout";

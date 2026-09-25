@@ -481,12 +481,6 @@ export function getCustomerInfo(customerId?: string): {
   };
 }
 
-export {
-  getSavedAddresses,
-  addAddress,
-  updateAddress,
-  deleteAddress,
-} from "@/services/profile";
 export type { DeliveryAddress };
 
 export function checkoutFeatureFlags(): CheckoutFeatureFlags {

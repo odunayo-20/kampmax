@@ -2,6 +2,8 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useAddresses, useCreateAddress, useDeleteAddress, useUpdateAddress } from "@/hooks/use-addresses";
+import { useEnsureVendors } from "@/hooks/use-vendor-cache";
 import { useCart } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
 import { useApp } from "@/lib/app-context";
@@ -21,10 +23,6 @@ import {
   getCustomerInfo,
   checkoutFeatureFlags,
   estimateLoyaltyPointsEarned,
-  getSavedAddresses,
-  addAddress as addAddressService,
-  updateAddress as updateAddressService,
-  deleteAddress as deleteAddressService,
 } from "@/services/checkout";
 import { checkoutOrdersApi } from "@/services/orders";
 import type { AddressFormValues } from "@/components/checkout/AddressForm";
@@ -80,7 +78,11 @@ export function useCheckout() {
   const [customer, setCustomer] = useState<CheckoutCustomer>({ fullName: "", email: "", phone: "" });
   const [customerErrors, setCustomerErrors] = useState<CustomerErrorBag>({});
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
-  const [addresses, setAddresses] = useState<SavedAddress[]>([]);
+  const addressesQuery = useAddresses();
+  const addresses = useMemo<SavedAddress[]>(() => addressesQuery.data ?? [], [addressesQuery.data]);
+  const createAddressMutation = useCreateAddress();
+  const updateAddressMutation = useUpdateAddress();
+  const deleteAddressMutation = useDeleteAddress();
   const [loadingVendorId, setLoadingVendorId] = useState<string | null>(null);
 
   // ── Feature/state for the money features (display-only, backend-driven) ──
@@ -128,6 +130,9 @@ export function useCheckout() {
     [items]
   );
 
+  // Vendor names come from the shared vendor cache; load any that are missing.
+  const vendorsLoaded = useEnsureVendors(activeItems.map((i) => i.vendorId));
+
   // Build/maintain the presentation session from the live cart.
   useEffect(() => {
     if (activeItems.length === 0) {
@@ -141,7 +146,7 @@ export function useCheckout() {
         customerId: user?.id,
       })
     );
-  }, [activeItems, selectedCampus.id, user?.id]);
+  }, [activeItems, selectedCampus.id, user?.id, vendorsLoaded]);
 
   useEffect(() => {
     if (status === "authenticated" && user) {
@@ -152,10 +157,6 @@ export function useCheckout() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, user?.id]);
-
-  useEffect(() => {
-    setAddresses(getSavedAddresses());
-  }, []);
 
   // Default the selected saved address to the "default" one if present.
   useEffect(() => {
@@ -272,38 +273,47 @@ export function useCheckout() {
   }
 
   // ── Address actions ──
-  const addAddress = useCallback((values: AddressFormValues) => {
-    const updated = addAddressService({
-      label: values.label,
-      address: values.address,
-      campusId: values.campusId,
-      contactName: values.contactName,
-      contactPhone: values.contactPhone,
-      notes: values.notes,
-      isDefault: values.isDefault,
-    });
-    setAddresses(getSavedAddresses());
-    setSelectedAddressId(updated.id);
-  }, []);
+  const addAddress = useCallback(
+    async (values: AddressFormValues) => {
+      const created = await createAddressMutation.mutateAsync({
+        label: values.label,
+        address: values.address,
+        campusId: values.campusId,
+        contactName: values.contactName,
+        contactPhone: values.contactPhone,
+        notes: values.notes,
+        isDefault: values.isDefault,
+      });
+      setSelectedAddressId(created.id);
+    },
+    [createAddressMutation]
+  );
 
-  const updateAddress = useCallback((id: string, values: AddressFormValues) => {
-    updateAddressService(id, {
-      label: values.label,
-      address: values.address,
-      campusId: values.campusId,
-      contactName: values.contactName,
-      contactPhone: values.contactPhone,
-      notes: values.notes,
-      isDefault: values.isDefault,
-    });
-    setAddresses(getSavedAddresses());
-  }, []);
+  const updateAddress = useCallback(
+    async (id: string, values: AddressFormValues) => {
+      await updateAddressMutation.mutateAsync({
+        id,
+        patch: {
+          label: values.label,
+          address: values.address,
+          campusId: values.campusId,
+          contactName: values.contactName,
+          contactPhone: values.contactPhone,
+          notes: values.notes,
+          isDefault: values.isDefault,
+        },
+      });
+    },
+    [updateAddressMutation]
+  );
 
-  const deleteAddress = useCallback((id: string) => {
-    deleteAddressService(id);
-    setAddresses(getSavedAddresses());
-    setSelectedAddressId((cur) => (cur === id ? null : cur));
-  }, []);
+  const deleteAddress = useCallback(
+    async (id: string) => {
+      await deleteAddressMutation.mutateAsync(id);
+      setSelectedAddressId((cur) => (cur === id ? null : cur));
+    },
+    [deleteAddressMutation]
+  );
 
   const selectAddress = useCallback((addr: SavedAddress) => {
     setSelectedAddressId(addr.id);
@@ -433,7 +443,7 @@ export function useCheckout() {
     const initResult = await initializePaystackPayment(
       session,
       createdOrderId,
-      typeof window !== "undefined" ? `${window.location.origin}/orders` : undefined
+      typeof window !== "undefined" ? `${window.location.origin}/checkout/callback` : undefined
     );
 
     if (!initResult.ok) {
@@ -443,29 +453,19 @@ export function useCheckout() {
       return false;
     }
 
-    // If external authorization URL is provided (e.g. live Paystack redirect)
+    // Paystack hosted checkout: the customer pays there and returns to
+    // /checkout/callback, which verifies the payment with the backend. The cart
+    // is only cleared and the order only confirmed after that verification.
     const initData = initResult.data as { reference?: string; authorizationUrl?: string } | undefined;
-    const reference = initData?.reference || "";
-
-    // 4. Verify payment status
-    transitionTo(CHECKOUT_STATES.PAYMENT_PENDING);
-    const statusRes = await getPaymentStatus(reference);
-
-    if (!statusRes.ok && statusRes.data?.status === "failed") {
+    if (!initData?.authorizationUrl) {
       busyRef.current = false;
       transitionTo(CHECKOUT_STATES.PAYMENT_FAILED);
-      setErrorInfo(statusRes.error || { message: "Payment was not successful. Please try again." });
+      setErrorInfo({ code: "no_authorization_url", message: "Payment could not be started. Please try again." });
       return false;
     }
 
-    // 5. Confirmed success moves to confirmation and clears the cart.
-    transitionTo(CHECKOUT_STATES.PAYMENT_SUCCESS);
-    transitionTo(CHECKOUT_STATES.ORDER_CONFIRMATION);
-    busyRef.current = false;
-    clearCart();
-
-    const targetUrl = createdOrderId ? `/orders/${createdOrderId}` : "/orders";
-    router.push(targetUrl);
+    transitionTo(CHECKOUT_STATES.PAYMENT_PENDING);
+    window.location.assign(initData.authorizationUrl);
     return true;
   }, [
     session,

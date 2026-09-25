@@ -796,3 +796,8 @@ export const communityEventKeys = {
   all: ["community", "events"] as const,
   upcoming: (campusId: string) => ["community", "events", campusId] as const,
 };
+
+export const addressKeys = {
+  all: ["addresses"] as const,
+  list: (userId: string) => ["addresses", userId] as const,
+};

@@ -21,9 +21,10 @@ import { apiClient } from "@/lib/api-client";
 import { getOrdersByUser } from "@/services/orders";
 import { useAuth } from "@/lib/auth-context";
 import { useApp } from "@/lib/app-context";
+import { useAddresses } from "@/hooks/use-addresses";
 import { getWalletByUser } from "@/services/wallet";
 import { formatNaira } from "@/lib/utils";
-import { fetchMyProfile, getLoyaltyProgram, getSavedAddresses, getSavedPaymentMethods, mapBackendProfileToFrontend } from "@/services/profile";
+import { fetchMyProfile, getLoyaltyProgram, getSavedPaymentMethods, mapBackendProfileToFrontend } from "@/services/profile";
 import type { User } from "@/types";
 
 export default function ProfilePage() {
@@ -33,6 +34,7 @@ export default function ProfilePage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const [showVendorCard, setShowVendorCard] = useState(true);
+  const addressesQuery = useAddresses();
   const isVendorUser = currentUser?.role === "vendor";
   const { data: vendor } = useQuery({
     queryKey: ["vendors", "me", currentUser?.id ?? ""],
@@ -63,7 +65,7 @@ export default function ProfilePage() {
   const orders = getOrdersByUser(currentUser.id);
   const wallet = getWalletByUser(currentUser.id);
   const loyalty = getLoyaltyProgram();
-  const savedAddressesCount = getSavedAddresses().length;
+  const savedAddressesCount = addressesQuery.data?.length ?? 0;
   const savedPaymentMethodsCount = getSavedPaymentMethods().length;
 
   const activeOrders = orders.filter((o) =>

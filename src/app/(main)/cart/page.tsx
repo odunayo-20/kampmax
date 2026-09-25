@@ -6,6 +6,7 @@ import { ArrowLeft, Trash2, ShoppingBag, Loader2 } from "lucide-react";
 import { useCart } from "@/lib/cart-context";
 import { useApp } from "@/lib/app-context";
 import { getVendorById } from "@/services/users";
+import { useEnsureVendors } from "@/hooks/use-vendor-cache";
 import { formatNaira } from "@/lib/utils";
 import { PageContainer } from "@/components/layout";
 import { Button } from "@/components/atoms/Button";
@@ -40,6 +41,8 @@ export default function CartPage() {
     [items]
   );
 
+  const vendorsLoaded = useEnsureVendors(items.map((i) => i.product.vendorId));
+
   const vendorNameCache = useMemo(() => {
     const cache: Record<string, { name: string; verified: boolean }> = {};
     vendorGroups.forEach((g) => {
@@ -59,7 +62,8 @@ export default function CartPage() {
       }
     });
     return cache;
-  }, [vendorGroups, savedItems]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vendorGroups, savedItems, vendorsLoaded]);
 
   // Re-validate cart lines against the current catalog on mount.
   useEffect(() => {

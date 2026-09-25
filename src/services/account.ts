@@ -11,7 +11,6 @@ import { getLoyaltyProgram } from "@/services/profile";
 import { getReviewsByUser, hasUserReviewedProduct } from "@/services/reviews";
 import { getWishlistCount } from "@/services/wishlist";
 import { getUnreadNotificationCount } from "@/services/notifications";
-import { getSavedAddresses } from "@/services/profile";
 import type { SavedAddress } from "@/types";
 
 /**
@@ -114,7 +113,6 @@ export function getAwaitingReviews(userId: string) {
 
 // Re-export address/wishlist/notification helpers so the account UI imports
 // from a single place and can be swapped for an API client later.
-export { getSavedAddresses };
 export type { SavedAddress };
 export { getWishlist, getWishlistCount, toggleWishlist, removeFromWishlist, addToWishlist } from "@/services/wishlist";
 export { getOrdersByUser, getOrderById, getActiveOrders, getCompletedOrders, getCancelledOrders } from "@/services/orders";

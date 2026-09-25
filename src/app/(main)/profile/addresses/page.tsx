@@ -9,14 +9,20 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { SettingsGroup } from "@/components/profile/SettingsGroup";
 import { SavedAddress } from "@/types";
-import { getSavedAddresses, addAddress, deleteAddress, updateAddress } from "@/services/profile";
+import { useAddresses, useCreateAddress, useDeleteAddress, useUpdateAddress } from "@/hooks/use-addresses";
 import { useApp } from "@/lib/app-context";
 import { getCampuses } from "@/services/campus";
 
 export default function AddressesPage() {
   const router = useRouter();
   const { selectedCampus } = useApp();
-  const [addresses, setAddresses] = useState<SavedAddress[]>(getSavedAddresses);
+  const addressesQuery = useAddresses();
+  const addresses = addressesQuery.data ?? [];
+  const createMutation = useCreateAddress();
+  const updateMutation = useUpdateAddress();
+  const deleteMutation = useDeleteAddress();
+  const saving = createMutation.isPending || updateMutation.isPending;
+  const [formError, setFormError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -57,38 +63,34 @@ export default function AddressesPage() {
     setShowForm(true);
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!formLabel.trim() || !formAddress.trim()) return;
-    if (editingId) {
-      updateAddress(editingId, {
-        label: formLabel,
-        address: formAddress,
-        campusId: formCampusId,
-        contactName: formContactName,
-        contactPhone: formContactPhone,
-        notes: formNotes || undefined,
-        isDefault: formIsDefault,
-      });
-    } else {
-      addAddress({
-        label: formLabel,
-        address: formAddress,
-        campusId: formCampusId,
-        contactName: formContactName,
-        contactPhone: formContactPhone,
-        notes: formNotes || undefined,
-        isDefault: formIsDefault,
-      });
+    setFormError(null);
+    const values = {
+      label: formLabel,
+      address: formAddress,
+      campusId: formCampusId,
+      contactName: formContactName,
+      contactPhone: formContactPhone,
+      notes: formNotes || undefined,
+      isDefault: formIsDefault,
+    };
+    try {
+      if (editingId) await updateMutation.mutateAsync({ id: editingId, patch: values });
+      else await createMutation.mutateAsync(values);
+      setShowForm(false);
+      resetForm();
+    } catch (e) {
+      setFormError(e instanceof Error && e.message ? e.message : "Couldn't save the address. Try again.");
     }
-    setAddresses(getSavedAddresses());
-    setShowForm(false);
-    resetForm();
   }
 
-  function handleDelete(id: string) {
-    deleteAddress(id);
-    setAddresses(getSavedAddresses());
-    setDeletingId(null);
+  async function handleDelete(id: string) {
+    try {
+      await deleteMutation.mutateAsync(id);
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   return (
@@ -119,7 +121,14 @@ export default function AddressesPage() {
       </div>
 
       {/* Address List */}
-      {addresses.length === 0 && !showForm ? (
+      {addressesQuery.isLoading ? (
+        <p className="text-sm text-kampmax-text-secondary text-center py-8">Loading addresses…</p>
+      ) : addressesQuery.isError ? (
+        <div className="bg-white rounded-xl border border-kampmax-border p-6 text-center">
+          <p className="text-sm text-kampmax-text">Couldn't load your addresses.</p>
+          <button type="button" onClick={() => addressesQuery.refetch()} className="mt-2 text-sm font-medium text-kampmax-blue">Try again</button>
+        </div>
+      ) : addresses.length === 0 && !showForm ? (
         <div className="bg-white rounded-xl border border-kampmax-border p-8 text-center">
           <MapPin className="h-10 w-10 text-kampmax-text-secondary mx-auto mb-3" />
           <p className="text-sm font-medium text-kampmax-text">No saved addresses</p>
@@ -176,10 +185,7 @@ export default function AddressesPage() {
                 </button>
                 {!addr.isDefault && (
                   <button
-                    onClick={() => {
-                      updateAddress(addr.id, { isDefault: true });
-                      setAddresses(getSavedAddresses());
-                    }}
+                    onClick={() => updateMutation.mutate({ id: addr.id, patch: { isDefault: true } })}
                     className="text-xs text-kampmax-text-secondary font-medium flex items-center gap-1"
                   >
                     <Star className="h-3 w-3" /> Set Default
@@ -323,12 +329,13 @@ export default function AddressesPage() {
               </label>
             </div>
             <div className="shrink-0 bg-white border-t border-kampmax-border px-4 py-3">
+              {formError && <p className="text-xs text-kampmax-error mb-2">{formError}</p>}
               <button
                 onClick={handleSave}
-                disabled={!formLabel.trim() || !formAddress.trim()}
+                disabled={!formLabel.trim() || !formAddress.trim() || saving}
                 className="w-full py-3 rounded-xl bg-kampmax-blue text-white text-sm font-semibold disabled:opacity-40"
               >
-                {editingId ? "Update Address" : "Save Address"}
+                {saving ? "Saving…" : editingId ? "Update Address" : "Save Address"}
               </button>
             </div>
           </div>
