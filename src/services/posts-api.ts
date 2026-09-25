@@ -14,7 +14,30 @@ import { apiClient, type ApiError } from "@/lib/api-client";
 // The author is always the signed-in user (from the JWT). The backend has no
 // titles, tags, polls, events, saves or reports yet, so the UI doesn't fake them.
 
+export type PostKind = "POST" | "POLL" | "LOST_FOUND" | "ANNOUNCEMENT";
+
+export interface PostPoll {
+  options: { text: string; votes: number }[];
+  totalVotes: number;
+  myVote: number | null;
+  endsAt: string;
+  closed: boolean;
+}
+
+export interface PostLostFound {
+  status: "LOST" | "FOUND";
+  item: string;
+  location: string;
+  contact?: string;
+  resolved: boolean;
+}
+
 export interface CommunityPost {
+  kind: PostKind;
+  savedByMe: boolean;
+  poll?: PostPoll;
+  lostFound?: PostLostFound;
+  announcement?: { priority: "INFO" | "WARNING" | "URGENT" };
   id: string;
   authorId: string;
   authorName: string;
@@ -28,6 +51,8 @@ export interface CommunityPost {
 }
 
 export interface CommunityComment {
+  likeCount: number;
+  likedByMe: boolean;
   id: string;
   postId: string;
   authorId: string;
@@ -37,6 +62,11 @@ export interface CommunityComment {
 }
 
 interface BackendPost {
+  kind: PostKind;
+  savedByMe?: boolean;
+  poll?: PostPoll;
+  lostFound?: PostLostFound;
+  announcement?: { priority: "INFO" | "WARNING" | "URGENT" };
   id: string;
   authorId: string;
   authorName: string;
@@ -67,6 +97,11 @@ function mapPost(p: BackendPost): CommunityPost {
     authorName: p.vendorName || p.authorName,
     vendorName: p.vendorName,
     content: p.content,
+    kind: p.kind ?? "POST",
+    savedByMe: p.savedByMe ?? false,
+    poll: p.poll,
+    lostFound: p.lostFound,
+    announcement: p.announcement,
     likeCount: p.likeCount,
     commentCount: p.commentCount,
     likedByMe: p.likedByMe,
@@ -92,6 +127,10 @@ export async function fetchPost(id: string): Promise<CommunityPost> {
 export async function createPostApi(input: {
   content?: string;
   campusId?: string;
+  kind?: PostKind;
+  poll?: { options: string[]; durationDays: number };
+  lostFound?: { status: "LOST" | "FOUND"; item: string; location: string; contact?: string };
+  announcement?: { priority: "INFO" | "WARNING" | "URGENT" };
   media?: { type: "IMAGE"; url: string; sortOrder: number }[];
  }): Promise<CommunityPost> {
   return mapPost(await unwrap(apiClient.post<typeof input, BackendPost>("/posts", input)));
@@ -160,5 +199,36 @@ export async function createEventApi(input: {
 
 export async function setEventAttendingApi(id: string, attending: boolean): Promise<void> {
   const { error } = attending ? await apiClient.post(`/events/${id}/attend`) : await apiClient.delete(`/events/${id}/attend`);
+  if (error) throw error;
+}
+
+export async function fetchSavedPosts(): Promise<CommunityPost[]> {
+  const res = await unwrap(apiClient.get<BackendPage<BackendPost>>("/posts/saved?page=1&limit=50"));
+  return res.items.map(mapPost);
+}
+
+export async function setPostSavedApi(id: string, saved: boolean): Promise<void> {
+  const { error } = saved ? await apiClient.post(`/posts/${id}/save`) : await apiClient.delete(`/posts/${id}/save`);
+  if (error) throw error;
+}
+
+export async function votePollApi(id: string, optionIndex: number): Promise<void> {
+  const { error } = await apiClient.post(`/posts/${id}/poll/vote`, { optionIndex });
+  if (error) throw error;
+}
+
+export async function resolveLostFoundApi(id: string): Promise<void> {
+  const { error } = await apiClient.post(`/posts/${id}/resolve`);
+  if (error) throw error;
+}
+
+export async function deleteCommentApi(postId: string, commentId: string): Promise<void> {
+  const { error } = await apiClient.delete(`/posts/${postId}/comments/${commentId}`);
+  if (error) throw error;
+}
+
+export async function setCommentLikedApi(postId: string, commentId: string, liked: boolean): Promise<void> {
+  const path = `/posts/${postId}/comments/${commentId}/like`;
+  const { error } = liked ? await apiClient.post(path) : await apiClient.delete(path);
   if (error) throw error;
 }

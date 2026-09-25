@@ -1,13 +1,25 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
 import { MessageCircle, Plus } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { PostCard } from "@/components/community/PostCard";
 import { CommunityEventCard } from "@/components/community/EventCard";
 import { useAuth } from "@/lib/auth-context";
 import { useApp } from "@/lib/app-context";
-import { useCommunityFeed, useUpcomingEvents } from "@/hooks/use-community";
+import { useCommunityFeed, useSavedPosts, useUpcomingEvents } from "@/hooks/use-community";
+
+type Tab = "all" | "LOST_FOUND" | "ANNOUNCEMENT" | "POLL" | "saved";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "POLL", label: "Polls" },
+  { id: "LOST_FOUND", label: "Lost & found" },
+  { id: "ANNOUNCEMENT", label: "Announcements" },
+  { id: "saved", label: "Saved" },
+];
 
 export default function CommunityFeedPage() {
   const router = useRouter();
@@ -16,10 +28,14 @@ export default function CommunityFeedPage() {
   const campusId = selectedCampus?.id ?? "";
   const feed = useCommunityFeed(campusId);
   const events = useUpcomingEvents(campusId);
+  const [tab, setTab] = useState<Tab>("all");
+  const saved = useSavedPosts(tab === "saved");
 
   if (!user) return null;
 
-  const posts = feed.data?.items ?? [];
+  const source = tab === "saved" ? saved : feed;
+  const allPosts = tab === "saved" ? (saved.data ?? []) : (feed.data?.items ?? []);
+  const posts = tab === "all" || tab === "saved" ? allPosts : allPosts.filter((p) => p.kind === tab);
 
   return (
     <PageContainer className="space-y-4">
@@ -50,7 +66,23 @@ export default function CommunityFeedPage() {
         </button>
       </div>
 
-      {events.data && events.data.length > 0 && (
+      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setTab(t.id)}
+            className={cn(
+              "shrink-0 rounded-xl px-3 py-2 text-xs font-semibold",
+              tab === t.id ? "bg-kampmax-navy text-white" : "border border-kampmax-border bg-white text-kampmax-text-secondary"
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "all" && events.data && events.data.length > 0 && (
         <section className="space-y-2">
           <h2 className="text-xs font-bold uppercase tracking-wider text-kampmax-text-secondary px-1">Upcoming events</h2>
           {events.data.slice(0, 3).map((event) => (
@@ -59,12 +91,12 @@ export default function CommunityFeedPage() {
         </section>
       )}
 
-      {feed.isLoading ? (
+      {source.isLoading ? (
         <p className="text-sm text-kampmax-text-secondary text-center py-12">Loading posts…</p>
-      ) : feed.isError ? (
+      ) : source.isError ? (
         <div className="bg-white rounded-xl border border-kampmax-border p-8 text-center">
           <p className="text-sm font-medium text-kampmax-text">Couldn&apos;t load the community feed.</p>
-          <button type="button" onClick={() => feed.refetch()} className="mt-2 text-sm text-kampmax-blue font-medium">
+          <button type="button" onClick={() => source.refetch()} className="mt-2 text-sm text-kampmax-blue font-medium">
             Try again
           </button>
         </div>

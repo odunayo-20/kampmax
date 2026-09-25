@@ -1,16 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { MessageCircle, Send } from "lucide-react";
+import { Heart, MessageCircle, Send, Trash2 } from "lucide-react";
 import { cn, timeAgo } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
-import { useAddComment, usePostComments } from "@/hooks/use-community";
+import { useAddComment, useDeleteComment, usePostComments, useToggleCommentLike } from "@/hooks/use-community";
 
 export function CommentSection({ postId }: { postId: string }) {
   const { user } = useAuth();
   const [text, setText] = useState("");
   const comments = usePostComments(postId);
   const add = useAddComment(postId);
+  const like = useToggleCommentLike();
+  const del = useDeleteComment();
 
   if (!user) return null;
 
@@ -45,6 +47,29 @@ export function CommentSection({ postId }: { postId: string }) {
                   <span className="text-[9px] text-kampmax-text-secondary">{timeAgo(comment.createdAt)}</span>
                 </div>
                 <p className="text-sm text-kampmax-text leading-relaxed break-words">{comment.content}</p>
+                <div className="mt-1 flex items-center gap-3">
+                  <button
+                    type="button"
+                    disabled={like.isPending}
+                    onClick={() => like.mutate({ postId, commentId: comment.id, liked: !comment.likedByMe })}
+                    aria-pressed={comment.likedByMe}
+                    className={cn("flex items-center gap-1 text-[10px] font-medium", comment.likedByMe ? "text-kampmax-blue" : "text-kampmax-text-secondary/70")}
+                  >
+                    <Heart className={cn("h-3 w-3", comment.likedByMe && "fill-kampmax-blue")} />
+                    {comment.likeCount > 0 && comment.likeCount}
+                  </button>
+                  {comment.authorId === user.id && (
+                    <button
+                      type="button"
+                      disabled={del.isPending}
+                      onClick={() => del.mutate({ postId, commentId: comment.id })}
+                      aria-label="Delete comment"
+                      className="text-kampmax-text-secondary/70 hover:text-kampmax-error"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
               </div>
             </li>
           ))}

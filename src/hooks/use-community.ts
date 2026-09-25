@@ -6,6 +6,12 @@ import { communityEventKeys, communityKeys } from "@/lib/query-keys";
 import {
   addCommentApi,
   createEventApi,
+  deleteCommentApi,
+  fetchSavedPosts,
+  resolveLostFoundApi,
+  setCommentLikedApi,
+  setPostSavedApi,
+  votePollApi,
   createPostApi,
   deletePostApi,
   fetchComments,
@@ -113,3 +119,32 @@ export function useToggleEventAttendance() {
     onSettled: () => queryClient.invalidateQueries({ queryKey: communityEventKeys.all }),
   });
 }
+
+export function useSavedPosts(enabled: boolean) {
+  const { status } = useAuth();
+  return useQuery({
+    queryKey: communityKeys.saved(),
+    enabled: enabled && status === "authenticated",
+    queryFn: fetchSavedPosts,
+  });
+}
+
+function useCommunityMutation<V>(fn: (v: V) => Promise<unknown>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSettled: () => queryClient.invalidateQueries({ queryKey: communityKeys.all }),
+  });
+}
+
+export const useToggleSavePost = () =>
+  useCommunityMutation((v: { id: string; saved: boolean }) => setPostSavedApi(v.id, v.saved));
+export const useVotePoll = () =>
+  useCommunityMutation((v: { id: string; optionIndex: number }) => votePollApi(v.id, v.optionIndex));
+export const useResolveLostFound = () => useCommunityMutation((id: string) => resolveLostFoundApi(id));
+export const useDeleteComment = () =>
+  useCommunityMutation((v: { postId: string; commentId: string }) => deleteCommentApi(v.postId, v.commentId));
+export const useToggleCommentLike = () =>
+  useCommunityMutation((v: { postId: string; commentId: string; liked: boolean }) =>
+    setCommentLikedApi(v.postId, v.commentId, v.liked)
+  );

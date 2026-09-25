@@ -788,6 +788,7 @@ export const communityKeys = {
   all: ["community"] as const,
   feed: (campusId: string) => ["community", "feed", campusId] as const,
   post: (id: string) => ["community", "post", id] as const,
+  saved: () => ["community", "saved"] as const,
   comments: (id: string) => ["community", "comments", id] as const,
 };
 
