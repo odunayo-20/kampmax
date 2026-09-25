@@ -3,12 +3,10 @@
 import { useState } from "react";
 import Image from "next/image";
 import { Review, ReviewReportReason } from "@/types";
-import { getUserById } from "@/services/users";
-import { toggleHelpful, reportReview, hasUserReportedReview } from "@/services/reviews";
+import { useReportPublicReview } from "@/hooks/use-target-reviews";
 import { useAuth } from "@/lib/auth-context";
 import { StarRating } from "./StarRating";
 import { ReviewImageGallery } from "./ReviewImageGallery";
-import { HelpfulButton } from "./HelpfulButton";
 import { ReportReviewModal } from "./ReportReviewModal";
 import { cn, timeAgo } from "@/lib/utils";
 import { ShieldCheck, MoreHorizontal, Flag } from "lucide-react";
@@ -23,20 +21,18 @@ export function ReviewCard({ review, onRefresh }: ReviewCardProps) {
   const [showReport, setShowReport] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
 
-  const author = getUserById(review.userId);
-  const isHelpful = user ? (review.helpfulBy || []).includes(user.id) : false;
-  const isReported = user ? hasUserReportedReview(review.id, user.id) : false;
+  const authorName = review.authorName;
+  const reportMutation = useReportPublicReview();
+  const isReported = reportMutation.isSuccess || Boolean(review.reportedBy?.length);
 
-  function handleHelpful() {
+  async function handleReport(reason: ReviewReportReason, details: string) {
     if (!user) return;
-    toggleHelpful(review.id, user.id);
-    onRefresh?.();
-  }
-
-  function handleReport(reason: ReviewReportReason, details: string) {
-    if (!user) return;
-    reportReview(review.id, user.id, reason, details);
-    onRefresh?.();
+    try {
+      await reportMutation.mutateAsync({ reviewId: review.id, reason, details });
+      onRefresh?.();
+    } catch {
+      // The modal stays usable; the review is simply not reported.
+    }
   }
 
   return (
@@ -45,12 +41,12 @@ export function ReviewCard({ review, onRefresh }: ReviewCardProps) {
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-full bg-kampmax-blue/10 flex items-center justify-center text-xs font-bold text-kampmax-blue">
-              {author ? author.name.charAt(0) : "?"}
+              {authorName ? authorName.charAt(0) : "?"}
             </div>
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="text-sm font-medium text-kampmax-text">
-                  {author?.name || "Anonymous"}
+                  {authorName || "Customer"}
                 </span>
                 {review.verifiedPurchase && (
                   <span className="flex items-center gap-0.5 text-[10px] font-medium text-kampmax-blue bg-kampmax-blue/5 px-1.5 py-0.5 rounded">
@@ -127,13 +123,6 @@ export function ReviewCard({ review, onRefresh }: ReviewCardProps) {
           </div>
         )}
 
-        <div className="flex items-center gap-2 mt-3">
-          <HelpfulButton
-            count={review.helpfulCount}
-            isHelpful={isHelpful}
-            onToggle={handleHelpful}
-          />
-        </div>
       </div>
 
       <ReportReviewModal

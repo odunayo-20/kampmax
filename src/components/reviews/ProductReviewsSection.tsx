@@ -5,7 +5,6 @@ import {
   Star,
   ShieldCheck,
   MessageSquare,
-  ThumbsUp,
   Flag,
   ChevronDown,
   Sparkles,
@@ -18,14 +17,12 @@ import { ReviewImageGallery } from "@/components/reviews/ReviewImageGallery";
 import { cn } from "@/lib/utils";
 import { timeAgo } from "@/lib/utils";
 import {
-  getReviewsByProduct,
-  getReviewsByVendor,
-  getReviewSummary,
-  toggleHelpful,
-  hasUserReviewedProduct,
-  hasUserReviewedVendor,
-  reportReviewApi,
-} from "@/services/reviews";
+  reviewedKey,
+  useMyReviewedTargets,
+  useReportPublicReview,
+  useTargetReviewSummary,
+  useTargetReviews,
+} from "@/hooks/use-target-reviews";
 import type { Review, ReviewSortOption } from "@/types";
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -48,13 +45,12 @@ interface ProductReviewsSectionProps {
 }
 
 type TabValue = "product" | "store";
-type SortOption = "recent" | "highest" | "lowest" | "helpful";
+type SortOption = "recent" | "highest" | "lowest";
 
 const SORT_LABELS: Record<SortOption, string> = {
   recent: "Most Recent",
   highest: "Highest Rated",
   lowest: "Lowest Rated",
-  helpful: "Most Helpful",
 };
 
 const PAGE_SIZE = 5;
@@ -106,16 +102,14 @@ function RatingBar({
 function ReviewCard({
   review,
   userId,
-  onHelpful,
   onReport,
 }: {
   review: Review;
   userId: string | null;
-  onHelpful: (reviewId: string) => void;
   onReport: (reviewId: string) => void;
 }) {
-  const initials = review.userId.slice(0, 2).toUpperCase();
-  const alreadyHelpful = userId ? (review.helpfulBy ?? []).includes(userId) : false;
+  const displayName = review.authorName || "Customer";
+  const initials = displayName.slice(0, 2).toUpperCase();
 
   return (
     <article className="rounded-xl border border-kampmax-border bg-white p-4 transition-shadow hover:shadow-sm">
@@ -128,8 +122,7 @@ function ReviewCard({
           <div>
             <div className="flex items-center gap-1.5">
               <span className="text-sm font-semibold text-kampmax-text">
-                {/* anonymised — real names come from backend */}
-                Customer
+                {displayName}
               </span>
               {review.verifiedPurchase && (
                 <span className="inline-flex items-center gap-0.5 rounded-full bg-green-50 px-1.5 py-0.5 text-[10px] font-semibold text-green-600">
@@ -175,21 +168,6 @@ function ReviewCard({
 
       {/* Actions */}
       <div className="mt-3 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => onHelpful(review.id)}
-          aria-pressed={alreadyHelpful}
-          className={cn(
-            "inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors",
-            alreadyHelpful
-              ? "bg-kampmax-blue/10 text-kampmax-blue"
-              : "text-kampmax-text-secondary hover:bg-kampmax-muted hover:text-kampmax-text"
-          )}
-        >
-          <ThumbsUp className="h-3.5 w-3.5" aria-hidden />
-          Helpful {review.helpfulCount > 0 && `(${review.helpfulCount})`}
-        </button>
-
         {userId && (
           <button
             type="button"
@@ -226,29 +204,34 @@ export function ProductReviewsSection({
   const [reportTarget, setReportTarget] = useState<string | null>(null);
   const [sortOpen, setSortOpen] = useState(false);
 
-  // ── Data ────────────────────────────────────────────────────────────────
-  const rawReviews = tab === "product"
-    ? getReviewsByProduct(productId)
-    : getReviewsByVendor(vendorId);
+  // ── Data (live API) ─────────────────────────────────────────────────────
+  const kind = tab === "product" ? "product" : "vendor";
+  const targetId = tab === "product" ? productId : vendorId;
+  const reviewsQuery = useTargetReviews(kind, targetId);
+  const summaryQuery = useTargetReviewSummary(kind, targetId);
+  const myReviewed = useMyReviewedTargets();
+  const reportMutation = useReportPublicReview();
 
-  const summary = getReviewSummary(tab === "product" ? productId : vendorId, tab === "product" ? "product" : "vendor");
+  const rawReviews = reviewsQuery.data ?? [];
+  const summary = summaryQuery.data ?? {
+    averageRating: 0,
+    totalReviews: 0,
+    breakdown: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
+    recommendPercentage: 0,
+  };
 
   const alreadyReviewed = userId
-    ? tab === "product"
-      ? hasUserReviewedProduct(userId, productId)
-      : hasUserReviewedVendor(userId, vendorId)
+    ? Boolean(myReviewed.data?.has(reviewedKey(kind, targetId)))
     : false;
 
   // ── Filter + sort ────────────────────────────────────────────────────────
   let filtered = starFilter ? rawReviews.filter((r) => r.rating === starFilter) : rawReviews;
-  const sortFns: Record<string, (a: Review, b: Review) => number> = {
-    recent: (a: Review, b: Review) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    highest: (a: Review, b: Review) => b.rating - a.rating,
-    lowest: (a: Review, b: Review) => a.rating - b.rating,
-    helpful: (a: Review, b: Review) => b.helpfulCount - a.helpfulCount,
+  const sortFns: Record<SortOption, (a: Review, b: Review) => number> = {
+    recent: (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    highest: (a, b) => b.rating - a.rating,
+    lowest: (a, b) => a.rating - b.rating,
   };
-  const sortFn = sortFns[sort] || sortFns.recent;
-  filtered = [...filtered].sort(sortFn);
+  filtered = [...filtered].sort(sortFns[sort] ?? sortFns.recent);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -258,22 +241,19 @@ export function ProductReviewsSection({
   useEffect(() => { setPage(1); }, [tab, sort, starFilter, tick]);
 
   // ── Actions ──────────────────────────────────────────────────────────────
-  const handleHelpful = useCallback((reviewId: string) => {
-    if (!userId) return;
-    toggleHelpful(reviewId, userId);
-    setTick((t) => t + 1);
-  }, [userId]);
-
   const handleReport = useCallback((reviewId: string) => {
     setReportTarget(reviewId);
   }, []);
 
   const handleReportSubmit = useCallback(async (reason: string, details?: string) => {
     if (!reportTarget || !userId) return;
-    await reportReviewApi(reportTarget, reason, details);
-    setReportTarget(null);
-    setTick((t) => t + 1);
-  }, [reportTarget, userId]);
+    try {
+      await reportMutation.mutateAsync({ reviewId: reportTarget, reason, details });
+    } finally {
+      setReportTarget(null);
+      setTick((t) => t + 1);
+    }
+  }, [reportTarget, userId, reportMutation]);
 
   // ── Write review button logic ─────────────────────────────────────────
   const canWriteReview = userId && isVerifiedBuyer && !alreadyReviewed;
@@ -423,7 +403,6 @@ export function ProductReviewsSection({
               key={review.id}
               review={review}
               userId={userId}
-              onHelpful={handleHelpful}
               onReport={handleReport}
             />
           ))}

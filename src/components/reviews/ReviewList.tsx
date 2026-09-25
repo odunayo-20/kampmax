@@ -20,8 +20,6 @@ const sortOptions: { value: ReviewSortOption; label: string }[] = [
   { value: "recent", label: "Most Recent" },
   { value: "highest", label: "Highest Rated" },
   { value: "lowest", label: "Lowest Rated" },
-  { value: "helpful", label: "Most Helpful" },
-  { value: "with_images", label: "With Photos" },
 ];
 
 export function ReviewList({

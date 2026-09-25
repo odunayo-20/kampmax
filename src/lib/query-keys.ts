@@ -774,3 +774,11 @@ export const vendorCustomerKeys = {
   detail: (id: string) => ["vendor-customers", "detail", id] as const,
   notes: (id: string) => ["vendor-customers", "notes", id] as const,
 };
+
+/** Public (customer-facing) reviews of products and stores. */
+export const targetReviewKeys = {
+  all: ["target-reviews"] as const,
+  list: (kind: string, id: string) => ["target-reviews", "list", kind, id] as const,
+  summary: (kind: string, id: string) => ["target-reviews", "summary", kind, id] as const,
+  mine: () => ["target-reviews", "mine"] as const,
+};

@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { X, Camera, Send, Check } from "lucide-react";
+import { X, Send, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StarRating } from "./StarRating";
-import { addReview } from "@/services/reviews";
+import { useSubmitReview } from "@/hooks/use-target-reviews";
 import { useAuth } from "@/lib/auth-context";
 
 interface ReviewFormProps {
@@ -41,23 +41,28 @@ export function ReviewForm({
   const [title, setTitle] = useState("");
   const [comment, setComment] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const submitReview = useSubmitReview();
 
   if (!isOpen) return null;
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!user || rating === 0 || comment.trim().length < 10) return;
+    setError(null);
 
-    addReview({
-      targetId,
-      target,
-      userId: user.id,
-      rating,
-      title: title.trim() || undefined,
-      comment: comment.trim(),
-      vendorId,
-      productId,
-      orderId,
-    });
+    try {
+      await submitReview.mutateAsync({
+        kind: target,
+        targetId,
+        rating,
+        title: title.trim() || undefined,
+        comment: comment.trim(),
+      });
+    } catch (err) {
+      // e.g. "You can only review products you have purchased and received"
+      setError(err instanceof Error ? err.message : "We couldn't post your review.");
+      return;
+    }
 
     setSubmitted(true);
     setTimeout(() => {
@@ -163,27 +168,19 @@ export function ReviewForm({
               </div>
             </div>
 
-            {/* Image upload placeholder */}
-            <div>
-              <p className="text-xs font-medium text-kampmax-text-secondary mb-1.5">
-                Add photos (optional)
-              </p>
-              <button className="w-20 h-20 rounded-lg border-2 border-dashed border-kampmax-border flex flex-col items-center justify-center gap-1 text-kampmax-text-secondary hover:border-kampmax-blue hover:text-kampmax-blue transition-colors">
-                <Camera className="h-5 w-5" />
-                <span className="text-[10px]">Add Photo</span>
-              </button>
-              <p className="text-[10px] text-kampmax-text-secondary mt-1">
-                JPG, PNG up to 5MB. Max 5 photos.
-              </p>
-            </div>
           </div>
         )}
 
         {!submitted && (
           <div className="shrink-0 border-t border-kampmax-border px-4 py-3">
+            {error && (
+              <p role="alert" className="mb-2 rounded-lg bg-kampmax-error/10 px-3 py-2 text-xs font-medium text-kampmax-error">
+                {error}
+              </p>
+            )}
             <button
               onClick={handleSubmit}
-              disabled={!isValid}
+              disabled={!isValid || submitReview.isPending}
               className={cn(
                 "w-full py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors",
                 isValid
