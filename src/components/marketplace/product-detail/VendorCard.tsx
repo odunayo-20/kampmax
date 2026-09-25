@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Store, MessageCircle, MapPin, ShieldCheck, Star } from "lucide-react";
 import { Avatar, Button } from "@/components/ui";
 import { useAuth } from "@/lib/auth-context";
-import { getOrCreateDirectConversation } from "@/services/messages";
+import { openVendorConversation } from "@/services/messages-api";
 
 interface VendorCardProps {
   vendor: {
@@ -40,16 +40,14 @@ export function VendorCard({
 
   if (!vendor) return null;
 
-  const targetUserId = vendor.userId || vendor.id;
-
-  function handleMessageVendor() {
+  async function handleMessageVendor() {
     if (status !== "authenticated" || !user) {
       router.push(`/login?returnTo=${encodeURIComponent(window.location.pathname)}`);
       return;
     }
 
-    const result = getOrCreateDirectConversation(user.id, targetUserId);
-    if (result && result.conversation) {
+    try {
+      const conversationId = await openVendorConversation(vendor!.id);
       // Build a query string so the chat page can auto-populate the product context
       const params = new URLSearchParams();
       if (productId) params.set("productId", productId);
@@ -57,8 +55,8 @@ export function VendorCard({
       if (productPrice !== undefined) params.set("productPrice", String(productPrice));
       if (productImage) params.set("productImage", productImage);
       const qs = params.toString();
-      router.push(`/chat/${result.conversation.id}${qs ? `?${qs}` : ""}`);
-    } else {
+      router.push(`/chat/${conversationId}${qs ? `?${qs}` : ""}`);
+    } catch {
       router.push("/chat");
     }
   }

@@ -22,7 +22,7 @@ import { useCart } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
 import { isWishlisted, toggleWishlist } from "@/services/wishlist";
 import { getVendorById } from "@/services/users";
-import { getOrCreateDirectConversation } from "@/services/messages";
+import { openVendorConversation } from "@/services/messages-api";
 import { addRecentlyViewed } from "@/services/recently-viewed";
 import { Button } from "@/components/ui";
 
@@ -84,21 +84,20 @@ export function QuickViewModal({ product, onClose }: QuickViewModalProps) {
     setTimeout(() => setAddedToast(false), 3000);
   }
 
-  function handleMessageVendor() {
+  async function handleMessageVendor() {
     if (status !== "authenticated" || !user) {
       router.push(`/login?returnTo=${encodeURIComponent(`/marketplace/${product!.id}`)}`);
       return;
     }
-    const targetUserId = vendor?.userId || vendor?.id || product!.vendorId;
-    const result = getOrCreateDirectConversation(user.id, targetUserId);
-    if (result && result.conversation) {
+    try {
+      const conversationId = await openVendorConversation(product!.vendorId);
       const params = new URLSearchParams();
       params.set("productId", product!.id);
       params.set("productTitle", product!.title);
       params.set("productPrice", String(product!.price));
       if (images[0]) params.set("productImage", images[0]);
-      router.push(`/chat/${result.conversation.id}?${params.toString()}`);
-    } else {
+      router.push(`/chat/${conversationId}?${params.toString()}`);
+    } catch {
       router.push("/chat");
     }
   }

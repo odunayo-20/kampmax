@@ -1,38 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  InfiniteData,
-  useInfiniteQuery,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { MessageListFilters, messageKeys } from "@/lib/query-keys";
 import {
-  getConversationForUser,
-  getMessages,
-  getTotalUnreadCount,
-  markAllAsRead,
-  markAsRead,
-  searchConversations,
-  sendMessage,
-} from "@/services/messages";
+  fetchConversation,
+  fetchConversations,
+  fetchMessagesPage,
+  fetchUnreadTotal,
+  markConversationReadApi,
+  sendMessageApi,
+} from "@/services/messages-api";
 import { Conversation, Message } from "@/types";
-import {
-  CONVERSATIONS_PAGE_SIZE,
-  MESSAGE_SEND_MIN_DELAY_MS,
-  MESSAGES_PAGE_SIZE,
-} from "@/config/messaging";
+import { CONVERSATIONS_PAGE_SIZE, MESSAGES_PAGE_SIZE } from "@/config/messaging";
 
-/**
- * Simulates network latency for the sync, in-memory store so the UI
- * exercises the same loading states it will against the real API.
- */
-function delay(ms = 250): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+/** There is no push channel yet, so open views poll at these cadences. */
+const THREAD_POLL_MS = 5_000;
+const LIST_POLL_MS = 15_000;
 
 /**
  * Debounced search value so the conversations query key changes at most
@@ -58,37 +43,46 @@ export interface MessagePagePayload {
   olderCursor: number | null;
 }
 
-type MessageThreadQueryKey = readonly ["messages", "thread", string, string];
+function useSessionUserId() {
+  const { status, user } = useAuth();
+  const userId = user?.id ?? null;
+  return { userId, enabled: status === "authenticated" && !!userId };
+}
 
 // ────────────────────────────────────────────────────────────────
 // Reads
 // ────────────────────────────────────────────────────────────────
 
+/** Does this conversation match the inbox search (peer name, store name or last message)? */
+function matchesSearch(conversation: Conversation, userId: string, needle: string): boolean {
+  if (conversation.lastMessage?.text.toLowerCase().includes(needle)) return true;
+  if (conversation.vendorName?.toLowerCase().includes(needle)) return true;
+  return conversation.participants.some(
+    (id) => id !== userId && (conversation.participantNames?.[id] ?? "").toLowerCase().includes(needle)
+  );
+}
+
 /**
- * Multi-page conversation list. `enabled` only turns the query on after a
- * session is authenticated. Search is folded into the query key: each
- * debounced search term is its own cached query.
+ * Multi-page conversation list (newest activity first). Search is applied
+ * over the loaded pages, so each debounced term is its own cached query.
  */
 export function useConversations(
   filters: MessageListFilters = { search: "" },
   options?: { pageSize?: number }
 ) {
-  const { status, user } = useAuth();
-  const userId = user?.id ?? null;
-  const enabled = status === "authenticated" && !!userId;
+  const { userId, enabled } = useSessionUserId();
   const pageSize = options?.pageSize ?? CONVERSATIONS_PAGE_SIZE;
+  const needle = filters.search.trim().toLowerCase();
 
   return useInfiniteQuery({
     queryKey: messageKeys.conversations(userId ?? "", filters),
     enabled,
-    initialPageParam: 0,
+    initialPageParam: 1,
+    refetchInterval: LIST_POLL_MS,
     queryFn: async ({ pageParam }): Promise<ConversationPagePayload> => {
-      await delay();
-      const all = searchConversations(userId!, filters.search);
-      const items = all.slice(pageParam, pageParam + pageSize);
-      const nextCursor =
-        pageParam + pageSize < all.length ? pageParam + pageSize : null;
-      return { items, nextCursor, hasMore: nextCursor !== null };
+      const res = await fetchConversations(pageParam, pageSize);
+      const items = needle ? res.items.filter((c) => matchesSearch(c, userId!, needle)) : res.items;
+      return { items, nextCursor: res.hasMore ? pageParam + 1 : null, hasMore: res.hasMore };
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     select: (data) => ({
@@ -100,138 +94,85 @@ export function useConversations(
 }
 
 /**
- * Single, membership-checked conversation. The service returns `undefined`
- * for conversations the session user does not belong to (or that don't
- * exist) and both surface as a NOT_FOUND so the UI never reveals the
- * existence of private conversations.
+ * Single conversation, verified server-side. A missing conversation and one
+ * the user doesn't belong to are indistinguishable (both surface as NOT_FOUND)
+ * so the existence of private chats is never revealed.
  */
 export function useConversation(conversationId: string) {
-  const { status, user } = useAuth();
-  const userId = user?.id ?? null;
-  const enabled = status === "authenticated" && !!userId && !!conversationId;
+  const { userId, enabled: authed } = useSessionUserId();
 
   return useQuery({
     queryKey: messageKeys.conversation(conversationId, userId ?? ""),
-    enabled,
+    enabled: authed && !!conversationId,
     queryFn: async () => {
-      await delay(0);
-      const conversation = getConversationForUser(conversationId, userId!);
-      if (!conversation) {
-        throw Object.assign(new Error("Conversation not found"), {
-          code: "NOT_FOUND",
-        });
+      try {
+        return await fetchConversation(conversationId);
+      } catch {
+        throw Object.assign(new Error("Conversation not found"), { code: "NOT_FOUND" });
       }
-      return conversation;
     },
+    retry: false,
   });
 }
 
 /**
- * Newest-last, cursor-paged message thread. The first page holds the most
- * recent `pageSize` messages (ascending); older pages are fetched backwards
- * via `fetchPreviousPage`. Only enabled once the session user is confirmed a
- * participant, so message content is never fetched for unauthorised ids.
+ * Newest-last message thread. The first page holds the most recent messages;
+ * older pages load backwards via `fetchPreviousPage`. Only enabled once the
+ * user is confirmed a participant.
  */
 export function useMessages(
   conversationId: string,
   isParticipant: boolean,
   options?: { pageSize?: number }
 ) {
-  const { status, user } = useAuth();
-  const userId = user?.id ?? null;
-  const enabled =
-    status === "authenticated" && !!userId && !!conversationId && isParticipant;
+  const { userId, enabled: authed } = useSessionUserId();
+  const enabled = authed && !!conversationId && isParticipant;
   const pageSize = options?.pageSize ?? MESSAGES_PAGE_SIZE;
 
   return useInfiniteQuery<
-    MessagePagePayload,
+    MessagePagePayload & { page: number },
     Error,
-    {
-      pages: MessagePagePayload[];
-      pageParams: number[];
-      flattened: Message[];
-    },
-    MessageThreadQueryKey,
+    { pages: MessagePagePayload[]; pageParams: number[]; flattened: Message[] },
+    ReturnType<typeof messageKeys.thread>,
     number
   >({
     queryKey: messageKeys.thread(conversationId, userId ?? ""),
     enabled,
-    initialPageParam: 0,
-    queryFn: async ({ pageParam }): Promise<MessagePagePayload> => {
-      await delay();
-      const all = getMessages(conversationId!);
-      const end = Math.max(0, all.length - pageParam);
-      const start = Math.max(0, end - pageSize);
-      const items = all.slice(start, end);
-      const olderCursor = start > 0 ? pageParam + pageSize : null;
-      return { items, olderCursor };
+    initialPageParam: 1,
+    refetchInterval: THREAD_POLL_MS,
+    queryFn: async ({ pageParam }) => {
+      const res = await fetchMessagesPage(conversationId, pageParam, pageSize);
+      return {
+        items: res.items,
+        olderCursor: res.hasOlder ? pageParam + 1 : null,
+        page: pageParam,
+      };
     },
-    // A newest-last thread only ever loads older pages, so there is no
-    // "next" (newer) direction.
+    // Newest-last thread: only older pages are ever requested.
     getNextPageParam: () => null,
     getPreviousPageParam: (firstPage) => firstPage.olderCursor,
-    select: (data) => ({
-      pages: data.pages,
-      pageParams: data.pageParams,
-      flattened: data.pages.flatMap((page) => page.items),
-    }),
+    select: (data) => {
+      // Server page 1 = newest; keep pages ordered oldest → newest for display.
+      const ordered = [...data.pages].sort((a, b) => b.page - a.page);
+      return {
+        pages: ordered,
+        pageParams: data.pageParams,
+        flattened: ordered.flatMap((page) => page.items),
+      };
+    },
   });
 }
 
-/**
- * Shared header/badge counter. A separate key means bumping the badge never
- * refetches the full list or any thread.
- */
+/** Shared header/badge counter (separate key so bumping it never refetches threads). */
 export function useUnreadMessageCount() {
-  const { status, user } = useAuth();
-  const userId = user?.id ?? null;
-  const enabled = status === "authenticated" && !!userId;
+  const { userId, enabled } = useSessionUserId();
 
   return useQuery({
     queryKey: messageKeys.unreadCount(userId ?? ""),
     enabled,
-    queryFn: async () => {
-      await delay(0);
-      return getTotalUnreadCount(userId!);
-    },
+    refetchInterval: LIST_POLL_MS,
+    queryFn: fetchUnreadTotal,
   });
-}
-
-// ────────────────────────────────────────────────────────────────
-// Cache helpers
-// ────────────────────────────────────────────────────────────────
-
-type ThreadData = InfiniteData<MessagePagePayload, number>;
-type ConversationsData = InfiniteData<ConversationPagePayload, number>;
-
-const CONVERSATIONS_QUERY_PREFIX = ["messages", "conversations"] as const;
-
-function setThreadQueriesData(
-  queryClient: ReturnType<typeof useQueryClient>,
-  userId: string,
-  conversationId: string,
-  updater: (data: ThreadData | undefined) => ThreadData | undefined
-): void {
-  queryClient.setQueriesData<ThreadData>(
-    { queryKey: messageKeys.thread(conversationId, userId) },
-    updater
-  );
-}
-
-function setConversationsQueriesData(
-  queryClient: ReturnType<typeof useQueryClient>,
-  userId: string,
-  updater: (data: ConversationsData | undefined) => ConversationsData | undefined
-): void {
-  queryClient.setQueriesData<ConversationsData>(
-    {
-      queryKey: [
-        ...CONVERSATIONS_QUERY_PREFIX,
-        userId,
-      ] as const,
-    },
-    updater
-  );
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -244,58 +185,17 @@ export interface SendMessageInput {
 }
 
 /**
- * Sends a message to a conversation. The sender identity comes from the
- * authenticated session (never from the client input — mass-assignment
- * safe), ids are generated by the store, and the conversation is only
- * written when the session user is a member. The composer stays disabled
- * while pending and only clears after this resolves, so a failure never
- * loses the draft.
+ * Sends a message. The sender comes from the session on the server (never the
+ * client). The composer stays disabled while pending and only clears after
+ * this resolves, so a failure never loses the draft.
  */
 export function useSendMessage() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
-  const userId = user?.id ?? null;
+  const { userId } = useSessionUserId();
 
   return useMutation({
-    mutationFn: async ({ conversationId, text }: SendMessageInput): Promise<Message> => {
-      await delay(MESSAGE_SEND_MIN_DELAY_MS);
-      return sendMessage(conversationId, userId!, text);
-    },
-    onSuccess: (message, { conversationId }) => {
-      if (!userId) return;
-      // Append to the newest page of the open thread so the message appears
-      // immediately; the conversations preview refreshes on settle.
-      setThreadQueriesData(queryClient, userId, conversationId, (data) => {
-        if (!data) return data;
-        const newestPageIndex = data.pages.length - 1;
-        return {
-          ...data,
-          pages: data.pages.map((page, index) =>
-            index === newestPageIndex
-              ? { ...page, items: [...page.items, message] }
-              : page
-          ),
-        };
-      });
-      setConversationsQueriesData(queryClient, userId, (data) => {
-        if (!data) return data;
-        return {
-          ...data,
-          pages: data.pages.map((page) => ({
-            ...page,
-            items: page.items.map((conversation) =>
-              conversation.id === conversationId
-                ? {
-                    ...conversation,
-                    lastMessage: message,
-                    updatedAt: message.createdAt,
-                  }
-                : conversation
-            ),
-          })),
-        };
-      });
-    },
+    mutationFn: ({ conversationId, text }: SendMessageInput): Promise<Message> =>
+      sendMessageApi(conversationId, text),
     onSettled: () => {
       if (!userId) return;
       queryClient.invalidateQueries({ queryKey: messageKeys.all });
@@ -303,21 +203,14 @@ export function useSendMessage() {
   });
 }
 
-/**
- * Marks a conversation's incoming messages as read. The store only zeroes
- * the unread count for members and only flips messages from other
- * participants, matching what the real API will do server-side. Called once
- * per conversation open from a per-id effect — never per render.
- */
+/** Marks a conversation read once per open; refreshes badges and the list. */
 export function useMarkConversationAsRead() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
-  const userId = user?.id ?? null;
+  const { userId } = useSessionUserId();
 
   return useMutation({
     mutationFn: async (conversationId: string) => {
-      await delay(0);
-      markAsRead(conversationId, userId!);
+      await markConversationReadApi(conversationId);
       return conversationId;
     },
     onSettled: () => {
@@ -327,20 +220,17 @@ export function useMarkConversationAsRead() {
   });
 }
 
-/**
- * Marks every conversation in the session user's inbox as read. Unlike the
- * legacy version (which updated the store but never refreshed the UI), the
- * settle-time invalidation repaints the list and badge from the store.
- */
+/** Marks every unread conversation in the inbox as read. */
 export function useMarkAllMessagesAsRead() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
-  const userId = user?.id ?? null;
+  const { userId } = useSessionUserId();
 
   return useMutation({
     mutationFn: async () => {
-      await delay();
-      if (userId) markAllAsRead(userId);
+      const { items } = await fetchConversations(1, 100);
+      await Promise.all(
+        items.filter((c) => c.unreadCount > 0).map((c) => markConversationReadApi(c.id))
+      );
     },
     onSettled: () => {
       if (!userId) return;

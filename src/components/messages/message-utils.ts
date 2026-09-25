@@ -1,34 +1,32 @@
 import { Conversation } from "@/types";
-import { getUserById, getVendorByUserId } from "@/services/users";
 
 export interface ConversationPeer {
   id: string;
   name: string;
   isVendor: boolean;
   roleLabel: string;
-  vendor?: ReturnType<typeof getVendorByUserId>;
-  user?: ReturnType<typeof getUserById>;
 }
 
 /**
- * Resolves the other participant in a one-to-one conversation. Only public
- * profile data is exposed (store name / user name) — never email or phone.
+ * Resolves the other participant from API-supplied conversation data. Only
+ * public profile data (name / role) is exposed — never email or phone.
  */
 export function getConversationPeer(
   userId: string,
   conversation: Conversation
 ): ConversationPeer {
   const peerId = conversation.participants.find((p) => p !== userId) ?? "";
-  const vendor = peerId ? getVendorByUserId(peerId) : undefined;
-  const user = peerId ? getUserById(peerId) : undefined;
-  const isVendor = conversation.type === "vendor_chat" || !!vendor;
+  const peerRole = conversation.participantRoles?.[peerId];
+  const isVendor = conversation.type === "vendor_chat" && peerRole === "VENDOR";
+  const name =
+    (isVendor ? conversation.vendorName : undefined) ||
+    conversation.participantNames?.[peerId] ||
+    "Unknown";
   return {
     id: peerId,
-    name: vendor?.storeName || user?.name || "Unknown",
+    name,
     isVendor,
-    roleLabel: isVendor ? "Vendor" : "Student",
-    vendor,
-    user,
+    roleLabel: isVendor ? "Vendor" : peerRole === "VENDOR" ? "Vendor" : "Customer",
   };
 }
 

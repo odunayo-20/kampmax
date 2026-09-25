@@ -32,7 +32,7 @@ import { OpenDisputeModal } from "@/components/orders/OpenDisputeModal";
 import { ConfirmEscrowReleaseModal } from "@/components/orders/ConfirmEscrowReleaseModal";
 import { getOrderById, fetchOrderById, cancelOrderApi } from "@/services/orders";
 import { getVendorById } from "@/services/users";
-import { getOrCreateDirectConversation } from "@/services/messages";
+import { openVendorConversation } from "@/services/messages-api";
 import { useAuth } from "@/lib/auth-context";
 import { PICKUP_LOCATION_LABELS, PickupLocation, Order } from "@/types";
 import { formatDate } from "@/lib/utils";
@@ -163,11 +163,8 @@ export default function OrderDetailPage({
     }
   }
 
-  function handleContactVendor() {
+  async function handleContactVendor() {
     if (!order) return;
-    const currentUserId = user?.id || "u1";
-    const vendorUserId = vendor?.userId || vendor?.id || order.vendorId;
-    const result = getOrCreateDirectConversation(currentUserId, vendorUserId);
 
     const params = new URLSearchParams();
     params.set("orderId", order.id);
@@ -176,9 +173,10 @@ export default function OrderDetailPage({
       params.set("productTitle", order.items[0].product.title);
     }
 
-    if (result && result.conversation) {
-      router.push(`/chat/${result.conversation.id}?${params.toString()}`);
-    } else {
+    try {
+      const conversationId = await openVendorConversation(order.vendorId);
+      router.push(`/chat/${conversationId}?${params.toString()}`);
+    } catch {
       router.push(`/chat?${params.toString()}`);
     }
   }

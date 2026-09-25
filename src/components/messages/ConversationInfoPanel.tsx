@@ -1,9 +1,8 @@
 "use client";
 
-import { Store, Verified } from "lucide-react";
+import { Store } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
-import { getCampusById } from "@/services/campus";
 import { getProductById } from "@/services/products";
 import { Conversation } from "@/types";
 import { getConversationPeer } from "./message-utils";
@@ -17,7 +16,6 @@ import { getConversationPeer } from "./message-utils";
 export function ConversationInfoPanel({ conversation }: { conversation: Conversation }) {
   const { user } = useAuth();
   const peer = getConversationPeer(user!.id, conversation);
-  const campus = peer.user ? getCampusById(peer.user.campusId) : undefined;
   const relatedProduct = conversation.productId
     ? getProductById(conversation.productId)
     : undefined;
@@ -35,38 +33,9 @@ export function ConversationInfoPanel({ conversation }: { conversation: Conversa
         </div>
         <p className="text-sm font-bold text-kampmax-text flex items-center justify-center gap-1">
           {peer.name}
-          {(peer.isVendor ? peer.vendor?.verified : peer.user?.isVerified) && (
-            <Verified className="h-3.5 w-3.5 text-kampmax-blue flex-shrink-0" aria-label="Verified" />
-          )}
         </p>
         <p className="text-xs text-kampmax-text-secondary mt-0.5">{peer.roleLabel}</p>
       </div>
-
-      <div className="px-4 py-3 border-b border-kampmax-border text-xs text-kampmax-text-secondary space-y-2">
-        {peer.isVendor && peer.vendor && (
-          <p className="text-sm text-kampmax-text">{peer.vendor.description}</p>
-        )}
-        {peer.user && !peer.isVendor && (
-          <p className="text-sm text-kampmax-text">
-            {[peer.user.department, peer.user.level].filter(Boolean).join(" \u00b7 ")}
-          </p>
-        )}
-        {campus && <p className="text-xs">{campus.name}</p>}
-      </div>
-
-      {peer.isVendor && peer.vendor && (
-        <div className="px-4 py-3 border-b border-kampmax-border">
-          <p className="text-[10px] font-semibold text-kampmax-text-secondary uppercase mb-2">
-            Store info
-          </p>
-          <div className="space-y-2 text-xs text-kampmax-text">
-            <p className="flex items-center gap-1">
-              Rating: <strong>{peer.vendor.rating.toFixed(1)}</strong> / 5
-            </p>
-            <p>Specialties: {peer.vendor.specialties.join(", ")}</p>
-          </div>
-        </div>
-      )}
 
       <div className="px-4 py-3">
         <p className="text-[10px] font-semibold text-kampmax-text-secondary uppercase mb-2">

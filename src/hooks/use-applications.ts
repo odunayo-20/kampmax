@@ -16,7 +16,7 @@ import {
   rejectProposalApi,
   shortlistProposalApi,
 } from "@/services/proposals";
-import { getOrCreateDirectConversation } from "@/services/messages";
+import { openDirectConversation } from "@/services/messages-api";
 import type {
   EmployerApplicationStatus,
   EmployerApplicationsPage,
@@ -177,8 +177,11 @@ export function useCandidateConversation() {
   return useCallback(
     async (candidateId: string): Promise<string | null> => {
       if (!senderId) return null;
-      const result = getOrCreateDirectConversation(senderId, candidateId);
-      return result ? result.conversation.id : null;
+      try {
+        return await openDirectConversation(candidateId);
+      } catch {
+        return null;
+      }
     },
     [senderId]
   );

@@ -17,7 +17,6 @@ export function ConversationHeader({ conversation, infoOpen, onToggleInfo }: Con
   const router = useRouter();
   const { user } = useAuth();
   const peer = getConversationPeer(user!.id, conversation);
-  const verified = peer.isVendor ? peer.vendor?.verified : !!peer.user?.isVerified;
 
   return (
     <div className="bg-kampmax-navy px-3 py-2.5 flex items-center gap-3 flex-shrink-0 z-10">
@@ -42,7 +41,7 @@ export function ConversationHeader({ conversation, infoOpen, onToggleInfo }: Con
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-white truncate flex items-center gap-1.5">
           <span className="truncate">{peer.name}</span>
-          {verified && (
+          {false && (
             <Verified className="h-3.5 w-3.5 text-kampmax-gold flex-shrink-0" aria-label="Verified" />
           )}
         </p>

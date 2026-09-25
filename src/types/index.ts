@@ -379,6 +379,11 @@ export interface Conversation {
   id: string;
   type: ConversationType;
   participants: string[];
+  /** userId → display name / role, supplied by the API. */
+  participantNames?: Record<string, string>;
+  participantRoles?: Record<string, string>;
+  /** Store name for vendor chats. */
+  vendorName?: string;
   lastMessage?: Message;
   unreadCount: number;
   createdAt: string;

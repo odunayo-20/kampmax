@@ -5,8 +5,7 @@ import { useRouter } from "next/navigation";
 import { X, MessageCircle, Check } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/atoms/Button";
-import { getOrCreateDirectConversation, sendMessage } from "@/services/messages";
-import { getVendorById } from "@/services/users";
+import { openVendorConversation, sendMessageApi } from "@/services/messages-api";
 
 interface ContactStoreModalProps {
   isOpen: boolean;
@@ -48,24 +47,17 @@ export function ContactStoreModal({
     setSending(true);
 
     try {
-      const vendor = getVendorById(vendorId);
-      const targetUserId = vendor?.userId || vendorId;
-      const result = getOrCreateDirectConversation(user.id, targetUserId);
-
-      if (result?.conversation) {
-        sendMessage(result.conversation.id, user.id, message.trim());
+      const conversationId = await openVendorConversation(vendorId);
+      await sendMessageApi(conversationId, message.trim());
+      {
         setSending(false);
         setSent(true);
         setTimeout(() => {
           setSent(false);
           setMessage("");
           onClose();
-          router.push(`/chat/${result.conversation.id}`);
+          router.push(`/chat/${conversationId}`);
         }, 1000);
-      } else {
-        setSending(false);
-        onClose();
-        router.push("/chat");
       }
     } catch {
       setSending(false);
