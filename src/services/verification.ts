@@ -42,6 +42,33 @@ const mockVerificationStates: Record<string, KycVerificationState> = {
 // BACKEND API METHODS (Two-tier with mock fallback)
 // ============================================================
 
+interface BackendVendorDocument {
+  id: string;
+  type: string;
+  filename?: string | null;
+  status: "SUBMITTED" | "APPROVED" | "REJECTED";
+  rejectionReason?: string | null;
+  submittedAt: string;
+}
+
+function humanizeDocumentType(type: string): string {
+  const label = type.replace(/_/g, " ").toLowerCase();
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function mapBackendDocument(doc: BackendVendorDocument): KycDocument {
+  return {
+    id: doc.id,
+    type: doc.type as KycDocument["type"],
+    name: doc.filename || humanizeDocumentType(doc.type),
+    url: "",
+    status:
+      doc.status === "APPROVED" ? "approved" : doc.status === "REJECTED" ? "rejected" : "pending",
+    uploadedAt: doc.submittedAt,
+    rejectionReason: doc.rejectionReason ?? undefined,
+  };
+}
+
 /**
  * Fetch KYC verification status for the authenticated vendor.
  * GET /api/v1/vendors/me/verification/status
@@ -50,7 +77,11 @@ export async function fetchVendorKycStatus(): Promise<{
   data: KycVerificationState;
   error: ApiError | null;
 }> {
-  const { data, error } = await apiClient.get<any>("/vendors/me/verification/status");
+  const [statusRes, docsRes] = await Promise.all([
+    apiClient.get<any>("/vendors/me/verification/status"),
+    apiClient.get<BackendVendorDocument[]>("/vendors/me/documents"),
+  ]);
+  const { data, error } = statusRes;
   if (error || !data) {
     return { data: mockVerificationStates.vendor_default, error };
   }
@@ -59,11 +90,20 @@ export async function fetchVendorKycStatus(): Promise<{
   const status: KycStatus =
     statusRaw === "approved" || statusRaw === "verified"
       ? "verified"
-      : statusRaw === "pending_review" || statusRaw === "pending"
+      : statusRaw === "pending_review" ||
+        statusRaw === "pending" ||
+        statusRaw === "submitted" ||
+        statusRaw === "under_review"
       ? "pending_review"
       : statusRaw === "rejected"
       ? "rejected"
       : "unverified";
+
+  // The status endpoint only returns a requirements checklist; the actual
+  // uploaded documents come from the documents endpoint.
+  const documents: KycDocument[] = Array.isArray(docsRes.data)
+    ? docsRes.data.map(mapBackendDocument)
+    : [];
 
   const mapped: KycVerificationState = {
     userId: data.userId || "u1",
@@ -73,7 +113,7 @@ export async function fetchVendorKycStatus(): Promise<{
     bvnVerified: Boolean(data.bvnVerified || status === "verified"),
     phoneVerified: Boolean(data.phoneVerified ?? true),
     emailVerified: Boolean(data.emailVerified ?? true),
-    documents: data.documents || [],
+    documents,
     submittedAt: data.submittedAt,
     verifiedAt: data.verifiedAt,
     rejectionReason: data.rejectionReason,

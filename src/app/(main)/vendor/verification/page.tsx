@@ -243,33 +243,13 @@ export default function VendorVerificationPage() {
           )}
         </div>
 
-        {kycState.documents.length === 0 && !isVerified ? (
+        {kycState.documents.length === 0 ? (
           <div className="rounded-xl border border-dashed border-neutral-200 p-6 text-center text-xs text-neutral-400">
             No compliance documents uploaded yet. Click "Start Verification" above to upload your NIN slip and ID.
           </div>
         ) : (
           <div className="divide-y divide-neutral-100">
-            {(kycState.documents.length > 0
-              ? kycState.documents
-              : [
-                  {
-                    id: "d1",
-                    type: "NIN_SLIP" as const,
-                    name: "National Identity Number Slip",
-                    url: "#",
-                    status: "approved" as const,
-                    uploadedAt: new Date().toISOString(),
-                  },
-                  {
-                    id: "d2",
-                    type: "CAC_DOCUMENT" as const,
-                    name: "CAC Business Certificate",
-                    url: "#",
-                    status: "approved" as const,
-                    uploadedAt: new Date().toISOString(),
-                  },
-                ]
-            ).map((doc) => (
+            {kycState.documents.map((doc) => (
               <div
                 key={doc.id}
                 className="flex items-center justify-between py-3 text-xs"
