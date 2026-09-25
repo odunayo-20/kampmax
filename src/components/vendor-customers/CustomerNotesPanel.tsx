@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Check, Eye, Lock, Pencil, Plus, Trash2 } from "lucide-react";
 import { formatDateTime } from "@/lib/utils";
-import { addVendorCustomerNote, updateVendorCustomerNote, deleteVendorCustomerNote } from "@/services/vendor-customers";
+import { useAddCustomerNote, useDeleteCustomerNote, useUpdateCustomerNote } from "@/hooks/use-vendor-customers";
 import { Button } from "@/components/ui";
 import type { VendorCustomerNote } from "@/types/vendor-customers";
 
@@ -18,45 +18,41 @@ export function CustomerNotesPanel({ buyerId, notes, canNote, onChanged }: Custo
   const [draft, setDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
+  const addNote = useAddCustomerNote(buyerId);
+  const updateNote = useUpdateCustomerNote();
+  const deleteNote = useDeleteCustomerNote();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function submitNew() {
+  async function run(action: () => Promise<unknown>, fallback: string, after?: () => void) {
     setBusy(true);
     setError(null);
-    const result = addVendorCustomerNote(buyerId, draft);
-    if (result.ok) {
-      setDraft("");
+    try {
+      await action();
+      after?.();
       onChanged();
-    } else {
-      setError(result.error ?? "Could not save note.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : fallback);
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
   }
 
-  function submitEdit() {
-    if (!editingId) return;
-    setBusy(true);
-    setError(null);
-    const result = updateVendorCustomerNote(editingId, editingText);
-    if (result.ok) {
-      setEditingId(null);
-      setEditingText("");
-      onChanged();
-    } else {
-      setError(result.error ?? "Could not update note.");
-    }
-    setBusy(false);
-  }
+  const submitNew = () => run(() => addNote.mutateAsync(draft), "Could not save note.", () => setDraft(""));
 
-  function submitDelete(noteId: string) {
-    setBusy(true);
-    setError(null);
-    const result = deleteVendorCustomerNote(noteId);
-    if (!result.ok) setError(result.error ?? "Could not delete note.");
-    onChanged();
-    setBusy(false);
-  }
+  const submitEdit = () => {
+    if (!editingId) return Promise.resolve();
+    return run(
+      () => updateNote.mutateAsync({ noteId: editingId, body: editingText }),
+      "Could not update note.",
+      () => {
+        setEditingId(null);
+        setEditingText("");
+      }
+    );
+  };
+
+  const submitDelete = (noteId: string) => run(() => deleteNote.mutateAsync(noteId), "Could not delete note.");
 
   return (
     <section className="rounded-xl border border-kampmax-border bg-white p-4">

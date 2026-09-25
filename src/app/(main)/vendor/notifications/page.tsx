@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -16,7 +16,9 @@ import {
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Breadcrumbs, BreadcrumbItem } from "@/components/layout/Breadcrumbs";
 import { formatDate } from "@/lib/utils";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
+import { useAuth } from "@/lib/auth-context";
 
 interface VendorNotification {
   id: string;
@@ -28,51 +30,83 @@ interface VendorNotification {
   link?: string;
 }
 
+interface BackendNotification {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  data: Record<string, unknown> | null;
+  readAt: string | null;
+  createdAt: string;
+}
+
+const TYPE_MAP: Record<string, VendorNotification["type"]> = {
+  ORDER: "order",
+  PAYMENT: "escrow",
+  VENDOR: "dispute",
+};
+
+/** Notifications addressed to the user as a shopper are hidden from the store view. */
+function isVendorFacing(n: BackendNotification): boolean {
+  return n.data?.audience !== "customer";
+}
+
+function mapNotification(n: BackendNotification): VendorNotification {
+  return {
+    id: n.id,
+    type: TYPE_MAP[n.type] ?? "order",
+    title: n.title,
+    message: n.body,
+    timestamp: n.createdAt,
+    read: Boolean(n.readAt),
+    link: typeof n.data?.link === "string" ? n.data.link : undefined,
+  };
+}
+
+const NOTIFICATIONS_KEY = ["vendor-notifications"] as const;
+
+async function fetchVendorNotifications(): Promise<VendorNotification[]> {
+  const { data, error } = await apiClient.get<{ items: BackendNotification[] }>("/notifications?limit=50");
+  if (error) throw error;
+  return (data?.items ?? []).filter(isVendorFacing).map(mapNotification);
+}
+
 export default function VendorNotificationsPage() {
-  const [notifications, setNotifications] = useState<VendorNotification[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { status } = useAuth();
+  const queryClient = useQueryClient();
   const [filter, setFilter] = useState<"all" | "unread" | "order" | "dispute">("all");
 
-  useEffect(() => {
-    async function loadNotifications() {
-      setIsLoading(true);
-      const { data } = await apiClient.get<any>("/notifications");
-      if (data) {
-        const rawItems = Array.isArray(data) ? data : data.items || [];
-        const mapped: VendorNotification[] = rawItems.map((n: any) => ({
-          id: n.id,
-          type: (n.type?.toLowerCase() as any) || "order",
-          title: n.title || "Store Notification",
-          message: n.message || n.content || "",
-          timestamp: n.createdAt || new Date().toISOString(),
-          read: !!n.readAt,
-          link: n.link || n.actionUrl,
-        }));
-        setNotifications(mapped);
-      }
-      setIsLoading(false);
-    }
+  const query = useQuery({
+    queryKey: NOTIFICATIONS_KEY,
+    queryFn: fetchVendorNotifications,
+    enabled: status === "authenticated",
+    refetchInterval: 60_000,
+  });
+  const notifications = query.data ?? [];
+  const isLoading = query.isPending;
 
-    loadNotifications();
-  }, []);
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_KEY });
 
-  const markAllRead = async () => {
-    const { error } = await apiClient.patch("/notifications/read-all", {});
-    if (!error) {
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    }
-  };
+  const markAllReadMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await apiClient.patch("/notifications/read-all", {});
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
 
-  const toggleRead = async (id: string) => {
-    const target = notifications.find((n) => n.id === id);
-    if (!target) return;
+  const markReadMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await apiClient.patch(`/notifications/${id}/read`, {});
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
 
-    if (!target.read) {
-      await apiClient.patch(`/notifications/${id}/read`, {});
-    }
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: !n.read } : n))
-    );
+  const markAllRead = () => markAllReadMutation.mutate();
+  const toggleRead = (id: string) => {
+    if (notifications.find((n) => n.id === id)?.read) return; // the API only marks as read
+    markReadMutation.mutate(id);
   };
 
   const filtered = notifications.filter((n) => {
@@ -221,12 +255,14 @@ export default function VendorNotificationsPage() {
                             View Details →
                           </Link>
                         )}
-                        <button
-                          onClick={() => toggleRead(n.id)}
-                          className="text-[11px] font-medium text-kampmax-text-secondary hover:text-kampmax-text"
-                        >
-                          {n.read ? "Mark unread" : "Mark as read"}
-                        </button>
+                        {!n.read && (
+                          <button
+                            onClick={() => toggleRead(n.id)}
+                            className="text-[11px] font-medium text-kampmax-text-secondary hover:text-kampmax-text"
+                          >
+                            Mark as read
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>

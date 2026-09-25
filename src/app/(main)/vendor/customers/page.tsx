@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState, use } from "react";
+import { useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { Users } from "lucide-react";
-import { listVendorCustomers, getVendorCustomerCounts } from "@/services/vendor-customers";
+import { useVendorCustomerCounts, useVendorCustomers } from "@/hooks/use-vendor-customers";
 import { CustomersHeader } from "@/components/vendor-customers/CustomersHeader";
 import { CustomersToolbar } from "@/components/vendor-customers/CustomersToolbar";
 import { CustomersTable } from "@/components/vendor-customers/CustomersTable";
@@ -22,26 +22,18 @@ export default function VendorCustomersPage({ params }: { params: Promise<{}> })
   const [search, setSearch] = useState("");
   const [segment, setSegment] = useState<VendorCustomerSegment | "all">("all");
   const [sort, setSort] = useState<VendorCustomerSortField>("recent");
-  const [loading, setLoading] = useState(true);
 
-  const counts = useMemo(() => getVendorCustomerCounts(), []);
+  const countsQuery = useVendorCustomerCounts();
+  const customersQuery = useVendorCustomers({
+    search: search || undefined,
+    segment,
+    sort,
+    page,
+    pageSize: PAGE_SIZE,
+  });
 
-  const result = useMemo(
-    () =>
-      listVendorCustomers({
-        search: search || undefined,
-        segment,
-        sort,
-        page,
-        pageSize: PAGE_SIZE,
-      }),
-    [search, segment, sort, page]
-  );
-
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 250);
-    return () => clearTimeout(timer);
-  }, []);
+  const counts = countsQuery.data ?? { all: 0, new: 0, returning: 0, frequent: 0, inactive: 0 };
+  const result = customersQuery.data;
 
   const hasActiveFilters = search !== "" || segment !== "all";
 
@@ -72,13 +64,20 @@ export default function VendorCustomersPage({ params }: { params: Promise<{}> })
           setSort(v);
           setPage(1);
         }}
-        total={result.total}
+        total={result?.total ?? 0}
         hasActiveFilters={hasActiveFilters}
         onClearFilters={clearFilters}
       />
 
-      {loading ? (
+      {customersQuery.isPending ? (
         <CustomerListSkeleton />
+      ) : customersQuery.isError || !result ? (
+        <div className="rounded-xl border border-error-200 bg-error-50 p-6 text-center">
+          <p className="text-sm font-medium text-error-700">Couldn&apos;t load your customers.</p>
+          <button type="button" onClick={() => customersQuery.refetch()} className="mt-2 text-xs font-semibold text-error-700 underline">
+            Try again
+          </button>
+        </div>
       ) : result.items.length === 0 ? (
         <div className="rounded-xl border border-kampmax-border bg-white p-10 text-center">
           <Users className="mx-auto mb-3 h-10 w-10 text-kampmax-text-secondary" aria-hidden />

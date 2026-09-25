@@ -765,3 +765,12 @@ export const vendorFinancialKeys = {
   payouts: (query: object) => ["vendor-financials", "payouts", query] as const,
   statement: (month: string) => ["vendor-financials", "statement", month] as const,
 };
+
+/** Vendor customers (CRM; owner-scoped). */
+export const vendorCustomerKeys = {
+  all: ["vendor-customers"] as const,
+  list: (query: object) => ["vendor-customers", "list", query] as const,
+  counts: () => ["vendor-customers", "counts"] as const,
+  detail: (id: string) => ["vendor-customers", "detail", id] as const,
+  notes: (id: string) => ["vendor-customers", "notes", id] as const,
+};
