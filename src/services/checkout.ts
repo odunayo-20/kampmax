@@ -1,5 +1,5 @@
 import type { CartLineItem } from "@/types/cart";
-import { getVendorById, getUserById } from "@/services/users";
+import { getVendorById, getCurrentUser } from "@/services/users";
 import { estimateDelivery } from "@/services/cart";
 import { checkoutOrdersApi, CheckoutPayload } from "@/services/orders";
 import { apiClient, ApiError } from "@/lib/api-client";
@@ -472,7 +472,8 @@ export function getCustomerInfo(customerId?: string): {
   email: string;
   phone: string;
 } {
-  const user = customerId ? getUserById(customerId) : undefined;
+  const current = customerId ? getCurrentUser() : undefined;
+  const user = current && current.id === customerId ? current : undefined;
   return {
     fullName: user?.name || "",
     email: user?.email || "",

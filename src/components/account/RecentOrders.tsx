@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ChevronRight, PackageOpen } from "lucide-react";
 import type { Order } from "@/types";
 import { OrderCard } from "@/components/orders/OrderCard";
-import { getVendorByUserId } from "@/services/users";
+import { getVendorById } from "@/services/users";
 import { AccountEmptyState } from "./AccountEmptyState";
 
 interface RecentOrdersProps {
@@ -29,7 +29,7 @@ export function RecentOrders({ orders }: RecentOrdersProps) {
         <OrderCard
           key={order.id}
           order={order}
-          vendorName={getVendorByUserId(order.vendorId)?.storeName}
+          vendorName={getVendorById(order.vendorId)?.storeName}
         />
       ))}
       <Link

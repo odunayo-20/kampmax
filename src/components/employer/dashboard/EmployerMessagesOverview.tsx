@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { getUserById } from "@/services/users";
 import { useConversations } from "@/hooks/use-messages";
 import { useAuth } from "@/lib/auth-context";
 import { timeAgo } from "@/lib/utils";
@@ -46,7 +45,7 @@ export function EmployerMessagesOverview() {
         <ul className="divide-y divide-kampmax-border/70">
           {conversations.map((conversation) => {
             const otherId = conversation.participants.find((id) => id !== user?.id);
-            const otherName = otherId ? getUserById(otherId)?.name ?? "Candidate" : "Candidate";
+            const otherName = (otherId && conversation.participantNames?.[otherId]) || "Candidate";
             const unread = conversation.unreadCount > 0;
             return (
               <li key={conversation.id}>

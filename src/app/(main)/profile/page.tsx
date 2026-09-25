@@ -16,7 +16,8 @@ import {
   ProfileLoyaltyBadge,
 } from "@/components/profile";
 import { SettingsGroup, SettingsRow } from "@/components/profile/SettingsGroup";
-import { getVendorByUserId } from "@/services/users";
+import { useQuery } from "@tanstack/react-query";
+import { apiClient } from "@/lib/api-client";
 import { getOrdersByUser } from "@/services/orders";
 import { useAuth } from "@/lib/auth-context";
 import { useApp } from "@/lib/app-context";
@@ -32,6 +33,17 @@ export default function ProfilePage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const [showVendorCard, setShowVendorCard] = useState(true);
+  const isVendorUser = currentUser?.role === "vendor";
+  const { data: vendor } = useQuery({
+    queryKey: ["vendors", "me", currentUser?.id ?? ""],
+    enabled: status === "authenticated" && isVendorUser,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await apiClient.get<{ storeName: string; rating: number; totalSales: number }>("/vendors/me");
+      if (error || !data) throw error ?? new Error("No store");
+      return data;
+    },
+  });
 
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -48,7 +60,6 @@ export default function ProfilePage() {
     );
   }
 
-  const vendor = getVendorByUserId(currentUser.id);
   const orders = getOrdersByUser(currentUser.id);
   const wallet = getWalletByUser(currentUser.id);
   const loyalty = getLoyaltyProgram();
