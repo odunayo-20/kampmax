@@ -62,9 +62,6 @@ export interface BackendPaymentDetailResponse extends BackendPaymentResponse {
 }
 
 const CHECKOUT_SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutes
-const PLATFORM_FEE_RATE = 0.025;
-const PLATFORM_FEE_MIN = 50;
-const PLATFORM_FEE_MAX = 2000;
 
 interface CheckoutFeatureFlags {
   couponValidationEnabled: boolean;
@@ -93,13 +90,6 @@ function sanitizeError(err: unknown, fallback: string): CheckoutErrorInfo {
 
 function makeSessionId(): string {
   return `cs_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function platformFee(subtotal: number): number {
-  return Math.max(
-    PLATFORM_FEE_MIN,
-    Math.min(PLATFORM_FEE_MAX, Math.round(subtotal * PLATFORM_FEE_RATE))
-  );
 }
 
 function buildVendorDeliveryOptions(vendorId: string): VendorDeliveryOption[] {
@@ -163,11 +153,10 @@ export function createCheckoutSession(options: CheckoutSessionOptions): Checkout
   const itemsSubtotal = vendorRaw.reduce((s, v) => s + v.subtotal, 0);
   const itemCount = active.reduce((s, i) => s + i.quantity, 0);
   const deliveryTotal = 0;
-  const platformFeeTotal = platformFee(itemsSubtotal);
   const discountTotal = 0;
   const coinDeduction = 0;
   const finalTotal =
-    Math.max(0, itemsSubtotal + platformFeeTotal + deliveryTotal - discountTotal - coinDeduction);
+    Math.max(0, itemsSubtotal + deliveryTotal - discountTotal - coinDeduction);
 
   const vendorGroups: CheckoutVendorGroup[] = vendorRaw.map((v) => {
     const vendor = getVendorById(v.vendorId);
@@ -204,7 +193,6 @@ export function createCheckoutSession(options: CheckoutSessionOptions): Checkout
     vendorGroups,
     pricing: {
       itemsSubtotal,
-      platformFee: platformFeeTotal,
       deliveryTotal,
       discountTotal,
       coinDeduction,

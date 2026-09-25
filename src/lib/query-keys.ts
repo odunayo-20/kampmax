@@ -755,3 +755,13 @@ export const vendorPromotionKeys = {
   redemptions: (id: string) => ["vendor-promotions", "redemptions", id] as const,
   formContext: () => ["vendor-promotions", "form-context"] as const,
 };
+
+/** Vendor financials (wallet ledger; owner-scoped). */
+export const vendorFinancialKeys = {
+  all: ["vendor-financials"] as const,
+  overview: () => ["vendor-financials", "overview"] as const,
+  transactions: (query: object) => ["vendor-financials", "transactions", query] as const,
+  transaction: (id: string) => ["vendor-financials", "transaction", id] as const,
+  payouts: (query: object) => ["vendor-financials", "payouts", query] as const,
+  statement: (month: string) => ["vendor-financials", "statement", month] as const,
+};

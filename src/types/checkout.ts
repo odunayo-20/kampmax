@@ -179,7 +179,6 @@ export interface CheckoutVendorGroup {
 
 export interface CheckoutSessionPricing {
   itemsSubtotal: number;
-  platformFee: number;
   deliveryTotal: number;
   discountTotal: number;
   coinDeduction: number;

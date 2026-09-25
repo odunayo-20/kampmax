@@ -161,7 +161,8 @@ export function mapBackendOrderToFrontend(
   const deliveryFee = Number(raw.deliveryFee || 0);
   const totalAmount = Number(raw.totalAmount || subtotal + deliveryFee);
   const discountAmount = Number(raw.discountAmount || 0);
-  const platformFee = Math.max(0, totalAmount - subtotal - deliveryFee + discountAmount);
+  // The platform fee is charged to the vendor and is not part of the customer's total.
+  const platformFee = 0;
 
   const items: CartItem[] = (raw.items || []).map((item) => {
     const existingProduct = getProductById(item.productId);

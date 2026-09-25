@@ -1,48 +1,29 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { PayoutAccountCard } from "@/components/vendor-financials/PayoutAccountCard";
 import { PayoutsTable } from "@/components/vendor-financials/PayoutsTable";
 import { PayoutRequestModal } from "@/components/vendor-financials/PayoutRequestModal";
 import { VendorPagination } from "@/components/vendor-shared/VendorPagination";
 import { FinancialsSkeleton } from "@/components/vendor-financials/FinancialsSkeleton";
-import { getPayouts, getPayoutAccount, requestPayout, getFinancialOverview } from "@/services/vendor-financials";
-import type { VendorPayout, VendorPayoutStatus, PayoutRequestResult } from "@/types/vendor-financials";
+import { useFinancialOverview, usePayouts, useRequestPayout } from "@/hooks/use-vendor-financials";
+import type { PayoutRequestInput, PayoutRequestResult, VendorPayoutStatus } from "@/types/vendor-financials";
 
 const DEFAULT_PAGE_SIZE = 10;
 
 export default function PayoutsPage() {
-  const router = useRouter();
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(DEFAULT_PAGE_SIZE);
   const [statusFilter, setStatusFilter] = useState<VendorPayoutStatus | "all">("all");
-  const [data, setData] = useState<{ items: VendorPayout[]; total: number; page: number; pageSize: number; totalPages: number } | null>(null);
-  const [account, setAccount] = useState<import("@/types/vendor-financials").VendorPayoutAccount | null>(null);
-  const [available, setAvailable] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [payoutsRes, overview] = await Promise.all([
-        Promise.resolve(getPayouts({ page, pageSize, status: statusFilter })),
-        Promise.resolve(getFinancialOverview()),
-      ]);
-      setData(payoutsRes);
-      setAccount(overview.account);
-      setAvailable(overview.cards.find((c) => c.key === "available")?.value ?? 0);
-    } catch {
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, pageSize, statusFilter]);
+  const payoutsQuery = usePayouts({ page, pageSize: DEFAULT_PAGE_SIZE, status: statusFilter });
+  const overviewQuery = useFinancialOverview();
+  const requestPayout = useRequestPayout();
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const data = payoutsQuery.data;
+  const account = overviewQuery.data?.account ?? null;
+  const available = overviewQuery.data?.available ?? 0;
+  const loading = payoutsQuery.isPending || overviewQuery.isPending;
 
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
@@ -57,13 +38,10 @@ export default function PayoutsPage() {
     setModalOpen(true);
   };
 
-  const handleModalSubmit = (input: { amount: number; idempotencyKey: string; confirmed: boolean }) => {
-    const res = requestPayout(input);
-    if (res.ok) {
-      fetchData();
-      setModalOpen(false);
-    }
-    // Modal handles error state internally
+  const handleModalSubmit = async (input: PayoutRequestInput): Promise<PayoutRequestResult> => {
+    const res = await requestPayout.mutateAsync(input);
+    if (res.ok) setModalOpen(false);
+    return res;
   };
 
   const handleModalClose = () => {
@@ -71,7 +49,16 @@ export default function PayoutsPage() {
   };
 
   if (loading) return <FinancialsSkeleton />;
-  if (!data) return <div className="text-center py-12 text-kampmax-text-secondary">No access</div>;
+  if (payoutsQuery.isError || !data || !account) {
+    return (
+      <div className="rounded-xl border border-error-200 bg-error-50 p-6 text-center">
+        <p className="text-sm font-medium text-error-700">Couldn&apos;t load your payouts.</p>
+        <button type="button" onClick={() => payoutsQuery.refetch()} className="mt-2 text-xs font-semibold text-error-700 underline">
+          Try again
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -85,7 +72,7 @@ export default function PayoutsPage() {
       </header>
 
       <PayoutAccountCard
-        account={account!}
+        account={account}
         onRequestPayout={handleRequestPayout}
         canRequest={account?.status === "verified"}
       />

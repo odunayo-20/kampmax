@@ -45,6 +45,9 @@ interface BackendVendorOrderBase {
   status: BackendOrderStatus;
   subtotal: number | string;
   deliveryFee: number | string;
+  discountAmount?: number | string;
+  platformFee?: number | string;
+  vendorPayout?: number | string;
   totalAmount: number | string;
   createdAt: string;
 }
@@ -58,6 +61,7 @@ interface BackendVendorOrderDetail extends BackendVendorOrderBase {
   updatedAt: string;
   notes: string | null;
   customerPhone: string;
+  settledAt?: string | null;
   paymentStatus: string | null;
   items: (BackendOrderItem & { id: string })[];
   address: {
@@ -149,6 +153,11 @@ const NO_REFUND: VendorOrder["refund"] = { status: "none" };
 function mapBase(raw: BackendVendorOrderBase): Omit<VendorOrder, "items" | "timeline" | "updatedAt"> {
   const itemsSubtotal = Number(raw.subtotal);
   const deliveryFee = Number(raw.deliveryFee);
+  const discount = Number(raw.discountAmount ?? 0);
+  // The platform fee is charged to the vendor and deducted from the payout;
+  // the customer's total never includes it.
+  const platformFee = Number(raw.platformFee ?? 0);
+  const vendorPayout = Number(raw.vendorPayout ?? Number(raw.totalAmount) - platformFee);
   return {
     id: raw.id,
     parentOrderId: raw.id,
@@ -158,8 +167,10 @@ function mapBase(raw: BackendVendorOrderBase): Omit<VendorOrder, "items" | "time
     totals: {
       itemsSubtotal,
       deliveryFee,
-      platformFee: 0,
-      vendorSubtotal: itemsSubtotal,
+      platformFee,
+      discount,
+      vendorPayout,
+      vendorSubtotal: vendorPayout + platformFee,
       customerTotal: Number(raw.totalAmount),
     },
     fulfillmentStatus: TO_FULFILLMENT[raw.status],
@@ -214,10 +225,17 @@ export function mapVendorOrderDetail(raw: BackendVendorOrderDetail): VendorOrder
     })),
     paymentStatus: payment,
     deliveryAddress: deliveryAddress || undefined,
-    escrow: {
-      state: payment === "paid" ? "funds_held" : "none",
-      displayAmount: payment === "paid" ? Number(raw.totalAmount) : undefined,
-    },
+    escrow: raw.settledAt
+      ? {
+          state: "released",
+          displayAmount: Number(raw.vendorPayout ?? 0),
+          updatedAt: raw.settledAt,
+          note: "Released to your wallet after delivery.",
+        }
+      : {
+          state: payment === "paid" ? "funds_held" : "none",
+          displayAmount: payment === "paid" ? Number(raw.vendorPayout ?? raw.totalAmount) : undefined,
+        },
     timeline: raw.statusHistory.map((h) => ({
       id: h.id,
       kind: STATUS_EVENT[h.status],

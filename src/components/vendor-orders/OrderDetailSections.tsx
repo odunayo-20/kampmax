@@ -88,15 +88,16 @@ export function TotalsSection({ order }: { order: VendorOrder }) {
     <SectionShell title="Totals" icon={<CreditCard className="h-3.5 w-3.5" aria-hidden />}>
       <dl className="divide-y divide-kampmax-border/60">
         <Row label="Items subtotal" value={formatNaira(t.itemsSubtotal)} />
+        {(t.discount ?? 0) > 0 && <Row label="Promotion discount" value={`− ${formatNaira(t.discount ?? 0)}`} />}
         <Row label="Delivery fee" value={formatNaira(t.deliveryFee)} />
-        <Row label="Platform fee" value={`− ${formatNaira(t.platformFee)}`} />
         <div className="flex items-start justify-between gap-3 py-2">
-          <dt className="text-sm font-medium text-kampmax-text-secondary">Customer total</dt>
+          <dt className="text-sm font-medium text-kampmax-text-secondary">Customer paid</dt>
           <dd className="text-right text-base font-bold tabular-nums text-kampmax-text">
             {formatNaira(t.customerTotal)}
           </dd>
         </div>
-        <Row label="You receive (escrow)" value={formatNaira(t.vendorSubtotal)} />
+        <Row label="Platform fee (deducted from your payout)" value={`− ${formatNaira(t.platformFee)}`} />
+        <Row label="You receive" value={formatNaira(t.vendorPayout ?? t.vendorSubtotal - t.platformFee)} />
       </dl>
     </SectionShell>
   );

@@ -12,7 +12,7 @@ import type { PayoutRequestResult, PayoutRequestInput } from "@/types/vendor-fin
 interface PayoutRequestModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (input: PayoutRequestInput) => void;
+  onSubmit: (input: PayoutRequestInput) => void | Promise<PayoutRequestResult | void>;
   available: number;
 }
 
@@ -107,8 +107,13 @@ export function PayoutRequestModal({
     setPhase("submitting");
     setError(undefined);
 
-    // Call parent submit
-    onSubmit({ amount: val, idempotencyKey, confirmed: true });
+    // Call parent submit; if it reports a failure, return to the form with the reason.
+    void Promise.resolve(onSubmit({ amount: val, idempotencyKey, confirmed: true })).then((res) => {
+      if (res && !res.ok) {
+        setError(res.error ?? "We couldn't process your payout request.");
+        setPhase("amount");
+      }
+    });
   };
 
   // Parent will call onClose when done; we just handle local UI

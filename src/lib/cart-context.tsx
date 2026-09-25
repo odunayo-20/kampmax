@@ -44,7 +44,6 @@ export interface VendorCartGroup {
 // ── Cart Summary ──
 export interface CartSummary {
   itemsSubtotal: number;
-  platformFee: number;
   deliveryFee: number;
   discountTotal: number;
   total: number;

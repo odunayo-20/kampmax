@@ -72,7 +72,6 @@ export function OrderSummary({
           {p.coinDeduction > 0 && (
             <Row label="Kampmax coin" value={`-${formatNaira(p.coinDeduction)}`} />
           )}
-          <Row label="Platform fee" value={formatNaira(p.platformFee)} />
           <Row label="Total items" value={String(p.itemCount)} />
 
           <div className="border-t border-kampmax-border pt-3 flex items-center justify-between">

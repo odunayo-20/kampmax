@@ -577,9 +577,9 @@ function withDiscount(s: CheckoutSession, discount: number): CheckoutSession {
 }
 
 function finalTotalFor(s: CheckoutSession): number {
-  const fee = Math.max(50, Math.min(2000, Math.round(s.pricing.itemsSubtotal * 0.025)));
+  // The platform fee is charged to the vendor, never to the customer.
   return Math.max(
     0,
-    s.pricing.itemsSubtotal + s.pricing.deliveryTotal + fee - s.pricing.discountTotal
+    s.pricing.itemsSubtotal + s.pricing.deliveryTotal - s.pricing.discountTotal
   );
 }

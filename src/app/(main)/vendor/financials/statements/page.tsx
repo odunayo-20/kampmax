@@ -1,76 +1,65 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useMemo, useState } from "react";
 import { StatementPanel } from "@/components/vendor-financials/StatementPanel";
 import { FinancialsSkeleton } from "@/components/vendor-financials/FinancialsSkeleton";
-import { getStatement, exportStatementCsv, getFinancialOverview } from "@/services/vendor-financials";
-import type { VendorStatement } from "@/types/vendor-financials";
+import { useStatement } from "@/hooks/use-vendor-financials";
+import { statementToCsv } from "@/services/vendor-financials-api";
+
+/** The last 12 calendar months, newest first (YYYY-MM). */
+function recentPeriods(count = 12): string[] {
+  const now = new Date();
+  return Array.from({ length: count }, (_, i) => {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+  });
+}
 
 export default function StatementsPage() {
-  const [period, setPeriod] = useState("2026-08");
-  const [statement, setStatement] = useState<VendorStatement | null>(null);
-  const [availablePeriods, setAvailablePeriods] = useState<string[]>(["2026-08", "2026-07", "2026-06"]);
-  const [loading, setLoading] = useState(true);
-  const [exporting, setExporting] = useState(false);
-
-  const fetchStatement = useCallback(async () => {
-    setLoading(true);
-    try {
-      const stmt = getStatement({ month: period });
-      setStatement(stmt);
-    } catch {
-      setStatement(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [period]);
-
-  useEffect(() => {
-    fetchStatement();
-  }, [fetchStatement]);
+  const availablePeriods = useMemo(() => recentPeriods(), []);
+  const [period, setPeriod] = useState(availablePeriods[0]);
+  const statementQuery = useStatement(period);
 
   const handleExport = () => {
-    setExporting(true);
-    try {
-      const res = exportStatementCsv({ month: period });
-      if (res.ok) {
-        const blob = new Blob([res.csv], { type: "text/csv;charset=utf-8;" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = res.filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }
-    } finally {
-      setExporting(false);
-    }
+    if (!statementQuery.data) return;
+    const { csv, filename } = statementToCsv(statementQuery.data);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
-  const handlePeriodChange = (newPeriod: string) => {
-    setPeriod(newPeriod);
-  };
-
-  if (loading) return <FinancialsSkeleton />;
-  if (!statement) return <div className="text-center py-12 text-kampmax-text-secondary">No access</div>;
+  if (statementQuery.isPending) return <FinancialsSkeleton />;
+  const statement = statementQuery.data;
+  if (statementQuery.isError || !statement) {
+    return (
+      <div className="rounded-xl border border-error-200 bg-error-50 p-6 text-center">
+        <p className="text-sm font-medium text-error-700">Couldn&apos;t load this statement.</p>
+        <button type="button" onClick={() => statementQuery.refetch()} className="mt-2 text-xs font-semibold text-error-700 underline">
+          Try again
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-kampmax-text">Statements</h1>
-          <p className="mt-1 text-sm text-kampmax-text-secondary">
-            Download monthly financial statements
-          </p>
+          <p className="mt-1 text-sm text-kampmax-text-secondary">Download monthly financial statements</p>
         </div>
       </header>
 
       <StatementPanel
         statement={statement}
         onExport={handleExport}
-        onPeriodChange={handlePeriodChange}
+        onPeriodChange={setPeriod}
         availablePeriods={availablePeriods}
       />
     </div>

@@ -66,15 +66,7 @@ export interface UpdateCartItemPayload {
 
 // ── Local helpers (no I/O) ────────────────────────────────────────────────
 
-const PLATFORM_FEE_RATE = 0.025;
-const PLATFORM_FEE_MIN = 50;
-const PLATFORM_FEE_MAX = 2000;
 const DELIVERY_FEE_HOSTEL = 500;
-
-export function computePlatformFee(subtotal: number): number {
-  const fee = Math.round(subtotal * PLATFORM_FEE_RATE);
-  return Math.max(PLATFORM_FEE_MIN, Math.min(PLATFORM_FEE_MAX, fee));
-}
 
 export function buildPricingSummary(items: CartLineItem[]): CartPricingSummary {
   const itemsSubtotal = items.reduce(
@@ -83,11 +75,10 @@ export function buildPricingSummary(items: CartLineItem[]): CartPricingSummary {
   );
   const hasItems = items.length > 0;
   const deliveryFee = hasItems ? DELIVERY_FEE_HOSTEL : 0;
-  const platformFee = hasItems ? computePlatformFee(itemsSubtotal) : 0;
   const discountTotal = 0; // established at checkout / coupon application
-  const total = itemsSubtotal + deliveryFee + platformFee - discountTotal;
+  const total = itemsSubtotal + deliveryFee - discountTotal;
   const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
-  return { itemsSubtotal, platformFee, deliveryFee, discountTotal, total, itemCount };
+  return { itemsSubtotal, deliveryFee, discountTotal, total, itemCount };
 }
 
 const DELIVERY_ESTIMATES: Record<string, string> = {

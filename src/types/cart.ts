@@ -88,7 +88,6 @@ export interface CartVendorGroup {
 
 export interface CartPricingSummary {
   itemsSubtotal: number;
-  platformFee: number;
   deliveryFee: number;
   discountTotal: number;
   total: number;

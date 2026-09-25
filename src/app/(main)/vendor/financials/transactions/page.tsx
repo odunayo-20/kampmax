@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { TransactionsToolbar } from "@/components/vendor-financials/TransactionsToolbar";
 import { TransactionTable } from "@/components/vendor-financials/TransactionTable";
 import { VendorPagination } from "@/components/vendor-shared/VendorPagination";
 import { FinancialsSkeleton } from "@/components/vendor-financials/FinancialsSkeleton";
-import { getTransactions } from "@/services/vendor-financials";
-import type { VendorFinancialQuery, VendorFinancialTransaction, VendorFinancialPage } from "@/types/vendor-financials";
+import { useFinancialTransactions } from "@/hooks/use-vendor-financials";
+import type { VendorFinancialQuery } from "@/types/vendor-financials";
 
 const DEFAULT_PAGE_SIZE = 10;
 
@@ -22,8 +22,6 @@ export default function TransactionsPage() {
     pageSize: DEFAULT_PAGE_SIZE,
     sort: "newest",
   });
-  const [data, setData] = useState<VendorFinancialPage<VendorFinancialTransaction> | null>(null);
-  const [loading, setLoading] = useState(true);
 
   // Initialize from URL params
   useEffect(() => {
@@ -42,21 +40,8 @@ export default function TransactionsPage() {
     setPage(1);
   }, [searchParams]);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const result = getTransactions(query);
-      setData(result);
-    } catch {
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [query]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const txQuery = useFinancialTransactions(query);
+  const data = txQuery.data;
 
   const handleQueryChange = (newQuery: Partial<VendorFinancialQuery>) => {
     const merged = { ...query, ...newQuery, page: newQuery.page ?? 1 };
@@ -68,8 +53,17 @@ export default function TransactionsPage() {
     handleQueryChange({ page: newPage });
   };
 
-  if (loading) return <FinancialsSkeleton />;
-  if (!data) return <div className="text-center py-12 text-kampmax-text-secondary">No access</div>;
+  if (txQuery.isPending) return <FinancialsSkeleton />;
+  if (txQuery.isError || !data) {
+    return (
+      <div className="rounded-xl border border-error-200 bg-error-50 p-6 text-center">
+        <p className="text-sm font-medium text-error-700">Couldn&apos;t load your transactions.</p>
+        <button type="button" onClick={() => txQuery.refetch()} className="mt-2 text-xs font-semibold text-error-700 underline">
+          Try again
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

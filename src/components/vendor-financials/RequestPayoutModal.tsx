@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { X, CheckCircle2, AlertCircle, Building2, ArrowRight } from "lucide-react";
 import { formatNaira } from "@/lib/utils";
-import { requestPayout } from "@/services/vendor-financials";
+import { useRequestPayout } from "@/hooks/use-vendor-financials";
 import { VENDOR_FINANCIAL_LIMITS, VendorPayoutAccount } from "@/types/vendor-financials";
 import { Button } from "@/components/ui";
 
@@ -23,6 +23,7 @@ export function RequestPayoutModal({
   onSuccess,
 }: RequestPayoutModalProps) {
   const [amountStr, setAmountStr] = useState(String(availableBalance > 0 ? availableBalance : ""));
+  const payoutMutation = useRequestPayout();
   const [confirmed, setConfirmed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +45,7 @@ export function RequestPayoutModal({
     setError(null);
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!isValidAmount || !confirmed) return;
 
@@ -54,7 +55,7 @@ export function RequestPayoutModal({
     const idempotencyKey = `payout-key-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
     try {
-      const res = requestPayout({
+      const res = await payoutMutation.mutateAsync({
         amount,
         idempotencyKey,
         confirmed: true,

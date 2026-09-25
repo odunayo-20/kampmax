@@ -366,7 +366,6 @@ export default function OrderDetailPage({
         {/* Fees */}
         <OrderFees
           subtotal={displayOrder.subtotal}
-          platformFee={displayOrder.platformFee}
           deliveryFee={displayOrder.deliveryFee}
           discountAmount={displayOrder.discountAmount}
           total={displayOrder.total}

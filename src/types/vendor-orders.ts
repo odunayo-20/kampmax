@@ -242,7 +242,11 @@ export interface VendorOrderTotals {
   itemsSubtotal: number;
   deliveryFee: number;
   platformFee: number;
-  /** Money the vendor will receive after platform fee + delivery (escrow). */
+  /** Promotion discount funded by the vendor (reduces the items amount). */
+  discount?: number;
+  /** Amount the vendor receives after the platform fee is deducted. */
+  vendorPayout?: number;
+  /** Gross amount before the platform fee (items − discount + delivery). */
   vendorSubtotal: number;
   customerTotal: number;
 }
