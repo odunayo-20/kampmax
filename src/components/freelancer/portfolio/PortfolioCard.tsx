@@ -5,6 +5,7 @@ import Image from "next/image";
 import { ImageIcon, Eye, EyeOff, Pencil, ExternalLink, MoreHorizontal } from "lucide-react";
 import type { FreelancerPortfolioItem } from "@/types/freelancer";
 import { categoryLabel } from "../services/serviceHelpers";
+import { useCategories } from "@/hooks/use-taxonomy";
 
 export function PortfolioCard({
   item,
@@ -13,6 +14,7 @@ export function PortfolioCard({
   item: FreelancerPortfolioItem;
   onAction?: (item: FreelancerPortfolioItem) => void;
 }) {
+  useCategories("SERVICE"); // warms id -> name for categoryLabel()
   return (
     <article className="group flex flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm transition-shadow hover:shadow-md">
       <Link href={`/freelancer/portfolio/${item.id}`} className="block">

@@ -46,28 +46,25 @@ export function isOrganizationLikeClientType(type: EmployerClientType | ""): boo
   );
 }
 
-// ── Hiring categories (backend IDs) ─────────────────────────
+// ── Hiring categories ───────────────────────────────────────
+// Selectable hiring categories come from the JOB taxonomy (API). This map only
+// labels ids saved by pre-taxonomy drafts / demo records; never use it to build
+// a picker or to validate input.
 
-export interface EmployerHiringCategory {
-  id: string;
-  name: string;
-  description: string;
-}
-
-export const EMPLOYER_HIRING_CATEGORIES: EmployerHiringCategory[] = [
-  { id: "ec1", name: "Web Development", description: "Sites, web apps and landing pages" },
-  { id: "ec2", name: "Mobile Development", description: "iOS, Android and cross-platform apps" },
-  { id: "ec3", name: "Graphic Design", description: "Logos, brand identity and print" },
-  { id: "ec4", name: "UI/UX Design", description: "Product and interface design" },
-  { id: "ec5", name: "Writing", description: "Copywriting, content and technical writing" },
-  { id: "ec6", name: "Marketing", description: "Digital marketing, social media, SEO" },
-  { id: "ec7", name: "Video Editing", description: "Video production and editing" },
-  { id: "ec8", name: "Photography", description: "Event and product photography" },
-  { id: "ec9", name: "Data", description: "Data analysis, science and engineering" },
-  { id: "ec10", name: "Tutoring", description: "Academic and skills tutoring" },
-  { id: "ec11", name: "Virtual Assistance", description: "Admin, research and scheduling" },
-  { id: "ec12", name: "Other", description: "Anything else you need help with" },
-];
+export const LEGACY_HIRING_CATEGORY_NAMES: Readonly<Record<string, string>> = {
+  ec1: "Web Development",
+  ec2: "Mobile Development",
+  ec3: "Graphic Design",
+  ec4: "UI/UX Design",
+  ec5: "Writing",
+  ec6: "Marketing",
+  ec7: "Video Editing",
+  ec8: "Photography",
+  ec9: "Data",
+  ec10: "Tutoring",
+  ec11: "Virtual Assistance",
+  ec12: "Other",
+};
 
 // ── Experience preference ───────────────────────────────────
 

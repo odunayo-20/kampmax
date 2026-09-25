@@ -5,7 +5,8 @@ import { Globe, Mail, MapPin, Pencil, Phone } from "lucide-react";
 import { cn, isValidEmail } from "@/lib/utils";
 import type { EmployerOnboardingDraft } from "@/types/employer";
 import { EMPLOYER_CONTACT_METHODS } from "@/config/employer";
-import { EMPLOYER_HIRING_CATEGORIES } from "@/config/employer";
+import { LEGACY_HIRING_CATEGORY_NAMES } from "@/config/employer";
+import { useCategories } from "@/hooks/use-taxonomy";
 
 function InfoRow({
   icon,
@@ -43,9 +44,6 @@ function InfoRow({
   );
 }
 
-const categoryName = (id: string) =>
-  EMPLOYER_HIRING_CATEGORIES.find((c) => c.id === id)?.name ?? id;
-
 const contactLabel = (value?: string) =>
   EMPLOYER_CONTACT_METHODS.find((c) => c.value === value)?.label ?? value;
 
@@ -63,6 +61,9 @@ export function EmployerProfileView({
   editHref: string;
   editLabel: string;
 }) {
+  const { nameById } = useCategories("JOB");
+  const categoryName = (id: string) => nameById.get(id) ?? LEGACY_HIRING_CATEGORY_NAMES[id] ?? id;
+
   const isOrgLike =
     draft.clientType === "business" ||
     draft.clientType === "organization" ||

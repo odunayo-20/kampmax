@@ -42,9 +42,8 @@ import {
   marketplaceServiceProviders,
   marketplaceServices,
   marketplaceServiceReviews,
-  serviceCategorySlug,
-  serviceCategoryBySlug,
 } from "@/data/service-marketplace";
+import { subtreeNodes, type TaxonomyNode } from "@/services/taxonomy";
 
 export async function getMarketplaceServicesApi(query: MarketplaceServiceQuery = {}): Promise<MarketplaceServicePage> {
   const params = new URLSearchParams();
@@ -85,29 +84,40 @@ export function getProviderDisplayName(providerId: string): string {
 
 // ── Categories (taxonomy + counts) ────────────────────────────
 
-export function getServiceCategories(): ServiceMarketplaceCategory[] {
+const nameSlug = (name: string) =>
+  name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+
+/**
+ * Category ids a listing may carry for a SERVICE-taxonomy node: the node's own
+ * and its descendants' ids, plus the legacy ids ("cat3") on seeded demo
+ * listings whose category name matches one of those nodes.
+ */
+export function categoryIdsFor(node: TaxonomyNode): string[] {
+  const nodes = subtreeNodes(node);
+  const ids = new Set(nodes.map((n) => n.id));
+  for (const legacy of SP_SERVICE_CATEGORIES) {
+    if (nodes.some((n) => n.slug === nameSlug(legacy.name))) ids.add(legacy.id);
+  }
+  return [...ids];
+}
+
+/** Browse categories = the root nodes of the SERVICE taxonomy, with live counts. */
+export function getServiceCategories(roots: TaxonomyNode[]): ServiceMarketplaceCategory[] {
   const active = getActiveServices();
-  return SP_SERVICE_CATEGORIES.map((c) => ({
-    id: c.id,
-    name: c.name,
-    group: c.group,
-    slug: serviceCategorySlug(c.id),
-    serviceCount: active.filter((s) => s.categoryId === c.id).length,
-  }));
+  return roots.map((r) => {
+    const ids = new Set(categoryIdsFor(r));
+    return {
+      id: r.id,
+      name: r.name,
+      group: r.name,
+      slug: r.slug,
+      serviceCount: active.filter((s) => ids.has(s.categoryId)).length,
+    };
+  });
 }
 
 export function getServiceCategoryName(categoryId: string): string {
   return spServiceCategoryName(categoryId);
-}
-
-export function getServiceCategoryBySlug(slug: string): ServiceMarketplaceCategory | undefined {
-  const raw = serviceCategoryBySlug(slug);
-  if (!raw) return undefined;
-  return getServiceCategories().find((c) => c.id === raw.id);
-}
-
-export function getServiceCategoryById(id: string): ServiceMarketplaceCategory | undefined {
-  return getServiceCategories().find((c) => c.id === id);
 }
 
 // ── Pricing & location display (backend-authoritative) ────────
@@ -250,7 +260,10 @@ export function getServicePage(query: MarketplaceServiceQuery = {}): Marketplace
     const q = query.q.trim();
     if (q) items = items.filter((s) => matchesQuery(s, providersById[s.providerId], q));
   }
-  if (query.categoryId) {
+  if (query.categoryIds?.length) {
+    const allowed = new Set(query.categoryIds);
+    items = items.filter((s) => allowed.has(s.categoryId));
+  } else if (query.categoryId) {
     items = items.filter((s) => s.categoryId === query.categoryId);
   }
   if (query.campusId) {

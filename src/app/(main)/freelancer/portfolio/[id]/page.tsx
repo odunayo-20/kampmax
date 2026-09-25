@@ -10,9 +10,11 @@ import type { FreelancerPortfolioItem } from "@/types/freelancer";
 import { PortfolioActionMenu, PortfolioErrorState, PortfolioGridSkeleton } from "@/components/freelancer/portfolio";
 import type { PortfolioAction } from "@/components/freelancer/portfolio";
 import { categoryLabel } from "@/components/freelancer/services";
+import { useCategories } from "@/hooks/use-taxonomy";
 import { Button } from "@/components/ui";
 
 export default function PortfolioDetailPage() {
+  useCategories("SERVICE"); // warms id -> name for categoryLabel()
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const id = params.id;

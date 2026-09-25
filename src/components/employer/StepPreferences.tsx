@@ -5,10 +5,10 @@ import { Input, Select } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import {
   EMPLOYER_EXPERIENCE_LEVELS,
-  EMPLOYER_HIRING_CATEGORIES,
   EMPLOYER_PROJECT_DURATIONS,
   EMPLOYER_WORK_TYPES,
 } from "@/config/employer";
+import { useCategoryTree } from "@/hooks/use-taxonomy";
 import type { EmployerOnboardingDraft } from "@/types/employer";
 
 interface StepPreferencesProps {
@@ -19,6 +19,7 @@ interface StepPreferencesProps {
 export function StepPreferences({ draft, onUpdate }: StepPreferencesProps) {
   const [budgetError, setBudgetError] = useState<string | null>(null);
   const prefs = draft?.preferences ?? { categories: [] as string[] };
+  const { data: hiringCategories = [], isLoading: categoriesLoading } = useCategoryTree("JOB");
 
   const toggleCategory = (id: string) => {
     const current = prefs.categories;
@@ -56,8 +57,9 @@ export function StepPreferences({ draft, onUpdate }: StepPreferencesProps) {
         <legend className="block text-sm font-medium text-kampmax-text mb-3">
           Categories You Hire For <span className="text-kampmax-error">*</span>
         </legend>
+        {categoriesLoading && <p className="text-sm text-kampmax-text-secondary">Loading…</p>}
         <div className="grid gap-3 sm:grid-cols-2">
-          {EMPLOYER_HIRING_CATEGORIES.map((cat) => {
+          {hiringCategories.map((cat) => {
             const selected = draft?.preferences.categories.includes(cat.id) ?? false;
             return (
               <label
@@ -78,7 +80,7 @@ export function StepPreferences({ draft, onUpdate }: StepPreferencesProps) {
                 <span className="flex-1">
                   <span className="block font-medium text-kampmax-text text-sm">{cat.name}</span>
                   <span className="block text-xs text-kampmax-text-secondary">
-                    {cat.description}
+                    {cat.description ?? ""}
                   </span>
                 </span>
               </label>

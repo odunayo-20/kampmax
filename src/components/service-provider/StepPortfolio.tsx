@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Plus, Image, Trash2, X, Camera, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button, Input, Select } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { TaxonomySelect } from "@/components/taxonomy";
 import type { ServiceProviderOnboardingDraft, ServiceProviderPortfolioItemDraft } from "@/types/service-provider";
 
 interface StepPortfolioProps {
@@ -179,24 +180,12 @@ export function StepPortfolio({ draft, onUpdate }: StepPortfolioProps) {
                   className="w-full px-3 py-2 text-sm bg-white border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600/20 resize-y"
                   maxLength={300}
                 />
-                <Select
+                <TaxonomySelect
+                  type="SERVICE"
                   value={item.categoryId}
-                  onChange={(e) => updateItem(index, { categoryId: e.target.value })}
-                >
-                  <option value="">Select category</option>
-                  <option value="cat1">Beauty & Personal Care</option>
-                  <option value="cat2">Education & Tutoring</option>
-                  <option value="cat3">Technology & IT</option>
-                  <option value="cat4">Repairs & Maintenance</option>
-                  <option value="cat5">Creative & Design</option>
-                  <option value="cat6">Home Services</option>
-                  <option value="cat7">Transportation</option>
-                  <option value="cat8">Food & Catering</option>
-                  <option value="cat9">Events & Entertainment</option>
-                  <option value="cat10">Fitness & Wellness</option>
-                  <option value="cat11">Professional Services</option>
-                  <option value="cat12">Printing & Stationery</option>
-                </Select>
+                  onChange={(id) => updateItem(index, { categoryId: id })}
+                  placeholder="Select category"
+                />
               </div>
             </div>
           ))}

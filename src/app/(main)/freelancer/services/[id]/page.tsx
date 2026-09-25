@@ -9,6 +9,7 @@ import type { FreelancerService } from "@/types/freelancer-services";
 import { ServiceStatusBadge, ServicePreview, ServiceActions } from "@/components/freelancer/services";
 import type { ServiceActionKind } from "@/components/freelancer/services";
 import { categoryLabel, servicePriceLabel } from "@/components/freelancer/services";
+import { useCategories } from "@/hooks/use-taxonomy";
 import {
   pauseMyService,
   resumeMyService,
@@ -229,6 +230,7 @@ function DetailContent() {
 }
 
 export default function ServiceDetailPage() {
+  useCategories("SERVICE"); // warms id -> name for categoryLabel()
   return (
     <Suspense fallback={null}>
       <DetailContent />

@@ -1,25 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useCategoryTree } from "@/hooks/use-taxonomy";
 import { Search, ChevronDown, Plus, X, Tag } from "lucide-react";
 import { Button, Input } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import type { ServiceProviderOnboardingDraft } from "@/types/service-provider";
 
-const CATEGORIES = [
-  { id: "cat1", name: "Beauty & Personal Care", icon: "💇", sub: "Hair, makeup, nails, spa" },
-  { id: "cat2", name: "Education & Tutoring", icon: "📚", sub: "Academic tutoring, skills, languages" },
-  { id: "cat3", name: "Technology & IT", icon: "💻", sub: "Repair, setup, development, support" },
-  { id: "cat4", name: "Repairs & Maintenance", icon: "🔧", sub: "Phone, laptop, appliance, auto" },
-  { id: "cat5", name: "Creative & Design", icon: "🎨", sub: "Graphics, video, photography, writing" },
-  { id: "cat6", name: "Home Services", icon: "🏠", sub: "Cleaning, plumbing, electrical, carpentry" },
-  { id: "cat7", name: "Transportation", icon: "🚗", sub: "Rides, delivery, logistics" },
-  { id: "cat8", name: "Food & Catering", icon: "🍽️", sub: "Meals, baking, events, meal prep" },
-  { id: "cat9", name: "Events & Entertainment", icon: "🎉", sub: "Planning, decor, DJ, photography" },
-  { id: "cat10", name: "Fitness & Wellness", icon: "💪", sub: "Training, yoga, massage, nutrition" },
-  { id: "cat11", name: "Professional Services", icon: "📋", sub: "Legal, accounting, consulting, CV writing" },
-  { id: "cat12", name: "Printing & Stationery", icon: "🖨️", sub: "Printing, binding, design, supplies" },
-];
 
 interface StepCategoryProps {
   draft: ServiceProviderOnboardingDraft | null;
@@ -28,6 +15,18 @@ interface StepCategoryProps {
 
 export function StepCategory({ draft, onUpdate }: StepCategoryProps) {
   const [search, setSearch] = useState("");
+  const { data: tree = [] } = useCategoryTree("SERVICE");
+  // Root SERVICE categories; the subtitle is the admin description or the subcategory names.
+  const CATEGORIES = useMemo(
+    () =>
+      tree.map((n) => ({
+        id: n.id,
+        name: n.name,
+        icon: n.icon ?? "🏷️",
+        sub: n.description ?? n.children.map((c) => c.name).join(", "),
+      })),
+    [tree]
+  );
   const [primaryOpen, setPrimaryOpen] = useState(false);
   const [secondaryOpen, setSecondaryOpen] = useState(false);
 

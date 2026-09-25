@@ -4,9 +4,11 @@ import Image from "next/image";
 import { ImageIcon, ExternalLink, Calendar } from "lucide-react";
 import type { FreelancerPortfolioItem } from "@/types/freelancer";
 import { categoryLabel } from "../services/serviceHelpers";
+import { useCategories } from "@/hooks/use-taxonomy";
 
 /** Public-style preview of a portfolio item — what clients see. */
 export function PortfolioPreview({ item }: { item: FreelancerPortfolioItem }) {
+  useCategories("SERVICE"); // warms id -> name for categoryLabel()
   return (
     <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
       <div className="relative aspect-[4/3] w-full bg-neutral-100">

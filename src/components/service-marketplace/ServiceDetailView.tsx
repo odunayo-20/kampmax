@@ -21,7 +21,9 @@ import type {
 } from "@/types/service-marketplace";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
+import { useCategoryTree } from "@/hooks/use-taxonomy";
 import {
+  categoryIdsFor,
   getProviderById,
   getProviderReviews,
   getProviderReviewSummary,
@@ -62,8 +64,12 @@ export function ServiceDetailView({
 
   const isQuoteOnly = service.pricingModel === "quote";
 
-  const categories = useMemo(() => getServiceCategories(), []);
-  const serviceCategory = categories.find((c) => c.id === service.categoryId);
+  const { data: categoryTree } = useCategoryTree("SERVICE");
+  const categories = useMemo(() => getServiceCategories(categoryTree ?? []), [categoryTree]);
+  const serviceCategory = useMemo(() => {
+    const root = (categoryTree ?? []).find((r) => categoryIdsFor(r).includes(service.categoryId));
+    return root ? categories.find((c) => c.id === root.id) : undefined;
+  }, [categoryTree, categories, service.categoryId]);
   const reviewSummary = useMemo(() => getProviderReviewSummary(provider.id), [provider.id]);
   const serviceReviews = useMemo(
     () => getProviderReviews(provider.id, service.id).slice(0, 3),

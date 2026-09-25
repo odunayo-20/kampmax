@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Plus, Trash2, ChevronDown, Tag, Clock, DollarSign, MapPin, Globe, Home, Wifi, Settings } from "lucide-react";
 import { Button, Input, Select } from "@/components/ui";
 import { cn, formatNaira } from "@/lib/utils";
+import { TaxonomySelect } from "@/components/taxonomy";
 import type { ServiceProviderOnboardingDraft, ServiceProviderServiceDraft, ServiceProviderPricingModel, ServiceProviderLocationType, ServiceProviderServiceStatus } from "@/types/service-provider";
 
 const PRICING_MODELS = [
@@ -176,24 +177,12 @@ function ServiceCard({
             <label className="block text-sm font-medium text-kampmax-text mb-1.5">
               Category <span className="text-kampmax-error">*</span>
             </label>
-            <Select
+            <TaxonomySelect
+              type="SERVICE"
               value={service.categoryId}
-              onChange={(e) => onUpdate({ categoryId: e.target.value })}
-            >
-              <option value="">Select category</option>
-              <option value="cat1">Beauty & Personal Care</option>
-              <option value="cat2">Education & Tutoring</option>
-              <option value="cat3">Technology & IT</option>
-              <option value="cat4">Repairs & Maintenance</option>
-              <option value="cat5">Creative & Design</option>
-              <option value="cat6">Home Services</option>
-              <option value="cat7">Transportation</option>
-              <option value="cat8">Food & Catering</option>
-              <option value="cat9">Events & Entertainment</option>
-              <option value="cat10">Fitness & Wellness</option>
-              <option value="cat11">Professional Services</option>
-              <option value="cat12">Printing & Stationery</option>
-            </Select>
+              onChange={(id) => onUpdate({ categoryId: id })}
+              placeholder="Select category"
+            />
           </div>
         </div>
 

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Package, SearchX } from "lucide-react";
 import { Button } from "@/components/ui";
 import { getCategories } from "@/services/categories";
-import { getServiceCategories } from "@/services/service-marketplace";
+import { useServiceCategories } from "@/hooks/useServiceMarketplace";
 import { cn } from "@/lib/utils";
 
 interface SearchEmptyStateProps {
@@ -27,7 +27,7 @@ export function SearchEmptyState({
   onClearFilters,
   className,
 }: SearchEmptyStateProps) {
-  const serviceCategories = getServiceCategories();
+  const serviceCategories = useServiceCategories();
   const browseLinks: { label: string; href: string }[] = [
     {
       label: "Marketplace",

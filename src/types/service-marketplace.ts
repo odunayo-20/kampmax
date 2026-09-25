@@ -144,6 +144,8 @@ export type ServicePriceBucket =
 export interface MarketplaceServiceQuery {
   q?: string;
   categoryId?: string;
+  /** Expanded set of ids a listing may carry for the chosen category (node + descendants). */
+  categoryIds?: string[];
   campusId?: string;
   ratingMin?: number;
   priceBucket?: ServicePriceBucket;

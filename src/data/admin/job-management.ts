@@ -31,7 +31,7 @@ import type {
 } from "@/types/admin";
 import type { Opportunity, Proposal } from "@/types/opportunity";
 import { getEmployerOnboardingDraft } from "@/data/employer";
-import { EMPLOYER_HIRING_CATEGORIES } from "@/config/employer";
+import { LEGACY_HIRING_CATEGORY_NAMES } from "@/config/employer";
 import { getCampusShortName } from "@/data/admin/campuses";
 import {
   getAllOpportunities,
@@ -39,12 +39,9 @@ import {
   getProposalCountForOpportunity,
 } from "@/data/opportunity";
 
-const CATEGORY_NAME = new Map(
-  EMPLOYER_HIRING_CATEGORIES.map((c) => [c.id, c.name] as const)
-);
-
-export function jobCategoryName(categoryId: string): string {
-  return CATEGORY_NAME.get(categoryId) ?? "Uncategorized";
+/** Prefer the name delivered with the job (taxonomy); the legacy map only labels old demo ids. */
+export function jobCategoryName(categoryId: string, categoryName?: string): string {
+  return categoryName ?? LEGACY_HIRING_CATEGORY_NAMES[categoryId] ?? "Uncategorized";
 }
 
 // ------------------------------------------------------------
@@ -208,7 +205,7 @@ export function buildJobDataset(): JobDataset {
       publication: publicationOf(opp.status),
       moderation: moderationOf(opp.status),
       categoryId: opp.categoryId,
-      categoryName: jobCategoryName(opp.categoryId),
+      categoryName: jobCategoryName(opp.categoryId, opp.categoryName),
       skills: opp.skills,
       workArrangement: opp.workArrangement,
       experienceLevel: opp.experienceLevel,
@@ -333,7 +330,7 @@ function buildDetail(
       requirements: opp.requirements,
       skills: opp.skills,
       categoryId: opp.categoryId,
-      categoryName: jobCategoryName(opp.categoryId),
+      categoryName: jobCategoryName(opp.categoryId, opp.categoryName),
       status: opp.status,
       publication: publicationOf(opp.status),
       moderation: moderationOf(opp.status),
@@ -513,7 +510,8 @@ export function computeJobFacets(rows: ManagedJobRow[]): ManagedJobFacets {
   }
 
   for (const [id, count] of categoriesMap) {
-    categories.push({ id, name: jobCategoryName(id), count });
+    const sample = rows.find((r) => r.categoryId === id);
+    categories.push({ id, name: sample?.categoryName ?? jobCategoryName(id), count });
   }
   categories.sort((a, b) => a.name.localeCompare(b.name));
 

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Input, Select, Button } from "@/components/ui";
-import { FREELANCER_CATEGORIES } from "@/config/freelancer";
+import { TaxonomySelect, TaxonomyMultiSelect } from "@/components/taxonomy";
 import {
   FREELANCER_SERVICE_DELIVERY_OPTIONS,
   FREELANCER_SERVICE_PRICING_OPTIONS,
@@ -12,7 +12,6 @@ import type {
   FreelancerServiceInput,
 } from "@/types/freelancer-services";
 import { FREELANCER_SERVICE_PRICING } from "@/types/freelancer-services";
-import { categoryLabel, skillsForCategory } from "./serviceHelpers";
 import { X } from "lucide-react";
 
 export interface ServiceFormValues extends FreelancerServiceInput {}
@@ -66,17 +65,6 @@ export function ServiceForm({ initial, onSubmit, onCancel, isSubmitting }: Servi
     setValues((v) => ({ ...v, [key]: value }));
   };
 
-  const categorySkills = skillsForCategory(values.categoryId);
-
-  function toggleSkill(skill: string) {
-    setValues((v) => ({
-      ...v,
-      skills: v.skills.includes(skill)
-        ? v.skills.filter((s) => s !== skill)
-        : [...v.skills, skill],
-    }));
-  }
-
   function addDeliverable() {
     const next = newDeliverable.trim();
     if (!next) return;
@@ -128,22 +116,13 @@ export function ServiceForm({ initial, onSubmit, onCancel, isSubmitting }: Servi
           />
           <div>
             <label className="mb-1.5 block text-sm font-medium text-neutral-900">Category</label>
-            <Select
+            <TaxonomySelect
+              type="SERVICE"
               value={values.categoryId}
-              onChange={(e) => {
-                set("categoryId", e.target.value);
-                set("skills", []);
-              }}
+              onChange={(id) => set("categoryId", id)}
               placeholder="Select a category"
               error={errors.categoryId}
-            >
-              {FREELANCER_CATEGORIES.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </Select>
-            <p className="mt-1 text-xs text-neutral-500">{categoryLabel(values.categoryId)}</p>
+            />
           </div>
           <Input
             label="Short description"
@@ -179,39 +158,17 @@ export function ServiceForm({ initial, onSubmit, onCancel, isSubmitting }: Servi
         <p className="mt-1 text-xs text-neutral-500">
           Select the skills that describe this service. Pick at least one.
         </p>
-        {values.categoryId ? (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {categorySkills.map((skill) => {
-              const selected = values.skills.includes(skill);
-              return (
-                <button
-                  key={skill}
-                  type="button"
-                  onClick={() => toggleSkill(skill)}
-                  aria-pressed={selected}
-                  className={
-                    selected
-                      ? "rounded-full bg-primary-600 px-3 py-1 text-xs font-medium text-white"
-                      : "rounded-full border border-neutral-300 px-3 py-1 text-xs font-medium text-neutral-600 hover:border-primary-400"
-                  }
-                >
-                  {skill}
-                </button>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="mt-3 text-xs text-neutral-400">Choose a category first to see skills.</p>
-        )}
-        {errors.skills ? (
-          <p className="mt-2 text-xs text-kampmax-error">{errors.skills}</p>
-        ) : (
-          values.skills.length > 0 && (
-            <p className="mt-2 text-xs text-neutral-500">
-              Selected: {values.skills.join(", ")}
-            </p>
-          )
-        )}
+        <div className="mt-3">
+          <TaxonomyMultiSelect
+            type="SKILL"
+            valueBy="name"
+            leafOnly
+            value={values.skills}
+            onChange={(skills) => set("skills", skills)}
+            placeholder="Search skills…"
+          />
+        </div>
+        {errors.skills && <p className="mt-2 text-xs text-kampmax-error">{errors.skills}</p>}
       </section>
 
       {/* Pricing & delivery */}

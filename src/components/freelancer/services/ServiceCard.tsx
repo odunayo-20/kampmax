@@ -7,6 +7,7 @@ import type { FreelancerService } from "@/types/freelancer-services";
 import { ServiceStatusBadge } from "./ServiceStatusBadge";
 import { categoryLabel, servicePriceLabel } from "./serviceHelpers";
 import { formatDate } from "@/lib/utils";
+import { useCategories } from "@/hooks/use-taxonomy";
 
 export function ServiceCard({
   service,
@@ -15,6 +16,7 @@ export function ServiceCard({
   service: FreelancerService;
   onAction?: (service: FreelancerService) => void;
 }) {
+  useCategories("SERVICE"); // warms id -> name for categoryLabel()
   const price = servicePriceLabel(service);
 
   return (

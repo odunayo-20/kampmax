@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Briefcase, Package, Wrench } from "lucide-react";
 import { getCategories } from "@/services/categories";
-import { getServiceCategories } from "@/services/service-marketplace";
+import { useServiceCategories } from "@/hooks/useServiceMarketplace";
 import { cn } from "@/lib/utils";
 
 /**
@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
  */
 export function SearchCategoryBrowse({ className }: { className?: string }) {
   const marketplaceCategories = getCategories();
-  const serviceCategories = getServiceCategories();
+  const serviceCategories = useServiceCategories();
 
   return (
     <div className={cn("space-y-8", className)}>

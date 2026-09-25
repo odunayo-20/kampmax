@@ -6,8 +6,10 @@ import type { MarketplaceProvider, MarketplaceService } from "@/types/service-ma
 import { useApp } from "@/lib/app-context";
 import { useDebounce } from "@/hooks/use-debounce";
 import { campuses } from "@/data/campus";
-import { serviceCategoryBySlug } from "@/data/service-marketplace";
+import { useCategoryTree } from "@/hooks/use-taxonomy";
+import { findTaxonomyNode } from "@/services/taxonomy";
 import {
+  categoryIdsFor,
   getProviderById,
   getServiceCategories,
   getServicePage,
@@ -19,6 +21,12 @@ import {
   SORT_OPTIONS,
   type ServiceMarketplaceFilters,
 } from "@/components/service-marketplace/constants";
+
+/** Browse categories: the root nodes of the SERVICE taxonomy (API), with live counts. */
+export function useServiceCategories() {
+  const { data: tree } = useCategoryTree("SERVICE");
+  return useMemo(() => getServiceCategories(tree ?? []), [tree]);
+}
 
 const PAGE_SIZE = 12;
 const RATING_CHOICES = [2, 3, 4];
@@ -35,10 +43,8 @@ function parseSearchParams(sp: URLSearchParams, lockedCategoryId?: string): { fi
   const q = sp.get("q");
   if (q) filters.q = q;
   const category = sp.get("category");
-  if (category) {
-    const bySlug = serviceCategoryBySlug(category);
-    filters.categoryId = bySlug ? bySlug.id : category;
-  }
+  // A taxonomy id or slug; resolved against the loaded SERVICE tree at fetch time.
+  if (category) filters.categoryId = category;
   if (lockedCategoryId) filters.categoryId = lockedCategoryId;
   const campus = sp.get("campus");
   if (campus) filters.campusId = campus;
@@ -110,7 +116,8 @@ export function useServiceMarketplace(options?: UseServiceMarketplaceOptions) {
   const [totalPages, setTotalPages] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const categories = useMemo(() => getServiceCategories(), []);
+  const { data: categoryTree } = useCategoryTree("SERVICE");
+  const categories = useMemo(() => getServiceCategories(categoryTree ?? []), [categoryTree]);
   const campusOptions = useMemo(
     () => campuses.map((c) => ({ id: c.id, name: c.name, abbreviation: c.abbreviation })),
     []
@@ -128,11 +135,15 @@ export function useServiceMarketplace(options?: UseServiceMarketplaceOptions) {
 
   // Fetch. Debounced query only fires 350ms after the user stops typing.
   useEffect(() => {
+    // A category filter can only be resolved once the taxonomy has loaded.
+    if (filters.categoryId && !categoryTree) return;
     setIsLoading(true);
+    const node = filters.categoryId && categoryTree ? findTaxonomyNode(categoryTree, filters.categoryId) : undefined;
     const timeout = setTimeout(() => {
       const result = getServicePage({
         q: debouncedQ,
         categoryId: filters.categoryId || undefined,
+        categoryIds: node ? categoryIdsFor(node) : undefined,
         campusId: filters.campusId || selectedCampus.id,
         ratingMin: filters.ratingMin || undefined,
         priceBucket: filters.priceBucket || undefined,
@@ -154,7 +165,7 @@ export function useServiceMarketplace(options?: UseServiceMarketplaceOptions) {
       setIsLoading(false);
     }, 200);
     return () => clearTimeout(timeout);
-  }, [debouncedQ, filters.categoryId, filters.campusId, filters.ratingMin, filters.priceBucket, filters.locationType, filters.sort, page, selectedCampus.id]);
+  }, [categoryTree, debouncedQ, filters.categoryId, filters.campusId, filters.ratingMin, filters.priceBucket, filters.locationType, filters.sort, page, selectedCampus.id]);
 
   const setFilter = useCallback(
     <K extends keyof ServiceMarketplaceFilters>(key: K, value: ServiceMarketplaceFilters[K]) => {

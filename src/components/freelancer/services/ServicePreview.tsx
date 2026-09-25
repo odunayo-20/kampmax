@@ -4,6 +4,7 @@ import Image from "next/image";
 import { Clock, Grid2X2, Check, ExternalLink } from "lucide-react";
 import type { FreelancerService } from "@/types/freelancer-services";
 import { categoryLabel, servicePriceLabel } from "./serviceHelpers";
+import { useCategories } from "@/hooks/use-taxonomy";
 
 /**
  * Public-style preview of a freelancer service. Reused for the "preview before
@@ -11,6 +12,7 @@ import { categoryLabel, servicePriceLabel } from "./serviceHelpers";
  * client would. No private fields are rendered.
  */
 export function ServicePreview({ service }: { service: FreelancerService }) {
+  useCategories("SERVICE"); // warms id -> name for categoryLabel()
   const price = servicePriceLabel(service);
 
   return (

@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/api-client";
+import { getApiBaseUrl } from "@/lib/api-config";
 
 /**
  * Taxonomy API client (NestJS categories module). Every selectable
@@ -64,6 +65,42 @@ export async function fetchTaxonomyTree(type: TaxonomyType): Promise<TaxonomyNod
 /** Active direct children of one category. */
 export function fetchTaxonomyChildren(parentId: string): Promise<TaxonomyNode[]> {
   return unwrap(apiClient.get<TaxonomyNode[]>(`/categories/${parentId}/children`));
+}
+
+/** Find a node (any depth) by id or slug. */
+export function findTaxonomyNode(tree: TaxonomyNode[], idOrSlug: string): TaxonomyNode | undefined {
+  for (const node of tree) {
+    if (node.id === idOrSlug || node.slug === idOrSlug) return node;
+    const inChild = findTaxonomyNode(node.children, idOrSlug);
+    if (inChild) return inChild;
+  }
+  return undefined;
+}
+
+/** The node plus all of its descendants. */
+export function subtreeNodes(node: TaxonomyNode): TaxonomyNode[] {
+  return [node, ...node.children.flatMap(subtreeNodes)];
+}
+
+/**
+ * Server-safe single-category lookup by slug (used by server-rendered pages
+ * for metadata and 404s). Returns null when missing or inactive.
+ */
+export async function fetchTaxonomyNodeBySlug(
+  type: TaxonomyType,
+  slug: string
+): Promise<Pick<TaxonomyNode, "id" | "name" | "slug" | "taxonomy" | "parentId"> | null> {
+  try {
+    const url = new URL(
+      `/api/v1/categories/${encodeURIComponent(slug)}?type=${type}`,
+      getApiBaseUrl()
+    );
+    const res = await fetch(url, { next: { revalidate: 60 } });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
 
 /** Depth-first flatten of a tree, keeping each node's depth and root ancestor. */

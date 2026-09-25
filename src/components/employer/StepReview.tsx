@@ -5,7 +5,7 @@ import { Button } from "@/components/ui";
 import {
   EMPLOYER_BUSINESS_TYPES,
   EMPLOYER_EXPERIENCE_LEVELS,
-  EMPLOYER_HIRING_CATEGORIES,
+  LEGACY_HIRING_CATEGORY_NAMES,
   EMPLOYER_PROJECT_DURATIONS,
   EMPLOYER_WORK_PREFERENCES,
   EMPLOYER_WORK_TYPES,
@@ -16,6 +16,7 @@ import {
 import { getEmployerPublicPreview } from "@/services/employer";
 import { getCampusById } from "@/services/campus";
 import { formatNaira } from "@/lib/utils";
+import { useCategories } from "@/hooks/use-taxonomy";
 import type { EmployerOnboardingDraft } from "@/types/employer";
 
 interface StepReviewProps {
@@ -35,13 +36,14 @@ function labelFor<T extends readonly { value: string; label: string }[]>(
 }
 
 export function StepReview({ draft, onSubmit, isSubmitting = false, onEditStep }: StepReviewProps) {
+  const { nameById } = useCategories("JOB");
   const preview = getEmployerPublicPreview(draft);
   const campus = draft?.location.campusId ? getCampusById(draft.location.campusId) : undefined;
   const clientTypeLabel =
     EMPLOYER_CLIENT_TYPES.find((t) => t.value === draft?.clientType)?.label ?? "—";
 
   const categoryNames = (draft?.preferences.categories ?? [])
-    .map((id) => EMPLOYER_HIRING_CATEGORIES.find((c) => c.id === id)?.name)
+    .map((id) => nameById.get(id) ?? LEGACY_HIRING_CATEGORY_NAMES[id])
     .filter(Boolean) as string[];
 
   const workPrefLabel = labelFor(EMPLOYER_WORK_PREFERENCES, draft?.location.workPreference);

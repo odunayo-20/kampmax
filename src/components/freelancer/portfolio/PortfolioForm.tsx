@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import { Input, Select, Button } from "@/components/ui";
-import { FREELANCER_CATEGORIES } from "@/config/freelancer";
+import { TaxonomySelect, TaxonomyMultiSelect } from "@/components/taxonomy";
 import type { FreelancerPortfolioItem } from "@/types/freelancer";
-import { skillsForCategory } from "../services/serviceHelpers";
 
 export interface PortfolioFormValues {
   title: string;
@@ -49,17 +48,6 @@ export function PortfolioForm({ initial, onSubmit, onCancel, isSubmitting }: Por
     setValues((v) => ({ ...v, [key]: value }));
   };
 
-  const categorySkills = values.categoryId ? skillsForCategory(values.categoryId) : [];
-
-  function toggleSkill(skill: string) {
-    setValues((v) => ({
-      ...v,
-      skills: v.skills.includes(skill)
-        ? v.skills.filter((s) => s !== skill)
-        : [...v.skills, skill],
-    }));
-  }
-
   function validate(): boolean {
     const e: Record<string, string> = {};
     if (!values.title.trim()) e.title = "Title is required.";
@@ -101,20 +89,12 @@ export function PortfolioForm({ initial, onSubmit, onCancel, isSubmitting }: Por
           />
           <div>
             <label className="mb-1.5 block text-sm font-medium text-neutral-900">Category</label>
-            <Select
+            <TaxonomySelect
+              type="SERVICE"
               value={values.categoryId ?? ""}
-              onChange={(e) => {
-                set("categoryId", e.target.value || undefined);
-                set("skills", []);
-              }}
+              onChange={(id) => set("categoryId", id || undefined)}
               placeholder="Select a category (optional)"
-            >
-              {FREELANCER_CATEGORIES.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </Select>
+            />
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium text-neutral-900">Description</label>
@@ -141,33 +121,17 @@ export function PortfolioForm({ initial, onSubmit, onCancel, isSubmitting }: Por
 
       <section className="rounded-xl border border-neutral-200 bg-white p-5">
         <h2 className="text-sm font-semibold text-neutral-900">Skills</h2>
-        <p className="mt-1 text-xs text-neutral-500">
-          {values.categoryId
-            ? "Select the skills used on this project."
-            : "Choose a category to see relevant skills (optional)."}
-        </p>
-        {values.categoryId && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {categorySkills.map((skill) => {
-              const selected = values.skills.includes(skill);
-              return (
-                <button
-                  key={skill}
-                  type="button"
-                  onClick={() => toggleSkill(skill)}
-                  aria-pressed={selected}
-                  className={
-                    selected
-                      ? "rounded-full bg-primary-600 px-3 py-1 text-xs font-medium text-white"
-                      : "rounded-full border border-neutral-300 px-3 py-1 text-xs font-medium text-neutral-600 hover:border-primary-400"
-                  }
-                >
-                  {skill}
-                </button>
-              );
-            })}
-          </div>
-        )}
+        <p className="mt-1 text-xs text-neutral-500">Select the skills used on this project (optional).</p>
+        <div className="mt-3">
+          <TaxonomyMultiSelect
+            type="SKILL"
+            valueBy="name"
+            leafOnly
+            value={values.skills}
+            onChange={(skills) => set("skills", skills)}
+            placeholder="Search skills…"
+          />
+        </div>
       </section>
 
       <section className="rounded-xl border border-neutral-200 bg-white p-5">

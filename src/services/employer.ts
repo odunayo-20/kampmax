@@ -45,7 +45,6 @@ import {
   isEmployerBlockingStatus,
 } from "@/types/employer";
 import {
-  EMPLOYER_HIRING_CATEGORIES,
   EMPLOYER_EXPERIENCE_LEVELS,
   EMPLOYER_WORK_TYPES,
   EMPLOYER_PROJECT_DURATIONS,
@@ -498,7 +497,6 @@ export function getEmployerCampusOptions() {
 
 // ── Profile update (mass-assignment safe) ────────────────────
 
-const VALID_CATEGORY_IDS = new Set<string>(EMPLOYER_HIRING_CATEGORIES.map((c) => c.id));
 const VALID_EXPERIENCE = new Set<string>(EMPLOYER_EXPERIENCE_LEVELS.map((e) => e.value));
 const VALID_WORK_TYPES = new Set<string>(EMPLOYER_WORK_TYPES.map((w) => w.value));
 const VALID_DURATIONS = new Set<string>(EMPLOYER_PROJECT_DURATIONS.map((d) => d.value));
@@ -580,7 +578,10 @@ export function updateEmployerProfileForUser(
     const rawCats = Array.isArray(payload.preferences.categories)
       ? payload.preferences.categories
       : [];
-    const categories = rawCats.filter((c) => VALID_CATEGORY_IDS.has(c)).slice(0, 12);
+    // Ids come from the JOB taxonomy API; only shape is checked here.
+    const categories = rawCats
+      .filter((c) => typeof c === "string" && c.length > 0 && c.length <= 64)
+      .slice(0, 12);
 
     next.preferences = {
       categories,

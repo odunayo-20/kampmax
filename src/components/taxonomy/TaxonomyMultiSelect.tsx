@@ -16,6 +16,8 @@ interface Props {
   placeholder?: string;
   /** Only list nodes without children (e.g. skills under skill groups). */
   leafOnly?: boolean;
+  /** Store ids (default) or names; skills are sent to the backend by name. */
+  valueBy?: "id" | "name";
 }
 
 /**
@@ -31,6 +33,7 @@ export function TaxonomyMultiSelect({
   max,
   placeholder = "Search…",
   leafOnly = false,
+  valueBy = "id",
 }: Props) {
   const { categories, nameById, isLoading, isError } = useCategories(type);
   const [query, setQuery] = useState("");
@@ -38,15 +41,19 @@ export function TaxonomyMultiSelect({
   const selected = useMemo(() => new Set(value), [value]);
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const map = new Map<string, { id: string; name: string }[]>();
+    const map = new Map<string, { id: string; name: string; key: string }[]>();
     for (const node of categories) {
       if (leafOnly && node.hasChildren) continue;
       if (q && !node.name.toLowerCase().includes(q)) continue;
       const group = node.path[0] ?? (node.hasChildren ? node.name : "Other");
-      map.set(group, [...(map.get(group) ?? []), { id: node.id, name: node.name }]);
+      map.set(group, [
+        ...(map.get(group) ?? []),
+        { id: node.id, name: node.name, key: valueBy === "name" ? node.name : node.id },
+      ]);
     }
     return [...map.entries()];
-  }, [categories, query, leafOnly]);
+  }, [categories, query, leafOnly, valueBy]);
+  const labelOf = (v: string) => (valueBy === "name" ? v : (nameById.get(v) ?? "…"));
 
   const toggle = (id: string) => {
     if (selected.has(id)) return onChange(value.filter((v) => v !== id));
@@ -65,8 +72,8 @@ export function TaxonomyMultiSelect({
               key={id}
               className="inline-flex items-center gap-1 rounded-full bg-primary-100 px-2 py-0.5 text-xs text-primary-800"
             >
-              {nameById.get(id) ?? "…"}
-              <button type="button" aria-label={`Remove ${nameById.get(id) ?? "item"}`} onClick={() => toggle(id)}>
+              {labelOf(id)}
+              <button type="button" aria-label={`Remove ${labelOf(id)}`} onClick={() => toggle(id)}>
                 <X className="h-3 w-3" />
               </button>
             </span>
@@ -96,13 +103,13 @@ export function TaxonomyMultiSelect({
             <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-kampmax-text-secondary">{group}</p>
             <div className="flex flex-wrap gap-1.5">
               {items.map((item) => {
-                const on = selected.has(item.id);
+                const on = selected.has(item.key);
                 return (
                   <button
                     key={item.id}
                     type="button"
                     aria-pressed={on}
-                    onClick={() => toggle(item.id)}
+                    onClick={() => toggle(item.key)}
                     className={cn(
                       "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
                       on

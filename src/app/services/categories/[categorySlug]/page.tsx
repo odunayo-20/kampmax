@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { ServicesCategoryView } from "@/components/service-marketplace/ServicesBrowseView";
 import { ServiceCardSkeleton } from "@/components/service-marketplace/ServiceSkeletons";
 import { getSiteBaseUrl } from "@/lib/utils";
-import { getServiceCategoryBySlug } from "@/services/service-marketplace";
+import { fetchTaxonomyNodeBySlug } from "@/services/taxonomy";
 
 interface CategoryPageProps {
   params: Promise<{ categorySlug: string }>;
@@ -12,14 +12,14 @@ interface CategoryPageProps {
 
 export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
   const { categorySlug } = await params;
-  const category = getServiceCategoryBySlug(categorySlug);
+  const category = await fetchTaxonomyNodeBySlug("SERVICE", categorySlug);
   if (!category) {
     return { title: "Category not found | Kampmax" };
   }
   const baseUrl = getSiteBaseUrl();
   const canonical = `${baseUrl}/services/categories/${category.slug}`;
   const title = `${category.name} services | Kampmax`;
-  const description = `Browse ${category.name.toLowerCase()} services from verified providers in the ${category.group}. Filter by campus, price and rating, then book or request a quote.`;
+  const description = `Browse ${category.name.toLowerCase()} services from verified providers. Filter by campus, price and rating, then book or request a quote.`;
 
   return {
     title,
@@ -37,7 +37,7 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
 
 export default async function ServicesCategoryPage({ params }: CategoryPageProps) {
   const { categorySlug } = await params;
-  const category = getServiceCategoryBySlug(categorySlug);
+  const category = await fetchTaxonomyNodeBySlug("SERVICE", categorySlug);
   if (!category) notFound();
 
   return (

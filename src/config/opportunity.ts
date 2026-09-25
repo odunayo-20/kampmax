@@ -13,33 +13,13 @@ import type {
   ProposalStatus,
 } from "@/types/opportunity";
 import { OPPORTUNITY_STATUS, PROPOSAL_STATUS } from "@/types/opportunity";
-import { EMPLOYER_HIRING_CATEGORIES, EMPLOYER_EXPERIENCE_LEVELS } from "@/config/employer";
-import { FREELANCER_CATEGORIES } from "@/config/freelancer";
+import { EMPLOYER_EXPERIENCE_LEVELS } from "@/config/employer";
 
-// ── Re-export unified job taxonomy (single source of truth) ──
-// Both Module 23C discovery and Module 27 (Jobs Marketplace) use the
-// employer hiring categories added in Module 26 — one taxonomy, never two.
+// Job categories and skills come from the taxonomy API (JOB / SKILL types).
 
-export { EMPLOYER_HIRING_CATEGORIES as JOB_CATEGORIES };
 export { EMPLOYER_EXPERIENCE_LEVELS as JOB_EXPERIENCE_LEVELS };
 
 export { OPPORTUNITY_STATUS, PROPOSAL_STATUS };
-
-// ── Global skill list (derived from freelancer categories) ──
-// A flat, deduplicated list used by search/filter only (presentation).
-
-export const JOB_SKILLS: string[] = (() => {
-  const seen = new Set<string>();
-  for (const c of FREELANCER_CATEGORIES) {
-    for (const s of c.skills) {
-      const key = s.toLowerCase();
-      if (!seen.has(key)) {
-        seen.add(key);
-      }
-    }
-  }
-  return Array.from(seen);
-})();
 
 // ── Work arrangement labels ─────────────────────────────────
 

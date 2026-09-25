@@ -11,7 +11,6 @@ import type {
 } from "@/types/employer";
 import {
   EMPLOYER_CONTACT_METHODS,
-  EMPLOYER_HIRING_CATEGORIES,
   EMPLOYER_EXPERIENCE_LEVELS,
   EMPLOYER_WORK_TYPES,
   EMPLOYER_PROJECT_DURATIONS,
@@ -21,6 +20,7 @@ import {
   isOrganizationLikeClientType,
 } from "@/config/employer";
 import { getEmployerCampusOptions } from "@/services/employer";
+import { useCategoryTree } from "@/hooks/use-taxonomy";
 import { fetchCampuses } from "@/services/campus";
 
 const MAX_LOGO_BYTES = 5 * 1024 * 1024;
@@ -157,6 +157,7 @@ export function EmployerProfileEditForm({
   onSave: (payload: EmployerProfileUpdatePayload) => void;
 }) {
   const router = useRouter();
+  const { data: hiringCategories = [] } = useCategoryTree("JOB");
   const [form, setForm] = useState<EditFormState>(() => toFormState(draft));
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [logoError, setLogoError] = useState<string | null>(null);
@@ -527,7 +528,7 @@ export function EmployerProfileEditForm({
               Categories you're hiring for
             </legend>
             <div className="grid gap-2 sm:grid-cols-2">
-              {EMPLOYER_HIRING_CATEGORIES.map((c) => {
+              {hiringCategories.map((c) => {
                 const checked = form.categories.includes(c.id);
                 return (
                   <label
@@ -545,7 +546,7 @@ export function EmployerProfileEditForm({
                     />
                     <span>
                       <span className="font-medium text-kampmax-text">{c.name}</span>
-                      <span className="block text-xs text-kampmax-text-secondary">{c.description}</span>
+                      <span className="block text-xs text-kampmax-text-secondary">{c.description ?? ""}</span>
                     </span>
                   </label>
                 );
