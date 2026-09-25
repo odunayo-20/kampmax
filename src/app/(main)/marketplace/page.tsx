@@ -26,8 +26,7 @@ import { Button } from "@/components/atoms/Button";
 
 function MarketplaceContent() {
   const searchParams = useSearchParams();
-  const { selectedCampus } = useApp();
-  const campuses = useMemo(() => getCampuses(), []);
+  const { selectedCampus, campuses } = useApp();
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
 
   const {

@@ -11,11 +11,10 @@ import { SettingsGroup } from "@/components/profile/SettingsGroup";
 import { SavedAddress } from "@/types";
 import { useAddresses, useCreateAddress, useDeleteAddress, useUpdateAddress } from "@/hooks/use-addresses";
 import { useApp } from "@/lib/app-context";
-import { getCampuses } from "@/services/campus";
 
 export default function AddressesPage() {
   const router = useRouter();
-  const { selectedCampus } = useApp();
+  const { selectedCampus, campuses } = useApp();
   const addressesQuery = useAddresses();
   const addresses = addressesQuery.data ?? [];
   const createMutation = useCreateAddress();
@@ -273,7 +272,7 @@ export default function AddressesPage() {
                   onChange={(e) => setFormCampusId(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-lg border border-kampmax-border text-sm text-kampmax-text bg-white focus:outline-none focus:border-kampmax-blue focus:ring-1 focus:ring-kampmax-blue/20"
                 >
-                  {getCampuses().map((c) => (
+                  {campuses.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
                     </option>

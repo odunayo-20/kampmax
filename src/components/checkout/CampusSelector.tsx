@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MapPin, Search, Check, X, Loader2, Building2 } from "lucide-react";
-import { getCampuses } from "@/services/campus";
+import { useApp } from "@/lib/app-context";
 import type { Campus } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -21,7 +21,7 @@ export function CheckoutCampusSelector({
   const [search, setSearch] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const campuses = useMemo(() => getCampuses(), []);
+  const { campuses } = useApp();
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

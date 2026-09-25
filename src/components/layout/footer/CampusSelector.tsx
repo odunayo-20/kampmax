@@ -31,7 +31,7 @@ interface CampusSelectorProps {
 }
 
 export function CampusSelector({ open, onOpenChange }: CampusSelectorProps) {
-  const { selectedCampus, setSelectedCampus } = useApp();
+  const { selectedCampus, setSelectedCampus, campuses } = useApp();
   const [innerOpen, setInnerOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
@@ -43,7 +43,6 @@ export function CampusSelector({ open, onOpenChange }: CampusSelectorProps) {
     if (!v) setSearch("");
   };
 
-  const campuses = useMemo(() => getCampuses(), []);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {

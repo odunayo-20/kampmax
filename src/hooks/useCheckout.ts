@@ -184,6 +184,29 @@ export function useCheckout() {
     [addresses, selectedAddressId]
   );
 
+  // Fall back to the address contact details when profile details are missing.
+  useEffect(() => {
+    if (!selectedAddress) return;
+    setCustomer((prev) => ({
+      ...prev,
+      fullName: prev.fullName || selectedAddress.contactName,
+      phone: prev.phone || selectedAddress.contactPhone,
+    }));
+  }, [selectedAddress]);
+
+  // Coming back from Paystack via the browser Back button restores this page
+  // mid-payment; reset so the order button is usable again.
+  useEffect(() => {
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (!e.persisted) return;
+      busyRef.current = false;
+      setStateRaw((cur) => (cur === CHECKOUT_STATES.PAYMENT_PENDING || cur === CHECKOUT_STATES.PAYMENT_INITIALIZING ? CHECKOUT_STATES.READY : cur));
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, []);
+
+
   const vendorNames = useMemo(() => {
     const names: Record<string, string> = {};
     session?.vendorGroups.forEach((g) => {

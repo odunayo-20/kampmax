@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Plus, Check, MapPin, Pencil, Trash2, Home } from "lucide-react";
 import type { SavedAddress } from "@/types";
-import { getCampuses } from "@/services/campus";
+import { useApp } from "@/lib/app-context";
 import { cn } from "@/lib/utils";
 import { AddressForm, AddressFormValues } from "./AddressForm";
 
@@ -26,7 +26,7 @@ export function SavedAddresses({
 }: SavedAddressesProps) {
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const campuses = useMemo(() => getCampuses(), []);
+  const { campuses } = useApp();
 
   const campusName = (id: string) =>
     campuses.find((c) => c.id === id)?.name || "Campus";

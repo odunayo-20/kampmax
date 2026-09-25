@@ -220,10 +220,13 @@ export default function CheckoutPage() {
               }
             />
             <TrustInformation />
+            {!selectedAddress && (
+              <p className="text-xs text-kampmax-text-secondary">Add or select a delivery address to place your order.</p>
+            )}
             <PlaceOrderButton
               state={state}
               disabled={
-                !selectedAddress || !customer.fullName || isBusy || sessionExpired
+                !selectedAddress || isBusy || sessionExpired
               }
               onClick={() => void placeOrder()}
             />
@@ -249,7 +252,7 @@ export default function CheckoutPage() {
           <PlaceOrderButton
             state={state}
             disabled={
-              !selectedAddress || !customer.fullName || isBusy || sessionExpired
+              !selectedAddress || isBusy || sessionExpired
             }
             onClick={() => void placeOrder()}
           />
