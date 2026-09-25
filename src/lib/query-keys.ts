@@ -782,3 +782,16 @@ export const targetReviewKeys = {
   summary: (kind: string, id: string) => ["target-reviews", "summary", kind, id] as const,
   mine: () => ["target-reviews", "mine"] as const,
 };
+
+/** Community feed (posts, comments). Mutations invalidate the whole tree. */
+export const communityKeys = {
+  all: ["community"] as const,
+  feed: (campusId: string) => ["community", "feed", campusId] as const,
+  post: (id: string) => ["community", "post", id] as const,
+  comments: (id: string) => ["community", "comments", id] as const,
+};
+
+export const communityEventKeys = {
+  all: ["community", "events"] as const,
+  upcoming: (campusId: string) => ["community", "events", campusId] as const,
+};

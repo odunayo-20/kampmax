@@ -1,121 +1,52 @@
 "use client";
 
+import { CalendarDays, MapPin, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { CampusEvent } from "@/types";
-import { CalendarDays, MapPin, Users, Video, Tag } from "lucide-react";
+import { useToggleEventAttendance } from "@/hooks/use-community";
+import type { CommunityEvent } from "@/services/posts-api";
 
-interface CommunityEventCardProps {
-  event: CampusEvent;
-  onAttend?: () => void;
-  isAttending?: boolean;
-  compact?: boolean;
-}
+export function CommunityEventCard({ event }: { event: CommunityEvent }) {
+  const toggle = useToggleEventAttendance();
+  const pending = toggle.isPending ? toggle.variables : undefined;
+  const attending = pending ? pending.attending : event.attending;
+  const count = pending ? event.attendeeCount + (pending.attending ? 1 : -1) : event.attendeeCount;
 
-export function CommunityEventCard({
-  event,
-  onAttend,
-  isAttending,
-  compact,
-}: CommunityEventCardProps) {
-  const spotsLeft = event.maxAttendees
-    ? event.maxAttendees - event.attendees.length
-    : null;
-  const isFull = spotsLeft !== null && spotsLeft <= 0;
-
-  const startDate = new Date(event.startDate);
-  const day = startDate.toLocaleDateString("en-NG", { day: "numeric" });
-  const month = startDate.toLocaleDateString("en-NG", { month: "short" }).toUpperCase();
-  const time = startDate.toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" });
+  const start = new Date(event.startsAt);
+  const day = start.toLocaleDateString("en-NG", { day: "numeric" });
+  const month = start.toLocaleDateString("en-NG", { month: "short" }).toUpperCase();
+  const time = start.toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" });
 
   return (
-    <div className={cn(
-      "rounded-xl border border-kampmax-border bg-white overflow-hidden",
-      compact && "flex"
-    )}>
-      {/* Date Badge */}
-      {compact ? (
-        <div className="w-16 flex-shrink-0 bg-kampmax-blue/5 border-r border-kampmax-border flex flex-col items-center justify-center py-3">
-          <span className="text-lg font-bold text-kampmax-blue leading-none">{day}</span>
-          <span className="text-[9px] font-bold text-kampmax-blue/60">{month}</span>
-        </div>
-      ) : (
-        <div className="h-2 bg-kampmax-blue" />
-      )}
-
-      <div className={cn("flex-1", compact ? "p-3" : "p-4")}>
-        {/* Tags */}
-        {event.tags && event.tags.length > 0 && (
-          <div className="flex gap-1.5 mb-2 flex-wrap">
-            {event.tags.slice(0, 3).map((tag) => (
-              <span
-                key={tag}
-                className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-full bg-kampmax-muted text-kampmax-text-secondary font-medium"
-              >
-                <Tag className="h-2.5 w-2.5" />
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Title */}
-        <h3 className={cn(
-          "font-bold text-kampmax-text mb-1",
-          compact ? "text-sm" : "text-base"
-        )}>
-          {event.title}
-        </h3>
-
-        {/* Description */}
-        <p className={cn(
-          "text-kampmax-text-secondary line-clamp-2 mb-3",
-          compact ? "text-xs" : "text-sm"
-        )}>
-          {event.description}
+    <div className="flex rounded-xl border border-kampmax-border bg-white overflow-hidden">
+      <div className="w-16 shrink-0 bg-kampmax-blue/5 border-r border-kampmax-border flex flex-col items-center justify-center py-3">
+        <span className="text-lg font-bold text-kampmax-blue leading-none">{day}</span>
+        <span className="text-[9px] font-bold text-kampmax-blue/60">{month}</span>
+      </div>
+      <div className="flex-1 min-w-0 p-3 space-y-1">
+        <h3 className="text-sm font-bold text-kampmax-text truncate">{event.title}</h3>
+        <p className="text-[11px] text-kampmax-text-secondary flex items-center gap-1">
+          <CalendarDays className="h-3 w-3" /> {time}
+          <MapPin className="h-3 w-3 ml-2" /> <span className="truncate">{event.location}</span>
         </p>
-
-        {/* Details */}
-        <div className="flex flex-wrap gap-3 text-[11px] text-kampmax-text-secondary mb-3">
-          <span className="flex items-center gap-1">
-            <CalendarDays className="h-3.5 w-3.5" />
-            {day} {month} · {time}
+        {event.description && (
+          <p className="text-xs text-kampmax-text-secondary line-clamp-2">{event.description}</p>
+        )}
+        <div className="flex items-center justify-between pt-1">
+          <span className="text-[11px] text-kampmax-text-secondary flex items-center gap-1">
+            <Users className="h-3 w-3" /> {count} going · by {event.organizerName}
           </span>
-          <span className="flex items-center gap-1">
-            {event.isVirtual ? (
-              <Video className="h-3.5 w-3.5" />
-            ) : (
-              <MapPin className="h-3.5 w-3.5" />
-            )}
-            {event.location}
-          </span>
-          <span className="flex items-center gap-1">
-            <Users className="h-3.5 w-3.5" />
-            {event.attendees.length}
-            {event.maxAttendees ? `/${event.maxAttendees}` : ""} attending
-          </span>
-        </div>
-
-        {/* Action */}
-        {onAttend && (
           <button
-            onClick={onAttend}
-            disabled={isFull && !isAttending}
+            type="button"
+            disabled={toggle.isPending}
+            onClick={() => toggle.mutate({ id: event.id, attending: !event.attending })}
             className={cn(
-              "w-full py-2 rounded-lg text-xs font-semibold transition-colors",
-              isAttending
-                ? "bg-kampmax-navy text-white"
-                : isFull
-                  ? "bg-kampmax-muted text-kampmax-text-secondary cursor-not-allowed"
-                  : "bg-kampmax-blue text-white hover:bg-kampmax-blue/90"
+              "px-3 py-1 rounded-lg text-[11px] font-semibold",
+              attending ? "bg-kampmax-blue/10 text-kampmax-blue" : "bg-kampmax-blue text-white"
             )}
           >
-            {isAttending
-              ? "Attending ✓"
-              : isFull
-                ? "Full"
-                : "Attend"}
+            {attending ? "Going" : "RSVP"}
           </button>
-        )}
+        </div>
       </div>
     </div>
   );

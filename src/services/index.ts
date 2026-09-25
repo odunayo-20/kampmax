@@ -66,22 +66,6 @@ export {
   unattendEvent,
 } from "./events";
 export {
-  getCampusPosts,
-  getCampusPostById,
-  getCommentsByPost,
-  getPostsByUser,
-  getPostsByType,
-  createPost,
-  addComment,
-  togglePostLike,
-  toggleCommentLike,
-  toggleSavePost,
-  reportPost,
-  votePoll,
-  deletePost,
-  deleteComment,
-} from "./posts";
-export {
   getWallet,
   getWalletTransactions,
   getWalletBalance,
