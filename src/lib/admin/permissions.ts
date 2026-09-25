@@ -76,13 +76,23 @@ export function canSeeSection(
   return access === "*" || access.includes(key);
 }
 
-/** Placeholder for future fine-grained checks (resource/action). */
+/**
+ * Resource/action checks the UI can already mirror from the backend RBAC
+ * catalog. The backend stays the authority (it returns 403); this only keeps
+ * controls out of sight for roles that would be rejected.
+ */
+const ACTION_ROLES: Record<string, AdminRole[]> = {
+  // backend permission `taxonomy.manage` (SUPER_ADMIN, ADMIN)
+  "categories:manage": ["SUPER_ADMIN", "ADMIN"],
+};
+
 export function canPerform(
-  _role: AdminRole,
-  _resource: string,
-  _action: string
+  role: AdminRole,
+  resource: string,
+  action: string
 ): boolean {
-  // Mock phase: every signed-in operator may act. Replace with an
-  // RBAC lookup once the API exposes permission sets per role.
-  return true;
+  const allowed = ACTION_ROLES[`${resource}:${action}`];
+  // Anything not listed above keeps the mock-phase behaviour: every
+  // signed-in operator may act, until the API exposes permission sets.
+  return allowed ? allowed.includes(role) : true;
 }

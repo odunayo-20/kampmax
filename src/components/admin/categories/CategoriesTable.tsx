@@ -131,6 +131,7 @@ function Row({
   onToggleStatus,
   onDelete,
   onReorder,
+  readOnly,
 }: { category: ManagedCategory } & CategoryRowActions) {
   const isChild = Boolean(category.parentId);
   const deletable = category.productCount === 0 && category.subcategoryCount === 0;
@@ -195,22 +196,26 @@ function Row({
       {/* Order controls */}
       <td className="px-2.5 py-2.5 sm:px-4">
         <div className="flex items-center justify-center gap-1">
-          <button
-            type="button"
-            aria-label={`Move ${category.name} up`}
-            onClick={() => onReorder(category, "up")}
-            className="rounded p-1 text-kampmax-text-secondary transition-colors hover:bg-kampmax-muted hover:text-kampmax-text"
-          >
-            <ArrowUp className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            aria-label={`Move ${category.name} down`}
-            onClick={() => onReorder(category, "down")}
-            className="rounded p-1 text-kampmax-text-secondary transition-colors hover:bg-kampmax-muted hover:text-kampmax-text"
-          >
-            <ArrowDown className="h-3.5 w-3.5" />
-          </button>
+          {!readOnly && (
+            <>
+              <button
+                type="button"
+                aria-label={`Move ${category.name} up`}
+                onClick={() => onReorder(category, "up")}
+                className="rounded p-1 text-kampmax-text-secondary transition-colors hover:bg-kampmax-muted hover:text-kampmax-text"
+              >
+                <ArrowUp className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                aria-label={`Move ${category.name} down`}
+                onClick={() => onReorder(category, "down")}
+                className="rounded p-1 text-kampmax-text-secondary transition-colors hover:bg-kampmax-muted hover:text-kampmax-text"
+              >
+                <ArrowDown className="h-3.5 w-3.5" />
+              </button>
+            </>
+          )}
           <span className="ml-1 w-10 text-center text-[11px] tabular-nums text-kampmax-text-secondary">
             #{category.sortOrder}
           </span>
@@ -232,14 +237,16 @@ function Row({
 
       {/* Actions */}
       <td className="relative px-2.5 py-2.5 text-right sm:px-4">
-        <CategoryRowMenu
-          category={category}
-          deletable={deletable}
-          onEdit={onEdit}
-          onCreateSub={onCreateSub}
-          onToggleStatus={onToggleStatus}
-          onDelete={onDelete}
-        />
+        {!readOnly && (
+          <CategoryRowMenu
+            category={category}
+            deletable={deletable}
+            onEdit={onEdit}
+            onCreateSub={onCreateSub}
+            onToggleStatus={onToggleStatus}
+            onDelete={onDelete}
+          />
+        )}
       </td>
     </tr>
   );

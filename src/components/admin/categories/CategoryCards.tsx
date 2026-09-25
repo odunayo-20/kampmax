@@ -33,6 +33,7 @@ function Card({
   onToggleStatus,
   onDelete,
   onReorder,
+  readOnly,
 }: { category: ManagedCategory } & CategoryRowActions) {
   const isChild = Boolean(category.parentId);
   const deletable = category.productCount === 0 && category.subcategoryCount === 0;
@@ -101,34 +102,40 @@ function Card({
       {/* Footer: reorder + menu */}
       <div className="mt-2.5 flex items-center justify-between border-t border-kampmax-border/60 pt-2">
         <div className="flex items-center gap-0.5">
-          <button
-            type="button"
-            aria-label={`Move ${category.name} up`}
-            onClick={() => onReorder(category, "up")}
-            className="rounded p-1.5 text-kampmax-text-secondary transition-colors hover:bg-kampmax-muted hover:text-kampmax-text"
-          >
-            <ArrowUp className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            aria-label={`Move ${category.name} down`}
-            onClick={() => onReorder(category, "down")}
-            className="rounded p-1.5 text-kampmax-text-secondary transition-colors hover:bg-kampmax-muted hover:text-kampmax-text"
-          >
-            <ArrowDown className="h-4 w-4" />
-          </button>
+          {!readOnly && (
+            <>
+              <button
+                type="button"
+                aria-label={`Move ${category.name} up`}
+                onClick={() => onReorder(category, "up")}
+                className="rounded p-1.5 text-kampmax-text-secondary transition-colors hover:bg-kampmax-muted hover:text-kampmax-text"
+              >
+                <ArrowUp className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                aria-label={`Move ${category.name} down`}
+                onClick={() => onReorder(category, "down")}
+                className="rounded p-1.5 text-kampmax-text-secondary transition-colors hover:bg-kampmax-muted hover:text-kampmax-text"
+              >
+                <ArrowDown className="h-4 w-4" />
+              </button>
+            </>
+          )}
           <span className="ml-1 text-[11px] tabular-nums text-kampmax-text-secondary">
             Order #{category.sortOrder}
           </span>
         </div>
-        <CategoryRowMenu
-          category={category}
-          deletable={deletable}
-          onEdit={onEdit}
-          onCreateSub={onCreateSub}
-          onToggleStatus={onToggleStatus}
-          onDelete={onDelete}
-        />
+        {!readOnly && (
+          <CategoryRowMenu
+            category={category}
+            deletable={deletable}
+            onEdit={onEdit}
+            onCreateSub={onCreateSub}
+            onToggleStatus={onToggleStatus}
+            onDelete={onDelete}
+          />
+        )}
       </div>
     </li>
   );

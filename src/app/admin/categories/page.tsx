@@ -22,6 +22,8 @@ import { categoryStatusLabel } from "@/components/admin/categories/categories-me
 import type { CategoryReorderDirection } from "@/types/admin";
 import { categoryManagementService, setCategoryTaxonomy } from "@/services/admin";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAdminSession } from "@/lib/admin/admin-auth-context";
+import { canPerform } from "@/lib/admin/permissions";
 import { taxonomyKeys, useTaxonomyTypes } from "@/hooks/use-taxonomy";
 import type { TaxonomyType } from "@/services/taxonomy";
 import type {
@@ -79,6 +81,8 @@ function CategoriesConsole() {
   );
   setCategoryTaxonomy(taxonomy);
   const queryClient = useQueryClient();
+  const { admin } = useAdminSession();
+  const canManage = admin ? canPerform(admin.role, "categories", "manage") : false;
   const { data: taxonomyTypes } = useTaxonomyTypes();
   const typeLabel = taxonomyTypes?.find((t) => t.key === taxonomy);
 
@@ -310,14 +314,20 @@ function CategoriesConsole() {
                 {counts.productsCovered.toLocaleString("en-NG")} products covered
               </span>
             )}
-            <button
-              type="button"
-              onClick={() => setForm({ mode: "create" })}
-              className="inline-flex h-9 items-center gap-1.5 rounded-md bg-kampmax-blue px-3 text-sm font-medium text-white transition-colors hover:bg-kampmax-blue/90"
-            >
-              <PlusCircle className="h-3.5 w-3.5" />
-              New category
-            </button>
+            {canManage ? (
+              <button
+                type="button"
+                onClick={() => setForm({ mode: "create" })}
+                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-kampmax-blue px-3 text-sm font-medium text-white transition-colors hover:bg-kampmax-blue/90"
+              >
+                <PlusCircle className="h-3.5 w-3.5" />
+                New category
+              </button>
+            ) : (
+              <span className="inline-flex h-9 items-center rounded-md border border-kampmax-border bg-white px-3 text-xs font-medium text-kampmax-text-secondary">
+                View only
+              </span>
+            )}
           </>
         }
       />
@@ -410,6 +420,7 @@ function CategoriesConsole() {
         onToggleStatus={(category) => void toggleStatus(category)}
         onDelete={requestDelete}
         onReorder={(category, direction) => void reorder(category, direction)}
+        readOnly={!canManage}
       />
 
       {list && list.totalPages > 1 && (

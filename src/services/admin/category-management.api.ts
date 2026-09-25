@@ -38,7 +38,13 @@ interface BackendCategory {
   updatedAt?: string;
 }
 
-function fail(error: { message?: string }, fallback: string): never {
+function fail(error: { message?: string; status?: number }, fallback: string): never {
+  if (error.status === 401) {
+    throw new Error("You're signed out. Sign in again to manage categories.");
+  }
+  if (error.status === 403) {
+    throw new Error("You don't have permission to manage categories.");
+  }
   throw new Error(error.message || fallback);
 }
 

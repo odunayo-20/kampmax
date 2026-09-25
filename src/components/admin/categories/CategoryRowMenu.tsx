@@ -21,6 +21,8 @@ export interface CategoryRowActions {
   onToggleStatus: (category: ManagedCategory) => void;
   onDelete: (category: ManagedCategory) => void;
   onReorder: (category: ManagedCategory, direction: CategoryReorderDirection) => void;
+  /** View-only operators: hide reorder controls and the actions menu. */
+  readOnly?: boolean;
 }
 
 // ------------------------------------------------------------
