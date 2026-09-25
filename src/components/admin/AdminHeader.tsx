@@ -265,7 +265,7 @@ export function AdminHeader() {
               </p>
             </div>
 
-            {isSuperAdmin && (
+            {isSuperAdmin && admins.length > 1 && (
               <div className="px-3.5 py-2.5">
                 <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-kampmax-text-secondary">
                   Switch account (demo · Super Admin only)

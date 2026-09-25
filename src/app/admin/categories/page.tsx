@@ -23,7 +23,7 @@ import type { CategoryReorderDirection } from "@/types/admin";
 import { categoryManagementService, setCategoryTaxonomy } from "@/services/admin";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAdminSession } from "@/lib/admin/admin-auth-context";
-import { canPerform } from "@/lib/admin/permissions";
+import { canAdminPerform } from "@/lib/admin/permissions";
 import { taxonomyKeys, useTaxonomyTypes } from "@/hooks/use-taxonomy";
 import type { TaxonomyType } from "@/services/taxonomy";
 import type {
@@ -82,7 +82,7 @@ function CategoriesConsole() {
   setCategoryTaxonomy(taxonomy);
   const queryClient = useQueryClient();
   const { admin } = useAdminSession();
-  const canManage = admin ? canPerform(admin.role, "categories", "manage") : false;
+  const canManage = admin ? canAdminPerform(admin, "categories", "manage") : false;
   const { data: taxonomyTypes } = useTaxonomyTypes();
   const typeLabel = taxonomyTypes?.find((t) => t.key === taxonomy);
 

@@ -86,6 +86,26 @@ const ACTION_ROLES: Record<string, AdminRole[]> = {
   "categories:manage": ["SUPER_ADMIN", "ADMIN"],
 };
 
+/** UI action -> backend permission slug (see backend common/rbac/permissions.ts). */
+const ACTION_SLUGS: Record<string, string> = {
+  "categories:manage": "taxonomy.manage",
+};
+
+/**
+ * Preferred check for a signed-in operator: a live session carries the exact
+ * permission slugs the API enforces, so use those; mock profiles (no
+ * `permissions`) fall back to the role table.
+ */
+export function canAdminPerform(
+  admin: { role: AdminRole; permissions?: string[] },
+  resource: string,
+  action: string
+): boolean {
+  const slug = ACTION_SLUGS[`${resource}:${action}`];
+  if (admin.permissions && slug) return admin.permissions.includes(slug);
+  return canPerform(admin.role, resource, action);
+}
+
 export function canPerform(
   role: AdminRole,
   resource: string,

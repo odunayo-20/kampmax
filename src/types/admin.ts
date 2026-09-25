@@ -28,6 +28,8 @@ export interface AdminProfile {
   avatar: string;
   title: string;
   lastLoginAt: string;
+  /** Backend permission slugs (live sessions only; mock profiles omit this). */
+  permissions?: string[];
 }
 
 // ------------------------------------------------------------

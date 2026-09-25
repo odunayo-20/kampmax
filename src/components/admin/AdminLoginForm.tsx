@@ -36,6 +36,7 @@ export function AdminLoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showDemo, setShowDemo] = useState(true);
+  const demoAccounts = adminAuthService.getDemoCredentials();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -86,7 +87,7 @@ export function AdminLoginForm() {
           </p>
         </div>
         <p className="text-[11px] text-slate-500">
-          Kampmax prototype · mock backend · admin module
+          Kampmax operations console
         </p>
       </div>
 
@@ -165,7 +166,14 @@ export function AdminLoginForm() {
             </button>
           </form>
 
-          {/* Demo credentials */}
+          {/* Demo credentials: only when the auth service provides any (not with live auth) */}
+          {demoAccounts.length === 0 ? (
+            <p className="mt-6 text-center text-[11px]">
+              <Link href="/" className="font-medium text-kampmax-blue hover:underline">
+                Back to storefront
+              </Link>
+            </p>
+          ) : (
           <div className="mt-6 rounded-lg border border-dashed border-kampmax-border bg-white p-4">
             <button
               type="button"
@@ -183,7 +191,7 @@ export function AdminLoginForm() {
             </button>
             {showDemo && (
               <ul className="mt-3 space-y-2">
-                {adminAuthService.getDemoCredentials().map((c) => (
+                {demoAccounts.map((c) => (
                   <li key={c.email}>
                     <button
                       type="button"
@@ -214,6 +222,7 @@ export function AdminLoginForm() {
               </ul>
             )}
           </div>
+          )}
         </div>
       </div>
     </div>

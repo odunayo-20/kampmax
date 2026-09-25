@@ -28,7 +28,8 @@ import { mockDisputes, mockPosts, mockReports, mockReviews } from "@/data/admin/
 import { DashboardService, createMockDashboardService } from "./dashboard.service";
 
 export type { ChartRange } from "./dashboard.service";
-import { AdminAuthService, createMockAdminAuthService } from "./auth.service";
+import type { AdminAuthService } from "./auth.service";
+import { createApiAdminAuthService } from "./auth.api";
 
 export type {
   AdminAuthFailCode,
@@ -36,9 +37,8 @@ export type {
   AdminLoginInput,
 } from "./auth.service";
 
-/** POST/GET admin auth session (Module 34 authorization boundary). */
-export const adminAuthService: AdminAuthService =
-  createMockAdminAuthService();
+/** Live operator auth: POST /admin/auth/login, GET /admin/auth/session. */
+export const adminAuthService: AdminAuthService = createApiAdminAuthService();
 import { AdminUserService, createMockUserService } from "./users.service";
 import {
   AdminUserManagementService,
