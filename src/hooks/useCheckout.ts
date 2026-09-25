@@ -411,7 +411,17 @@ export function useCheckout() {
         },
         deliveryFee: session.pricing.deliveryTotal,
         notes: `Deliver to ${selectedAddress.label}`,
+        promotionCode: coupon.status === "valid" ? coupon.code : undefined,
       });
+
+      if (orderErr) {
+        // Surface the real reason (e.g. a promo that just expired) instead of
+        // failing later with a generic payment error.
+        busyRef.current = false;
+        transitionTo(CHECKOUT_STATES.VALIDATION_FAILED);
+        setErrorInfo({ code: "validation_failed", message: orderErr.message || "We couldn't place your order." });
+        return false;
+      }
 
       if (!orderErr && createdOrders && createdOrders.length > 0) {
         createdOrderId = createdOrders[0].id;
@@ -459,6 +469,7 @@ export function useCheckout() {
     return true;
   }, [
     session,
+    coupon,
     selectedAddress,
     customer,
     selectedCampus,
@@ -468,6 +479,31 @@ export function useCheckout() {
     clearCart,
     router,
   ]);
+
+  // The displayed session always reflects the currently applied coupon, so a
+  // rebuilt session (cart change, delivery change) can't lose the discount.
+  const displaySession = useMemo(
+    () =>
+      session
+        ? withDiscount(session, coupon.status === "valid" ? (coupon.appliedDiscount ?? 0) : 0)
+        : session,
+    [session, coupon]
+  );
+
+  // Re-price an applied code when the cart changes so the shown discount
+  // matches what the server will charge.
+  const itemsSubtotal = session?.pricing?.itemsSubtotal;
+  useEffect(() => {
+    if (!session || coupon.status !== "valid") return;
+    let cancelled = false;
+    void applyCoupon(session, coupon.code).then((res) => {
+      if (!cancelled && res.data) setCoupon(res.data);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemsSubtotal]);
 
   // ── Exposed summary helpers ──
   const summaryItemCount = session?.pricing?.itemCount ?? 0;
@@ -480,7 +516,7 @@ export function useCheckout() {
     transitionTo,
 
     // session & summary
-    session,
+    session: displaySession,
     refreshSession,
     flags,
 
@@ -529,7 +565,21 @@ export function useCheckout() {
 // Compute the display final total from a session's current line items/delivery,
 // using only the same placeholder maths the service uses — never authoritative.
 // (local helper so placeOrder and delivery updates stay in sync for display)
+function withDiscount(s: CheckoutSession, discount: number): CheckoutSession {
+  const next: CheckoutSession = {
+    ...s,
+    discountTotal: discount,
+    pricing: { ...s.pricing, discountTotal: discount },
+  };
+  next.pricing.finalTotal = finalTotalFor(next);
+  next.finalTotal = next.pricing.finalTotal;
+  return next;
+}
+
 function finalTotalFor(s: CheckoutSession): number {
   const fee = Math.max(50, Math.min(2000, Math.round(s.pricing.itemsSubtotal * 0.025)));
-  return Math.max(0, s.pricing.itemsSubtotal + s.pricing.deliveryTotal + fee - 0 - 0);
+  return Math.max(
+    0,
+    s.pricing.itemsSubtotal + s.pricing.deliveryTotal + fee - s.pricing.discountTotal
+  );
 }

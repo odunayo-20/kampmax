@@ -248,29 +248,74 @@ export async function validateCheckout(
   };
 }
 
+interface CouponPreviewResponse {
+  code: string;
+  totalDiscount: number;
+  quotes: {
+    vendorId: string;
+    applied: boolean;
+    discountAmount: number;
+    reason?: string;
+    promotion?: { id: string; code: string; title: string };
+  }[];
+}
+
+/** Maps the server's human-readable rejection to the UI's coupon status. */
+function couponStatusFromReason(reason: string): CouponState["status"] {
+  const r = reason.toLowerCase();
+  if (r.includes("expired")) return "expired";
+  if (r.includes("spend at least")) return "minimum_not_reached";
+  if (r.includes("this store")) return "vendor_specific";
+  if (r.includes("does not apply")) return "product_specific";
+  if (r.includes("already used") || r.includes("maximum number") || r.includes("usage limit")) {
+    return "already_used";
+  }
+  if (r.includes("not valid")) return "invalid";
+  return "not_applicable";
+}
+
+/**
+ * Prices a promo code against the customer's server-side cart.
+ * POST /api/v1/orders/checkout/preview — the server is authoritative; the
+ * amount shown here is re-computed when the order is actually placed.
+ */
 export async function applyCoupon(
   session: CheckoutSession,
   code: string
 ): Promise<CheckoutActionResult<CouponState>> {
-  if (!FEATURE_FLAGS.couponValidationEnabled) {
+  void session;
+  const { data, error } = await apiClient.post<{ promotionCode: string }, CouponPreviewResponse>(
+    "/orders/checkout/preview",
+    { promotionCode: code }
+  );
+
+  if (error || !data) {
+    const message = error?.message || "We couldn't check that code. Please try again.";
     return {
       ok: false,
+      data: { code, status: "not_applicable", message },
+      error: { code: "coupon_unavailable", message },
+    };
+  }
+
+  if (data.totalDiscount > 0) {
+    const applied = data.quotes.find((q) => q.applied)?.promotion;
+    return {
+      ok: true,
       data: {
         code,
-        status: "not_applicable",
-        message: "Promo codes are validated securely at checkout by the server.",
-      },
-      error: {
-        code: "backend_required",
-        message: "Coupon validation is processed by the server.",
+        status: "valid",
+        message: applied?.title,
+        appliedDiscount: data.totalDiscount,
       },
     };
   }
-  void session;
+
+  const reason = data.quotes.find((q) => q.reason)?.reason ?? "That code can't be applied to this order.";
   return {
     ok: false,
-    data: { code, status: "not_applicable" },
-    error: { code: "backend_required", message: "Coupon backend unavailable." },
+    data: { code, status: couponStatusFromReason(reason), message: reason },
+    error: { code: "coupon_rejected", message: reason },
   };
 }
 

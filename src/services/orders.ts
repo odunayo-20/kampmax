@@ -56,6 +56,8 @@ export interface BackendOrderListItem {
   status: BackendOrderStatus;
   subtotal: number;
   deliveryFee: number;
+  discountAmount?: number | string;
+  promotionCode?: string | null;
   totalAmount: number;
   itemCount: number;
   createdAt: string | Date;
@@ -95,6 +97,8 @@ export interface CheckoutPayload {
   address: CheckoutAddressPayload;
   notes?: string;
   deliveryFee?: number;
+  /** Promotion code to apply; the server re-validates and prices it. */
+  promotionCode?: string;
 }
 
 // In-memory cache for fast lookups and sync fallbacks
@@ -156,7 +160,8 @@ export function mapBackendOrderToFrontend(
   const subtotal = Number(raw.subtotal || 0);
   const deliveryFee = Number(raw.deliveryFee || 0);
   const totalAmount = Number(raw.totalAmount || subtotal + deliveryFee);
-  const platformFee = Math.max(0, totalAmount - subtotal - deliveryFee);
+  const discountAmount = Number(raw.discountAmount || 0);
+  const platformFee = Math.max(0, totalAmount - subtotal - deliveryFee + discountAmount);
 
   const items: CartItem[] = (raw.items || []).map((item) => {
     const existingProduct = getProductById(item.productId);
@@ -220,7 +225,7 @@ export function mapBackendOrderToFrontend(
     subtotal,
     platformFee,
     deliveryFee,
-    discountAmount: 0,
+    discountAmount,
     total: totalAmount,
     status: mapBackendOrderStatusToFrontend(raw.status),
     deliveryMethod: "delivery",
