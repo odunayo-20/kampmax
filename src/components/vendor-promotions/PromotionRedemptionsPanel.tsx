@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { Receipt } from "lucide-react";
 import { formatDateTime, formatNaira } from "@/lib/utils";
-import { getUserById } from "@/services/users";
 import type { VendorPromotionRedemption } from "@/types/vendor-promotions";
 
 interface PromotionRedemptionsPanelProps {
@@ -35,14 +34,13 @@ export function PromotionRedemptionsPanel({ redemptions }: PromotionRedemptionsP
             </thead>
             <tbody>
               {redemptions.map((redemption) => {
-                const user = getUserById(redemption.customerId);
                 return (
                   <tr key={redemption.id} className="border-b border-kampmax-border/60 last:border-b-0">
-                    <td className="px-4 py-3 font-medium text-kampmax-text">{user?.name || redemption.customerId}</td>
+                    <td className="px-4 py-3 font-medium text-kampmax-text">{redemption.customerName || "Customer"}</td>
                     <td className="px-4 py-3">
                       {redemption.orderId ? (
                         <Link href={`/vendor/orders/${redemption.orderId}`} className="font-medium text-kampmax-blue hover:underline">
-                          {redemption.orderId}
+                          {redemption.orderNumber ?? redemption.orderId}
                         </Link>
                       ) : (
                         <span className="text-kampmax-text-secondary">—</span>

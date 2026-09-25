@@ -52,14 +52,17 @@ import type { ApiError } from "@/lib/api-client";
 
 /** Mirrors ReviewTargetType enum on the backend */
 export type BackendReviewTargetType =
-  | "product"
-  | "vendor"
-  | "freelancer"
-  | "service"
-  | "service_provider";
+  | "PRODUCT"
+  | "VENDOR"
+  | "SERVICE_PROVIDER"
+  | "SERVICE_PROVIDER_SERVICE"
+  | "FREELANCER_SERVICE"
+  | "FREELANCER_PROFILE"
+  | "ENGAGEMENT"
+  | "SERVICE_BOOKING";
 
 /** Mirrors ReviewStatus enum on the backend */
-export type BackendReviewStatus = "pending" | "approved" | "rejected" | "flagged";
+export type BackendReviewStatus = "PENDING" | "PUBLISHED" | "HIDDEN" | "FLAGGED" | "REMOVED";
 
 export interface BackendReview {
   id: string;

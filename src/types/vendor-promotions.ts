@@ -91,6 +91,10 @@ export interface VendorPromotionRedemption {
   id: string;
   promotionId: string;
   customerId: string;
+  /** Customer's name, supplied by the API. */
+  customerName?: string;
+  /** Human-readable order reference; `orderId` is the route key. */
+  orderNumber?: string;
   orderId?: string;
   /** Backend-computed discount amount in naira. */
   discountAmount: number;

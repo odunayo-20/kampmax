@@ -83,15 +83,15 @@ async function buildStorefrontAsync(vendor: Vendor): Promise<Storefront> {
 
   const [productsRes, ratingRes] = await Promise.all([
     fetchProducts({ vendorId: vendor.id, status: "ACTIVE", limit: 1 }),
-    getTargetRatingSummary("vendor", vendor.id),
+    getTargetRatingSummary("VENDOR", vendor.id),
   ]);
 
-  const mockSummary = getReviewSummary(vendor.id, "vendor");
   const productsCount = productsRes.error
     ? getProductsByVendor(vendor.id).filter(isProductPublishable).length
     : productsRes.total;
-  const rating = ratingRes.summary?.average ?? (mockSummary.averageRating || vendor.rating);
-  const reviewCount = ratingRes.summary?.total ?? mockSummary.totalReviews;
+  // Live rating from the reviews API; the vendor record's stored rating is the fallback.
+  const rating = ratingRes.summary?.average ?? vendor.rating;
+  const reviewCount = ratingRes.summary?.total ?? 0;
 
   return {
     vendorId: vendor.id,
