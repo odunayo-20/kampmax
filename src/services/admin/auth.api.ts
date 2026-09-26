@@ -70,10 +70,21 @@ export function createApiAdminAuthService(): AdminAuthService {
     async login({ email, password }) {
       // Never carry a previous (possibly non-operator) session into a login.
       clearAuthTokens();
-      const { data, error } = await apiClient.post<Record<string, unknown>, LoginResponse>(
-        "/admin/auth/login",
-        { email, password }
-      );
+      let response;
+      try {
+        response = await apiClient.post<Record<string, unknown>, LoginResponse>(
+          "/admin/auth/login",
+          { email, password }
+        );
+      } catch {
+        // fetch itself failed (API down, wrong URL, CORS): there is no HTTP status.
+        return {
+          success: false,
+          code: "INVALID_CREDENTIALS",
+          message: "Can't reach the server. Check that the API is running and try again.",
+        };
+      }
+      const { data, error } = response;
       if (error || !data?.admin || !data.tokens) return failure(error);
 
       persistAuthTokens(data.tokens.accessToken, data.tokens.refreshToken);
@@ -83,9 +94,15 @@ export function createApiAdminAuthService(): AdminAuthService {
     // The token argument is the console's marker; the API client sends the
     // stored access token itself (and refreshes it when it expires).
     async getCurrentSession() {
-      const { data, error } = await apiClient.get<{ admin: BackendOperator }>("/admin/auth/session");
-      if (error || !data?.admin) return null;
-      return { admin: toProfile(data.admin) };
+      try {
+        const { data, error } = await apiClient.get<{ admin: BackendOperator }>("/admin/auth/session");
+        if (error || !data?.admin) return null;
+        return { admin: toProfile(data.admin) };
+      } catch {
+        // API unreachable: treat as signed out so the console shows the login page
+        // instead of crashing; the stored tokens are kept for the next attempt.
+        return null;
+      }
     },
 
     async logout() {

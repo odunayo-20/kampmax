@@ -18,6 +18,7 @@ import {
   Lock,
   MessageSquare,
   ShieldCheck,
+  ScanLine,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { VendorPermissions } from "@/types/vendor-dashboard";
@@ -60,6 +61,7 @@ export function VendorSidebar({ storeName, permissions, status }: VendorSidebarP
       items: [
         { href: "/vendor/products", label: "Products", icon: Package, permission: "canManageProducts" },
         { href: "/vendor/orders", label: "Orders", icon: ShoppingCart, permission: "canManageOrders" },
+        { href: "/scan", label: "Scan pickup", icon: ScanLine, permission: "canManageOrders" },
         { href: "/vendor/customers", label: "Customers", icon: Users, permission: "canManageCustomers" },
         { href: "/vendor/reviews", label: "Reviews", icon: Star, permission: "canManageReviews" },
       ],

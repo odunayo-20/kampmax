@@ -342,6 +342,77 @@ export async function checkoutOrdersApi(
   return { data: mapped, error: null };
 }
 
+// ============================================================
+// CAMPUS PICKUP (QR handover)
+// ============================================================
+
+export interface PickupCode {
+  orderNumber: string;
+  /** Text to encode in the QR code. */
+  qrPayload: string;
+  /** 6-digit manual fallback. */
+  pin: string;
+}
+
+export interface PickupPreview {
+  orderId: string;
+  orderNumber: string;
+  status: string;
+  total: number;
+  vendorName: string;
+  customerName: string;
+  items: Array<{ name: string; quantity: number; variation: string | null }>;
+}
+
+/** What the scanner sends: a decoded QR, or order number + PIN. */
+export interface PickupScanInput {
+  code?: string;
+  orderNumber?: string;
+  pin?: string;
+}
+
+/**
+ * The customer's own pickup QR payload and PIN (paid, not yet handed over).
+ * GET /api/v1/orders/:id/pickup-code
+ */
+export async function getPickupCodeApi(
+  id: string
+): Promise<{ data: PickupCode | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.get<PickupCode>(`/orders/${id}/pickup-code`);
+  if (error || !data || !data.qrPayload) return { data: null, error };
+  return { data, error: null };
+}
+
+/**
+ * Scanner: verify a code and preview the order. Changes nothing.
+ * POST /api/v1/orders/pickup/lookup
+ */
+export async function lookupPickupApi(
+  input: PickupScanInput
+): Promise<{ data: PickupPreview | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.post<PickupScanInput, PickupPreview>(
+    "/orders/pickup/lookup",
+    input
+  );
+  if (error || !data || !data.orderNumber) return { data: null, error };
+  return { data, error: null };
+}
+
+/**
+ * Scanner: confirm the handover (marks delivered, releases escrow).
+ * POST /api/v1/orders/pickup/complete
+ */
+export async function completePickupApi(
+  input: PickupScanInput
+): Promise<{ data: PickupPreview | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.post<PickupScanInput, PickupPreview>(
+    "/orders/pickup/complete",
+    input
+  );
+  if (error || !data || !data.orderNumber) return { data: null, error };
+  return { data, error: null };
+}
+
 /**
  * Customer confirms they received a shipped order; releases escrow to the vendor.
  * PATCH /api/v1/orders/:id/confirm-receipt

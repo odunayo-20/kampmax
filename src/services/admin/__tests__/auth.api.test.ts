@@ -88,6 +88,17 @@ describe("live admin auth service", () => {
     expect(await service.getCurrentSession("ignored")).toBeNull();
   });
 
+  it("survives an unreachable API instead of throwing", async () => {
+    postMock.mockRejectedValue(new TypeError("Failed to fetch"));
+    expect(await service.login({ email: "a@b.co", password: "pw" })).toMatchObject({
+      success: false,
+      message: expect.stringContaining("Can't reach the server"),
+    });
+
+    getMock.mockRejectedValue(new TypeError("Failed to fetch"));
+    expect(await service.getCurrentSession("t")).toBeNull();
+  });
+
   it("logs out on the server and clears local tokens even if the call fails", async () => {
     storage.getRefreshToken.mockReturnValue("ref");
     postMock.mockRejectedValue(new Error("network"));
