@@ -265,14 +265,12 @@ export const trustSafetyService: AdminTrustSafetyService =
 
 export type { TrustSafetySortField } from "./report-management.service";
 
-import {
-  AdminVerificationManagementService,
-  createVerificationManagementService,
-} from "./verification-management.service";
+import type { AdminVerificationManagementService } from "./verification-management.service";
+import { createApiVerificationManagementService } from "./verification-management.api";
 
 /** /admin/verifications console (Admin Verification & KYC - unified view over real vendor/employer/freelancer verification state). */
 export const verificationManagementService: AdminVerificationManagementService =
-  createVerificationManagementService();
+  createApiVerificationManagementService();
 
 import {
   AdminTransactionManagementService,

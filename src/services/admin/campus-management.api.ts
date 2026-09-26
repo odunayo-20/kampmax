@@ -105,12 +105,20 @@ export function createApiCampusManagementService(): AdminCampusManagementService
     },
 
     async update(id, patch) {
+      // Status has its own endpoint; the details DTO rejects it (400).
+      const { status, ...details } = patch;
       const { data, error } = await apiClient.patch<
         Record<string, unknown>,
         ManagedCampus
-      >(`/admin/campuses/${id}`, { ...patch });
+      >(`/admin/campuses/${id}`, { ...details });
       if (error) fail(error, "Couldn't update the campus.");
-      return data;
+      if (!status) return data;
+      const { data: withStatus, error: statusError } = await apiClient.patch<
+        Record<string, string>,
+        ManagedCampus
+      >(`/admin/campuses/${id}/status`, { status });
+      if (statusError) fail(statusError, "Couldn't change the campus status.");
+      return withStatus;
     },
 
     async setStatus(id, status) {

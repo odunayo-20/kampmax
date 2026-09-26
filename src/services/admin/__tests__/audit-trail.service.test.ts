@@ -12,7 +12,7 @@ import { createUserManagementService } from "@/services/admin/user-management.mo
 import { createVendorManagementService } from "@/services/admin/vendor-management.mock";
 import { createFreelancerManagementService } from "@/services/admin/freelancer-management.mock";
 import { createEmployerManagementService } from "@/services/admin/employer-management.mock";
-import { createVerificationManagementService } from "@/services/admin/verification-management.service";
+import { createVerificationManagementService } from "@/services/admin/verification-management.mock";
 import { createAdminCommunicationService } from "@/services/admin/communication-management.service";
 import { resetVendorAdminState } from "@/data/admin/vendor-management";
 import type { ManagedUserDataset } from "@/data/admin/user-management";

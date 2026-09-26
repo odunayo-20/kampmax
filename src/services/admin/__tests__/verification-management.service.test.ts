@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { createVerificationManagementService } from "@/services/admin/verification-management.service";
+import { createVerificationManagementService } from "@/services/admin/verification-management.mock";
 import { resetVendorAdminState } from "@/data/admin/vendor-management";
 
 // ------------------------------------------------------------
