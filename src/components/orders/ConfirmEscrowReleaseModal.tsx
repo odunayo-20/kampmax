@@ -10,7 +10,10 @@ interface ConfirmEscrowReleaseModalProps {
   order: Order;
   isOpen: boolean;
   onClose: () => void;
-  onConfirmRelease: (rating: number) => void;
+  /** Resolves ok=false with a message when the backend refuses. */
+  onConfirmRelease: (
+    rating: number
+  ) => Promise<{ ok: boolean; message?: string; reviewNote?: string }>;
 }
 
 export function ConfirmEscrowReleaseModal({
@@ -23,17 +26,28 @@ export function ConfirmEscrowReleaseModal({
   const [confirmed, setConfirmed] = useState(false);
   const [releasing, setReleasing] = useState(false);
   const [released, setReleased] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [reviewNote, setReviewNote] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  function handleConfirm() {
-    if (!confirmed) return;
+  async function handleConfirm() {
+    if (!confirmed || releasing) return;
     setReleasing(true);
-    setTimeout(() => {
-      onConfirmRelease(rating);
+    setError(null);
+    try {
+      const result = await onConfirmRelease(rating);
+      if (result.ok) {
+        setReviewNote(result.reviewNote ?? null);
+        setReleased(true);
+      } else {
+        setError(result.message ?? "Couldn't confirm receipt. Please try again.");
+      }
+    } catch {
+      setError("Couldn't confirm receipt. Please try again.");
+    } finally {
       setReleasing(false);
-      setReleased(true);
-    }, 600);
+    }
   }
 
   return (
@@ -71,6 +85,11 @@ export function ConfirmEscrowReleaseModal({
                 Thank you for confirming receipt of Order <strong className="text-neutral-900">#{order.id}</strong>. <strong className="text-emerald-700">{formatNaira(order.total)}</strong> has been credited to the seller.
               </p>
             </div>
+            {reviewNote && (
+              <p className="text-xs text-neutral-600 bg-neutral-50 border border-neutral-200 rounded-lg p-2.5">
+                {reviewNote}
+              </p>
+            )}
             <Button
               onClick={onClose}
               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-xl"
@@ -124,6 +143,12 @@ export function ConfirmEscrowReleaseModal({
                 I confirm that I have received and inspected my ordered items and authorize Kampmax to release escrow payment to the seller.
               </span>
             </label>
+
+            {error && (
+              <p role="alert" className="text-error-700 bg-error-50 border border-error-200 rounded-lg p-2.5">
+                {error}
+              </p>
+            )}
 
             <div className="flex gap-2 pt-2">
               <button

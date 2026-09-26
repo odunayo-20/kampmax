@@ -30,7 +30,13 @@ import { CampusPickupPinCard } from "@/components/orders/CampusPickupPinCard";
 import { OrderProgressStepper } from "@/components/orders/OrderProgressStepper";
 import { OpenDisputeModal } from "@/components/orders/OpenDisputeModal";
 import { ConfirmEscrowReleaseModal } from "@/components/orders/ConfirmEscrowReleaseModal";
-import { getOrderById, fetchOrderById, cancelOrderApi } from "@/services/orders";
+import {
+  getOrderById,
+  fetchOrderById,
+  cancelOrderApi,
+  confirmOrderReceiptApi,
+} from "@/services/orders";
+import { createReview } from "@/services/reviews";
 import { getVendorById } from "@/services/users";
 import { openVendorConversation } from "@/services/messages-api";
 import { useAuth } from "@/lib/auth-context";
@@ -49,6 +55,7 @@ export default function OrderDetailPage({
   const [order, setOrder] = useState<Order | null>(() => getOrderById(id) || null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
@@ -145,10 +152,17 @@ export default function OrderDetailPage({
 
   async function confirmCancel() {
     setIsCancelling(true);
-    await cancelOrderApi(order!.id);
+    setActionError(null);
+    const { error } = await cancelOrderApi(order!.id);
+    setIsCancelling(false);
+    if (error) {
+      // The backend refused (e.g. the order is already paid); don't pretend.
+      setActionError(error.message || "Couldn't cancel this order.");
+      setShowCancelModal(false);
+      return;
+    }
     setIsCancelled(true);
     setShowCancelModal(false);
-    setIsCancelling(false);
   }
 
   function handleReorder() {
@@ -186,8 +200,39 @@ export default function OrderDetailPage({
     setDisputeDetails({ reason, statement });
   }
 
-  function handleEscrowConfirm(rating: number) {
+  async function handleEscrowConfirm(
+    rating: number
+  ): Promise<{ ok: boolean; message?: string; reviewNote?: string }> {
+    const { data, error } = await confirmOrderReceiptApi(order!.id);
+    if (error || !data) {
+      return {
+        ok: false,
+        message: error?.message || "Couldn't confirm receipt. Please try again.",
+      };
+    }
+    setOrder(data);
     setEscrowReleased(true);
+
+    // Save the star rating as a real vendor review. Receipt is already
+    // confirmed, so a review problem is reported but never undoes it.
+    const { error: reviewError } = await createReview({
+      targetType: "VENDOR",
+      targetId: data.vendorId,
+      rating,
+    });
+    if (reviewError) {
+      const alreadyReviewed = /already reviewed/i.test(reviewError.message ?? "");
+      return {
+        ok: true,
+        reviewNote: alreadyReviewed
+          ? "You've already reviewed this vendor, so your rating wasn't added again."
+          : "Your receipt is confirmed, but we couldn't save your rating.",
+      };
+    }
+    return {
+      ok: true,
+      reviewNote: "Your rating was submitted and will appear once it's approved.",
+    };
   }
 
   const breadcrumbs: BreadcrumbItem[] = [
@@ -231,7 +276,8 @@ export default function OrderDetailPage({
               </button>
             )}
 
-            {currentStatus !== "cancelled" && currentStatus !== "delivered" && (
+            {/* Receipt can only be confirmed once the vendor has shipped it. */}
+            {currentStatus === "out_for_delivery" && (
               <button
                 onClick={() => setReleaseModalOpen(true)}
                 className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition-colors"
@@ -241,6 +287,21 @@ export default function OrderDetailPage({
             )}
           </div>
         </div>
+
+        {actionError && (
+          <div
+            role="alert"
+            className="p-3 rounded-xl bg-error-50 border border-error-200 text-error-700 text-xs flex items-start justify-between gap-3"
+          >
+            <span>{actionError}</span>
+            <button
+              onClick={() => setActionError(null)}
+              className="font-semibold shrink-0"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {/* Dispute Filed Alert Banner */}
         {disputeFiled && (

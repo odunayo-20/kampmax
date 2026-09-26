@@ -343,6 +343,32 @@ export async function checkoutOrdersApi(
 }
 
 /**
+ * Customer confirms they received a shipped order; releases escrow to the vendor.
+ * PATCH /api/v1/orders/:id/confirm-receipt
+ */
+export async function confirmOrderReceiptApi(
+  id: string
+): Promise<{ data: Order | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.patch<Record<string, never>, BackendOrderDetail>(
+    `/orders/${id}/confirm-receipt`,
+    {}
+  );
+
+  if (error || !data || !data.id) {
+    return { data: null, error };
+  }
+
+  const mapped = mapBackendOrderToFrontend(data);
+  const idx = cachedOrders.findIndex((o) => o.id === mapped.id || o.id === id);
+  if (idx >= 0) {
+    cachedOrders[idx] = mapped;
+  } else {
+    cachedOrders.unshift(mapped);
+  }
+  return { data: mapped, error: null };
+}
+
+/**
  * Cancel a pending order.
  * PATCH /api/v1/orders/:id/cancel
  */
