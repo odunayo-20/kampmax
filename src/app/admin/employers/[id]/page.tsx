@@ -105,16 +105,16 @@ export default function AdminEmployerDetailPage() {
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3800);
   }, []);
 
-  async function runStatusAction(status: "approve" | "reject" | "suspend" | "restore") {
+  async function runStatusAction(status: "approve" | "reject" | "suspend" | "restore", reason = "") {
     setConfirmWorking(true);
     try {
       if (status === "approve") await approveMut.mutateAsync(employerId);
-      else if (status === "reject") await rejectMut.mutateAsync({ id: employerId });
-      else if (status === "suspend") await suspendMut.mutateAsync(employerId);
+      else if (status === "reject") await rejectMut.mutateAsync({ id: employerId, reason });
+      else if (status === "suspend") await suspendMut.mutateAsync({ id: employerId, reason });
       else await restoreMut.mutateAsync(employerId);
       pushToast("success", "Employer updated.");
-    } catch {
-      pushToast("error", "The action failed. Try again.");
+    } catch (err) {
+      pushToast("error", err instanceof Error ? err.message : "The action failed. Try again.");
     } finally {
       setConfirmWorking(false);
       setApproveOpen(false);
@@ -565,7 +565,8 @@ export default function AdminEmployerDetailPage() {
         confirmLabel="Suspend employer"
         tone="warning"
         loading={confirmWorking}
-        onConfirm={() => void runStatusAction("suspend")}
+        reasonLabel="Reason for suspension (emailed to the employer)"
+        onConfirm={(reason) => void runStatusAction("suspend", reason)}
         onCancel={() => setSuspendOpen(false)}
       />
 
@@ -576,7 +577,8 @@ export default function AdminEmployerDetailPage() {
         confirmLabel="Reject employer"
         tone="danger"
         loading={confirmWorking}
-        onConfirm={() => void runStatusAction("reject")}
+        reasonLabel="Reason for rejection (emailed to the employer)"
+        onConfirm={(reason) => void runStatusAction("reject", reason)}
         onCancel={() => setRejectOpen(false)}
       />
 

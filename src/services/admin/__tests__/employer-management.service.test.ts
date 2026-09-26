@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createEmployerManagementService } from "@/services/admin/employer-management.service";
+import { createEmployerManagementService } from "@/services/admin/employer-management.mock";
 
 // ------------------------------------------------------------
 // EMPLOYER MANAGEMENT SERVICE TESTS

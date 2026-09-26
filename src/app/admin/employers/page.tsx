@@ -27,10 +27,10 @@ import {
   useAdminEmployerApproveMutation,
   useAdminEmployerRejectMutation,
   useAdminEmployerRestoreMutation,
+  useAdminEmployerCampuses,
   useAdminEmployerSuspendMutation,
 } from "@/hooks/admin/use-admin-employers";
 import { useDebounce } from "@/hooks/use-debounce";
-import { mockCampuses } from "@/data/admin/campuses";
 import type { ManagedEmployer, SortDir } from "@/types/admin";
 import type { ManagedEmployerSortField } from "@/services/admin";
 
@@ -112,8 +112,9 @@ function AdminEmployersListPageInner() {
   const approveMut = useAdminEmployerApproveMutation();
   const rejectMut = useAdminEmployerRejectMutation();
 
+  const campusesQuery = useAdminEmployerCampuses();
   const campusOptions = useMemo(
-    () => mockCampuses.map((c) => ({ id: c.id, name: c.name })),
+    () => (campusesQuery.data ?? []).map((c) => ({ id: c.id, name: c.label })),
     []
   );
 
@@ -177,17 +178,18 @@ function AdminEmployersListPageInner() {
 
   async function runEmployerAction(
     employer: ManagedEmployer,
-    action: "suspend" | "restore" | "approve" | "reject"
+    action: "suspend" | "restore" | "approve" | "reject",
+    reason = ""
   ) {
     setConfirmWorking(true);
     try {
-      if (action === "suspend") await suspendMut.mutateAsync(employer.id);
+      if (action === "suspend") await suspendMut.mutateAsync({ id: employer.id, reason });
       else if (action === "restore") await restoreMut.mutateAsync(employer.id);
       else if (action === "approve") await approveMut.mutateAsync(employer.id);
-      else await rejectMut.mutateAsync({ id: employer.id });
+      else await rejectMut.mutateAsync({ id: employer.id, reason });
       pushToast("success", "Employer updated.");
-    } catch {
-      pushToast("error", "The action failed. Try again.");
+    } catch (err) {
+      pushToast("error", err instanceof Error ? err.message : "The action failed. Try again.");
     } finally {
       setConfirmWorking(false);
       setSuspendTarget(null);
@@ -270,7 +272,8 @@ function AdminEmployersListPageInner() {
         confirmLabel="Suspend employer"
         tone="warning"
         loading={confirmWorking}
-        onConfirm={() => suspendTarget && void runEmployerAction(suspendTarget, "suspend")}
+        reasonLabel="Reason for suspension (emailed to the employer)"
+        onConfirm={(reason) => suspendTarget && void runEmployerAction(suspendTarget, "suspend", reason)}
         onCancel={() => setSuspendTarget(null)}
       />
 
@@ -303,7 +306,8 @@ function AdminEmployersListPageInner() {
         confirmLabel="Reject employer"
         tone="danger"
         loading={confirmWorking}
-        onConfirm={() => rejectTarget && void runEmployerAction(rejectTarget, "reject")}
+        reasonLabel="Reason for rejection (emailed to the employer)"
+        onConfirm={(reason) => rejectTarget && void runEmployerAction(rejectTarget, "reject", reason)}
         onCancel={() => setRejectTarget(null)}
       />
 

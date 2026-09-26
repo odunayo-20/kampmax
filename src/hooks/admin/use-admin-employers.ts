@@ -14,7 +14,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminKeys } from "@/lib/query-keys";
-import { employerManagementService } from "@/services/admin";
+import { employerManagementService, fetchEmployerCampusOptions } from "@/services/admin";
 import type { ManagedEmployerListQuery, ManagedEmployer, EmployerActivityEvent } from "@/types/admin";
 import { useAdminSession } from "@/lib/admin/admin-auth-context";
 
@@ -24,6 +24,14 @@ function useActor() {
     throw new Error("Admin employer hooks require an authenticated admin session");
   }
   return admin;
+}
+
+export function useAdminEmployerCampuses() {
+  return useQuery({
+    queryKey: [...adminKeys.employers.all, "campuses"],
+    queryFn: fetchEmployerCampusOptions,
+    staleTime: 5 * 60_000,
+  });
 }
 
 export function useAdminEmployers(query: ManagedEmployerListQuery) {
@@ -69,7 +77,8 @@ export function useAdminEmployerSuspendMutation() {
   const { invalidate } = useEmployerTreeInvalidator();
   const admin = useActor();
   return useMutation({
-    mutationFn: (id: string) => employerManagementService.suspend(id, { actor: admin }),
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      employerManagementService.suspend(id, { actor: admin }, reason),
     onSuccess: invalidate,
   });
 }

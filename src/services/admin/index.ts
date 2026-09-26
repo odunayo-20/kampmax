@@ -329,14 +329,14 @@ export const freelancerManagementService: AdminFreelancerManagementService =
 
 export type { ManagedFreelancerSortField } from "./freelancer-management.service";
 
-import {
-  AdminEmployerManagementService,
-  createEmployerManagementService,
-} from "./employer-management.service";
+import type { AdminEmployerManagementService } from "./employer-management.service";
+import { createApiEmployerManagementService } from "./employer-management.api";
 
-/** /admin/employers console (employer lifecycle + hiring activity). */
+/** /admin/employers console: live directory + moderation API. */
 export const employerManagementService: AdminEmployerManagementService =
-  createEmployerManagementService();
+  createApiEmployerManagementService();
+
+export { fetchEmployerCampusOptions } from "./employer-management.api";
 
 export type { ManagedEmployerSortField } from "./employer-management.service";
 
