@@ -19,7 +19,6 @@ import {
   ShieldPlus,
   ShoppingBag,
   Store,
-  UserMinus,
   Users,
   Wallet,
   XCircle,
@@ -32,7 +31,6 @@ import { ErrorState } from "@/components/admin/ErrorState";
 import { LoadingSkeleton } from "@/components/admin/LoadingSkeleton";
 import { CampusAvatar, AdminAssignmentBadge, CampusStatusBadge } from "@/components/admin/campuses/CampusBadges";
 import { CampusFormDialog } from "@/components/admin/campuses/CampusFormDialog";
-import { AssignCampusAdminDialog } from "@/components/admin/campuses/AssignCampusAdminDialog";
 import { CampusActivityTimeline } from "@/components/admin/campuses/CampusActivityTimeline";
 import { campusManagementService } from "@/services/admin";
 import type {
@@ -62,11 +60,8 @@ export default function AdminCampusDetailPage() {
   // ----- overlays -----
   const [editing, setEditing] = useState(false);
   const [savingForm, setSavingForm] = useState(false);
-  const [assigning, setAssigning] = useState(false);
-  const [savingAssign, setSavingAssign] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
   const [confirmWorking, setConfirmWorking] = useState(false);
-  const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string } | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const toastId = useRef(0);
 
@@ -141,38 +136,6 @@ export default function AdminCampusDetailPage() {
     } finally {
       setConfirmWorking(false);
       setDeactivating(false);
-    }
-  }
-
-  async function assignAdmin(admin: CampusAdminInput) {
-    if (detail.status !== "ready") return;
-    setSavingAssign(true);
-    try {
-      await campusManagementService.assignAdmin(detail.data.campus.id, admin);
-      setAssigning(false);
-      refresh(`${admin.name} was invited as campus admin.`);
-    } catch (e) {
-      const message =
-        e instanceof Error && /already assigned/.test(e.message)
-          ? e.message
-          : "Couldn't send the invite. Try again.";
-      pushToast("error", message);
-    } finally {
-      setSavingAssign(false);
-    }
-  }
-
-  async function runRemoveAdmin() {
-    if (detail.status !== "ready" || !removeTarget) return;
-    setConfirmWorking(true);
-    try {
-      await campusManagementService.removeAdmin(detail.data.campus.id, removeTarget.id);
-      refresh(`${removeTarget.name} was removed as campus admin.`);
-    } catch {
-      pushToast("error", "Couldn't remove the admin. Try again.");
-    } finally {
-      setConfirmWorking(false);
-      setRemoveTarget(null);
     }
   }
 
@@ -355,31 +318,14 @@ export default function AdminCampusDetailPage() {
                         <AdminAssignmentBadge status={admin.status} />
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setRemoveTarget({ id: admin.id, name: admin.name })
-                      }
-                      aria-label={`Remove ${admin.name} as campus admin`}
-                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-kampmax-text-secondary transition-colors hover:bg-kampmax-error/5 hover:text-kampmax-error"
-                    >
-                      <UserMinus className="h-4 w-4" />
-                    </button>
                   </li>
                 ))}
               </ul>
             )}
 
-            <div className="border-t border-kampmax-border px-4 py-3">
-              <button
-                type="button"
-                onClick={() => setAssigning(true)}
-                className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-kampmax-navy px-3.5 text-sm font-medium text-white transition-colors hover:bg-kampmax-navy-light"
-              >
-                <ShieldPlus className="h-4 w-4" />
-                Assign campus admin
-              </button>
-            </div>
+            <p className="border-t border-kampmax-border px-4 py-3 text-xs text-kampmax-text-secondary">
+              Campus admins are administrators scoped to this campus. Manage who holds the role from the Users console.
+            </p>
           </section>
 
           {/* Commerce snapshot card */}
@@ -415,14 +361,6 @@ export default function AdminCampusDetailPage() {
         onSave={saveForm}
       />
 
-      <AssignCampusAdminDialog
-        open={assigning}
-        campus={campus}
-        saving={savingAssign}
-        onClose={() => !savingAssign && setAssigning(false)}
-        onAssign={assignAdmin}
-      />
-
       <ConfirmDialog
         open={deactivating}
         title={`Deactivate ${campus.name}?`}
@@ -432,17 +370,6 @@ export default function AdminCampusDetailPage() {
         loading={confirmWorking}
         onConfirm={runDeactivate}
         onCancel={() => !confirmWorking && setDeactivating(false)}
-      />
-
-      <ConfirmDialog
-        open={removeTarget !== null}
-        title={`Remove ${removeTarget?.name ?? ""}?`}
-        message="They immediately lose access to this campus's console. Orders, vendors and disputes they handled remain untouched."
-        confirmLabel="Remove admin"
-        tone="danger"
-        loading={confirmWorking}
-        onConfirm={runRemoveAdmin}
-        onCancel={() => !confirmWorking && setRemoveTarget(null)}
       />
 
       {/* ---------- Toasts ---------- */}

@@ -42,10 +42,8 @@ export const adminAuthService: AdminAuthService = createApiAdminAuthService();
 import { AdminUserService, createMockUserService } from "./users.service";
 import type { AdminUserManagementService } from "./user-management.service";
 import { createApiUserManagementService } from "./user-management.api";
-import {
-  AdminCampusManagementService,
-  createCampusManagementService,
-} from "./campus-management.service";
+import type { AdminCampusManagementService } from "./campus-management.service";
+import { createApiCampusManagementService } from "./campus-management.api";
 import { AdminCampusService, createMockCampusService } from "./campuses.service";
 import { AdminVendorService, createMockVendorService } from "./vendors.service";
 import type { AdminVendorManagementService } from "./vendor-management.service";
@@ -131,9 +129,9 @@ export type {
 } from "./user-management.service";
 export { getUserActionPolicy } from "./user-management.service";
 
-/** /admin/campuses console (campus lifecycle + admin assignments). */
+/** /admin/campuses console: live campus directory + management API. */
 export const campusManagementService: AdminCampusManagementService =
-  createCampusManagementService();
+  createApiCampusManagementService();
 
 export type { ManagedCampusSortField } from "./campus-management.service";
 
