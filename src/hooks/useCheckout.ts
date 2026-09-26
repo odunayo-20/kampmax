@@ -393,15 +393,21 @@ export function useCheckout() {
   useEffect(() => {
     if (state === CHECKOUT_STATES.IDLE && activeItems.length > 0) {
       transitionTo(CHECKOUT_STATES.LOADING);
-      // Simulate the server round-trip for building the presentation session.
-      const t = setTimeout(() => {
-        setErrorInfo(null);
-        transitionTo(CHECKOUT_STATES.READY);
-      }, 500);
-      return () => clearTimeout(t);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, activeItems.length]);
+
+  // Simulate the server round-trip for building the presentation session.
+  // Kept separate so the LOADING transition doesn't cancel its own timer.
+  useEffect(() => {
+    if (state !== CHECKOUT_STATES.LOADING) return;
+    const t = setTimeout(() => {
+      setErrorInfo(null);
+      transitionTo(CHECKOUT_STATES.READY);
+    }, 500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
 
   // ── Place order → full flow ──
   const placeOrder = useCallback(async () => {
@@ -431,7 +437,8 @@ export function useCheckout() {
     }
 
     // 2. Create order(s) via backend API if user is authenticated
-    let createdOrderId: string | undefined;
+    // One order is created per vendor; a single charge pays for all of them.
+    let createdOrderIds: string[] = [];
     if (status === "authenticated") {
       const { data: createdOrders, error: orderErr } = await checkoutOrdersApi({
         address: {
@@ -457,7 +464,9 @@ export function useCheckout() {
       }
 
       if (!orderErr && createdOrders && createdOrders.length > 0) {
-        createdOrderId = createdOrders[0].id;
+        createdOrderIds = createdOrders
+          .map((o) => o.backendId)
+          .filter((id): id is string => !!id);
       }
     }
 
@@ -465,7 +474,7 @@ export function useCheckout() {
     transitionTo(CHECKOUT_STATES.PAYMENT_INITIALIZING);
     const initResult = await initializePaystackPayment(
       session,
-      createdOrderId,
+      createdOrderIds,
       typeof window !== "undefined" ? `${window.location.origin}/checkout/callback` : undefined
     );
 

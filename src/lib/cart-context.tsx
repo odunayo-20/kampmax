@@ -122,10 +122,12 @@ function readStoredCart(): CartItem[] | null {
     if (!Array.isArray(parsed) || parsed.length === 0) return null;
     const lines: CartLineItem[] = [];
     for (const entry of parsed) {
-      const product = entry?.productId
-        ? getProductById(entry.productId)
+      // The catalog cache is empty on a fresh page load, so fall back to the
+      // snapshot saved with the line instead of dropping it.
+      const product: Product | undefined = entry?.productId
+        ? (getProductById(entry.productId) ?? entry.product)
         : undefined;
-      if (!product) continue; // product no longer in catalog — drop the line
+      if (!product?.id) continue;
       const qty = typeof entry?.quantity === "number" ? entry.quantity : 1;
       lines.push({
         id: makeLineId(),
@@ -155,6 +157,7 @@ function writeStoredCart(items: CartItem[]) {
     // Guest cart stores only minimum shopping info (product ref, qty, variant).
     const slim = items.map((i) => ({
       productId: i.product.id,
+      product: i.product,
       quantity: i.quantity,
       savedForLater: i.savedForLater ?? false,
       variantLabel: (i as CartLineItem).variantLabel,
@@ -191,10 +194,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Persist on every change for guest/offline.
+  // Signed-in carts live on the server; storing them here would make the next
+  // page load merge (and double) them again.
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || status === "authenticated") return;
     writeStoredCart(items);
-  }, [items, isLoading]);
+  }, [items, isLoading, status]);
 
   // Synchronize authenticated server cart and merge guest cart when auth is established.
   const mergeGuestWithServer = useCallback(async () => {
@@ -204,13 +209,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     try {
       const serverRes = await fetchServerCart();
+      // If the server cart can't be read, keep the local cart untouched and
+      // let the next sign-in retry the merge.
+      if (serverRes.error) {
+        mergedRef.current = null;
+        return;
+      }
       const serverItems = serverRes.items;
       const guest = items.filter((i) => !i.savedForLater) as CartLineItem[];
+      const saved = items.filter((i) => i.savedForLater);
 
       if (guest.length > 0) {
         // Send guest items to backend cart
+        let failed = 0;
         for (const g of guest) {
-          await addToServerCart({
+          const res = await addToServerCart({
             productId: g.productId,
             quantity: g.quantity,
             selectedVariation: g.selectedVariants
@@ -220,16 +233,35 @@ export function CartProvider({ children }: { children: ReactNode }) {
                 }
               : undefined,
           });
+          if (res.error) failed += 1;
         }
         const updated = await fetchServerCart();
-        const saved = items.filter((i) => i.savedForLater);
-        setItems([...updated.items, ...saved]);
+        if (updated.error) return;
+        // Keep any guest line the server did not accept so it isn't lost.
+        const missing = guest.filter(
+          (g) => !updated.items.some((u) => u.productId === g.productId)
+        );
+        setItems([...updated.items, ...missing, ...saved]);
+        if (failed > 0) {
+          setFeedback({
+            type: "error",
+            message: "Some items couldn't be saved to your account cart.",
+          });
+        } else {
+          // Merged: the server cart is now the source of truth, so the guest
+          // copy must not be merged again on the next page load.
+          try {
+            window.localStorage.removeItem(STORAGE_KEY);
+          } catch {
+            // ignore
+          }
+        }
       } else if (serverItems.length > 0) {
-        const saved = items.filter((i) => i.savedForLater);
         setItems([...serverItems, ...saved]);
       }
     } catch {
       // Keep local state if server sync fails
+      mergedRef.current = null;
     }
   }, [status, user, items]);
 
@@ -307,14 +339,35 @@ export function CartProvider({ children }: { children: ReactNode }) {
                 option: Object.values(options.selectedVariants)[0] || "",
               }
             : undefined,
-        }).then((res) => {
+        }).then(async (res) => {
+          if (res.error) {
+            setFeedback({
+              type: "error",
+              message: res.error.message || "Couldn't save this item to your cart. Please try again.",
+            });
+            // The server rejected it (e.g. out of stock): drop the optimistic
+            // line by reloading the real server cart.
+            const server = await fetchServerCart();
+            if (!server.error) {
+              setItems((prev) => [
+                ...server.items,
+                ...prev.filter((i) => i.savedForLater),
+              ]);
+            }
+            return;
+          }
           if (res.items && res.items.length > 0) {
             setItems((prev) => {
               const saved = prev.filter((i) => i.savedForLater);
               return [...res.items, ...saved];
             });
           }
-        }).catch(() => {});
+        }).catch(() => {
+          setFeedback({
+            type: "error",
+            message: "Couldn't save this item to your cart. Please try again.",
+          });
+        });
       }
 
       setFeedback({ type: "success", message: `${product.title} added to cart.` });
@@ -337,8 +390,38 @@ export function CartProvider({ children }: { children: ReactNode }) {
       setItems((prev) => prev.filter((i) => i.product.id !== productId));
       setFeedback({ type: "info", message: "Item removed from your cart." });
 
-      if (status === "authenticated" && lineId) {
-        removeServerCartItem(lineId).catch(() => {});
+      if (status === "authenticated") {
+        // Treat the server cart as the source of truth: adopt its response, or
+        // reload it if the delete failed so the item can't silently return.
+        const reconcile = async () => {
+          const res = lineId ? await removeServerCartItem(lineId) : null;
+          if (res && !res.error) {
+            setItems((prev) => [
+              ...res.items,
+              ...prev.filter((i) => i.savedForLater),
+            ]);
+            return;
+          }
+          const server = await fetchServerCart();
+          if (!server.error) {
+            setItems((prev) => [
+              ...server.items,
+              ...prev.filter((i) => i.savedForLater),
+            ]);
+          }
+          if (res?.error) {
+            setFeedback({
+              type: "error",
+              message: res.error.message || "Couldn't remove that item. Please try again.",
+            });
+          }
+        };
+        reconcile().catch(() => {
+          setFeedback({
+            type: "error",
+            message: "Couldn't remove that item. Please try again.",
+          });
+        });
       }
 
       queueMicrotask(() => {

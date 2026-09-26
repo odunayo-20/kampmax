@@ -3,6 +3,7 @@ import Image from "next/image";
 import { Product } from "@/types";
 import { ConditionBadge } from "@/components/atoms/Badge";
 import { formatNaira, cn } from "@/lib/utils";
+import { isOutOfStock } from "@/lib/stock";
 
 interface ProductCardHorizontalProps {
   product: Product;
@@ -11,6 +12,7 @@ interface ProductCardHorizontalProps {
 
 export function ProductCardHorizontal({ product, className }: ProductCardHorizontalProps) {
   const hasDiscount = product.originalPrice && product.originalPrice > product.price;
+  const outOfStock = isOutOfStock(product);
 
   return (
     <Link
@@ -26,10 +28,15 @@ export function ProductCardHorizontal({ product, className }: ProductCardHorizon
           src={product.images[0] || "/placeholder-product.svg"}
           alt={product.title}
           fill
-          className="object-cover"
+          className={cn("object-cover", outOfStock && "opacity-50 grayscale")}
           sizes="160px"
         />
-        {hasDiscount && (
+        {outOfStock && (
+          <div className="absolute top-1.5 left-1.5 bg-neutral-900 text-white text-[9px] font-bold px-1 py-0.5 rounded">
+            Out of stock
+          </div>
+        )}
+        {!outOfStock && hasDiscount && (
           <div className="absolute top-1.5 left-1.5 bg-kampmax-error text-white text-[9px] font-bold px-1 py-0.5 rounded">
             {Math.round(
               ((product.originalPrice! - product.price) / product.originalPrice!) * 100

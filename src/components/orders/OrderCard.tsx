@@ -28,7 +28,7 @@ const DELIVERY_ICONS: Record<string, typeof Package> = {
 export function OrderCard({ order, vendorName, className }: OrderCardProps) {
   const firstItem = order.items[0];
   const itemCount = order.items.reduce((sum, i) => sum + i.quantity, 0);
-  const moreCount = order.items.length - 1;
+  const moreCount = Math.max(order.items.length - 1, 0);
   const progress = getOrderProgress(order.status);
   const isCancelled = order.status === "cancelled";
   const isActive = !isCancelled && order.status !== "delivered";
@@ -62,12 +62,14 @@ export function OrderCard({ order, vendorName, className }: OrderCardProps) {
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-kampmax-text line-clamp-1">
-            {firstItem.product.title}
+            {firstItem?.product.title ?? "Order items"}
           </p>
-          <p className="text-xs text-kampmax-text-secondary">
-            {itemCount} {itemCount === 1 ? "item" : "items"}
-            {moreCount > 0 && ` (+${moreCount} more)`}
-          </p>
+          {firstItem && (
+            <p className="text-xs text-kampmax-text-secondary">
+              {itemCount} {itemCount === 1 ? "item" : "items"}
+              {moreCount > 0 && ` (+${moreCount} more)`}
+            </p>
+          )}
         </div>
       </div>
 

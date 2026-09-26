@@ -83,9 +83,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
   const gallery = useMemo(() => {
     if (!product) return [];
-    const base = product.images[0] || "/placeholder-product.svg";
-    const count = product.id.charCodeAt(1) % 2 === 0 ? 5 : 4;
-    return Array.from({ length: count }, (_, i) => (i === 0 ? base : `${base}?v=${i}`));
+    return product.images.length > 0 ? product.images : ["/placeholder-product.svg"];
   }, [product]);
 
   const variantGroups = useMemo(() => (product ? getVariantGroups(product.id, product.categoryId) : []), [product]);
@@ -104,6 +102,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     });
     setSelectedVariants(init);
   }, [variantGroups]);
+
+  const variantPriceModifier = useMemo(
+    () => calculateVariantPriceModifier(variantGroups, selectedVariants),
+    [variantGroups, selectedVariants]
+  );
 
   if (isLoading && !product) {
     return (
@@ -151,17 +154,19 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const isRemoved = product.status === "removed";
   const isUnavailable = isSold || isRemoved;
 
-  const variantPriceModifier = useMemo(
-    () => calculateVariantPriceModifier(variantGroups, selectedVariants),
-    [variantGroups, selectedVariants]
-  );
-
   const effectivePrice = product.price + variantPriceModifier;
   const hasDiscount = !!product.originalPrice && product.originalPrice > effectivePrice;
   const discountPct = hasDiscount ? calculateDiscountPercentage(product.originalPrice!, effectivePrice) : 0;
 
   const allVariantsSelected = areAllVariantsSelected(variantGroups, selectedVariants);
-  const variantStock = getStockForSelection(product.id, selectedVariants);
+  // Real stock from the backend (-1 = unlimited); the hash-based value is only
+  // a fallback for catalog entries that carry no stock figure.
+  const variantStock =
+    typeof product.stock === "number"
+      ? product.stock === -1
+        ? 999
+        : product.stock
+      : getStockForSelection(product.id, selectedVariants);
   const inStock = !isUnavailable && variantStock > 0;
   const lowStock = inStock && variantStock <= 3;
   const maxQty = Math.min(10, variantStock || 10);

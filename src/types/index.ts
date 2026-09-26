@@ -283,6 +283,8 @@ export interface OrderItem {
 
 export interface Order {
   id: string;
+  /** Backend UUID; `id` holds the human-readable order number when available. */
+  backendId?: string;
   buyerId: string;
   vendorId: string;
   items: CartItem[];

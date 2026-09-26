@@ -220,6 +220,7 @@ export function mapBackendOrderToFrontend(
 
   return {
     id: raw.orderNumber || raw.id,
+    backendId: raw.id,
     buyerId: "", // authorized user
     vendorId: raw.vendorId,
     items: items,

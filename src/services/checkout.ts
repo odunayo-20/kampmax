@@ -24,9 +24,11 @@ import type {
 
 export interface InitializePaymentPayload {
   orderId: string;
+  /** All orders covered by this charge (multi-vendor checkout), incl. `orderId`. */
+  orderIds?: string[];
   amount?: number;
   currency?: string;
-  gateway?: "PAYSTACK" | "FLUTTERWAVE" | "KAMPMAX_WALLET";
+  gateway?: "paystack" | "flutterwave";
   callbackUrl?: string;
   metadata?: Record<string, unknown>;
 }
@@ -383,9 +385,10 @@ export async function verifyPaymentApi(
  */
 export async function initializePaystackPayment(
   session: CheckoutSession,
-  orderId?: string,
+  orderIds: string[],
   callbackUrl?: string
 ): Promise<CheckoutActionResult<PaystackPaymentInitiation>> {
+  const [orderId] = orderIds;
   if (!orderId) {
     return {
       ok: false,
@@ -398,7 +401,8 @@ export async function initializePaystackPayment(
 
   const { data, error } = await initializePaymentApi({
     orderId,
-    gateway: "PAYSTACK",
+    orderIds,
+    gateway: "paystack",
     callbackUrl,
   });
 

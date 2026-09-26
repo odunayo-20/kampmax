@@ -8,6 +8,7 @@ import { useMarketplace } from "@/hooks/useMarketplace";
 import { useApp } from "@/lib/app-context";
 import { getCampuses } from "@/services/campus";
 import { getVendorById } from "@/services/users";
+import { useEnsureVendors } from "@/hooks/use-vendor-cache";
 import { SearchBar } from "@/components/shared";
 import { PageContainer } from "@/components/layout";
 import {
@@ -47,6 +48,10 @@ function MarketplaceContent() {
 
   const hasFilters = activeFilterCount > 0 || filters.search !== "";
 
+  // Load any vendors not yet in the shared cache; the count re-triggers the
+  // memo below once their names arrive.
+  const vendorsLoaded = useEnsureVendors(displayedProducts.map((p) => p.vendorId));
+
   const vendorCache = useMemo(() => {
     const cache: Record<string, { name: string; verified: boolean }> = {};
     filteredProducts.forEach((p) => {
@@ -59,7 +64,7 @@ function MarketplaceContent() {
       }
     });
     return cache;
-  }, [filteredProducts]);
+  }, [filteredProducts, vendorsLoaded]);
 
   return (
     <PageContainer className="space-y-4">

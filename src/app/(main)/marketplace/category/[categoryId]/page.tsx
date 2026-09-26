@@ -13,6 +13,7 @@ import {
   fetchProductsByCategory,
 } from "@/services/products";
 import { getVendorById } from "@/services/users";
+import { useEnsureVendors } from "@/hooks/use-vendor-cache";
 import { getCampuses } from "@/services/campus";
 import { formatNaira } from "@/lib/utils";
 import { PageContainer } from "@/components/layout";
@@ -159,6 +160,8 @@ function CategoryPageContent({ params }: CategoryPageProps) {
   const hasMore = visibleCount < filteredProducts.length;
   const activeFilterCount = Object.entries(filters).filter(([k, v]) => k !== "sort" && k !== "subcategoryId" && v).length;
 
+  const vendorsLoaded = useEnsureVendors(displayedProducts.map((p) => p.vendorId));
+
   const vendorCache = useMemo(() => {
     const cache: Record<string, { name: string; verified: boolean }> = {};
     filteredProducts.forEach((p) => {
@@ -171,7 +174,7 @@ function CategoryPageContent({ params }: CategoryPageProps) {
       }
     });
     return cache;
-  }, [filteredProducts]);
+  }, [filteredProducts, vendorsLoaded]);
 
   const activeFilters = buildActiveFilters(filters, categoryId);
 

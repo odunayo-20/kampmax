@@ -7,6 +7,7 @@ import { Product, ProductCondition } from "@/types";
 import { cn, formatNaira } from "@/lib/utils";
 import { isWishlisted, toggleWishlist } from "@/services/wishlist";
 import { useCart } from "@/lib/cart-context";
+import { isOutOfStock } from "@/lib/stock";
 
 interface ProductCardProps {
   product: Product;
@@ -38,6 +39,7 @@ export function ProductCard({
   const [imgError, setImgError] = useState(false);
   const { addItem } = useCart();
 
+  const outOfStock = isOutOfStock(product);
   const hasDiscount = !!product.originalPrice && product.originalPrice > product.price;
   const imageSrc = product.images && product.images.length > 0 ? product.images[0] : null;
 
@@ -59,6 +61,7 @@ export function ProductCard({
   function handleAddToCart(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
+    if (outOfStock) return;
     addItem(product, 1);
     setAddedToast(true);
     setTimeout(() => setAddedToast(false), 2000);
@@ -80,7 +83,10 @@ export function ProductCard({
             src={imageSrc}
             alt={product.title}
             onError={() => setImgError(true)}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            className={cn(
+              "w-full h-full object-cover group-hover:scale-105 transition-transform duration-300",
+              outOfStock && "opacity-50 grayscale"
+            )}
           />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center text-neutral-400/50 bg-neutral-100">
@@ -92,7 +98,14 @@ export function ProductCard({
         )}
 
         {/* Top Badges */}
-        {hasDiscount && (
+        {outOfStock && (
+          <div className="absolute top-2 left-2 z-10">
+            <span className="bg-neutral-900 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md leading-none shadow-sm">
+              Out of stock
+            </span>
+          </div>
+        )}
+        {!outOfStock && hasDiscount && (
           <div className="absolute top-2 left-2 z-10">
             <span className="bg-error-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md leading-none shadow-sm">
               -{discountPercent(product.originalPrice!, product.price)}%
@@ -176,9 +189,11 @@ export function ProductCard({
             {/* Quick Add to Cart Button */}
             <button
               onClick={handleAddToCart}
-              aria-label="Add to cart"
+              disabled={outOfStock}
+              aria-label={outOfStock ? "Out of stock" : "Add to cart"}
               className={cn(
                 "p-1.5 rounded-lg border transition-all shrink-0 flex items-center gap-1 text-xs font-semibold",
+                outOfStock && "opacity-40 cursor-not-allowed hover:bg-neutral-50 hover:text-neutral-700 hover:border-neutral-200",
                 addedToast
                   ? "bg-emerald-50 text-emerald-700 border-emerald-300"
                   : "bg-neutral-50 text-neutral-700 border-neutral-200 hover:bg-primary-600 hover:text-white hover:border-primary-600"
