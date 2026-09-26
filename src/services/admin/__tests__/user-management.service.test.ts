@@ -6,8 +6,8 @@ import {
   ManagedUserUpdateInput,
 } from "@/types/admin";
 import type { ManagedUserDataset } from "@/data/admin/user-management";
+import { createUserManagementService } from "@/services/admin/user-management.mock";
 import {
-  createUserManagementService,
   getUserActionPolicy,
   type AdminActingContext,
 } from "@/services/admin/user-management.service";

@@ -8,7 +8,7 @@ import {
   recordAdminAuditEvent,
   resetAdminAuditTrail,
 } from "@/data/admin/audit-trail";
-import { createUserManagementService } from "@/services/admin/user-management.service";
+import { createUserManagementService } from "@/services/admin/user-management.mock";
 import { createVendorManagementService } from "@/services/admin/vendor-management.service";
 import { createFreelancerManagementService } from "@/services/admin/freelancer-management.service";
 import { createEmployerManagementService } from "@/services/admin/employer-management.service";

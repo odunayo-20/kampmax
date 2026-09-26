@@ -40,10 +40,8 @@ export type {
 /** Live operator auth: POST /admin/auth/login, GET /admin/auth/session. */
 export const adminAuthService: AdminAuthService = createApiAdminAuthService();
 import { AdminUserService, createMockUserService } from "./users.service";
-import {
-  AdminUserManagementService,
-  createUserManagementService,
-} from "./user-management.service";
+import type { AdminUserManagementService } from "./user-management.service";
+import { createApiUserManagementService } from "./user-management.api";
 import {
   AdminCampusManagementService,
   createCampusManagementService,
@@ -114,9 +112,11 @@ export const dashboardService: DashboardService =
 
 export const userService: AdminUserService = createMockUserService(mockUsers);
 
-/** /admin/users console (full directory incl. staff accounts). */
+/** /admin/users console: live directory API (staff, vendors, customers). */
 export const userManagementService: AdminUserManagementService =
-  createUserManagementService();
+  createApiUserManagementService();
+
+export { fetchUserCampusOptions } from "./user-management.api";
 
 export type { ManagedUserSortField } from "./user-management.service";
 export type {

@@ -88,7 +88,10 @@ export function UsersFilters({
             className="h-9 min-w-[130px] rounded-lg border border-kampmax-border bg-white px-2.5 text-sm text-kampmax-text focus:outline-none focus:ring-1 focus:ring-kampmax-blue"
           >
             <option value="all">All roles</option>
-            {(Object.keys(USER_ROLE_LABELS) as ManagedUserRole[]).map((role) => (
+            {/* The platform has no campus-admin role, so it isn't offered as a filter. */}
+            {(Object.keys(USER_ROLE_LABELS) as ManagedUserRole[])
+              .filter((role) => role !== "campus_admin")
+              .map((role) => (
               <option key={role} value={role}>
                 {USER_ROLE_LABELS[role]}
               </option>

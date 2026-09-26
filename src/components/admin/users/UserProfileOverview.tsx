@@ -119,9 +119,11 @@ export function UserProfileOverview({
                     <p className="truncate text-sm font-semibold text-kampmax-text">
                       {user.vendorProfile.storeName}
                     </p>
-                    <p className="truncate text-xs text-kampmax-text-secondary">
-                      {user.vendorProfile.category}
-                    </p>
+                    {user.vendorProfile.category && (
+                      <p className="truncate text-xs text-kampmax-text-secondary">
+                        {user.vendorProfile.category}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -133,7 +135,10 @@ export function UserProfileOverview({
                 <MiniStat label="Products" value={String(user.vendorProfile.productsCount)} />
                 <MiniStat label="Total sales" value={formatNaira(user.vendorProfile.totalSales)} />
                 <MiniStat label="Reviews" value={String(user.vendorProfile.reviewsCount)} />
-                <MiniStat label="Fulfillment" value={`${user.vendorProfile.fulfillmentRate}%`} />
+                <MiniStat
+                  label="Fulfillment"
+                  value={user.vendorProfile.fulfillmentRate === null ? "—" : `${user.vendorProfile.fulfillmentRate}%`}
+                />
               </dl>
             </div>
           </Card>
@@ -223,7 +228,7 @@ export function UserProfileOverview({
             {user.vendorProfile && (
               <ModuleLinkRow icon={Store} label="Vendors" target="/admin/vendors" />
             )}
-            {(user.role === "admin" || user.role === "super_admin" || user.role === "campus_admin") && (
+            {(user.role === "admin" || user.role === "super_admin" || user.role === "moderator" || user.role === "support" || user.role === "campus_admin") && (
               <ModuleLinkRow icon={UserRound} label="Roles & permissions" target="/admin/permissions" />
             )}
           </ul>

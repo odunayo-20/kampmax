@@ -113,6 +113,8 @@ export interface PlatformUser {
 export type ManagedUserRole =
   | "customer"
   | "vendor"
+  | "moderator"
+  | "support"
   | "campus_admin"
   | "admin"
   | "super_admin";
@@ -135,13 +137,15 @@ export type ManagedUserListItem = Omit<ManagedUser, "walletBalance">;
 /** Store details attached when role === "vendor". */
 export interface ManagedVendorProfile {
   storeName: string;
-  category: string;
+  /** Stores have no category on the platform yet. */
+  category: string | null;
   status: VendorStatus;
   rating: number;
   reviewsCount: number;
   productsCount: number;
   totalSales: number;
-  fulfillmentRate: number;
+  /** Delivered / (delivered + cancelled) orders; null until a store has any. */
+  fulfillmentRate: number | null;
 }
 
 export interface ManagedUser {
@@ -206,8 +210,9 @@ export interface UserOrderSummary {
   itemsCount: number;
   total: number;
   status: AdminOrderStatus;
-  paymentMethod: AdminOrder["paymentMethod"];
-  paymentStatus: AdminOrder["paymentStatus"];
+  /** Not recorded per order on the platform yet. */
+  paymentMethod: AdminOrder["paymentMethod"] | null;
+  paymentStatus: AdminOrder["paymentStatus"] | null;
   createdAt: string;
 }
 
@@ -244,7 +249,7 @@ export interface UserProfileReport {
 /** Full payload backing the user profile drawer. */
 export interface ManagedUserDetail {
   user: ManagedUser;
-  campus: Campus | null;
+  campus: Pick<Campus, "id" | "name" | "shortName" | "city" | "state"> | null;
   wallet: UserWalletSummary;
   orders: UserOrderSummary[];
   activity: UserActivityEvent[];

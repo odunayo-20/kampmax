@@ -14,9 +14,9 @@ import { EditUserDialog } from "@/components/admin/users/EditUserDialog";
 import { UsersFilters, type UsersFilterState } from "@/components/admin/users/UsersFilters";
 import { UsersTable } from "@/components/admin/users/UsersTable";
 import { useDebounce } from "@/hooks/use-debounce";
-import { mockCampuses } from "@/data/admin/campuses";
 import { getUserActionPolicy } from "@/services/admin";
 import {
+  useAdminUserCampuses,
   useAdminUserCounts,
   useAdminUserResetStateMutation,
   useAdminUserSetStatusMutation,
@@ -45,14 +45,6 @@ interface ToastMessage {
   tone: "success" | "error";
   text: string;
 }
-
-const CAMPUS_OPTIONS = mockCampuses
-  .filter((c) => c.status === "active")
-  .map((c) => ({ id: c.id, label: c.shortName }));
-
-const CAMPUS_NAMES: Record<string, string> = Object.fromEntries(
-  mockCampuses.map((c) => [c.id, c.shortName])
-);
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
@@ -148,6 +140,12 @@ function AdminUsersPageInner() {
     pageSize,
   });
   const countsQuery = useAdminUserCounts();
+  const campusesQuery = useAdminUserCampuses();
+  const campusOptions = useMemo(() => campusesQuery.data ?? [], [campusesQuery.data]);
+  const campusNames = useMemo(
+    () => Object.fromEntries(campusOptions.map((c) => [c.id, c.label])),
+    [campusOptions]
+  );
 
   // ----- mutations -----
   const setStatusMutation = useAdminUserSetStatusMutation();
@@ -280,14 +278,14 @@ function AdminUsersPageInner() {
       <div className="mb-4">
         <UsersFilters
           filters={{ ...filters, search: searchInput }}
-          campuses={CAMPUS_OPTIONS}
+          campuses={campusOptions}
           counts={countsQuery.data ?? null}
           hideCampus={isCampusScoped}
           onChange={patchFilters}
         />
         {isCampusScoped && admin && (
           <p className="mt-2 text-xs text-kampmax-text-secondary">
-            Scoped view — only {CAMPUS_NAMES[admin.campusId ?? ""] ?? "your campus"}&apos;s
+            Scoped view — only {campusNames[admin.campusId ?? ""] ?? "your campus"}&apos;s
             accounts are shown, and account management is read-only.
           </p>
         )}
@@ -297,7 +295,7 @@ function AdminUsersPageInner() {
         page={readyData}
         loading={loading}
         error={listQuery.isError}
-        campusNames={CAMPUS_NAMES}
+        campusNames={campusNames}
         sortBy={sortBy}
         sortDir={sortDir}
         onSort={toggleSort}

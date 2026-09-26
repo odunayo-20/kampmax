@@ -12,6 +12,8 @@ import {
 export const USER_ROLE_LABELS: Record<ManagedUser["role"], string> = {
   customer: "Customer",
   vendor: "Vendor",
+  moderator: "Moderator",
+  support: "Support",
   campus_admin: "Campus Admin",
   admin: "Admin",
   super_admin: "Super Admin",
@@ -63,6 +65,8 @@ export function userStatusBadgeVariant(status: ManagedUserStatus): BadgeVariant 
 export const ROLE_PILL_STYLES: Record<ManagedUser["role"], string> = {
   customer: "bg-kampmax-muted text-kampmax-text-secondary",
   vendor: "bg-kampmax-gold/15 text-kampmax-gold-dark",
+  moderator: "bg-violet-100 text-violet-600",
+  support: "bg-kampmax-success/10 text-kampmax-success",
   campus_admin: "bg-kampmax-info/10 text-kampmax-info",
   admin: "bg-kampmax-blue/10 text-kampmax-blue",
   super_admin: "bg-kampmax-navy text-white",

@@ -13,6 +13,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminKeys } from "@/lib/query-keys";
 import {
+  fetchUserCampusOptions,
   getUserActionPolicy,
   userManagementService,
   type UserActionPolicy,
@@ -34,6 +35,14 @@ export function useAdminUsers(query: ManagedUserListQuery) {
   return useQuery({
     queryKey: adminKeys.users.list(query, admin.campusId),
     queryFn: () => userManagementService.list(query, { actor: admin }),
+  });
+}
+
+export function useAdminUserCampuses() {
+  return useQuery({
+    queryKey: [...adminKeys.users.all, "campuses"],
+    queryFn: fetchUserCampusOptions,
+    staleTime: 5 * 60_000,
   });
 }
 

@@ -60,9 +60,15 @@ export function DrawerOrdersList({ orders }: { orders: UserOrderSummary[] }) {
           <p className="mt-1 truncate text-sm text-kampmax-text">{o.itemsSummary}</p>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <StatusBadge variant={orderStatusVariant(o.status)} label={o.status.replace(/_/g, " ")} />
-            <span className="text-xs text-kampmax-text-secondary">via</span>
-            <span className="text-xs font-medium text-kampmax-text">{getPaymentLabel(o.paymentMethod)}</span>
-            <StatusBadge dot={false} variant={paymentStatusVariant(o.paymentStatus)} label={o.paymentStatus} />
+            {o.paymentMethod && (
+              <>
+                <span className="text-xs text-kampmax-text-secondary">via</span>
+                <span className="text-xs font-medium text-kampmax-text">{getPaymentLabel(o.paymentMethod)}</span>
+              </>
+            )}
+            {o.paymentStatus && (
+              <StatusBadge dot={false} variant={paymentStatusVariant(o.paymentStatus)} label={o.paymentStatus} />
+            )}
           </div>
           <p className="mt-1.5 text-sm font-semibold tabular-nums text-kampmax-text">
             {formatNaira(o.total)}
