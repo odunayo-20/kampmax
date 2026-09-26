@@ -3593,27 +3593,80 @@ export interface FreelancerServiceSummary {
   title: string;
   categoryId: string;
   pricingModel: string;
-  price: number;
+  /** Null when the service has no starting price. */
+  price: number | null;
   priceMax?: number;
-  durationMinutes: number;
+  /** Null when no delivery time is set. */
+  durationMinutes: number | null;
   isActive: boolean;
   isFeatured: boolean;
   viewCount: number;
+  /** draft | published | paused | archived (live API only). */
+  status?: string;
   createdAt: string;
+}
+
+/** Everything an admin needs to decide on a freelancer profile. */
+export interface FreelancerReviewInfo {
+  avatar: string | null;
+  bio: string;
+  links: { website: string | null; linkedin: string | null; github: string | null };
+  hourlyRate: number | null;
+  currency: string;
+  experienceLevel: string | null;
+  yearsOfExperience: number | null;
+  location: string;
+  /** Why the profile was rejected (shown to the freelancer). */
+  rejectionReason: string | null;
+  suspendedReason: string | null;
+  experience: {
+    id: string;
+    title: string;
+    company: string;
+    startDate: string;
+    endDate: string | null;
+    current: boolean;
+    description: string;
+  }[];
+  education: {
+    id: string;
+    institution: string;
+    qualification: string;
+    fieldOfStudy: string;
+    startYear: string;
+    endYear: string | null;
+  }[];
+  certifications: {
+    id: string;
+    name: string;
+    issuer: string;
+    issueDate: string;
+    expirationDate: string | null;
+    credentialUrl: string | null;
+  }[];
+}
+
+export interface FreelancerPortfolioReviewItem extends MarketplaceProviderPortfolioItem {
+  projectUrl?: string | null;
+  technologies?: string[];
+  completionDate?: string | null;
 }
 
 export interface ManagedFreelancerDetail {
   freelancer: ManagedFreelancer;
   profile: FreelancerProfileSummary;
+  /** Present on the live API; the in-memory fixture omits it. */
+  review?: FreelancerReviewInfo;
   services: FreelancerServiceSummary[];
-  portfolio: MarketplaceProviderPortfolioItem[];
+  portfolio: FreelancerPortfolioReviewItem[];
   reviews: MarketplaceServiceReview[];
   availability: {
     status: string;
     workingDays: string[];
-    workingHoursStart: string;
-    workingHoursEnd: string;
-    timezone: string;
+    /** Working hours and timezone aren't stored on freelancer profiles. */
+    workingHoursStart: string | null;
+    workingHoursEnd: string | null;
+    timezone: string | null;
   };
   activity: FreelancerActivityEvent[];
 }

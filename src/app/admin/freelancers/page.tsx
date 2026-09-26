@@ -155,15 +155,19 @@ function AdminFreelancersListPageInner() {
     void refetch();
   }, [refetch]);
 
-  async function setFreelancerStatus(id: string, status: "suspended" | "approved" | "rejected") {
+  async function setFreelancerStatus(
+    id: string,
+    status: "suspended" | "approved" | "rejected",
+    reason = ""
+  ) {
     setConfirmWorking(true);
     try {
-      if (status === "suspended") await suspendMut.mutateAsync(id);
+      if (status === "suspended") await suspendMut.mutateAsync({ id, reason });
       else if (status === "approved") await activateMut.mutateAsync(id);
-      else await deactivateMut.mutateAsync(id);
+      else await deactivateMut.mutateAsync({ id, reason });
       pushToast("success", "Freelancer updated.");
-    } catch {
-      pushToast("error", "The action failed. Try again.");
+    } catch (err) {
+      pushToast("error", err instanceof Error ? err.message : "The action failed. Try again.");
     } finally {
       setConfirmWorking(false);
       setSuspendTarget(null);
@@ -258,7 +262,8 @@ function AdminFreelancersListPageInner() {
         confirmLabel="Suspend freelancer"
         tone="warning"
         loading={confirmWorking}
-        onConfirm={() => suspendTarget && void setFreelancerStatus(suspendTarget.id, "suspended")}
+        reasonLabel="Reason for suspension (recorded in the audit log)"
+        onConfirm={(reason) => suspendTarget && void setFreelancerStatus(suspendTarget.id, "suspended", reason)}
         onCancel={() => setSuspendTarget(null)}
       />
 
@@ -280,7 +285,8 @@ function AdminFreelancersListPageInner() {
         confirmLabel="Reject freelancer"
         tone="danger"
         loading={confirmWorking}
-        onConfirm={() => deactivateTarget && void setFreelancerStatus(deactivateTarget.id, "rejected")}
+        reasonLabel="Reason for rejection (emailed to the freelancer)"
+        onConfirm={(reason) => deactivateTarget && void setFreelancerStatus(deactivateTarget.id, "rejected", reason)}
         onCancel={() => setDeactivateTarget(null)}
       />
 

@@ -70,15 +70,15 @@ export default function AdminFreelancerDetailPage() {
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3800);
   }, []);
 
-  async function runStatusAction(status: "suspended" | "approved" | "rejected") {
+  async function runStatusAction(status: "suspended" | "approved" | "rejected", reason = "") {
     setConfirmWorking(true);
     try {
-      if (status === "suspended") await suspendMut.mutateAsync(freelancerId);
+      if (status === "suspended") await suspendMut.mutateAsync({ id: freelancerId, reason });
       else if (status === "approved") await activateMut.mutateAsync(freelancerId);
-      else await deactivateMut.mutateAsync(freelancerId);
+      else await deactivateMut.mutateAsync({ id: freelancerId, reason });
       pushToast("success", "Freelancer updated.");
-    } catch {
-      pushToast("error", "The action failed. Try again.");
+    } catch (err) {
+      pushToast("error", err instanceof Error ? err.message : "The action failed. Try again.");
     } finally {
       setConfirmWorking(false);
       setSuspendOpen(false);
@@ -137,7 +137,7 @@ export default function AdminFreelancerDetailPage() {
   }
 
   const detail: ManagedFreelancerDetail = data;
-  const { freelancer, services, portfolio, reviews, availability, activity } = detail;
+  const { freelancer, services, portfolio, reviews, availability, activity, review: reviewInfo } = detail;
   const availabilityStatus = getFreelancerActionAvailability(freelancer);
   const activityEvents = activityData ?? activity;
 
@@ -253,21 +253,88 @@ export default function AdminFreelancerDetailPage() {
             </dl>
           </section>
 
+          {/* Review dossier: what an admin needs to approve or reject */}
+          {reviewInfo && (
+            <section aria-label="Review information" className="rounded-lg border border-kampmax-border bg-white">
+              <div className="border-b border-kampmax-border px-4 py-3">
+                <h2 className="text-sm font-semibold text-kampmax-text">Review information</h2>
+              </div>
+
+              {(reviewInfo.rejectionReason || reviewInfo.suspendedReason) && (
+                <div className="mx-4 mt-4 rounded-md border border-kampmax-error/30 bg-kampmax-error/5 px-3 py-2 text-sm text-kampmax-text">
+                  {reviewInfo.suspendedReason ? "Suspended: " : "Rejected: "}
+                  {reviewInfo.suspendedReason ?? reviewInfo.rejectionReason}
+                </div>
+              )}
+
+              <div className="flex gap-3 px-4 py-4">
+                {reviewInfo.avatar ? (
+                  <img src={reviewInfo.avatar} alt="" className="h-14 w-14 shrink-0 rounded-full object-cover" />
+                ) : (
+                  <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-kampmax-muted text-xs text-kampmax-text-secondary">
+                    No photo
+                  </span>
+                )}
+                <p className="text-sm leading-relaxed text-kampmax-text-secondary">
+                  {reviewInfo.bio || "No bio written."}
+                </p>
+              </div>
+
+              <dl className="grid grid-cols-1 gap-x-6 gap-y-3 border-t border-kampmax-border px-4 py-4 sm:grid-cols-2">
+                <InfoRow
+                  label="Hourly rate"
+                  value={reviewInfo.hourlyRate === null ? "Not set" : `${reviewInfo.currency} ${reviewInfo.hourlyRate.toLocaleString("en-NG")}`}
+                />
+                <InfoRow label="Experience level" value={reviewInfo.experienceLevel ?? "Not set"} />
+                <InfoRow
+                  label="Years of experience"
+                  value={reviewInfo.yearsOfExperience === null ? "Not set" : String(reviewInfo.yearsOfExperience)}
+                />
+                <InfoRow label="Location" value={reviewInfo.location || "Not set"} />
+                <InfoRow label="Website" value={reviewInfo.links.website ?? "—"} href={reviewInfo.links.website ?? undefined} />
+                <InfoRow label="LinkedIn" value={reviewInfo.links.linkedin ?? "—"} href={reviewInfo.links.linkedin ?? undefined} />
+                <InfoRow label="GitHub" value={reviewInfo.links.github ?? "—"} href={reviewInfo.links.github ?? undefined} />
+              </dl>
+
+              <ReviewList title="Work experience" empty="No work experience added." items={reviewInfo.experience.map((e) => ({
+                id: e.id,
+                primary: `${e.title} · ${e.company}`,
+                secondary: `${e.startDate} – ${e.current ? "Present" : (e.endDate ?? "—")}`,
+                body: e.description,
+              }))} />
+              <ReviewList title="Education" empty="No education added." items={reviewInfo.education.map((e) => ({
+                id: e.id,
+                primary: `${e.qualification}, ${e.fieldOfStudy}`,
+                secondary: `${e.institution} · ${e.startYear} – ${e.endYear ?? "Present"}`,
+              }))} />
+              <ReviewList title="Certifications" empty="No certifications added." items={reviewInfo.certifications.map((c) => ({
+                id: c.id,
+                primary: c.name,
+                secondary: `${c.issuer} · issued ${c.issueDate}${c.expirationDate ? ` · expires ${c.expirationDate}` : ""}`,
+                href: c.credentialUrl ?? undefined,
+              }))} />
+            </section>
+          )}
+
           {/* Availability */}
           <section aria-label="Availability" className="rounded-lg border border-kampmax-border bg-white">
             <div className="border-b border-kampmax-border px-4 py-3">
               <h2 className="text-sm font-semibold text-kampmax-text">Availability</h2>
             </div>
             <dl className="grid grid-cols-1 gap-x-6 gap-y-3 px-4 py-4 sm:grid-cols-2">
-              <InfoRow label="Status" value={availability.status} />
-              <InfoRow
-                label="Working days"
-                value={availability.workingDays
-                  .map((d) => d.charAt(0).toUpperCase() + d.slice(1))
-                  .join(", ")}
-              />
-              <InfoRow label="Hours" value={`${availability.workingHoursStart} - ${availability.workingHoursEnd}`} />
-              <InfoRow label="Timezone" value={availability.timezone} />
+              <InfoRow label="Status" value={availability.status || "—"} />
+              {availability.workingDays.length > 0 && (
+                <InfoRow
+                  label="Working days"
+                  value={availability.workingDays
+                    .map((d) => d.charAt(0).toUpperCase() + d.slice(1))
+                    .join(", ")}
+                />
+              )}
+              {availability.workingHoursStart && availability.workingHoursEnd && (
+                <InfoRow label="Hours" value={`${availability.workingHoursStart} - ${availability.workingHoursEnd}`} />
+              )}
+              {availability.timezone && <InfoRow label="Timezone" value={availability.timezone} />}
             </dl>
           </section>
 
@@ -352,8 +419,13 @@ export default function AdminFreelancerDetailPage() {
                   <li key={svc.id} className="flex flex-wrap items-center gap-2 px-4 py-3">
                     <span className="truncate text-sm font-medium text-kampmax-text">{svc.title}</span>
                     <span className="text-xs text-kampmax-text-secondary">
-                      {svc.pricingModel}: {formatNairaCompact(svc.price)}
+                      {svc.price === null ? "No price set" : `${svc.pricingModel}: ${formatNairaCompact(svc.price)}`}
                     </span>
+                    {svc.status && svc.status !== "published" && (
+                      <span className="rounded-full bg-kampmax-muted px-2 py-0.5 text-[11px] font-medium capitalize text-kampmax-text-secondary">
+                        {svc.status}
+                      </span>
+                    )}
                     {svc.isFeatured && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-kampmax-gold/15 px-2 py-0.5 text-[11px] font-medium text-kampmax-gold-dark">
                         <Star className="h-3 w-3" />
@@ -377,12 +449,32 @@ export default function AdminFreelancerDetailPage() {
               <div className="grid grid-cols-2 gap-3 p-4">
                 {portfolio.map((item) => (
                   <div key={item.id} className="rounded-lg bg-kampmax-surface/50 p-2">
-                    <img
-                      src={item.image}
-                      alt={item.title}
-                      className="h-20 w-full rounded-md object-cover"
-                    />
+                    {item.image ? (
+                      <img
+                        src={item.image}
+                        alt={item.title}
+                        className="h-20 w-full rounded-md object-cover"
+                      />
+                    ) : null}
                     <p className="mt-1 line-clamp-1 text-xs font-medium text-kampmax-text">{item.title}</p>
+                    {!item.image && item.description && (
+                      <p className="line-clamp-2 text-[11px] text-kampmax-text-secondary">{item.description}</p>
+                    )}
+                    {item.technologies && item.technologies.length > 0 && (
+                      <p className="mt-0.5 line-clamp-1 text-[11px] text-kampmax-text-secondary">
+                        {item.technologies.join(", ")}
+                      </p>
+                    )}
+                    {item.projectUrl && (
+                      <a
+                        href={item.projectUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-0.5 block truncate text-[11px] font-medium text-kampmax-blue hover:underline"
+                      >
+                        View project
+                      </a>
+                    )}
                   </div>
                 ))}
               </div>
@@ -411,7 +503,8 @@ export default function AdminFreelancerDetailPage() {
         confirmLabel="Suspend freelancer"
         tone="warning"
         loading={confirmWorking}
-        onConfirm={() => void runStatusAction("suspended")}
+        reasonLabel="Reason for suspension (recorded in the audit log)"
+        onConfirm={(reason) => void runStatusAction("suspended", reason)}
         onCancel={() => setSuspendOpen(false)}
       />
 
@@ -433,7 +526,8 @@ export default function AdminFreelancerDetailPage() {
         confirmLabel="Reject freelancer"
         tone="danger"
         loading={confirmWorking}
-        onConfirm={() => void runStatusAction("rejected")}
+        reasonLabel="Reason for rejection (emailed to the freelancer)"
+        onConfirm={(reason) => void runStatusAction("rejected", reason)}
         onCancel={() => setDeactivateOpen(false)}
       />
 
@@ -497,6 +591,42 @@ function MetricCard({ label, value }: { label: string; value: string }) {
     <div className="rounded-lg bg-kampmax-surface/50 px-2 py-2">
       <dt className="text-[11px] font-medium text-kampmax-text-secondary">{label}</dt>
       <dd className="mt-0.5 text-sm font-semibold tabular-nums text-kampmax-text">{value}</dd>
+    </div>
+  );
+}
+function ReviewList({
+  title,
+  empty,
+  items,
+}: {
+  title: string;
+  empty: string;
+  items: { id: string; primary: string; secondary?: string; body?: string; href?: string }[];
+}) {
+  return (
+    <div className="border-t border-kampmax-border px-4 py-3">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-kampmax-text-secondary">{title}</h3>
+      {items.length === 0 ? (
+        <p className="mt-1.5 text-sm text-kampmax-text-secondary">{empty}</p>
+      ) : (
+        <ul role="list" className="mt-1.5 space-y-2">
+          {items.map((item) => (
+            <li key={item.id}>
+              <p className="text-sm font-medium text-kampmax-text">
+                {item.href ? (
+                  <a href={item.href} target="_blank" rel="noopener noreferrer" className="text-kampmax-blue hover:underline">
+                    {item.primary}
+                  </a>
+                ) : (
+                  item.primary
+                )}
+              </p>
+              {item.secondary && <p className="text-xs text-kampmax-text-secondary">{item.secondary}</p>}
+              {item.body && <p className="mt-0.5 line-clamp-3 text-xs text-kampmax-text-secondary">{item.body}</p>}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

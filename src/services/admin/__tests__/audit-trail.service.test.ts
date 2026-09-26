@@ -10,7 +10,7 @@ import {
 } from "@/data/admin/audit-trail";
 import { createUserManagementService } from "@/services/admin/user-management.mock";
 import { createVendorManagementService } from "@/services/admin/vendor-management.mock";
-import { createFreelancerManagementService } from "@/services/admin/freelancer-management.service";
+import { createFreelancerManagementService } from "@/services/admin/freelancer-management.mock";
 import { createEmployerManagementService } from "@/services/admin/employer-management.service";
 import { createVerificationManagementService } from "@/services/admin/verification-management.service";
 import { createAdminCommunicationService } from "@/services/admin/communication-management.service";

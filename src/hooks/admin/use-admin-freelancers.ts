@@ -62,7 +62,8 @@ export function useAdminFreelancerSuspendMutation() {
   const admin = useActor();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => freelancerManagementService.suspend(id, { actor: admin }),
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      freelancerManagementService.suspend(id, { actor: admin }, reason),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: adminKeys.freelancers.all });
     },
@@ -84,7 +85,8 @@ export function useAdminFreelancerDeactivateMutation() {
   const admin = useActor();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => freelancerManagementService.deactivate(id, { actor: admin }),
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      freelancerManagementService.deactivate(id, { actor: admin }, reason),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: adminKeys.freelancers.all });
     },
