@@ -202,8 +202,8 @@ function AdminProductsPageInner() {
     try {
       await productManagementService.approve(product.id);
       refresh(`“${product.title}” approved - now live on the marketplace.`);
-    } catch {
-      pushToast("error", `Couldn't approve “${product.title}”. Try again.`);
+    } catch (err) {
+      pushToast("error", err instanceof Error && err.message ? err.message : `Couldn't approve “${product.title}”. Try again.`);
     }
   }
 
@@ -211,8 +211,8 @@ function AdminProductsPageInner() {
     try {
       await productManagementService.restore(product.id);
       refresh(`“${product.title}” restored to the marketplace.`);
-    } catch {
-      pushToast("error", `Couldn't restore “${product.title}”. Try again.`);
+    } catch (err) {
+      pushToast("error", err instanceof Error && err.message ? err.message : `Couldn't restore “${product.title}”. Try again.`);
     }
   }
 
@@ -221,8 +221,8 @@ function AdminProductsPageInner() {
     try {
       await productManagementService.reject(rejectTarget.id, reason);
       refresh(`“${rejectTarget.title}” was rejected. The vendor has been notified.`);
-    } catch {
-      pushToast("error", "The action failed. Try again.");
+    } catch (err) {
+      pushToast("error", err instanceof Error && err.message ? err.message : "The action failed. Try again.");
     } finally {
       setRejectTarget(null);
     }
@@ -233,8 +233,8 @@ function AdminProductsPageInner() {
     try {
       await productManagementService.suspend(suspendTarget.id, reason);
       refresh(`“${suspendTarget.title}” was suspended pending review.`);
-    } catch {
-      pushToast("error", "The action failed. Try again.");
+    } catch (err) {
+      pushToast("error", err instanceof Error && err.message ? err.message : "The action failed. Try again.");
     } finally {
       setSuspendTarget(null);
     }
@@ -245,8 +245,8 @@ function AdminProductsPageInner() {
     try {
       await productManagementService.archive(archiveTarget.id);
       refresh(`“${archiveTarget.title}” was archived.`);
-    } catch {
-      pushToast("error", "The action failed. Try again.");
+    } catch (err) {
+      pushToast("error", err instanceof Error && err.message ? err.message : "The action failed. Try again.");
     } finally {
       setArchiveTarget(null);
     }

@@ -657,7 +657,7 @@ export interface ManagedProduct {
   campusId: string;
   price: number;
   originalPrice: number | null;
-  condition: AdminProduct["condition"];
+  condition: AdminProduct["condition"] | "Refurbished";
   status: ManagedProductStatus;
   moderation: ProductModerationRecord;
   stock: number;
@@ -724,7 +724,7 @@ export interface ManagedProductDetail {
     rating: number;
     productsCount: number;
   };
-  campus: Campus | null;
+  campus: Pick<Campus, "id" | "name" | "shortName"> | null;
   reviews: ProductReviewRow[];
   reports: ContentReport[];
   activity: ProductActivityEvent[];

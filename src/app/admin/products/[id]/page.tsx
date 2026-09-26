@@ -112,8 +112,8 @@ export default function AdminProductDetailPage() {
     try {
       await productManagementService.approve(detail.data.product.id);
       refresh(`“${detail.data.product.title}” approved - now live on the marketplace.`);
-    } catch {
-      pushToast("error", "Couldn't approve the listing. Try again.");
+    } catch (err) {
+      pushToast("error", err instanceof Error && err.message ? err.message : "Couldn't approve the listing. Try again.");
     }
   }
 
@@ -122,8 +122,8 @@ export default function AdminProductDetailPage() {
     try {
       await productManagementService.restore(detail.data.product.id);
       refresh(`“${detail.data.product.title}” restored to the marketplace.`);
-    } catch {
-      pushToast("error", "Couldn't restore the listing. Try again.");
+    } catch (err) {
+      pushToast("error", err instanceof Error && err.message ? err.message : "Couldn't restore the listing. Try again.");
     }
   }
 
@@ -132,8 +132,8 @@ export default function AdminProductDetailPage() {
     try {
       await productManagementService.reject(detail.data.product.id, reason);
       refresh("Listing rejected - the vendor sees your reason in their dashboard.");
-    } catch {
-      pushToast("error", "The action failed. Try again.");
+    } catch (err) {
+      pushToast("error", err instanceof Error && err.message ? err.message : "The action failed. Try again.");
     } finally {
       setRejectOpen(false);
     }
@@ -144,8 +144,8 @@ export default function AdminProductDetailPage() {
     try {
       await productManagementService.suspend(detail.data.product.id, reason);
       refresh("Listing suspended and hidden from buyers.");
-    } catch {
-      pushToast("error", "The action failed. Try again.");
+    } catch (err) {
+      pushToast("error", err instanceof Error && err.message ? err.message : "The action failed. Try again.");
     } finally {
       setSuspendOpen(false);
     }
@@ -156,8 +156,8 @@ export default function AdminProductDetailPage() {
     try {
       await productManagementService.archive(detail.data.product.id);
       refresh("Listing archived.");
-    } catch {
-      pushToast("error", "The action failed. Try again.");
+    } catch (err) {
+      pushToast("error", err instanceof Error && err.message ? err.message : "The action failed. Try again.");
     } finally {
       setArchiveOpen(false);
     }
