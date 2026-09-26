@@ -226,12 +226,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
           const res = await addToServerCart({
             productId: g.productId,
             quantity: g.quantity,
-            selectedVariation: g.selectedVariants
-              ? {
-                  name: Object.keys(g.selectedVariants)[0] || "Variation",
-                  option: Object.values(g.selectedVariants)[0] || "",
-                }
-              : undefined,
           });
           if (res.error) failed += 1;
         }
@@ -330,15 +324,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
       // Send to backend if authenticated
       if (status === "authenticated") {
+        // Variants in the UI are generated placeholders (ids like "color"/"black"),
+        // not backend variations, so sending them makes the API reject the add.
         addToServerCart({
           productId: product.id,
           quantity,
-          selectedVariation: options?.selectedVariants
-            ? {
-                name: Object.keys(options.selectedVariants)[0] || "Variation",
-                option: Object.values(options.selectedVariants)[0] || "",
-              }
-            : undefined,
         }).then(async (res) => {
           if (res.error) {
             setFeedback({
