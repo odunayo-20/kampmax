@@ -1,8 +1,9 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Loader2, X } from "lucide-react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { Loader2, Trash2, Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { uploadFileDirect } from "@/services/media";
 import type { CampusCreateInput, CampusStatus, ManagedCampus } from "@/types/admin";
 import { Input } from "@/components/ui/Input";
 import { CampusAvatar } from "./CampusBadges";
@@ -39,6 +40,9 @@ interface FormErrors {
   city?: string;
 }
 
+/** Mirrors the backend's `campus` media category limit. */
+const MAX_LOGO_BYTES = 10 * 1024 * 1024;
+
 export function CampusFormDialog({
   open,
   campus,
@@ -51,9 +55,14 @@ export function CampusFormDialog({
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
+    setUploading(false);
+    setLogoError(null);
     if (campus) {
       setForm({
         institution: campus.institution,
@@ -121,8 +130,32 @@ export function CampusFormDialog({
     return next;
   }
 
+  async function handleLogoPick(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setLogoError("Choose an image file (PNG, JPG, WebP…).");
+      return;
+    }
+    if (file.size > MAX_LOGO_BYTES) {
+      setLogoError("That image is too large. The limit is 10 MB.");
+      return;
+    }
+    setLogoError(null);
+    setUploading(true);
+    const { data, error } = await uploadFileDirect(file, "campus");
+    setUploading(false);
+    if (error || !data?.url) {
+      setLogoError(error?.message || "Couldn't upload the logo. Try again.");
+      return;
+    }
+    set("logo", data.url);
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (uploading) return;
     setTouched(true);
     const next = validate();
     setErrors(next);
@@ -258,14 +291,55 @@ export function CampusFormDialog({
             />
           </label>
 
-          <Input
-            label="Logo"
-            hint="Paste an image URL - or type initials/emoji as a monogram."
-            value={form.logo}
-            onChange={(e) => set("logo", e.target.value)}
-            placeholder="https://… or UNI"
-            autoComplete="off"
-          />
+          <div>
+            <span className="mb-1.5 block text-sm font-medium text-kampmax-text">
+              Logo <span className="font-normal text-kampmax-text-secondary">(optional)</span>
+            </span>
+            <input
+              ref={fileInput}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleLogoPick}
+            />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => fileInput.current?.click()}
+                disabled={uploading || saving}
+                className="inline-flex h-11 items-center gap-1.5 rounded-lg border border-kampmax-border bg-white px-3 text-sm font-medium text-kampmax-text transition-colors hover:bg-kampmax-muted/60 disabled:opacity-60"
+              >
+                {uploading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="h-4 w-4" />
+                )}
+                {uploading ? "Uploading…" : form.logo ? "Replace image" : "Upload image"}
+              </button>
+              {form.logo && !uploading && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    set("logo", "");
+                    setLogoError(null);
+                  }}
+                  disabled={saving}
+                  aria-label="Remove logo"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-kampmax-border bg-white text-kampmax-text-secondary transition-colors hover:bg-kampmax-muted/60 hover:text-kampmax-text disabled:opacity-60"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <p
+              className={cn(
+                "mt-1 text-xs",
+                logoError ? "text-red-600" : "text-kampmax-text-secondary"
+              )}
+            >
+              {logoError ?? "PNG, JPG or WebP, up to 10 MB. Without one, the campus shows its initials."}
+            </p>
+          </div>
 
           <label className="block">
             <span className="mb-1.5 block text-sm font-medium text-kampmax-text">
@@ -299,7 +373,9 @@ export function CampusFormDialog({
           </button>
           <button
             type="submit"
-            disabled={saving || (touched && !dirty && Object.keys(errors).length === 0)}
+            disabled={
+              saving || uploading || (touched && !dirty && Object.keys(errors).length === 0)
+            }
             className={cn(
               "inline-flex h-9 items-center gap-1.5 rounded-md bg-kampmax-blue px-4 text-sm font-medium text-white transition-colors hover:bg-kampmax-blue-dark",
               "disabled:cursor-not-allowed disabled:opacity-60"
