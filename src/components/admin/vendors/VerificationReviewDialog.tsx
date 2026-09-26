@@ -31,6 +31,16 @@ interface VerificationReviewDialogProps {
   onClose: () => void;
   onApprove: (vendor: ManagedVendor) => Promise<void>;
   onReject: (vendor: ManagedVendor, reason: string) => Promise<void>;
+  /**
+   * Approve / reject a single document. A store can only be approved once
+   * its required documents are approved, so review mode needs this.
+   */
+  onReviewDocument?: (
+    vendor: ManagedVendor,
+    doc: VendorVerificationDocument,
+    decision: "approve" | "reject",
+    reason?: string
+  ) => Promise<void>;
 }
 
 const DOC_STATE_LABELS: Record<VendorDocState, string> = {
@@ -53,7 +63,11 @@ export function VerificationReviewDialog({
   onClose,
   onApprove,
   onReject,
+  onReviewDocument,
 }: VerificationReviewDialogProps) {
+  const [docBusy, setDocBusy] = useState<string | null>(null);
+  const [docRejectId, setDocRejectId] = useState<string | null>(null);
+  const [docReason, setDocReason] = useState("");
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState("");
   const [reasonError, setReasonError] = useState<string | null>(null);
@@ -65,6 +79,9 @@ export function VerificationReviewDialog({
     setReason("");
     setReasonError(null);
     setBusyButton(null);
+    setDocBusy(null);
+    setDocRejectId(null);
+    setDocReason("");
   }, [open]);
 
   useEffect(() => {
@@ -99,6 +116,22 @@ export function VerificationReviewDialog({
   if (!open || !vendor) return null;
 
   const v = vendor.verification;
+
+  async function reviewDoc(
+    doc: VendorVerificationDocument,
+    decision: "approve" | "reject",
+    why?: string
+  ) {
+    if (!vendor || !onReviewDocument || docBusy) return;
+    setDocBusy(doc.id);
+    try {
+      await onReviewDocument(vendor, doc, decision, why);
+      setDocRejectId(null);
+      setDocReason("");
+    } finally {
+      setDocBusy(null);
+    }
+  }
 
   async function handleApprove() {
     if (!vendor || busyButton) return;
@@ -186,11 +219,13 @@ export function VerificationReviewDialog({
               ok={v.phoneVerified}
               icon={<PhoneCall className="h-3.5 w-3.5" />}
             />
-            <CheckTile
-              label="BVN matched"
-              ok={v.bvnVerified}
-              icon={<ShieldQuestion className="h-3.5 w-3.5" />}
-            />
+            {v.bvnVerified !== null && (
+              <CheckTile
+                label="BVN matched"
+                ok={v.bvnVerified}
+                icon={<ShieldQuestion className="h-3.5 w-3.5" />}
+              />
+            )}
           </section>
 
           {/* Documents */}
@@ -206,7 +241,22 @@ export function VerificationReviewDialog({
 
             <ul className="space-y-1.5">
               {v.documents.map((doc) => (
-                <DocumentRow key={doc.id} doc={doc} />
+                <DocumentRow
+                  key={doc.id}
+                  doc={doc}
+                  reviewable={mode === "review" && !!onReviewDocument}
+                  busy={docBusy === doc.id}
+                  rejecting={docRejectId === doc.id}
+                  reason={docReason}
+                  onReason={setDocReason}
+                  onApprove={() => void reviewDoc(doc, "approve")}
+                  onStartReject={() => {
+                    setDocRejectId(doc.id);
+                    setDocReason("");
+                  }}
+                  onCancelReject={() => setDocRejectId(null)}
+                  onConfirmReject={() => void reviewDoc(doc, "reject", docReason)}
+                />
               ))}
             </ul>
           </section>
@@ -377,7 +427,31 @@ function CheckTile({
   );
 }
 
-function DocumentRow({ doc }: { doc: VendorVerificationDocument }) {
+function DocumentRow({
+  doc,
+  reviewable,
+  busy,
+  rejecting,
+  reason,
+  onReason,
+  onApprove,
+  onStartReject,
+  onCancelReject,
+  onConfirmReject,
+}: {
+  doc: VendorVerificationDocument;
+  reviewable: boolean;
+  busy: boolean;
+  rejecting: boolean;
+  reason: string;
+  onReason: (v: string) => void;
+  onApprove: () => void;
+  onStartReject: () => void;
+  onCancelReject: () => void;
+  onConfirmReject: () => void;
+}) {
+  // Missing documents haven't been uploaded, so there is nothing to review.
+  const canReview = reviewable && doc.state !== "missing";
   const variant = docStateBadgeVariant(doc.state);
   const stateIcon =
     doc.state === "approved" ? (
@@ -391,7 +465,8 @@ function DocumentRow({ doc }: { doc: VendorVerificationDocument }) {
     );
 
   return (
-    <li className="flex items-center justify-between gap-3 rounded-lg border border-kampmax-border px-3 py-2 transition-colors hover:bg-kampmax-muted/40">
+    <li className="rounded-lg border border-kampmax-border px-3 py-2 transition-colors hover:bg-kampmax-muted/40">
+      <div className="flex items-center justify-between gap-3">
       <div className="flex min-w-0 items-center gap-2.5">
         <span className="text-kampmax-text-secondary">{stateIcon}</span>
         <div className="min-w-0">
@@ -404,7 +479,62 @@ function DocumentRow({ doc }: { doc: VendorVerificationDocument }) {
           </p>
         </div>
       </div>
-      <StatusPill variant={variant} label={DOC_STATE_LABELS[doc.state]} />
+      <div className="flex shrink-0 items-center gap-1.5">
+        {canReview && !rejecting && (
+          <>
+            {doc.state !== "approved" && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onApprove}
+                className="inline-flex h-7 items-center rounded-md border border-kampmax-success/40 px-2 text-[11px] font-medium text-kampmax-success transition-colors hover:bg-kampmax-success/5 disabled:opacity-60"
+              >
+                {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : "Approve"}
+              </button>
+            )}
+            {doc.state !== "rejected" && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onStartReject}
+                className="inline-flex h-7 items-center rounded-md border border-kampmax-error/40 px-2 text-[11px] font-medium text-kampmax-error transition-colors hover:bg-kampmax-error/5 disabled:opacity-60"
+              >
+                Reject
+              </button>
+            )}
+          </>
+        )}
+        <StatusPill variant={variant} label={DOC_STATE_LABELS[doc.state]} />
+      </div>
+      </div>
+      {canReview && rejecting && (
+        <div className="mt-2 flex items-center gap-2">
+          <input
+            value={reason}
+            onChange={(e) => onReason(e.target.value)}
+            placeholder="Why is this document being rejected?"
+            aria-label="Document rejection reason"
+            maxLength={500}
+            className="h-8 min-w-0 flex-1 rounded-md border border-kampmax-border bg-white px-2 text-xs focus:border-kampmax-blue focus:outline-none focus:ring-1 focus:ring-kampmax-blue"
+          />
+          <button
+            type="button"
+            disabled={busy || !reason.trim()}
+            onClick={onConfirmReject}
+            className="inline-flex h-8 items-center rounded-md bg-kampmax-error px-2.5 text-xs font-medium text-white disabled:opacity-60"
+          >
+            {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : "Reject document"}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onCancelReject}
+            className="inline-flex h-8 items-center rounded-md border border-kampmax-border px-2.5 text-xs font-medium text-kampmax-text"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
     </li>
   );
 }

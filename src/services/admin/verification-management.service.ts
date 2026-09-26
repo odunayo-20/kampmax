@@ -13,7 +13,7 @@ import {
   filterVerificationRows,
   sortVerificationRows,
 } from "@/data/admin/verification-management";
-import { createVendorManagementService } from "./vendor-management.service";
+import { createVendorManagementService } from "./vendor-management.mock";
 import type { AdminActingContext, AdminProfile } from "@/types/admin";
 
 // ------------------------------------------------------------

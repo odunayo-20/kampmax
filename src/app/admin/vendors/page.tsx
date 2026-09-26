@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { BadgeCheck, CheckCircle2, Inbox, XCircle } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { Pagination } from "@/components/admin/Pagination";
@@ -16,14 +15,15 @@ import { VerificationReviewDialog } from "@/components/admin/vendors/Verificatio
 import { ViewOwnerDialog } from "@/components/admin/vendors/ViewOwnerDialog";
 import { ViewStoreDialog } from "@/components/admin/vendors/ViewStoreDialog";
 import { useDebounce } from "@/hooks/use-debounce";
-import { campusService } from "@/services/admin";
 import { VENDOR_QUEUE_LABELS } from "@/components/admin/vendors/vendors-meta";
 import {
   useAdminVendorActivateMutation,
   useAdminVendorApproveMutation,
+  useAdminVendorCampuses,
   useAdminVendorCategories,
   useAdminVendorCounts,
   useAdminVendorDeactivateMutation,
+  useAdminVendorDocumentReviewMutation,
   useAdminVendorRejectMutation,
   useAdminVendors,
   useAdminVendorSuspendMutation,
@@ -122,11 +122,9 @@ function AdminVendorsPageInner() {
   const { data, error, isLoading, refetch } = useAdminVendors(query);
   const counts = useAdminVendorCounts();
   const categoriesQuery = useAdminVendorCategories();
-  const campusesQuery = useQuery({
-    queryKey: ["admin", "campuses"],
-    queryFn: () => campusService.list(),
-  });
+  const campusesQuery = useAdminVendorCampuses();
   const approveMut = useAdminVendorApproveMutation();
+  const docReviewMut = useAdminVendorDocumentReviewMutation();
   const rejectMut = useAdminVendorRejectMutation();
   const suspendMut = useAdminVendorSuspendMutation();
   const activateMut = useAdminVendorActivateMutation();
@@ -134,7 +132,7 @@ function AdminVendorsPageInner() {
 
   const campuses = useMemo(
     () =>
-      (campusesQuery.data ?? []).map((c) => ({ id: c.id, name: c.shortName })),
+      (campusesQuery.data ?? []).map((c) => ({ id: c.id, name: c.label })),
     [campusesQuery.data]
   );
   const campusNames = useMemo(
@@ -189,8 +187,11 @@ function AdminVendorsPageInner() {
     await runExclusive(`vendor:approve:${vendor.id}`, async () => {
       await approveMut.mutateAsync(vendor.id);
       pushToast("success", `${vendor.storeName} verified - storefront is live.`);
-    }).catch(() => {
-      pushToast("error", `Couldn't approve ${vendor.storeName}. Try again.`);
+    }).catch((err: unknown) => {
+      pushToast(
+        "error",
+        err instanceof Error ? err.message : `Couldn't approve ${vendor.storeName}. Try again.`
+      );
     });
   }
 
@@ -198,8 +199,11 @@ function AdminVendorsPageInner() {
     await runExclusive(`vendor:reject:${vendor.id}`, async () => {
       await rejectMut.mutateAsync({ id: vendor.id, reason });
       pushToast("success", `${vendor.storeName}'s application was rejected.`);
-    }).catch(() => {
-      pushToast("error", `Couldn't reject ${vendor.storeName}. Try again.`);
+    }).catch((err: unknown) => {
+      pushToast(
+        "error",
+        err instanceof Error ? err.message : `Couldn't reject ${vendor.storeName}. Try again.`
+      );
     });
   }
 
@@ -207,19 +211,22 @@ function AdminVendorsPageInner() {
     await runExclusive(`vendor:activate:${vendor.id}`, async () => {
       await activateMut.mutateAsync(vendor.id);
       pushToast("success", `${vendor.storeName} is trading again.`);
-    }).catch(() => {
-      pushToast("error", `Couldn't activate ${vendor.storeName}. Try again.`);
+    }).catch((err: unknown) => {
+      pushToast(
+        "error",
+        err instanceof Error ? err.message : `Couldn't activate ${vendor.storeName}. Try again.`
+      );
     });
   }
 
-  async function runSuspend() {
+  async function runSuspend(reason: string) {
     if (!suspendTarget) return;
     setConfirmWorking(true);
     try {
-      await suspendMut.mutateAsync(suspendTarget.id);
+      await suspendMut.mutateAsync({ id: suspendTarget.id, reason });
       pushToast("success", `${suspendTarget.storeName} was suspended.`);
-    } catch {
-      pushToast("error", "The action failed. Try again.");
+    } catch (err) {
+      pushToast("error", err instanceof Error ? err.message : "The action failed. Try again.");
     } finally {
       setConfirmWorking(false);
       setSuspendTarget(null);
@@ -380,6 +387,26 @@ function AdminVendorsPageInner() {
         onReject={async (vendor, reason) => {
           await rejectVendor(vendor, reason);
         }}
+        onReviewDocument={async (vendor, doc, decision, reason) => {
+          try {
+            const fresh = await docReviewMut.mutateAsync({
+              vendorId: vendor.id,
+              documentId: doc.id,
+              decision,
+              reason,
+            });
+            setVerificationTarget(fresh);
+            pushToast(
+              "success",
+              decision === "approve" ? `${doc.label} approved.` : `${doc.label} rejected.`
+            );
+          } catch (err) {
+            pushToast(
+              "error",
+              err instanceof Error ? err.message : "Couldn't review the document."
+            );
+          }
+        }}
       />
 
       <ConfirmDialog
@@ -388,6 +415,7 @@ function AdminVendorsPageInner() {
         message="All listings are hidden and checkout is blocked immediately. The owner keeps account access and can appeal, but buyers can no longer place orders."
         confirmLabel="Suspend store"
         tone="warning"
+        reasonLabel="Reason for suspension (recorded in the audit log)"
         loading={confirmWorking}
         onConfirm={runSuspend}
         onCancel={() => setSuspendTarget(null)}

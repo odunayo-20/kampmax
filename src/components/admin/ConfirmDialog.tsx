@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Loader2, RotateCcw, ShieldOff, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -14,7 +14,12 @@ interface ConfirmDialogProps {
   cancelLabel?: string;
   tone?: ConfirmTone;
   loading?: boolean;
-  onConfirm: () => void;
+  /**
+   * When set, the dialog asks for a written reason and only enables the
+   * confirm button once one is entered. The reason is passed to onConfirm.
+   */
+  reasonLabel?: string;
+  onConfirm: (reason: string) => void;
   onCancel: () => void;
 }
 
@@ -52,10 +57,16 @@ export function ConfirmDialog({
   cancelLabel = "Cancel",
   tone = "danger",
   loading = false,
+  reasonLabel,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const [reason, setReason] = useState("");
+
+  useEffect(() => {
+    if (open) setReason("");
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -108,6 +119,25 @@ export function ConfirmDialog({
             <p id="confirm-dialog-message" className="mt-1.5 text-sm leading-relaxed text-kampmax-text-secondary">
               {message}
             </p>
+            {reasonLabel && (
+              <div className="mt-3">
+                <label
+                  htmlFor="confirm-dialog-reason"
+                  className="mb-1 block text-xs font-medium text-kampmax-text"
+                >
+                  {reasonLabel}
+                </label>
+                <textarea
+                  id="confirm-dialog-reason"
+                  value={reason}
+                  rows={3}
+                  maxLength={500}
+                  disabled={loading}
+                  onChange={(e) => setReason(e.target.value)}
+                  className="w-full rounded-lg border border-kampmax-border bg-white px-3 py-2 text-sm focus:border-kampmax-blue focus:outline-none focus:ring-1 focus:ring-kampmax-blue"
+                />
+              </div>
+            )}
           </div>
           {!loading && (
             <button
@@ -133,8 +163,8 @@ export function ConfirmDialog({
           <button
             ref={confirmRef}
             type="button"
-            onClick={onConfirm}
-            disabled={loading}
+            onClick={() => onConfirm(reason.trim())}
+            disabled={loading || (reasonLabel !== undefined && !reason.trim())}
             className={cn(
               "inline-flex h-9 items-center gap-1.5 rounded-md px-3.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-60",
               styles.button

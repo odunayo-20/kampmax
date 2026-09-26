@@ -48,10 +48,8 @@ import {
 } from "./campus-management.service";
 import { AdminCampusService, createMockCampusService } from "./campuses.service";
 import { AdminVendorService, createMockVendorService } from "./vendors.service";
-import {
-  AdminVendorManagementService,
-  createVendorManagementService,
-} from "./vendor-management.service";
+import type { AdminVendorManagementService } from "./vendor-management.service";
+import { createApiVendorManagementService } from "./vendor-management.api";
 import {
   AdminProductManagementService,
   createProductManagementService,
@@ -145,9 +143,14 @@ export const campusService: AdminCampusService =
 export const vendorService: AdminVendorService =
   createMockVendorService(mockVendors);
 
-/** /admin/vendors console (verification + store lifecycle). */
+/** /admin/vendors console: live store directory + lifecycle API. */
 export const vendorManagementService: AdminVendorManagementService =
-  createVendorManagementService();
+  createApiVendorManagementService();
+
+export {
+  fetchVendorCampusOptions,
+  reviewVendorDocument,
+} from "./vendor-management.api";
 
 export type { ManagedVendorSortField } from "./vendor-management.service";
 

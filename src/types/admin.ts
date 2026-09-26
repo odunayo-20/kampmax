@@ -404,8 +404,11 @@ export type VendorBucket =
 
 export type VendorVerificationDocKind =
   | "cac_certificate"
+  | "business_registration"
   | "government_id"
   | "address_proof"
+  | "tax_certificate"
+  | "store_photo"
   | "bank_details"
   | "campus_permit";
 
@@ -423,7 +426,8 @@ export interface VendorVerificationDocument {
 export interface VendorVerificationRecord {
   emailVerified: boolean;
   phoneVerified: boolean;
-  bvnVerified: boolean;
+  /** BVN is not collected on the platform yet, so this is null. */
+  bvnVerified: boolean | null;
   documents: VendorVerificationDocument[];
   submittedAt: string | null;
   reviewedAt: string | null;
@@ -504,7 +508,8 @@ export interface VendorOrderRow {
   itemsCount: number;
   total: number;
   status: AdminOrder["status"];
-  paymentStatus: AdminOrder["paymentStatus"];
+  /** Not recorded per order on the platform yet. */
+  paymentStatus: AdminOrder["paymentStatus"] | null;
   createdAt: string;
 }
 
@@ -552,7 +557,7 @@ export interface VendorStatusCounts {
 
 export interface ManagedVendorDetail {
   vendor: ManagedVendor;
-  campus: Campus | null;
+  campus: Pick<Campus, "id" | "name" | "shortName" | "city" | "state"> | null;
   earnings: VendorEarningsSummary;
   products: VendorProductRow[];
   orders: VendorOrderRow[];

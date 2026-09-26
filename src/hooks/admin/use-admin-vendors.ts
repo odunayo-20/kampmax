@@ -13,7 +13,11 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminKeys } from "@/lib/query-keys";
-import { vendorManagementService } from "@/services/admin";
+import {
+  fetchVendorCampusOptions,
+  reviewVendorDocument,
+  vendorManagementService,
+} from "@/services/admin";
 import type { ManagedVendorListQuery } from "@/services/admin/vendor-management.service";
 import { useAdminSession } from "@/lib/admin/admin-auth-context";
 
@@ -38,6 +42,14 @@ export function useAdminVendorCounts() {
   return useQuery({
     queryKey: adminKeys.vendors.counts(admin.campusId),
     queryFn: () => vendorManagementService.getCounts(),
+  });
+}
+
+export function useAdminVendorCampuses() {
+  return useQuery({
+    queryKey: [...adminKeys.vendors.all, "campuses"],
+    queryFn: fetchVendorCampusOptions,
+    staleTime: 5 * 60_000,
   });
 }
 
@@ -72,6 +84,26 @@ function useVendorTreeInvalidator() {
   };
 }
 
+/** Approve / reject one KYC document; resolves with the refreshed store. */
+export function useAdminVendorDocumentReviewMutation() {
+  const { invalidate } = useVendorTreeInvalidator();
+  return useMutation({
+    mutationFn: (input: {
+      vendorId: string;
+      documentId: string;
+      decision: "approve" | "reject";
+      reason?: string;
+    }) =>
+      reviewVendorDocument(
+        input.vendorId,
+        input.documentId,
+        input.decision,
+        input.reason
+      ),
+    onSuccess: invalidate,
+  });
+}
+
 export function useAdminVendorApproveMutation() {
   const { invalidate } = useVendorTreeInvalidator();
   const admin = useActor();
@@ -95,7 +127,8 @@ export function useAdminVendorSuspendMutation() {
   const { invalidate } = useVendorTreeInvalidator();
   const admin = useActor();
   return useMutation({
-    mutationFn: (id: string) => vendorManagementService.suspend(id, { actor: admin }),
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      vendorManagementService.suspend(id, { actor: admin }, reason),
     onSuccess: invalidate,
   });
 }

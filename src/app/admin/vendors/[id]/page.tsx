@@ -56,6 +56,7 @@ import {
   useAdminVendorActivateMutation,
   useAdminVendorApproveMutation,
   useAdminVendorDeactivateMutation,
+  useAdminVendorDocumentReviewMutation,
   useAdminVendorRejectMutation,
   useAdminVendorSuspendMutation,
 } from "@/hooks/admin/use-admin-vendors";
@@ -104,6 +105,7 @@ export default function AdminVendorDetailPage() {
   // ----- data hooks (always called at top level) -----
   const { data: detail, isPending, isError, refetch } = useAdminVendor(vendorId);
   const approveMut = useAdminVendorApproveMutation();
+  const docReviewMut = useAdminVendorDocumentReviewMutation();
   const rejectMut = useAdminVendorRejectMutation();
   const activateMut = useAdminVendorActivateMutation();
   const suspendMut = useAdminVendorSuspendMutation();
@@ -124,8 +126,11 @@ export default function AdminVendorDetailPage() {
     await runExclusive(`vendor:approve:${vendorId}`, async () => {
       await approveMut.mutateAsync(vendorId);
       refresh(`${detail?.vendor.storeName} verified - storefront is live.`);
-    }).catch(() => {
-      pushToast("error", "Couldn't approve the vendor. Try again.");
+    }).catch((err: unknown) => {
+      pushToast(
+        "error",
+        err instanceof Error ? err.message : "Couldn't approve the vendor. Try again."
+      );
     });
   }
 
@@ -142,18 +147,21 @@ export default function AdminVendorDetailPage() {
     await runExclusive(`vendor:activate:${vendorId}`, async () => {
       await activateMut.mutateAsync(vendorId);
       refresh(`${detail?.vendor.storeName} is trading again.`);
-    }).catch(() => {
-      pushToast("error", "Couldn't activate the store. Try again.");
+    }).catch((err: unknown) => {
+      pushToast(
+        "error",
+        err instanceof Error ? err.message : "Couldn't activate the store. Try again."
+      );
     });
   }
 
-  async function runSuspend() {
+  async function runSuspend(reason: string) {
     setConfirmWorking(true);
     try {
-      await suspendMut.mutateAsync(vendorId);
+      await suspendMut.mutateAsync({ id: vendorId, reason });
       refresh(`${detail?.vendor.storeName} was suspended.`);
-    } catch {
-      pushToast("error", "The action failed. Try again.");
+    } catch (err) {
+      pushToast("error", err instanceof Error ? err.message : "The action failed. Try again.");
     } finally {
       setConfirmWorking(false);
       setSuspendOpen(false);
@@ -357,6 +365,25 @@ export default function AdminVendorDetailPage() {
           setVerificationOpen(false);
           await reject(reason);
         }}
+        onReviewDocument={async (v, doc, decision, reason) => {
+          try {
+            await docReviewMut.mutateAsync({
+              vendorId: v.id,
+              documentId: doc.id,
+              decision,
+              reason,
+            });
+            pushToast(
+              "success",
+              decision === "approve" ? `${doc.label} approved.` : `${doc.label} rejected.`
+            );
+          } catch (err) {
+            pushToast(
+              "error",
+              err instanceof Error ? err.message : "Couldn't review the document."
+            );
+          }
+        }}
       />
 
       <ConfirmDialog
@@ -365,6 +392,7 @@ export default function AdminVendorDetailPage() {
         message="All listings are hidden and checkout is blocked immediately. The owner keeps account access and can appeal, but buyers can no longer place orders."
         confirmLabel="Suspend store"
         tone="warning"
+        reasonLabel="Reason for suspension (recorded in the audit log)"
         loading={confirmWorking}
         onConfirm={runSuspend}
         onCancel={() => setSuspendOpen(false)}
@@ -506,7 +534,7 @@ function OverviewTab({
             <div className="grid grid-cols-3 gap-1.5">
               <MiniCheck label="Email" ok={v.emailVerified} />
               <MiniCheck label="Phone" ok={v.phoneVerified} />
-              <MiniCheck label="BVN" ok={v.bvnVerified} />
+              {v.bvnVerified !== null && <MiniCheck label="BVN" ok={v.bvnVerified} />}
             </div>
 
             <ul role="list" className="divide-y divide-kampmax-border/70 rounded-md border border-kampmax-border/70">
@@ -707,7 +735,11 @@ function OrdersTab({ detail }: { detail: ManagedVendorDetail }) {
                   <Pill variant={orderStatusVariant(o.status)} label={o.status.replace(/_/g, " ")} />
                 </td>
                 <td className="px-4 py-2.5">
-                  <Pill variant={paymentStatusVariant(o.paymentStatus)} label={o.paymentStatus} />
+                  {o.paymentStatus ? (
+                    <Pill variant={paymentStatusVariant(o.paymentStatus)} label={o.paymentStatus} />
+                  ) : (
+                    <span className="text-kampmax-text-secondary">—</span>
+                  )}
                 </td>
                 <td className="whitespace-nowrap px-4 py-2.5 tabular-nums text-kampmax-text-secondary">
                   {formatDate(o.createdAt)}
