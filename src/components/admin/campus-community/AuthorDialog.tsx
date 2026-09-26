@@ -3,12 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Flag, Loader2, MessageCircle, MessagesSquare, X } from "lucide-react";
-import { StatusBadge, userStatusVariant } from "@/components/admin/StatusBadge";
-import { formatNaira, formatDate } from "@/lib/utils";
-import { communityCampusName } from "./campus-community-utils";
-import { userService, communityService } from "@/services/admin";
+import { StatusBadge } from "@/components/admin/StatusBadge";
+import { formatDate } from "@/lib/utils";
+import { communityService } from "@/services/admin";
 import type { CommunityAuthorSummary } from "@/services/admin/community.service";
-import type { CommunityAuthor, PlatformUser } from "@/types/admin";
+import type { CommunityAuthor } from "@/types/admin";
 
 /**
  * "View author" dialog: resolves the community author to their
@@ -21,7 +20,6 @@ export function AuthorDialog({
   author: CommunityAuthor | null;
   onClose: () => void;
 }) {
-  const [user, setUser] = useState<PlatformUser | null>(null);
   const [summary, setSummary] = useState<CommunityAuthorSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -31,15 +29,11 @@ export function AuthorDialog({
     let cancelled = false;
     setLoading(true);
     setError(false);
-    setUser(null);
     setSummary(null);
-    Promise.all([
-      userService.getById(author.id),
-      communityService.getAuthorSummary(author.id),
-    ])
-      .then(([u, s]) => {
+    communityService
+      .getAuthorSummary(author.id)
+      .then((s) => {
         if (cancelled) return;
-        setUser(u);
         setSummary(s);
       })
       .catch(() => !cancelled && setError(true))
@@ -97,7 +91,7 @@ export function AuthorDialog({
             <Loader2 className="h-4 w-4 animate-spin" />
             Loading profile…
           </div>
-        ) : error || !user ? (
+        ) : error || !summary ? (
           <div className="px-5 py-10 text-center text-sm text-kampmax-text-secondary">
             Couldn&apos;t load this author&apos;s profile.
           </div>
@@ -106,7 +100,7 @@ export function AuthorDialog({
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-kampmax-blue/10 text-sm font-semibold text-kampmax-blue">
-                  {user.name
+                  {summary.name
                     .split(/\s+/)
                     .map((w) => w.charAt(0))
                     .slice(0, 2)
@@ -115,16 +109,22 @@ export function AuthorDialog({
                 </span>
                 <div className="min-w-0">
                   <p className="truncate font-medium text-kampmax-text">
-                    {user.name}
+                    {summary.name}
                   </p>
-                  <p className="truncate text-xs capitalize text-kampmax-text-secondary">
-                    {user.kind} · {communityCampusName(user.campusId)}
+                  <p className="truncate text-xs text-kampmax-text-secondary">
+                    {summary.email}
                   </p>
                 </div>
               </div>
               <StatusBadge
-                variant={userStatusVariant(user.status)}
-                label={user.status}
+                variant={
+                  summary.status === "ACTIVE"
+                    ? "success"
+                    : summary.status === "SUSPENDED"
+                      ? "error"
+                      : "warning"
+                }
+                label={summary.status.toLowerCase().replace(/_/g, " ")}
               />
             </div>
 
@@ -134,7 +134,7 @@ export function AuthorDialog({
                   Email
                 </dt>
                 <dd className="truncate text-right text-xs font-medium text-kampmax-text">
-                  {user.email}
+                  {summary.email}
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-3">
@@ -142,7 +142,7 @@ export function AuthorDialog({
                   Phone
                 </dt>
                 <dd className="text-xs font-medium tabular-nums text-kampmax-text">
-                  {user.phone}
+                  {summary.phone ?? "—"}
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-3">
@@ -150,15 +150,7 @@ export function AuthorDialog({
                   Joined
                 </dt>
                 <dd className="text-xs font-medium text-kampmax-text">
-                  {formatDate(user.joinedAt)}
-                </dd>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <dt className="text-xs uppercase tracking-wide text-kampmax-text-secondary">
-                  Lifetime orders
-                </dt>
-                <dd className="text-xs font-medium tabular-nums text-kampmax-text">
-                  {user.ordersCount} · {formatNaira(user.totalSpent)} spent
+                  {formatDate(summary.joinedAt)}
                 </dd>
               </div>
             </dl>
@@ -184,7 +176,7 @@ export function AuthorDialog({
 
             <div className="mt-5 flex items-center justify-end gap-2 border-t border-dashed border-kampmax-border pt-3.5 pb-1">
               <Link
-                href={`/admin/users?q=${encodeURIComponent(user.name)}`}
+                href={`/admin/users?q=${encodeURIComponent(summary.name)}`}
                 className="inline-flex h-8 items-center rounded-md border border-kampmax-border bg-white px-3 text-xs font-medium text-kampmax-text transition-colors hover:bg-kampmax-muted/60"
               >
                 Open in Users

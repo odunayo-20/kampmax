@@ -927,7 +927,8 @@ export type CampusPostType =
   | "event"
   | "marketplace"
   | "announcement"
-  | "lost_found";
+  | "lost_found"
+  | "poll";
 
 export interface CampusPost {
   id: string;
@@ -1676,7 +1677,6 @@ export interface CommunityComment {
 }
 
 export type CommunityEventStatus =
-  | "draft"
   | "upcoming"
   | "live"
   | "completed"
@@ -1689,22 +1689,23 @@ export interface CommunityEvent {
   campusId: string;
   venue: string;
   startsAt: string;
-  endsAt: string;
+  /** The platform doesn't record an end time or capacity for events. */
+  endsAt: string | null;
   attendeeCount: number;
-  capacity: number;
+  capacity: number | null;
   status: CommunityEventStatus;
   createdAt: string;
 }
 
-export type AnnouncementStatus = "draft" | "scheduled" | "published" | "archived";
-export type AnnouncementPlacement = "feed_top" | "feed_banner" | "push" | "email";
+export type AnnouncementStatus = "published" | "archived";
+export type AnnouncementPriority = "info" | "warning" | "urgent";
 
 export interface ManagedAnnouncement {
   id: string;
   title: string;
   body: string;
-  placement: AnnouncementPlacement;
-  /** Empty array = all campuses. */
+  priority: AnnouncementPriority;
+  /** Empty array = network-wide (no campus). */
   campusIds: string[];
   publishAt: string | null;
   createdBy: string;
@@ -1716,10 +1717,9 @@ export interface ManagedAnnouncement {
 export interface AnnouncementInput {
   title: string;
   body: string;
-  placement: AnnouncementPlacement;
+  priority: AnnouncementPriority;
+  /** Empty array = network-wide (no campus). Ignored when editing. */
   campusIds: string[];
-  /** Required when scheduling. */
-  publishAt?: string | null;
 }
 
 export type CommunityReportTargetType = "post" | "comment" | "event" | "poll";

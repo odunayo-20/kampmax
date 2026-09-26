@@ -321,7 +321,7 @@ export function PollsSection({
       <ConfirmDialog
         open={reopenTarget !== null}
         title={`Reopen “${reopenTarget?.question}”?`}
-        message="Voting reopens until the original end date. Consider whether the results already published might change."
+        message="Voting reopens until the original end date, or for 3 more days if that date has passed. Consider whether the results already shown might change."
         confirmLabel="Reopen poll"
         tone="default"
         loading={working}

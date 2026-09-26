@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import type { BadgeVariant } from "@/components/admin/StatusBadge";
 import type {
-  AnnouncementPlacement,
+  AnnouncementPriority,
   AnnouncementStatus,
   CommunityCommentStatus,
   CommunityEventStatus,
@@ -73,6 +73,7 @@ export const POST_TYPE_LABELS: Record<CampusPostType, string> = {
   marketplace: "Marketplace",
   announcement: "Announcement",
   lost_found: "Lost & found",
+  poll: "Poll",
 };
 
 export function postTypeLabel(type: CampusPostType): string {
@@ -86,13 +87,13 @@ export const POST_TYPE_ICONS: Record<CampusPostType, LucideIcon> = {
   marketplace: ShoppingBag,
   announcement: Megaphone,
   lost_found: PackageSearch,
+  poll: BarChart3,
 };
 
+/** Post kinds the platform actually produces. */
 export const POST_TYPE_FILTER_ORDER: CampusPostType[] = [
   "discussion",
-  "question",
-  "event",
-  "marketplace",
+  "poll",
   "announcement",
   "lost_found",
 ];
@@ -158,7 +159,6 @@ export const COMMENT_STATUS_FILTER_ORDER: CommunityCommentStatus[] = [
 // ------------------------------------------------------------
 
 export const EVENT_STATUS_LABELS: Record<CommunityEventStatus, string> = {
-  draft: "Draft",
   upcoming: "Upcoming",
   live: "Live",
   completed: "Completed",
@@ -179,8 +179,6 @@ export function eventStatusVariant(
       return "info";
     case "cancelled":
       return "error";
-    case "draft":
-      return "warning";
     default:
       return "neutral"; // completed
   }
@@ -189,7 +187,6 @@ export function eventStatusVariant(
 export const EVENT_STATUS_FILTER_ORDER: CommunityEventStatus[] = [
   "upcoming",
   "live",
-  "draft",
   "completed",
   "cancelled",
 ];
@@ -199,8 +196,6 @@ export const EVENT_STATUS_FILTER_ORDER: CommunityEventStatus[] = [
 // ------------------------------------------------------------
 
 export const ANNOUNCEMENT_STATUS_LABELS: Record<AnnouncementStatus, string> = {
-  draft: "Draft",
-  scheduled: "Scheduled",
   published: "Published",
   archived: "Archived",
 };
@@ -215,43 +210,35 @@ export function announcementStatusVariant(
   switch (status) {
     case "published":
       return "success";
-    case "scheduled":
-      return "info";
-    case "draft":
-      return "warning";
     default:
       return "neutral"; // archived
   }
 }
 
 export const ANNOUNCEMENT_STATUS_FILTER_ORDER: AnnouncementStatus[] = [
-  "draft",
-  "scheduled",
   "published",
   "archived",
 ];
 
-export const ANNOUNCEMENT_PLACEMENT_LABELS: Record<
-  AnnouncementPlacement,
+export const ANNOUNCEMENT_PRIORITY_LABELS: Record<
+  AnnouncementPriority,
   string
 > = {
-  feed_top: "Feed top",
-  feed_banner: "Feed banner",
-  push: "Push notification",
-  email: "Email digest",
+  info: "Info",
+  warning: "Warning",
+  urgent: "Urgent",
 };
 
-export function announcementPlacementLabel(
-  placement: AnnouncementPlacement
+export function announcementPriorityLabel(
+  priority: AnnouncementPriority
 ): string {
-  return ANNOUNCEMENT_PLACEMENT_LABELS[placement] ?? placement;
+  return ANNOUNCEMENT_PRIORITY_LABELS[priority] ?? priority;
 }
 
-export const ANNOUNCEMENT_PLACEMENT_FILTER_ORDER: AnnouncementPlacement[] = [
-  "feed_top",
-  "feed_banner",
-  "push",
-  "email",
+export const ANNOUNCEMENT_PRIORITY_ORDER: AnnouncementPriority[] = [
+  "info",
+  "warning",
+  "urgent",
 ];
 
 // ------------------------------------------------------------

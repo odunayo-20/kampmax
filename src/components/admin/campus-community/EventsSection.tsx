@@ -1,14 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  CalendarDays,
-  MapPin,
-  Search,
-  Send,
-  UserRound,
-  XCircle,
-} from "lucide-react";
+import { CalendarDays, MapPin, Search, UserRound, XCircle } from "lucide-react";
 import { Pagination } from "@/components/admin/Pagination";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { Input } from "@/components/ui/Input";
@@ -38,6 +31,12 @@ import type {
 } from "@/types/admin";
 import type { CampusOption } from "./PostsSection";
 
+function attendanceLabel(e: CommunityEvent): string {
+  return e.capacity === null
+    ? `${e.attendeeCount} going`
+    : `${e.attendeeCount}/${e.capacity}`;
+}
+
 export function EventsSection({
   campusOptions,
   onToast,
@@ -59,9 +58,6 @@ export function EventsSection({
 
   const [author, setAuthor] = useState<CommunityAuthor | null>(null);
   const [cancelTarget, setCancelTarget] = useState<CommunityEvent | null>(null);
-  const [publishTarget, setPublishTarget] = useState<CommunityEvent | null>(
-    null
-  );
   const [working, setWorking] = useState(false);
 
   const loadMeta = useCallback(async () => {
@@ -99,14 +95,10 @@ export function EventsSection({
     void loadMeta();
   }, [loadMeta]);
 
-  async function setStatusFor(
-    e: CommunityEvent,
-    next: CommunityEventStatus,
-    successText: string
-  ) {
+  async function cancelEvent(e: CommunityEvent, successText: string) {
     setWorking(true);
     try {
-      await communityService.setEventStatus(e.id, next);
+      await communityService.cancelEvent(e.id);
       onToast("success", successText);
       await Promise.all([loadList(), loadMeta()]);
     } catch (err) {
@@ -250,18 +242,7 @@ export function EventsSection({
                     </td>
                     <td className="hidden whitespace-nowrap px-3 py-2.5 md:table-cell">
                       <span className="text-xs tabular-nums text-kampmax-text">
-                        {e.attendeeCount}/{e.capacity}
-                      </span>
-                      <span className="mt-1 block h-1 w-20 overflow-hidden rounded-full bg-kampmax-muted">
-                        <span
-                          className={cn(
-                            "block h-full rounded-full",
-                            e.attendeeCount / e.capacity > 0.85
-                              ? "bg-kampmax-warning"
-                              : "bg-kampmax-blue"
-                          )}
-                          style={{ width: `${Math.min(100, Math.round((e.attendeeCount / e.capacity) * 100))}%` }}
-                        />
+                        {attendanceLabel(e)}
                       </span>
                     </td>
                     <td className="px-3 py-2.5">
@@ -274,17 +255,7 @@ export function EventsSection({
                       <RowMenu
                         label={e.title}
                         actions={[
-                          ...(e.status === "draft"
-                            ? [
-                                {
-                                  key: "publish",
-                                  label: "Publish event",
-                                  icon: Send,
-                                  onSelect: () => setPublishTarget(e),
-                                },
-                              ]
-                            : []),
-                          ...(e.status === "upcoming" || e.status === "draft"
+                          ...(e.status === "upcoming" || e.status === "live"
                             ? [
                                 {
                                   key: "cancel",
@@ -355,23 +326,13 @@ export function EventsSection({
                     Attendance
                   </dt>
                   <dd className="tabular-nums text-kampmax-text">
-                    {e.attendeeCount}/{e.capacity}
+                    {attendanceLabel(e)}
                   </dd>
                 </div>
               </dl>
 
-              {(e.status === "draft" || e.status === "upcoming") && (
+              {(e.status === "live" || e.status === "upcoming") && (
                 <div className="mt-2.5 flex items-center justify-end gap-1">
-                  {e.status === "draft" && (
-                    <button
-                      type="button"
-                      title="Publish event"
-                      onClick={() => setPublishTarget(e)}
-                      className="rounded-md p-1.5 text-kampmax-success transition-colors hover:bg-emerald-50"
-                    >
-                      <Send className="h-3.5 w-3.5" />
-                    </button>
-                  )}
                   <button
                     type="button"
                     title="Cancel event"
@@ -401,35 +362,12 @@ export function EventsSection({
       <AuthorDialog author={author} onClose={() => setAuthor(null)} />
 
       <ConfirmDialog
-        open={publishTarget !== null}
-        title={`Publish “${publishTarget?.title}”?`}
-        message={
-          publishTarget == null
-            ? ""
-            : `The draft goes live on the ${communityCampusName(publishTarget.campusId)} events board for ${formatDateShort(publishTarget.startsAt)} at ${publishTarget.venue}.`
-        }
-        confirmLabel="Publish event"
-        tone="default"
-        loading={working}
-        onConfirm={() => {
-          if (!publishTarget) return;
-          const target = publishTarget;
-          void setStatusFor(
-            target,
-            "upcoming",
-            `“${target.title}” is now listed as upcoming.`
-          ).then(() => setPublishTarget(null));
-        }}
-        onCancel={() => setPublishTarget(null)}
-      />
-
-      <ConfirmDialog
         open={cancelTarget !== null}
         title={`Cancel “${cancelTarget?.title}”?`}
         message={
           cancelTarget == null
             ? ""
-            : `${cancelTarget.attendeeCount} registered attendee${cancelTarget.attendeeCount === 1 ? "" : "s"} will be notified that the event is cancelled. This cannot be undone.`
+            : `The event is marked as cancelled and removed from the events board. ${cancelTarget.attendeeCount} attendee${cancelTarget.attendeeCount === 1 ? " is" : "s are"} registered; they are not notified automatically. This cannot be undone.`
         }
         confirmLabel="Cancel event"
         tone="danger"
@@ -437,11 +375,9 @@ export function EventsSection({
         onConfirm={() => {
           if (!cancelTarget) return;
           const target = cancelTarget;
-          void setStatusFor(
-            target,
-            "cancelled",
-            `“${target.title}” was cancelled.`
-          ).then(() => setCancelTarget(null));
+          void cancelEvent(target, `“${target.title}” was cancelled.`).then(() =>
+            setCancelTarget(null)
+          );
         }}
         onCancel={() => setCancelTarget(null)}
       />

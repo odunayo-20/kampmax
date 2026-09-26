@@ -1,24 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  Archive,
-  CalendarClock,
-  Pencil,
-  PlusCircle,
-  Search,
-  Send,
-} from "lucide-react";
+import { Archive, Pencil, PlusCircle, RotateCcw, Search } from "lucide-react";
 import { Pagination } from "@/components/admin/Pagination";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { StatusBadge } from "@/components/admin/StatusBadge";
-import { cn, formatDateShort, formatDateTime, timeAgo } from "@/lib/utils";
+import { cn, formatDateShort, timeAgo } from "@/lib/utils";
 import { useDebounce } from "@/hooks/use-debounce";
 import {
   ANNOUNCEMENT_STATUS_FILTER_ORDER,
-  announcementPlacementLabel,
+  announcementPriorityLabel,
   announcementStatusLabel,
   announcementStatusVariant,
 } from "./campus-community-meta";
@@ -32,6 +25,7 @@ import type {
   AnnouncementInput,
   AnnouncementStatus,
   ManagedAnnouncement,
+  CommunitySectionCounts,
   Paginated,
 } from "@/types/admin";
 import type { CampusOption } from "./PostsSection";
@@ -60,8 +54,7 @@ export function AnnouncementsSection({
 
   const [list, setList] = useState<Paginated<ManagedAnnouncement> | null>(null);
   const [counts, setCounts] =
-    useState<Record<AnnouncementStatus, number> | null>(null);
-  const [total, setTotal] = useState<number | null>(null);
+    useState<CommunitySectionCounts<AnnouncementStatus> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -72,18 +65,7 @@ export function AnnouncementsSection({
 
   const loadMeta = useCallback(async () => {
     try {
-      const result = await communityService.listAnnouncements({
-        page: 1,
-        pageSize: 500,
-      });
-      setTotal(result.total);
-      const byStatus = Object.fromEntries(
-        ANNOUNCEMENT_STATUS_FILTER_ORDER.map((s) => [
-          s,
-          result.items.filter((a) => a.status === s).length,
-        ])
-      ) as Record<AnnouncementStatus, number>;
-      setCounts(byStatus);
+      setCounts(await communityService.getAnnouncementCounts());
     } catch {
       /* non-critical */
     }
@@ -115,46 +97,20 @@ export function AnnouncementsSection({
     void loadMeta();
   }, [loadMeta]);
 
-  async function submitForm(
-    input: AnnouncementInput & {
-      submitAs: "draft" | "scheduled" | "published";
-    }
-  ) {
+  async function submitForm(input: AnnouncementInput) {
     if (!formTarget) return;
     setFormSaving(true);
     try {
       if (formTarget.mode === "edit") {
-        await communityService.updateAnnouncement(formTarget.a.id, input);
-        if (input.submitAs === "published") {
-          await communityService.publishAnnouncement(formTarget.a.id);
-          onToast("success", `“${input.title}” updated and published.`);
-        } else if (input.publishAt) {
-          await communityService.scheduleAnnouncement(
-            formTarget.a.id,
-            input.publishAt
-          );
-          onToast("success", `“${input.title}” scheduled.`);
-        } else {
-          onToast("success", `“${input.title}” saved.`);
-        }
-      } else if (input.submitAs === "scheduled" && input.publishAt) {
-        const created = await communityService.createAnnouncement({
-          ...input,
-          submitAs: "draft",
+        await communityService.updateAnnouncement(formTarget.a.id, {
+          title: input.title,
+          body: input.body,
+          priority: input.priority,
         });
-        await communityService.scheduleAnnouncement(created.id, input.publishAt);
-        onToast(
-          "success",
-          `“${input.title}” scheduled for ${formatDateTime(input.publishAt)}.`
-        );
+        onToast("success", `“${input.title}” updated.`);
       } else {
         await communityService.createAnnouncement(input);
-        onToast(
-          "success",
-          input.submitAs === "published"
-            ? `“${input.title}” is live.`
-            : `“${input.title}” saved as a draft.`
-        );
+        onToast("success", `“${input.title}” is live.`);
       }
       setFormTarget(null);
       await Promise.all([loadList(), loadMeta()]);
@@ -174,7 +130,7 @@ export function AnnouncementsSection({
       switch (action.kind) {
         case "publish":
           await communityService.publishAnnouncement(action.a.id);
-          onToast("success", `“${action.a.title}” is now published.`);
+          onToast("success", `“${action.a.title}” is live again.`);
           break;
         case "archive":
           await communityService.archiveAnnouncement(action.a.id);
@@ -197,8 +153,8 @@ export function AnnouncementsSection({
   /** Which lifecycle actions each status allows. */
   function actionsFor(a: ManagedAnnouncement) {
     return {
-      edit: a.status === "draft" || a.status === "scheduled",
-      publish: a.status === "draft" || a.status === "scheduled",
+      edit: a.status === "published",
+      publish: a.status === "archived",
       archive: a.status === "published",
     };
   }
@@ -228,9 +184,9 @@ export function AnnouncementsSection({
           )}
         >
           All
-          {total !== null && (
+          {counts && (
             <span className="rounded-full bg-kampmax-muted px-1.5 py-px text-[10px] font-semibold tabular-nums">
-              {total}
+              {counts.all}
             </span>
           )}
         </button>
@@ -254,7 +210,7 @@ export function AnnouncementsSection({
             {announcementStatusLabel(tab)}
             {counts && (
               <span className="rounded-full bg-kampmax-muted px-1.5 py-px text-[10px] font-semibold tabular-nums">
-                {counts[tab]}
+                {counts.byStatus[tab]}
               </span>
             )}
           </button>
@@ -315,7 +271,7 @@ export function AnnouncementsSection({
               <thead>
                 <tr className="border-b border-kampmax-border bg-kampmax-muted/40 text-[11px] uppercase tracking-wide text-kampmax-text-secondary">
                   <th scope="col" className="px-4 py-2.5 font-medium">Announcement</th>
-                  <th scope="col" className="hidden px-3 py-2.5 font-medium lg:table-cell">Placement</th>
+                  <th scope="col" className="hidden px-3 py-2.5 font-medium lg:table-cell">Priority</th>
                   <th scope="col" className="hidden px-3 py-2.5 font-medium xl:table-cell">Audience</th>
                   <th scope="col" className="px-3 py-2.5 font-medium">Publish date</th>
                   <th scope="col" className="hidden px-3 py-2.5 font-medium md:table-cell">Created by</th>
@@ -340,12 +296,12 @@ export function AnnouncementsSection({
                         </p>
                       </td>
                       <td className="hidden whitespace-nowrap px-3 py-2.5 text-kampmax-text-secondary lg:table-cell">
-                        {announcementPlacementLabel(a.placement)}
+                        {announcementPriorityLabel(a.priority)}
                       </td>
                       <td className="hidden whitespace-nowrap px-3 py-2.5 xl:table-cell">
                         {a.campusIds.length === 0 ? (
                           <span className="text-kampmax-text-secondary">
-                            All campuses
+                            Network-wide
                           </span>
                         ) : (
                           <span className="font-medium text-kampmax-text">
@@ -354,12 +310,7 @@ export function AnnouncementsSection({
                         )}
                       </td>
                       <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-kampmax-text-secondary">
-                        {a.status === "scheduled" && a.publishAt ? (
-                          <span className="inline-flex items-center gap-1 font-medium text-kampmax-info">
-                            <CalendarClock className="h-3 w-3" aria-hidden />
-                            {formatDateTime(a.publishAt)}
-                          </span>
-                        ) : a.publishAt ? (
+                        {a.publishAt ? (
                           formatDateShort(a.publishAt)
                         ) : (
                           <span className="text-kampmax-text-secondary">-</span>
@@ -396,20 +347,10 @@ export function AnnouncementsSection({
                               ? [
                                   {
                                     key: "publish",
-                                    label:
-                                      a.status === "scheduled"
-                                        ? "Publish now"
-                                        : "Publish",
-                                    icon: Send,
+                                    label: "Restore",
+                                    icon: RotateCcw,
                                     onSelect: () =>
                                       setPending({ kind: "publish", a }),
-                                  },
-                                  {
-                                    key: "reschedule",
-                                    label: "Schedule / reschedule",
-                                    icon: CalendarClock,
-                                    onSelect: () =>
-                                      setFormTarget({ mode: "edit", a }),
                                   },
                                 ]
                               : []),
@@ -459,20 +400,16 @@ export function AnnouncementsSection({
                 </p>
 
                 <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 border-t border-dashed border-kampmax-border pt-2 text-xs">
-                  <MetaCell label="Placement">
-                    {announcementPlacementLabel(a.placement)}
+                  <MetaCell label="Priority">
+                    {announcementPriorityLabel(a.priority)}
                   </MetaCell>
                   <MetaCell label="Audience">
                     {a.campusIds.length === 0
-                      ? "All campuses"
+                      ? "Network-wide"
                       : a.campusIds.map(communityCampusName).join(", ")}
                   </MetaCell>
                   <MetaCell label="Publish date">
-                    {a.publishAt
-                      ? a.status === "scheduled"
-                        ? formatDateTime(a.publishAt)
-                        : formatDateShort(a.publishAt)
-                      : "-"}
+                    {a.publishAt ? formatDateShort(a.publishAt) : "-"}
                   </MetaCell>
                   <MetaCell label="Created by">{a.createdBy}</MetaCell>
                 </dl>
@@ -492,12 +429,12 @@ export function AnnouncementsSection({
                   {allowed.publish && (
                     <button
                       type="button"
-                      title="Publish now"
+                      title="Restore announcement"
                       onClick={() => setPending({ kind: "publish", a })}
                       className="inline-flex h-7 items-center gap-1 rounded-md border border-kampmax-blue/30 bg-kampmax-blue/10 px-2.5 text-[11px] font-medium text-kampmax-blue transition-colors hover:bg-kampmax-blue/15"
                     >
-                      <Send className="h-3 w-3" />
-                      Publish
+                      <RotateCcw className="h-3 w-3" />
+                      Restore
                     </button>
                   )}
                   {allowed.archive && (
@@ -540,15 +477,15 @@ export function AnnouncementsSection({
 
       <ConfirmDialog
         open={pending?.kind === "publish"}
-        title={`Publish “${pending?.a.title}”?`}
+        title={`Restore “${pending?.a.title}”?`}
         message={
           pending?.kind === "publish"
             ? pending.a.campusIds.length === 0
-              ? "This goes out to every campus feed immediately."
-              : `This goes live for ${pending.a.campusIds.map(communityCampusName).join(", ")} immediately.`
+              ? "This is shown network-wide again immediately."
+              : `This goes live again for ${pending.a.campusIds.map(communityCampusName).join(", ")} immediately.`
             : ""
         }
-        confirmLabel="Publish now"
+        confirmLabel="Restore"
         tone="default"
         loading={working}
         onConfirm={() => pending && void runAction(pending)}
@@ -558,7 +495,7 @@ export function AnnouncementsSection({
       <ConfirmDialog
         open={pending?.kind === "archive"}
         title={`Archive “${pending?.a.title}”?`}
-        message="The announcement is pulled from all surfaces but stays in history for reporting. Archived items can't be re-published directly."
+        message="The announcement is pulled from campus feeds but stays in history. You can restore it later."
         confirmLabel="Archive"
         tone="warning"
         loading={working}

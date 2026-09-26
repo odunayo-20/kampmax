@@ -237,16 +237,12 @@ export const reviewService: AdminReviewService = createMockReviewService(mockRev
 export const disputeService: AdminDisputeService =
   createMockDisputeService(mockDisputes);
 
-import {
-  AdminCommunityService,
-  createMockCommunityService,
-} from "./community.service";
+import type { AdminCommunityService } from "./community.service";
+import { createApiCommunityService } from "./community.api";
 
-/** /admin/campus console (posts, comments, events, announcements, reports, polls). */
+/** /admin/campus console: live moderation API (posts, comments, events, announcements, reports, polls). */
 export const communityService: AdminCommunityService =
-  createMockCommunityService();
-
-export type { CommunityAnnouncementCreateInput } from "./community.service";
+  createApiCommunityService();
 
 import {
   AdminReviewManagementService,

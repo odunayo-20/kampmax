@@ -23,7 +23,7 @@ import { AnnouncementsSection } from "@/components/admin/campus-community/Announ
 import { ReportsSection } from "@/components/admin/campus-community/ReportsSection";
 import { PollsSection } from "@/components/admin/campus-community/PollsSection";
 import { communityService } from "@/services/admin";
-import { communityCampusOptions } from "@/data/admin/community";
+import { registerCommunityCampuses } from "@/components/admin/campus-community/campus-community-utils";
 import type { CommunityOverviewStats } from "@/services/admin/community.service";
 import type { CampusOption } from "@/components/admin/campus-community/PostsSection";
 
@@ -84,9 +84,11 @@ function CampusCommunityConsole() {
   const [section, setSection] = useState<SectionKey>(() =>
     parseInitialSection(searchParams)
   );
-  const [campusOptions] = useState<CampusOption[]>(() =>
-    communityCampusOptions()
+  // null until loaded, so sections never render real campus ids as raw UUIDs.
+  const [campusOptions, setCampusOptions] = useState<CampusOption[] | null>(
+    null
   );
+  const [campusError, setCampusError] = useState(false);
 
   const [stats, setStats] = useState<CommunityOverviewStats | null>(null);
 
@@ -103,6 +105,21 @@ function CampusCommunityConsole() {
   useEffect(() => {
     window.history.replaceState(null, "", `/admin/campus?section=${section}`);
   }, [section]);
+
+  useEffect(() => {
+    let cancelled = false;
+    communityService
+      .listCampusOptions()
+      .then((options) => {
+        if (cancelled) return;
+        registerCommunityCampuses(options);
+        setCampusOptions(options);
+      })
+      .catch(() => !cancelled && setCampusError(true));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -144,7 +161,7 @@ function CampusCommunityConsole() {
               <StatChip
                 icon={Megaphone}
                 tone="neutral"
-                label={`${stats.scheduledAnnouncements} scheduled`}
+                label={`${stats.activeAnnouncements} announcement${stats.activeAnnouncements === 1 ? "" : "s"}`}
                 className="hidden md:inline-flex"
               />
             </div>
@@ -183,29 +200,38 @@ function CampusCommunityConsole() {
       </div>
 
       {/* Active section */}
-      <div key={section}>
-        {section === "posts" && (
-          <PostsSection campusOptions={campusOptions} onToast={pushToast} />
-        )}
-        {section === "comments" && (
-          <CommentsSection campusOptions={campusOptions} onToast={pushToast} />
-        )}
-        {section === "events" && (
-          <EventsSection campusOptions={campusOptions} onToast={pushToast} />
-        )}
-        {section === "announcements" && (
-          <AnnouncementsSection
-            campusOptions={campusOptions}
-            onToast={pushToast}
-          />
-        )}
-        {section === "reports" && (
-          <ReportsSection onToast={pushToast} />
-        )}
-        {section === "polls" && (
-          <PollsSection campusOptions={campusOptions} onToast={pushToast} />
-        )}
-      </div>
+      {campusError ? (
+        <div className="rounded-lg border border-kampmax-border bg-white px-4 py-10 text-center text-sm text-kampmax-text-secondary">
+          Couldn&apos;t load campuses. Refresh the page to try again.
+        </div>
+      ) : !campusOptions ? (
+        <LoadingSkeleton variant="cards" rows={4} />
+      ) : (
+        <div key={section}>
+          {section === "posts" && (
+            <PostsSection campusOptions={campusOptions} onToast={pushToast} />
+          )}
+          {section === "comments" && (
+            <CommentsSection
+              campusOptions={campusOptions}
+              onToast={pushToast}
+            />
+          )}
+          {section === "events" && (
+            <EventsSection campusOptions={campusOptions} onToast={pushToast} />
+          )}
+          {section === "announcements" && (
+            <AnnouncementsSection
+              campusOptions={campusOptions}
+              onToast={pushToast}
+            />
+          )}
+          {section === "reports" && <ReportsSection onToast={pushToast} />}
+          {section === "polls" && (
+            <PollsSection campusOptions={campusOptions} onToast={pushToast} />
+          )}
+        </div>
+      )}
 
       {/* Toasts */}
       <div
