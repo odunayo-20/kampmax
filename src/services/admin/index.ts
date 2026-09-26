@@ -334,14 +334,12 @@ export { fetchEmployerCampusOptions } from "./employer-management.api";
 
 export type { ManagedEmployerSortField } from "./employer-management.service";
 
-import {
-  AdminMarketplaceManagementService,
-  createMarketplaceManagementService,
-} from "./marketplace-management.service";
+import type { AdminMarketplaceManagementService } from "./marketplace-management.service";
+import { createApiMarketplaceManagementService } from "./marketplace-management.api";
 
-/** /admin/marketplace console (listing lifecycle oversight - derived from the real product store, read-only). */
+/** /admin/marketplace console (live listing oversight, read-only). */
 export const marketplaceManagementService: AdminMarketplaceManagementService =
-  createMarketplaceManagementService();
+  createApiMarketplaceManagementService();
 
 export type { MarketplaceSortField } from "./marketplace-management.service";
 

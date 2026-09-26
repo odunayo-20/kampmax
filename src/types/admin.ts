@@ -3910,7 +3910,7 @@ export interface MarketplaceListingRow {
   title: string;
   description: string;
   images: string[];
-  condition: "New" | "Used" | "Fair";
+  condition: "New" | "Used" | "Fair" | "Refurbished";
   categoryId: string;
   categoryName: string;
   campusId: string;

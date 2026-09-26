@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createMarketplaceManagementService } from "@/services/admin/marketplace-management.service";
+import { createMarketplaceManagementService } from "@/services/admin/marketplace-management.mock";
 
 // ------------------------------------------------------------
 // MARKETPLACE MANAGEMENT SERVICE TESTS (Module 39)
