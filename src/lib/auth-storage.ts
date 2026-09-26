@@ -22,8 +22,18 @@ function store(): Storage {
   return typeof window !== "undefined" ? window.localStorage as Storage : {} as Storage;
 }
 
+/** Reads a key, returning null on the server (no localStorage) or if storage throws. */
+function readKey(key: string): string | null {
+  try {
+    const s = store();
+    return typeof s.getItem === "function" ? s.getItem(key) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function getAccessToken(): string | null {
-  return store().getItem(ACCESS_TOKEN_KEY);
+  return readKey(ACCESS_TOKEN_KEY);
 }
 
 export function setAccessToken(token: string | null): void {
@@ -40,7 +50,7 @@ export function setAccessToken(token: string | null): void {
 }
 
 export function getRefreshToken(): string | null {
-  return store().getItem(REFRESH_TOKEN_KEY);
+  return readKey(REFRESH_TOKEN_KEY);
 }
 
 export function setRefreshToken(token: string | null): void {
