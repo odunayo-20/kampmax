@@ -347,14 +347,12 @@ export const marketplaceManagementService: AdminMarketplaceManagementService =
 
 export type { MarketplaceSortField } from "./marketplace-management.service";
 
-import {
-  AdminJobManagementService,
-  createJobManagementService,
-} from "./job-management.service";
+import type { AdminJobManagementService } from "./job-management.service";
+import { createApiJobManagementService } from "./job-management.api";
 
-/** /admin/jobs console (jobs & hiring oversight - derived from the real opportunity store, read-only). */
+/** /admin/jobs console (jobs & hiring oversight - live /admin/jobs, read-only). */
 export const jobManagementService: AdminJobManagementService =
-  createJobManagementService();
+  createApiJobManagementService();
 
 export type { ManagedJobSortField } from "./job-management.service";
 

@@ -17,6 +17,7 @@ export const JOB_STATUS_TABS: (ManagedJobStatus | "all")[] = [
   "open",
   "draft",
   "pending_review",
+  "paused",
   "closed",
   "expired",
   "cancelled",
@@ -26,6 +27,7 @@ export const JOB_STATUS_LABELS: Record<ManagedJobStatus, string> = {
   open: "Open",
   draft: "Draft",
   pending_review: "Pending review",
+  paused: "Paused",
   closed: "Closed",
   expired: "Expired",
   cancelled: "Cancelled",
@@ -35,6 +37,7 @@ export const JOB_STATUS_DOTS: Record<ManagedJobStatus, string> = {
   open: "bg-kampmax-success",
   draft: "bg-kampmax-text-secondary/50",
   pending_review: "bg-kampmax-info",
+  paused: "bg-kampmax-warning",
   closed: "bg-kampmax-text-secondary/50",
   expired: "bg-kampmax-warning",
   cancelled: "bg-kampmax-error",
@@ -63,7 +66,6 @@ export const ARRANGEMENT_OPTIONS: (string | "all")[] = [
   "all",
   "remote",
   "on_site",
-  "on_campus",
   "hybrid",
 ];
 
@@ -96,7 +98,7 @@ export const BUDGET_TYPE_LABELS: Record<string, string> = {
 };
 
 export function durationLabelOf(value: string): string {
-  return DURATION_LABELS[value] ?? "—";
+  return DURATION_LABELS[value] ?? (value.trim() || "—");
 }
 
 export function experienceLabelOf(value: string): string {
@@ -126,6 +128,7 @@ const jobStatusMap: Record<ManagedJobStatus, BadgeVariant> = {
   open: "success",
   draft: "neutral",
   pending_review: "info",
+  paused: "warning",
   closed: "neutral",
   expired: "warning",
   cancelled: "error",

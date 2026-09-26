@@ -486,6 +486,7 @@ export function computeJobCounts(rows: ManagedJobRow[]): ManagedJobStatusCounts 
     open: rows.filter((j) => j.status === "open").length,
     draft: rows.filter((j) => j.status === "draft").length,
     pending_review: rows.filter((j) => j.status === "pending_review").length,
+    paused: rows.filter((j) => j.status === "paused").length,
     closed: rows.filter((j) => j.status === "closed").length,
     expired: rows.filter((j) => j.status === "expired").length,
     cancelled: rows.filter((j) => j.status === "cancelled").length,

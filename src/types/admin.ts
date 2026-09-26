@@ -4044,7 +4044,7 @@ export type MarketplaceSortField =
 // store (src/data/employer.ts) and contracts (src/data/contracts.ts).
 // Statuses use the REAL OpportunityStatus vocabulary — nothing invented.
 
-export type ManagedJobStatus = OpportunityStatus;
+export type ManagedJobStatus = OpportunityStatus | "paused";
 
 /** Derived publication concept from the single real status field. */
 export type ManagedJobPublication = "published" | "unpublished" | "ended";
@@ -4119,6 +4119,7 @@ export interface ManagedJobStatusCounts {
   open: number;
   draft: number;
   pending_review: number;
+  paused: number;
   closed: number;
   expired: number;
   cancelled: number;

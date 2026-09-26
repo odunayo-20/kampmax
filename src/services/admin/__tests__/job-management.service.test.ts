@@ -7,7 +7,9 @@
 // ============================================================
 
 import { describe, expect, it } from "vitest";
-import { jobManagementService } from "@/services/admin";
+import { createJobManagementService } from "../job-management.mock";
+
+const jobManagementService = createJobManagementService();
 
 describe("jobManagementService", () => {
   describe("list", () => {
