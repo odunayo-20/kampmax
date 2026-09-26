@@ -29,6 +29,7 @@ import {
   ClipboardList,
   Fingerprint,
   Headphones,
+  Wrench,
 } from "lucide-react";
 import { AdminNavItemKey, canSeeSection } from "./permissions";
 import { AdminRole } from "@/types/admin";
@@ -62,6 +63,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         { key: "users", href: "/admin/users", label: "Users", icon: Users },
         { key: "vendors", href: "/admin/vendors", label: "Vendors", icon: Store },
         { key: "freelancers", href: "/admin/freelancers", label: "Freelancers", icon: Briefcase },
+        { key: "serviceProviders", href: "/admin/service-providers", label: "Service providers", icon: Wrench },
         { key: "employers", href: "/admin/employers", label: "Employers", icon: Handshake },
         { key: "verifications", href: "/admin/verifications", label: "Verifications", icon: BadgeCheck },
         { key: "campuses", href: "/admin/campuses", label: "Campuses", icon: Building2 },

@@ -34,6 +34,7 @@ export type AdminNavItemKey =
   | "permissions"
   | "auditLogs"
   | "freelancers"
+  | "serviceProviders"
   | "employers"
   | "jobs"
   | "verifications"
