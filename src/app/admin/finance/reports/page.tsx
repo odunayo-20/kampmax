@@ -64,7 +64,7 @@ function AdminFinanceReportsInner() {
     <>
       <AdminPageHeader
         title="Financial reports"
-        description="Tabular reports over the real orders, wallet and financials stores with CSV export. Read-only — reports never modify the underlying records."
+        description="Tabular reports over orders, payments and wallets with CSV export. Read-only — reports never modify the underlying records."
         actions={
           report ? (
             <button

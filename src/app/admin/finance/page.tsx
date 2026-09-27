@@ -40,7 +40,7 @@ function AdminFinancePageInner() {
     <>
       <AdminPageHeader
         title="Finance"
-        description="Read-only platform finance overview derived from the real orders, wallet and financials stores. Every figure traces to a real record — nothing here is generated."
+        description="Read-only platform finance overview computed live from orders, payments and wallets. Every figure traces to a real record — nothing here is generated."
         actions={
           overview ? (
             <button

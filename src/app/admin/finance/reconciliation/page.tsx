@@ -36,7 +36,7 @@ function AdminFinanceReconciliationInner() {
     <>
       <AdminPageHeader
         title="Finance reconciliation"
-        description="Checks that compare the real orders, wallet and financials stores against each other — every variance is quantified and traced to the exact records behind it."
+        description="Checks that compare orders, payments, escrow and wallets against each other — every variance is quantified and traced to the exact records behind it."
       />
 
       <FinanceTabs />
@@ -182,7 +182,7 @@ function SidePanel({
       <ul className="max-h-56 space-y-1 overflow-y-auto pr-1" role="list">
         {rows.length === 0 ? (
           <li className="rounded-md border border-dashed border-kampmax-border px-3 py-2 text-xs text-kampmax-text-muted">
-            No records in the owning stores.
+            No records for this side of the check.
           </li>
         ) : (
           rows.map((row) => (
