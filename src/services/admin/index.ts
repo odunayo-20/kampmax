@@ -266,14 +266,12 @@ import { createApiVerificationManagementService } from "./verification-managemen
 export const verificationManagementService: AdminVerificationManagementService =
   createApiVerificationManagementService();
 
-import {
-  AdminTransactionManagementService,
-  createTransactionManagementService,
-} from "./transaction-management.service";
+import type { AdminTransactionManagementService } from "./transaction-management.service";
+import { createApiTransactionManagementService } from "./transaction-management.api";
 
-/** /admin/transactions console (Admin Transactions & Payments - single real-data financial ledger; replaces the fabricated /admin/payments console). */
+/** /admin/transactions console: live read-only ledger (GET /admin/transactions) over order payments, wallet funding and refunds. */
 export const transactionManagementService: AdminTransactionManagementService =
-  createTransactionManagementService();
+  createApiTransactionManagementService();
 
 import {
   AdminPayoutManagementService,

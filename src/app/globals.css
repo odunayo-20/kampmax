@@ -86,7 +86,7 @@
   --color-kampmax-warning: #F59E0B;
   --color-kampmax-info: #0284C7;
   --color-kampmax-muted: #F3F4F6;
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
   /* ── Radius ── */
   --radius-sm: 6px;
   --radius-md: 10px;

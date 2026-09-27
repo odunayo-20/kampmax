@@ -22,6 +22,9 @@ export interface TransactionFilterState {
   status: ManagedTransactionStatus | "all";
   type: ManagedTransactionType | "all";
   method: ManagedTransactionMethod | "all";
+  /** `YYYY-MM-DD` or empty. */
+  dateFrom: string;
+  dateTo: string;
 }
 
 export const DEFAULT_TRANSACTION_FILTERS: TransactionFilterState = {
@@ -29,6 +32,8 @@ export const DEFAULT_TRANSACTION_FILTERS: TransactionFilterState = {
   status: "all",
   type: "all",
   method: "all",
+  dateFrom: "",
+  dateTo: "",
 };
 
 /**
@@ -125,6 +130,27 @@ export function TransactionsFilters({
             label: v === "all" ? "All methods" : transactionMethodLabel(v),
           }))}
         />
+
+        <label className="flex items-center gap-1.5 text-xs text-kampmax-text-muted">
+          From
+          <input
+            type="date"
+            value={filters.dateFrom}
+            max={filters.dateTo || undefined}
+            onChange={(e) => patch({ dateFrom: e.target.value })}
+            className="rounded-lg border border-kampmax-border bg-kampmax-surface px-2 py-1.5 text-xs text-kampmax-text focus:border-kampmax-primary focus:outline-none focus:ring-1 focus:ring-kampmax-primary/50"
+          />
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-kampmax-text-muted">
+          To
+          <input
+            type="date"
+            value={filters.dateTo}
+            min={filters.dateFrom || undefined}
+            onChange={(e) => patch({ dateTo: e.target.value })}
+            className="rounded-lg border border-kampmax-border bg-kampmax-surface px-2 py-1.5 text-xs text-kampmax-text focus:border-kampmax-primary focus:outline-none focus:ring-1 focus:ring-kampmax-primary/50"
+          />
+        </label>
 
         <button
           onClick={() => patch(DEFAULT_TRANSACTION_FILTERS)}

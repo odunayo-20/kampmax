@@ -101,6 +101,7 @@ export function transactionTypeVariant(type: ManagedTransactionType): BadgeVaria
 export const TRANSACTION_METHOD_OPTIONS: (ManagedTransactionMethod | "all")[] = [
   "all",
   "paystack",
+  "flutterwave",
   "wallet",
   "cod",
   "bank_transfer",
@@ -108,6 +109,7 @@ export const TRANSACTION_METHOD_OPTIONS: (ManagedTransactionMethod | "all")[] = 
 
 export const TRANSACTION_METHOD_LABELS: Record<ManagedTransactionMethod, string> = {
   paystack: "Paystack",
+  flutterwave: "Flutterwave",
   wallet: "Wallet",
   cod: "Cash on delivery",
   bank_transfer: "Bank transfer",

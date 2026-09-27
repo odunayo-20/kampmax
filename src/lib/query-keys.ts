@@ -506,6 +506,8 @@ export const adminKeys = {
       status?: string;
       type?: string;
       method?: string;
+      dateFrom?: string;
+      dateTo?: string;
       sortBy?: string;
       sortDir?: "asc" | "desc";
       page?: number;

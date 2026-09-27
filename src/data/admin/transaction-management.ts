@@ -330,11 +330,18 @@ export function filterTransactionRows(
   const status = query.status ?? "all";
   const type = query.type ?? "all";
   const method = query.method ?? "all";
+  const from = query.dateFrom ? new Date(`${query.dateFrom}T00:00:00`).getTime() : NaN;
+  const to = query.dateTo ? new Date(`${query.dateTo}T23:59:59.999`).getTime() : NaN;
 
   return rows.filter((r) => {
     if (status !== "all" && r.status !== status) return false;
     if (type !== "all" && r.type !== type) return false;
     if (method !== "all" && r.method !== method) return false;
+    if (!Number.isNaN(from) || !Number.isNaN(to)) {
+      const at = new Date(r.createdAt).getTime();
+      if (!Number.isNaN(from) && at < from) return false;
+      if (!Number.isNaN(to) && at > to) return false;
+    }
     if (search) {
       const haystack = [
         r.id,
@@ -417,6 +424,7 @@ const TYPE_NAMES: Record<ManagedTransactionType, string> = {
 
 const METHOD_NAMES: Record<ManagedTransactionMethod, string> = {
   paystack: "Paystack",
+  flutterwave: "Flutterwave",
   wallet: "Wallet",
   cod: "Cash on delivery",
   bank_transfer: "Bank transfer",

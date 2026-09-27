@@ -2344,6 +2344,7 @@ export type ManagedTransactionType = (typeof MANAGED_TRANSACTION_TYPES)[number];
 
 export const MANAGED_TRANSACTION_METHODS = [
   "paystack",
+  "flutterwave",
   "wallet",
   "cod",
   "bank_transfer",
@@ -2453,6 +2454,10 @@ export interface ManagedTransactionListQuery extends ListQuery {
   status?: ManagedTransactionStatus | "all";
   type?: ManagedTransactionType | "all";
   method?: ManagedTransactionMethod | "all";
+  /** Inclusive lower bound on createdAt, `YYYY-MM-DD` (local day). */
+  dateFrom?: string;
+  /** Inclusive upper bound on createdAt, `YYYY-MM-DD` (local day). */
+  dateTo?: string;
   sortBy?: ManagedTransactionSortField;
   sortDir?: SortDir;
 }

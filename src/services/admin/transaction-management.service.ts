@@ -21,6 +21,8 @@ import {
 
 export interface AdminTransactionManagementService {
   list(query?: ManagedTransactionListQuery): Promise<Paginated<ManagedTransaction>>;
+  /** Every row matching the query (ignores pagination) — used for CSV export. */
+  listAll(query?: ManagedTransactionListQuery): Promise<ManagedTransaction[]>;
   getById(id: string): Promise<ManagedTransactionDetail | null>;
   getCounts(): Promise<ManagedTransactionStatusCounts>;
   getFacets(): Promise<ManagedTransactionFacets>;
@@ -51,6 +53,15 @@ export function createTransactionManagementService(): AdminTransactionManagement
         query?.sortDir ?? "desc"
       );
       return paginate(rows, query ?? {});
+    },
+
+    async listAll(query) {
+      await apiDelay();
+      return sortTransactionRows(
+        filterTransactionRows(transactionDataset.rows, query ?? {}),
+        query?.sortBy,
+        query?.sortDir ?? "desc"
+      );
     },
 
     async getById(id) {

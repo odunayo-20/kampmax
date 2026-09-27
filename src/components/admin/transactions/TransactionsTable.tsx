@@ -57,7 +57,7 @@ export function TransactionsTable({
         </thead>
         <tbody className="divide-y divide-kampmax-border bg-kampmax-surface">
           {rows.map((row) => (
-            <tr key={row.id} className="hover:bg-kampmax-surface-hover/50">
+            <tr key={row.id} className="hover:bg-kampmax-surface-hover/50 [&>td]:px-4 [&>td]:py-3">
               <td>
                 <div className="flex flex-col">
                   <span className="font-mono text-xs font-semibold text-kampmax-text">

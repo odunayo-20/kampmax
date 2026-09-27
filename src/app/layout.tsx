@@ -1,10 +1,8 @@
 import "@/lib/storage-polyfill";
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import "@fontsource-variable/inter";
 import { Providers } from "@/lib/providers";
 import "./globals.css";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Kampmax - Your Campus Marketplace",
@@ -24,7 +22,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body>
         <Providers>{children}</Providers>
       </body>
     </html>
