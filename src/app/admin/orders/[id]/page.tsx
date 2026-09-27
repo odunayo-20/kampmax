@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { cn, formatDateTime, formatNaira, formatNairaCompact, timeAgo } from "@/lib/utils";
 import { ErrorState } from "@/components/admin/ErrorState";
+import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { LoadingSkeleton } from "@/components/admin/LoadingSkeleton";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { CampusLink } from "@/components/admin/campuses/CampusLink";
@@ -33,10 +34,22 @@ import {
   PaymentStatusBadge,
 } from "@/components/admin/orders/OrderBadges";
 import { orderManagementService } from "@/services/admin";
+import type { AdvanceOrderStatus } from "@/services/admin/order-management.service";
 import type {
   ManagedOrderDetail,
   ManagedOrderTimelineEvent,
 } from "@/types/admin";
+
+const NEXT_STEP: Partial<
+  Record<string, { status: AdvanceOrderStatus; label: string }>
+> = {
+  pending: { status: "confirmed", label: "Confirm order" },
+  confirmed: { status: "preparing", label: "Start preparing" },
+  preparing: { status: "out_for_delivery", label: "Mark out for delivery" },
+  out_for_delivery: { status: "delivered", label: "Mark delivered" },
+};
+
+const CANCELLABLE = new Set(["pending", "confirmed", "preparing", "out_for_delivery"]);
 
 const TIMELINE_STYLES: Record<
   ManagedOrderTimelineEvent["kind"],
@@ -58,6 +71,9 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
   const [orderId, setOrderId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [acting, setActing] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -79,6 +95,20 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  async function run(action: () => Promise<ManagedOrderDetail>) {
+    setActing(true);
+    setActionError(null);
+    try {
+      setDetail(await action());
+      setCancelOpen(false);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "The action failed. Try again.");
+      setCancelOpen(false);
+    } finally {
+      setActing(false);
+    }
+  }
+
   if (loading) return <LoadingSkeleton variant="cards" rows={5} />;
   if (error || !detail)
     return (
@@ -93,6 +123,9 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
     );
 
   const order = detail.order;
+  const next = NEXT_STEP[order.status];
+  const canCancel = CANCELLABLE.has(order.status);
+  const isPaid = order.paymentStatus === "paid";
 
   function SumRow({
     label,
@@ -160,6 +193,41 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
         </time>
       </div>
 
+      {(next || canCancel) && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {next && (
+            <button
+              type="button"
+              disabled={acting || (next.status === "delivered" && !isPaid)}
+              title={
+                next.status === "delivered" && !isPaid
+                  ? "An unpaid order can't be marked delivered"
+                  : undefined
+              }
+              onClick={() => void run(() => orderManagementService.advance(order.id, next.status))}
+              className="inline-flex h-9 items-center rounded-md bg-kampmax-blue px-3.5 text-sm font-medium text-white transition-colors hover:bg-kampmax-blue/90 disabled:opacity-60"
+            >
+              {next.label}
+            </button>
+          )}
+          {canCancel && (
+            <button
+              type="button"
+              disabled={acting}
+              onClick={() => setCancelOpen(true)}
+              className="inline-flex h-9 items-center rounded-md border border-kampmax-error/40 bg-white px-3.5 text-sm font-medium text-kampmax-error transition-colors hover:bg-kampmax-error/5 disabled:opacity-60"
+            >
+              Cancel order
+            </button>
+          )}
+        </div>
+      )}
+      {actionError && (
+        <div role="alert" className="mt-3 rounded-lg border border-kampmax-error/30 bg-kampmax-error/10 px-4 py-3 text-sm text-red-700">
+          {actionError}
+        </div>
+      )}
+
       {order.status === "disputed" && (
         <div
           role="alert"
@@ -172,7 +240,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
 
       {order.status === "cancelled" && (
         <div className="mt-3 rounded-lg border border-kampmax-border bg-kampmax-muted/50 px-4 py-3 text-sm text-kampmax-text-secondary">
-          This order was cancelled. Any refund is tracked in the payments ledger.
+          This order was cancelled. A paid order is refunded to the customer's Kampmax wallet.
         </div>
       )}
 
@@ -414,6 +482,22 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
           </section>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={cancelOpen}
+        title={`Cancel order ${order.id}?`}
+        message={
+          isPaid
+            ? "Stock is returned to the vendor and the customer is refunded to their Kampmax wallet as store credit."
+            : "Stock is returned to the vendor and the customer is notified."
+        }
+        confirmLabel="Cancel order"
+        tone="danger"
+        loading={acting}
+        reasonLabel="Reason (shown to the customer)"
+        onConfirm={(reason) => void run(() => orderManagementService.cancel(order.id, reason))}
+        onCancel={() => setCancelOpen(false)}
+      />
     </>
   );
 }

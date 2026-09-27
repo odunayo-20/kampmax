@@ -11,8 +11,8 @@ import type { AdminOrderManagementService } from "./order-management.service";
 
 /**
  * Live /admin/orders service backed by AdminOrdersController
- * (GET /admin/orders, /counts, /facets, /:id). Read-only. Orders are
- * addressed by their order number.
+ * (GET /admin/orders, /counts, /facets, /:id; PATCH /:id/cancel, /:id/status).
+ * Orders are addressed by their order number.
  */
 
 interface BackendPage<T> {
@@ -81,6 +81,28 @@ export function createApiOrderManagementService(): AdminOrderManagementService {
         "/admin/orders/counts"
       );
       if (error) fail(error, "Couldn't load order counts.");
+      return data;
+    },
+
+    async cancel(id, reason) {
+      if (!reason.trim()) throw new Error("A cancellation reason is required.");
+      const { data, error } = await apiClient.patch<
+        { reason: string },
+        ManagedOrderDetail
+      >(`/admin/orders/${encodeURIComponent(id)}/cancel`, { reason: reason.trim() });
+      if (error) fail(error, "Couldn't cancel the order.");
+      return data;
+    },
+
+    async advance(id, status, note) {
+      const { data, error } = await apiClient.patch<
+        { status: string; note?: string },
+        ManagedOrderDetail
+      >(`/admin/orders/${encodeURIComponent(id)}/status`, {
+        status,
+        ...(note?.trim() ? { note: note.trim() } : {}),
+      });
+      if (error) fail(error, "Couldn't update the order.");
       return data;
     },
 
