@@ -11,7 +11,8 @@ import type { AdminOrderManagementService } from "./order-management.service";
 
 /**
  * Live /admin/orders service backed by AdminOrdersController
- * (GET /admin/orders, /counts, /facets, /:id; PATCH /:id/cancel, /:id/status).
+ * (GET /admin/orders, /counts, /facets, /:id; PATCH /:id/cancel, /:id/status,
+ * /:id/dispute, /:id/dispute/resolve).
  * Orders are addressed by their order number.
  */
 
@@ -103,6 +104,29 @@ export function createApiOrderManagementService(): AdminOrderManagementService {
         ...(note?.trim() ? { note: note.trim() } : {}),
       });
       if (error) fail(error, "Couldn't update the order.");
+      return data;
+    },
+
+    async openDispute(id, reason) {
+      if (!reason.trim()) throw new Error("A dispute reason is required.");
+      const { data, error } = await apiClient.patch<
+        { reason: string },
+        ManagedOrderDetail
+      >(`/admin/orders/${encodeURIComponent(id)}/dispute`, { reason: reason.trim() });
+      if (error) fail(error, "Couldn't open the dispute.");
+      return data;
+    },
+
+    async resolveDispute(id, outcome, note) {
+      if (!note.trim()) throw new Error("A ruling note is required.");
+      const { data, error } = await apiClient.patch<
+        { outcome: string; note: string },
+        ManagedOrderDetail
+      >(`/admin/orders/${encodeURIComponent(id)}/dispute/resolve`, {
+        outcome,
+        note: note.trim(),
+      });
+      if (error) fail(error, "Couldn't resolve the dispute.");
       return data;
     },
 

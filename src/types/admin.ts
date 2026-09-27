@@ -1354,6 +1354,13 @@ export interface ManagedOrderDetail {
   delivery: ManagedOrderDeliveryInfo;
   timeline: ManagedOrderTimelineEvent[];
   notes: ManagedOrderNote[];
+  /** Present once a dispute has been opened; open while resolvedAt is null. */
+  dispute?: {
+    reason: string;
+    openedAt: string;
+    resolvedAt: string | null;
+    resolution: string | null;
+  } | null;
 }
 
 export type OrderSortField = "orderNumber" | "createdAt" | "total";

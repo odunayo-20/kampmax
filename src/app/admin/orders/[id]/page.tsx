@@ -40,16 +40,45 @@ import type {
   ManagedOrderTimelineEvent,
 } from "@/types/admin";
 
-const NEXT_STEP: Partial<
-  Record<string, { status: AdvanceOrderStatus; label: string }>
-> = {
-  pending: { status: "confirmed", label: "Confirm order" },
-  confirmed: { status: "preparing", label: "Start preparing" },
-  preparing: { status: "out_for_delivery", label: "Mark out for delivery" },
-  out_for_delivery: { status: "delivered", label: "Mark delivered" },
-};
+function nextStepFor(
+  status: string,
+  fulfillment: string
+): { status: AdvanceOrderStatus; label: string } | null {
+  const pickup = fulfillment === "campus_pickup";
+  switch (status) {
+    case "pending":
+      return { status: "confirmed", label: "Confirm order" };
+    case "confirmed":
+      return { status: "preparing", label: "Start preparing" };
+    case "preparing":
+      return pickup
+        ? { status: "ready_for_pickup", label: "Mark ready for pickup" }
+        : { status: "out_for_delivery", label: "Mark out for delivery" };
+    case "ready_for_pickup":
+      return { status: "delivered", label: "Mark handed over" };
+    case "out_for_delivery":
+      return { status: "delivered", label: "Mark delivered" };
+    default:
+      return null;
+  }
+}
 
-const CANCELLABLE = new Set(["pending", "confirmed", "preparing", "out_for_delivery"]);
+const CANCELLABLE = new Set([
+  "pending",
+  "confirmed",
+  "preparing",
+  "ready_for_pickup",
+  "out_for_delivery",
+  "disputed",
+]);
+const DISPUTABLE = new Set([
+  "pending",
+  "confirmed",
+  "preparing",
+  "ready_for_pickup",
+  "out_for_delivery",
+  "delivered",
+]);
 
 const TIMELINE_STYLES: Record<
   ManagedOrderTimelineEvent["kind"],
@@ -72,6 +101,8 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [disputeOpen, setDisputeOpen] = useState(false);
+  const [resolving, setResolving] = useState<"refund" | "dismiss" | null>(null);
   const [acting, setActing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -101,9 +132,13 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
     try {
       setDetail(await action());
       setCancelOpen(false);
+      setDisputeOpen(false);
+      setResolving(null);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "The action failed. Try again.");
       setCancelOpen(false);
+      setDisputeOpen(false);
+      setResolving(null);
     } finally {
       setActing(false);
     }
@@ -123,9 +158,11 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
     );
 
   const order = detail.order;
-  const next = NEXT_STEP[order.status];
+  const next = nextStepFor(order.status, order.deliveryMethod);
   const canCancel = CANCELLABLE.has(order.status);
   const isPaid = order.paymentStatus === "paid";
+  const canDispute = DISPUTABLE.has(order.status);
+  const dispute = detail.dispute ?? null;
 
   function SumRow({
     label,
@@ -193,7 +230,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
         </time>
       </div>
 
-      {(next || canCancel) && (
+      {(next || canCancel || canDispute) && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {next && (
             <button
@@ -208,6 +245,16 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
               className="inline-flex h-9 items-center rounded-md bg-kampmax-blue px-3.5 text-sm font-medium text-white transition-colors hover:bg-kampmax-blue/90 disabled:opacity-60"
             >
               {next.label}
+            </button>
+          )}
+          {canDispute && (
+            <button
+              type="button"
+              disabled={acting}
+              onClick={() => setDisputeOpen(true)}
+              className="inline-flex h-9 items-center rounded-md border border-kampmax-border bg-white px-3.5 text-sm font-medium text-kampmax-text transition-colors hover:bg-kampmax-muted/60 disabled:opacity-60"
+            >
+              Open dispute
             </button>
           )}
           {canCancel && (
@@ -228,13 +275,42 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
         </div>
       )}
 
-      {order.status === "disputed" && (
+      {order.status === "disputed" && dispute && (
         <div
           role="alert"
           className="mt-3 rounded-lg border border-kampmax-error/30 bg-kampmax-error/10 px-4 py-3 text-sm text-red-700"
         >
-          Dispute open - review evidence from both sides before ruling. Refunds are issued from
-          the Payments console.
+          <p className="font-medium">Dispute open since {formatDateTime(dispute.openedAt)}</p>
+          <p className="mt-1">{dispute.reason}</p>
+          <p className="mt-1 text-xs">The vendor payout is on hold until this is resolved.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {order.status === "disputed" && (
+              <>
+                <button
+                  type="button"
+                  disabled={acting}
+                  onClick={() => setResolving("refund")}
+                  className="inline-flex h-8 items-center rounded-md bg-kampmax-error px-3 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-60"
+                >
+                  Uphold - refund customer
+                </button>
+                <button
+                  type="button"
+                  disabled={acting}
+                  onClick={() => setResolving("dismiss")}
+                  className="inline-flex h-8 items-center rounded-md border border-kampmax-border bg-white px-3 text-xs font-medium text-kampmax-text hover:bg-kampmax-muted/60 disabled:opacity-60"
+                >
+                  Dismiss dispute
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+      {dispute?.resolvedAt && (
+        <div className="mt-3 rounded-lg border border-kampmax-border bg-kampmax-muted/50 px-4 py-3 text-sm text-kampmax-text-secondary">
+          Dispute resolved {formatDateTime(dispute.resolvedAt)}
+          {dispute.resolution ? ` - ${dispute.resolution}` : ""}.
         </div>
       )}
 
@@ -483,6 +559,34 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
         </div>
       </div>
 
+      <ConfirmDialog
+        open={disputeOpen}
+        title={`Open a dispute on ${order.id}?`}
+        message="The vendor payout is held and the order is frozen until the dispute is resolved."
+        confirmLabel="Open dispute"
+        tone="warning"
+        loading={acting}
+        reasonLabel="What is being disputed?"
+        onConfirm={(reason) => void run(() => orderManagementService.openDispute(order.id, reason))}
+        onCancel={() => setDisputeOpen(false)}
+      />
+      <ConfirmDialog
+        open={resolving !== null}
+        title={resolving === "refund" ? "Uphold the dispute?" : "Dismiss the dispute?"}
+        message={
+          resolving === "refund"
+            ? "The order is cancelled and the customer is refunded to their Kampmax wallet."
+            : "The dispute is closed with no change. A delivered order's held payout is released to the vendor."
+        }
+        confirmLabel={resolving === "refund" ? "Refund customer" : "Dismiss dispute"}
+        tone={resolving === "refund" ? "danger" : "default"}
+        loading={acting}
+        reasonLabel="Ruling (recorded on the order)"
+        onConfirm={(note) =>
+          void run(() => orderManagementService.resolveDispute(order.id, resolving ?? "dismiss", note))
+        }
+        onCancel={() => setResolving(null)}
+      />
       <ConfirmDialog
         open={cancelOpen}
         title={`Cancel order ${order.id}?`}

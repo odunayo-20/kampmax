@@ -27,11 +27,25 @@ export interface AdminOrderManagementService {
     status: AdvanceOrderStatus,
     note?: string
   ): Promise<ManagedOrderDetail>;
+  /** Opens a dispute; the vendor payout is held until it is resolved. */
+  openDispute(id: string, reason: string): Promise<ManagedOrderDetail>;
+  /**
+   * Resolves an open dispute. "refund" cancels the order and refunds the
+   * customer's wallet; "dismiss" closes it (and releases a held payout).
+   */
+  resolveDispute(
+    id: string,
+    outcome: DisputeOutcome,
+    note: string
+  ): Promise<ManagedOrderDetail>;
 }
+
+export type DisputeOutcome = "refund" | "dismiss";
 
 export type AdvanceOrderStatus =
   | "confirmed"
   | "preparing"
+  | "ready_for_pickup"
   | "out_for_delivery"
   | "delivered";
 
