@@ -17,6 +17,7 @@ import { useEnsureVendors } from "@/hooks/use-vendor-cache";
 import { getCampuses } from "@/services/campus";
 import { formatNaira } from "@/lib/utils";
 import { PageContainer } from "@/components/layout";
+import { FeaturedPromotions } from "@/components/home";
 import { 
   Breadcrumb,
   CategoryHeader,
@@ -222,6 +223,16 @@ function CategoryPageContent({ params }: CategoryPageProps) {
           description={category.icon ? `Discover ${category.name.toLowerCase()} from trusted vendors around your campus.` : undefined}
           productCount={filteredProducts.length}
         />
+
+        {/* Featured in this category */}
+        <div className="mb-4">
+          <FeaturedPromotions
+            placement="category_strip"
+            campusId={filters.campusId || undefined}
+            categoryId={categoryId}
+            title="Featured in this category"
+          />
+        </div>
 
         {/* Mobile Breadcrumb */}
         <div className="lg:hidden mb-4">

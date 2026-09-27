@@ -10,6 +10,7 @@ import {
 import type { BadgeVariant } from "@/components/admin/StatusBadge";
 import type {
   ManagedPromotionStatus,
+  PromotionReview,
   ManagedPromotionType,
   PromotionEligibility,
   PromotionPlacement,
@@ -21,7 +22,7 @@ export const PROMOTION_TYPE_LABELS: Record<ManagedPromotionType, string> = {
   promo_code: "Promo code",
   featured_product: "Featured product",
   featured_vendor: "Featured vendor",
-  campus_promotion: "Campus promotion",
+  campus_promotion: "Campus campaign",
 };
 
 export function promotionTypeLabel(type: ManagedPromotionType): string {
@@ -87,13 +88,6 @@ export const PROMOTION_PLACEMENT_LABELS: Record<PromotionPlacement, string> = {
   none: "No placement",
 };
 
-/** The storefront slots that actually show promotions. */
-export const PROMOTION_PLACEMENT_CHOICES: PromotionPlacement[] = [
-  "none",
-  "homepage_banner",
-  "deals_page",
-];
-
 export const PROMOTION_ELIGIBILITY_LABELS: Record<PromotionEligibility, string> = {
   all_customers: "Everyone",
   new_customers: "New to the store",
@@ -119,15 +113,24 @@ export function discountLabel(promotion: {
       return promotion.discountValue == null
         ? "Code perk"
         : `${promotion.discountValue}% w/ code`;
+    case "featured_product":
+      return "Featured product";
+    case "featured_vendor":
+      return "Featured vendors";
+    case "campus_promotion":
+      return "Campus campaign";
     default:
       return "Feature slot";
   }
 }
 
-/** The promotion types the platform actually supports. */
+/** The promotion types the platform supports (a bare "promo code" is one of the two codes). */
 export const PROMOTION_TYPE_FILTER_ORDER: ManagedPromotionType[] = [
   "percentage_discount",
   "fixed_discount",
+  "featured_product",
+  "featured_vendor",
+  "campus_promotion",
 ];
 
 export const PROMOTION_STATUS_FILTER_ORDER: ManagedPromotionStatus[] = [
@@ -137,3 +140,36 @@ export const PROMOTION_STATUS_FILTER_ORDER: ManagedPromotionStatus[] = [
   "paused",
   "ended",
 ];
+
+/** "1.2%" - clicks as a share of views, or null before anything was shown. */
+export function clickRate(views: number, clicks: number): string | null {
+  if (views <= 0) return null;
+  return `${((clicks / views) * 100).toFixed(1)}%`;
+}
+
+/** What the "usage" column shows: redemptions for a code, reach for a slot. */
+export function promotionUsageLabel(p: {
+  type: ManagedPromotionType;
+  usageCount: number;
+  usageLimit: number | null;
+  views?: number;
+  clicks?: number;
+}): string {
+  if (
+    p.type === "featured_product" ||
+    p.type === "featured_vendor" ||
+    p.type === "campus_promotion"
+  ) {
+    return `${p.views ?? 0} views · ${p.clicks ?? 0} clicks`;
+  }
+  return `${p.usageCount}${p.usageLimit != null ? ` / ${p.usageLimit}` : ""}`;
+}
+
+/** Badge text for a vendor promotion's review state, or null when nothing needs saying. */
+export function reviewBadge(
+  review: PromotionReview | undefined
+): { label: string; variant: BadgeVariant } | null {
+  if (review === "pending") return { label: "Needs review", variant: "warning" };
+  if (review === "rejected") return { label: "Rejected", variant: "error" };
+  return null;
+}

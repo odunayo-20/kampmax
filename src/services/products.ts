@@ -45,6 +45,8 @@ export interface BackendProductListItem {
   allowPickup?: boolean;
   deliveryFee?: number | string;
   createdAt: string | Date;
+  /** Shown first in a search because an admin boosted it. */
+  sponsored?: boolean;
 }
 
 export interface BackendProductDetail extends BackendProductListItem {
@@ -205,6 +207,7 @@ export function mapBackendProductToFrontend(
     sku: raw.sku || undefined,
     createdAt: typeof raw.createdAt === "string" ? raw.createdAt : (raw.createdAt?.toISOString?.() || new Date().toISOString()),
     location: raw.location ?? undefined,
+    sponsored: raw.sponsored ? true : undefined,
     tags: raw.tags ?? [],
     lowStockThreshold: raw.lowStockThreshold,
     costPrice:

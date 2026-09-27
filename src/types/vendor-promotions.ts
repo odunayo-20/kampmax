@@ -56,6 +56,8 @@ export type VendorPromotionEligibility = ValuesOf<typeof VENDOR_PROMOTION_ELIGIB
 
 // ── Core model ───────────────────────────────────────────────
 
+export type VendorPromotionReview = "approved" | "pending" | "rejected";
+
 export interface VendorPromotion {
   id: string;
   /** Owning vendor — always backend-set from the authenticated identity. */
@@ -85,6 +87,10 @@ export interface VendorPromotion {
   updatedAt: string;
   pausedAt?: string;
   cancelledAt?: string;
+  /** A new or edited promotion is pending until an admin approves it. */
+  review?: VendorPromotionReview;
+  /** Why it was rejected. */
+  reviewNote?: string;
 }
 
 export interface VendorPromotionRedemption {

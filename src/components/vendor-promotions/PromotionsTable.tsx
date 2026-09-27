@@ -6,6 +6,7 @@ import { formatDate, formatNaira } from "@/lib/utils";
 import { VENDOR_PROMOTION_SCOPE_LABELS } from "@/types/vendor-promotions";
 import type { VendorPromotion, VendorPromotionPermissions } from "@/types/vendor-promotions";
 import { PromotionStatusBadge } from "./PromotionStatusBadge";
+import { PromotionReviewBadge } from "./PromotionReviewBadge";
 import { PromotionRowActions } from "./PromotionRowActions";
 import { formatPromotionValue } from "./promotions-meta";
 
@@ -67,7 +68,10 @@ export function PromotionsTable({ promotions, permissions, onChanged }: Promotio
                 <span className="font-semibold text-kampmax-text">{promotion.usageCount}</span>
               </td>
               <td className="px-4 py-3">
-                <PromotionStatusBadge status={promotion.status} />
+                <div className="flex flex-wrap items-center gap-1">
+                  <PromotionStatusBadge status={promotion.status} />
+                  <PromotionReviewBadge review={promotion.review} />
+                </div>
               </td>
               <td className="px-4 py-3">
                 <PromotionRowActions promotion={promotion} permissions={permissions} onChanged={onChanged} />

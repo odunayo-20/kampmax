@@ -7,18 +7,22 @@ import { Select } from "@/components/ui/Select";
 import { cn } from "@/lib/utils";
 import {
   PROMOTION_ELIGIBILITY_LABELS,
-  PROMOTION_PLACEMENT_CHOICES,
   PROMOTION_PLACEMENT_LABELS,
   PROMOTION_TYPE_FILTER_ORDER,
   PROMOTION_TYPE_LABELS,
 } from "./promotions-meta";
 import {
   buildPromotionInput,
+  changeType,
   emptyPromotionForm,
   formFromPromotion,
+  isDiscountType,
+  placementChoicesFor,
+  targetListsFor,
   toggleTarget,
   validatePromotionForm,
   type PromotionFormState,
+  type PromotionFormType,
   type TargetList,
 } from "./promotion-form";
 import type {
@@ -58,6 +62,7 @@ export function PromotionFormDialog({
   if (!open) return null;
 
   const isPercent = form.type === "percentage_discount";
+  const isDiscount = isDiscountType(form.type);
 
   function patch(next: Partial<PromotionFormState>) {
     setForm((f) => ({ ...f, ...next }));
@@ -70,17 +75,21 @@ export function PromotionFormDialog({
     onSubmit(buildPromotionInput(form));
   }
 
+  const shown = new Set(targetListsFor(form.type));
+  const single = isDiscount ? " (pick one)" : "";
   const targetingFields: {
     key: TargetList;
     label: string;
     items: { id: string; name: string }[];
     searchable?: boolean;
-  }[] = [
-    { key: "campusIds", label: "Campuses", items: options.campuses },
-    { key: "vendorIds", label: "Vendor (pick one)", items: options.vendors, searchable: true },
-    { key: "productIds", label: "Products", items: options.products, searchable: true },
-    { key: "categoryIds", label: "Category (pick one)", items: options.categories },
-  ];
+  }[] = (
+    [
+      { key: "campusIds", label: isDiscount ? "Campuses" : form.type === "campus_promotion" ? "Campuses to promote" : "Only show on these campuses", items: options.campuses },
+      { key: "vendorIds", label: `Vendor${single}`, items: options.vendors, searchable: true },
+      { key: "productIds", label: "Products", items: options.products, searchable: true },
+      { key: "categoryIds", label: "Category (pick one)", items: options.categories },
+    ] as const
+  ).filter((f) => shown.has(f.key));
 
   return (
     <div
@@ -101,8 +110,9 @@ export function PromotionFormDialog({
             {promotion ? `Edit “${promotion.name}”` : "New promotion"}
           </h2>
           <p className="mt-0.5 text-xs leading-relaxed text-kampmax-text-secondary">
-            Customers enter the code at checkout. It applies to the items you
-            target, or to the whole basket when nothing is targeted.
+            {isDiscount
+              ? "Customers enter the code at checkout. It applies to the items you target, or to the whole basket when nothing is targeted."
+              : "A featured slot is shown on the storefront while it runs. It has no code or discount."}
           </p>
         </div>
 
@@ -119,7 +129,7 @@ export function PromotionFormDialog({
             <Select
               label="Type"
               value={form.type}
-              onChange={(e) => patch({ type: e.target.value as PromotionFormState["type"] })}
+              onChange={(e) => setForm((f) => changeType(f, e.target.value as PromotionFormType))}
             >
               {PROMOTION_TYPE_FILTER_ORDER.map((value) => (
                 <option key={value} value={value}>
@@ -129,92 +139,100 @@ export function PromotionFormDialog({
             </Select>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Input
-              label={isPercent ? "Discount (%)" : "Amount off (₦)"}
-              type="number"
-              min={isPercent ? 1 : 100}
-              max={isPercent ? 90 : undefined}
-              value={form.discountValue}
-              placeholder={isPercent ? "15" : "1500"}
-              error={errors.discountValue}
-              onChange={(e) => patch({ discountValue: e.target.value })}
-            />
-            <Input
-              label="Code"
-              value={form.code}
-              placeholder="CAMPUS15"
-              error={errors.code}
-              onChange={(e) => patch({ code: e.target.value.toUpperCase() })}
-            />
-            <Input
-              label="Min. spend (₦)"
-              hint="Optional"
-              type="number"
-              min={0}
-              value={form.minSpend}
-              placeholder="5000"
-              onChange={(e) => patch({ minSpend: e.target.value })}
-            />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-3">
-            {isPercent && (
+          {isDiscount && (
+            <>
+            <div className="grid gap-4 sm:grid-cols-3">
               <Input
-                label="Max discount (₦)"
-                hint="Optional - caps one order"
+                label={isPercent ? "Discount (%)" : "Amount off (₦)"}
+                type="number"
+                min={isPercent ? 1 : 100}
+                max={isPercent ? 90 : undefined}
+                value={form.discountValue}
+                placeholder={isPercent ? "15" : "1500"}
+                error={errors.discountValue}
+                onChange={(e) => patch({ discountValue: e.target.value })}
+              />
+              <Input
+                label="Code"
+                value={form.code}
+                placeholder="CAMPUS15"
+                error={errors.code}
+                onChange={(e) => patch({ code: e.target.value.toUpperCase() })}
+              />
+              <Input
+                label="Min. spend (₦)"
+                hint="Optional"
+                type="number"
+                min={0}
+                value={form.minSpend}
+                placeholder="5000"
+                onChange={(e) => patch({ minSpend: e.target.value })}
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              {isPercent && (
+                <Input
+                  label="Max discount (₦)"
+                  hint="Optional - caps one order"
+                  type="number"
+                  min={1}
+                  value={form.maxDiscount}
+                  placeholder="2000"
+                  error={errors.maxDiscount}
+                  onChange={(e) => patch({ maxDiscount: e.target.value })}
+                />
+              )}
+              <Input
+                label="Usage limit"
+                hint="Optional - total redemptions"
                 type="number"
                 min={1}
-                value={form.maxDiscount}
-                placeholder="2000"
-                error={errors.maxDiscount}
-                onChange={(e) => patch({ maxDiscount: e.target.value })}
+                value={form.usageLimit}
+                placeholder="200"
+                error={errors.usageLimit}
+                onChange={(e) => patch({ usageLimit: e.target.value })}
               />
-            )}
-            <Input
-              label="Usage limit"
-              hint="Optional - total redemptions"
-              type="number"
-              min={1}
-              value={form.usageLimit}
-              placeholder="200"
-              error={errors.usageLimit}
-              onChange={(e) => patch({ usageLimit: e.target.value })}
-            />
-            <Input
-              label="Per customer"
-              hint="Optional - times each can use it"
-              type="number"
-              min={1}
-              value={form.perUserLimit}
-              placeholder="1"
-              error={errors.perUserLimit}
-              onChange={(e) => patch({ perUserLimit: e.target.value })}
-            />
-          </div>
+              <Input
+                label="Per customer"
+                hint="Optional - times each can use it"
+                type="number"
+                min={1}
+                value={form.perUserLimit}
+                placeholder="1"
+                error={errors.perUserLimit}
+                onChange={(e) => patch({ perUserLimit: e.target.value })}
+              />
+            </div>
+
+            </>
+          )}
 
           <div className="grid gap-4 sm:grid-cols-2">
+            {isDiscount && (
+              <Select
+                label="Who can use it"
+                value={form.eligibility}
+                onChange={(e) => patch({ eligibility: e.target.value as PromotionEligibility })}
+              >
+                {(
+                  Object.entries(PROMOTION_ELIGIBILITY_LABELS) as [PromotionEligibility, string][]
+                ).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </Select>
+            )}
             <Select
-              label="Who can use it"
-              value={form.eligibility}
-              onChange={(e) => patch({ eligibility: e.target.value as PromotionEligibility })}
-            >
-              {(
-                Object.entries(PROMOTION_ELIGIBILITY_LABELS) as [PromotionEligibility, string][]
-              ).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </Select>
-            <Select
-              label="Featured on storefront"
+              label={isDiscount ? "Featured on storefront" : "Appears on"}
               value={form.placement}
+              error={errors.placement}
               onChange={(e) =>
                 patch({ placement: e.target.value as PromotionFormState["placement"] })
               }
             >
-              {PROMOTION_PLACEMENT_CHOICES.map((value) => (
+              {placementChoicesFor(form.type).map((value) => (
                 <option key={value} value={value}>
                   {PROMOTION_PLACEMENT_LABELS[value]}
                 </option>
@@ -261,8 +279,9 @@ export function PromotionFormDialog({
             <p className="text-xs font-semibold uppercase tracking-wide text-kampmax-text-secondary">
               Targeting{" "}
               <span className="font-normal normal-case">
-                - pick products, a category or a vendor, or leave empty for everything.
-                Campuses can be added to any of these.
+                {isDiscount
+                  ? "- pick products, a category or a vendor, or leave empty for everything. Campuses can be added to any of these."
+                  : "- pick what to show (up to 12)."}
               </span>
             </p>
             <div className="mt-3 space-y-3">
@@ -273,6 +292,7 @@ export function PromotionFormDialog({
                   items={field.items}
                   selected={form[field.key]}
                   searchable={field.searchable}
+                  error={errors[field.key]}
                   onToggle={(id) => setForm((f) => toggleTarget(f, field.key, id))}
                   onClearAll={() => setForm((f) => ({ ...f, [field.key]: [] }))}
                 />
@@ -311,6 +331,7 @@ function ChipMultiSelect({
   items,
   selected,
   searchable = false,
+  error,
   onToggle,
   onClearAll,
 }: {
@@ -318,6 +339,7 @@ function ChipMultiSelect({
   items: { id: string; name: string }[];
   selected: string[];
   searchable?: boolean;
+  error?: string;
   onToggle: (id: string) => void;
   onClearAll: () => void;
 }) {
@@ -340,7 +362,12 @@ function ChipMultiSelect({
         </span>
       </div>
 
-      <div className="rounded-md border border-kampmax-border bg-white">
+      <div
+        className={cn(
+          "rounded-md border bg-white",
+          error ? "border-kampmax-error" : "border-kampmax-border"
+        )}
+      >
         <div className="flex items-center justify-between gap-2 px-2 pt-2">
           {searchable ? (
             <div className="relative flex-1">
@@ -404,6 +431,7 @@ function ChipMultiSelect({
           )}
         </div>
       </div>
+      {error && <p className="mt-1 text-xs text-kampmax-error">{error}</p>}
     </div>
   );
 }

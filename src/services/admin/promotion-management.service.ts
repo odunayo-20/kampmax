@@ -18,5 +18,11 @@ export interface AdminPromotionManagementService {
   create(input: PromotionInput): Promise<ManagedPromotion>;
   update(id: string, patch: Partial<PromotionInput>): Promise<ManagedPromotion>;
   setStatus(id: string, status: ManagedPromotionStatus): Promise<ManagedPromotion>;
+  /** Approve or reject a vendor's pending promotion (a rejection needs a reason). */
+  review(
+    id: string,
+    decision: "approve" | "reject",
+    note?: string
+  ): Promise<ManagedPromotion>;
   remove(id: string): Promise<void>;
 }

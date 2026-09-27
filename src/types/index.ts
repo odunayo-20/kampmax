@@ -239,6 +239,8 @@ export interface Product {
   status: ProductStatus;
   createdAt: string;
   location?: string;
+  /** Shown first in a search because an admin boosted it. */
+  sponsored?: boolean;
   tags?: string[];
   viewCount?: number;
   saveCount?: number;

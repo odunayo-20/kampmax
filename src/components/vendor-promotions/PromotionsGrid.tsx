@@ -6,6 +6,7 @@ import { formatDate, formatNaira } from "@/lib/utils";
 import { VENDOR_PROMOTION_SCOPE_LABELS } from "@/types/vendor-promotions";
 import type { VendorPromotion, VendorPromotionPermissions } from "@/types/vendor-promotions";
 import { PromotionStatusBadge } from "./PromotionStatusBadge";
+import { PromotionReviewBadge } from "./PromotionReviewBadge";
 import { PromotionRowActions } from "./PromotionRowActions";
 import { formatPromotionValue } from "./promotions-meta";
 
@@ -37,6 +38,7 @@ export function PromotionsGrid({ promotions, permissions, onChanged }: Promotion
             </Link>
             <div className="flex shrink-0 items-center gap-1">
               <PromotionStatusBadge status={promotion.status} />
+              <PromotionReviewBadge review={promotion.review} />
               <PromotionRowActions promotion={promotion} permissions={permissions} onChanged={onChanged} />
             </div>
           </div>

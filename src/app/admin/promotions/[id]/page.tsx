@@ -7,7 +7,9 @@ import {
   ArrowLeft,
   Ban,
   CalendarRange,
+  Eye,
   Layers,
+  MousePointerClick,
   Play,
   Store,
   Tag,
@@ -20,11 +22,14 @@ import {
   PromotionStatusBadge,
   PromotionTypeBadge,
 } from "@/components/admin/promotions/PromotionBadges";
+import { StatusBadge } from "@/components/admin/StatusBadge";
 import { PromotionFormDialog } from "@/components/admin/promotions/PromotionFormDialog";
 import {
   PROMOTION_ELIGIBILITY_LABELS,
+  clickRate,
   discountLabel,
   promotionPlacementLabel,
+  reviewBadge,
 } from "@/components/admin/promotions/promotions-meta";
 import { promotionManagementService } from "@/services/admin";
 import type {
@@ -47,6 +52,8 @@ export default function AdminPromotionDetailPage({
   const [acting, setActing] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [endOpen, setEndOpen] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -75,9 +82,28 @@ export default function AdminPromotionDetailPage({
   async function act(status: ManagedPromotion["status"]) {
     if (!promotion) return;
     setActing(true);
+    setActionError(null);
     try {
       await promotionManagementService.setStatus(promotion.id, status);
       await load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "That didn't work. Try again.");
+    } finally {
+      setActing(false);
+    }
+  }
+
+  async function review(decision: "approve" | "reject", note?: string) {
+    if (!promotion) return;
+    setActing(true);
+    setActionError(null);
+    try {
+      await promotionManagementService.review(promotion.id, decision, note);
+      setRejectOpen(false);
+      await load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "That didn't work. Try again.");
+      setRejectOpen(false);
     } finally {
       setActing(false);
     }
@@ -105,6 +131,8 @@ export default function AdminPromotionDetailPage({
     );
 
   const t = promotion.targeting;
+  const isDiscount =
+    promotion.type === "percentage_discount" || promotion.type === "fixed_discount";
 
   return (
     <>
@@ -124,6 +152,12 @@ export default function AdminPromotionDetailPage({
           </h1>
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
             <PromotionStatusBadge status={promotion.status} />
+            {reviewBadge(promotion.review) && (
+              <StatusBadge
+                variant={reviewBadge(promotion.review)!.variant}
+                label={reviewBadge(promotion.review)!.label}
+              />
+            )}
             <span className="font-mono text-[11px] uppercase text-kampmax-text-secondary">
               {promotion.code ?? promotion.id.toUpperCase()}
             </span>
@@ -173,18 +207,88 @@ export default function AdminPromotionDetailPage({
         </div>
       </div>
 
+      {actionError && (
+        <div
+          role="alert"
+          className="mt-3 rounded-lg border border-kampmax-error/30 bg-kampmax-error/10 px-4 py-3 text-sm text-red-700"
+        >
+          {actionError}
+        </div>
+      )}
+
+      {promotion.vendorName && promotion.review === "pending" && (
+        <div
+          role="status"
+          className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-kampmax-warning/40 bg-kampmax-warning/10 px-4 py-3"
+        >
+          <p className="text-sm text-amber-900">
+            <span className="font-medium">{promotion.vendorName}</span> submitted this
+            promotion. Customers can&apos;t redeem it until you approve it.
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={acting}
+              onClick={() => void review("approve")}
+              className="inline-flex h-8 items-center rounded-md bg-kampmax-success/90 px-3 text-xs font-medium text-white hover:bg-kampmax-success disabled:opacity-40"
+            >
+              Approve
+            </button>
+            <button
+              type="button"
+              disabled={acting}
+              onClick={() => setRejectOpen(true)}
+              className="inline-flex h-8 items-center rounded-md border border-kampmax-border bg-white px-3 text-xs font-medium text-kampmax-error hover:bg-kampmax-error/5 disabled:opacity-40"
+            >
+              Reject
+            </button>
+          </div>
+        </div>
+      )}
+
+      {promotion.vendorName && promotion.review === "rejected" && (
+        <div
+          role="status"
+          className="mt-3 rounded-lg border border-kampmax-border bg-kampmax-muted/50 px-4 py-3 text-sm text-kampmax-text-secondary"
+        >
+          Rejected{promotion.reviewNote ? `: ${promotion.reviewNote}` : "."} It goes back
+          to review when the vendor edits it.
+        </div>
+      )}
+
       {/* Summary tiles */}
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <SummaryTile label="Discount" value={discountLabel(promotion)} icon={Tag} />
-        <SummaryTile
-          label="Usage"
-          value={
-            promotion.usageLimit != null
-              ? `${promotion.usageCount} / ${promotion.usageLimit}`
-              : `${promotion.usageCount} redemptions`
-          }
-          icon={Ticket}
-        />
+        {isDiscount ? (
+          <>
+            <SummaryTile label="Discount" value={discountLabel(promotion)} icon={Tag} />
+            <SummaryTile
+              label="Usage"
+              value={
+                promotion.usageLimit != null
+                  ? `${promotion.usageCount} / ${promotion.usageLimit}`
+                  : `${promotion.usageCount} redemptions`
+              }
+              icon={Ticket}
+            />
+          </>
+        ) : (
+          <>
+            <SummaryTile
+              label="Views"
+              value={String(promotion.views ?? 0)}
+              icon={Eye}
+            />
+            <SummaryTile
+              label="Clicks"
+              value={`${promotion.clicks ?? 0}${
+                clickRate(promotion.views ?? 0, promotion.clicks ?? 0)
+                  ? ` (${clickRate(promotion.views ?? 0, promotion.clicks ?? 0)})`
+                  : ""
+              }`}
+              icon={MousePointerClick}
+            />
+          </>
+        )}
         <SummaryTile
           label="Window"
           value={`${new Date(promotion.startsAt).toLocaleDateString("en-NG", { day: "numeric", month: "short" })} - ${promotion.endsAt ? new Date(promotion.endsAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" }) : "no end date"}`}
@@ -269,34 +373,38 @@ export default function AdminPromotionDetailPage({
                   : promotionPlacementLabel(promotion.placement)
               }
             />
-            <InfoRow
-              label="Who can use it"
-              value={PROMOTION_ELIGIBILITY_LABELS[promotion.eligibility ?? "all_customers"]}
-            />
-            <InfoRow
-              label="Max discount"
-              value={
-                promotion.maxDiscount != null
-                  ? `₦${promotion.maxDiscount.toLocaleString("en-NG")} per order`
-                  : "No cap"
-              }
-            />
-            <InfoRow
-              label="Per customer"
-              value={
-                promotion.perUserLimit != null
-                  ? `${promotion.perUserLimit} time${promotion.perUserLimit === 1 ? "" : "s"}`
-                  : "Unlimited"
-              }
-            />
-            <InfoRow
-              label="Min. spend"
-              value={
-                promotion.minSpend != null
-                  ? `₦${promotion.minSpend.toLocaleString("en-NG")}`
-                  : "None"
-              }
-            />
+            {isDiscount && (
+              <>
+              <InfoRow
+                label="Who can use it"
+                value={PROMOTION_ELIGIBILITY_LABELS[promotion.eligibility ?? "all_customers"]}
+              />
+              <InfoRow
+                label="Max discount"
+                value={
+                  promotion.maxDiscount != null
+                    ? `₦${promotion.maxDiscount.toLocaleString("en-NG")} per order`
+                    : "No cap"
+                }
+              />
+              <InfoRow
+                label="Per customer"
+                value={
+                  promotion.perUserLimit != null
+                    ? `${promotion.perUserLimit} time${promotion.perUserLimit === 1 ? "" : "s"}`
+                    : "Unlimited"
+                }
+              />
+              <InfoRow
+                label="Min. spend"
+                value={
+                  promotion.minSpend != null
+                    ? `₦${promotion.minSpend.toLocaleString("en-NG")}`
+                    : "None"
+                }
+              />
+              </>
+            )}
             {promotion.code && (
               <InfoRow
                 label="Code"
@@ -329,6 +437,18 @@ export default function AdminPromotionDetailPage({
           onSubmit={(input) => void submitEdit(input)}
         />
       )}
+
+      <ConfirmDialog
+        open={rejectOpen}
+        title={`Reject “${promotion.name}”?`}
+        message="The vendor is emailed your reason. The code stays unusable until they edit the promotion and it is approved."
+        confirmLabel="Reject promotion"
+        tone="danger"
+        loading={acting}
+        reasonLabel="Reason (shown to the vendor)"
+        onConfirm={(reason) => void review("reject", reason)}
+        onCancel={() => setRejectOpen(false)}
+      />
 
       <ConfirmDialog
         open={endOpen}

@@ -113,6 +113,14 @@ export function ProductCard({
           </div>
         )}
 
+        {product.sponsored && (
+          <div className="absolute bottom-2 left-2 z-10">
+            <span className="rounded-md bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-neutral-600 shadow-sm">
+              Sponsored
+            </span>
+          </div>
+        )}
+
         {/* Action Buttons Overlay on Hover */}
         <div className="absolute top-2 right-2 flex flex-col gap-1.5 z-10">
           <button

@@ -24,8 +24,8 @@ export const homeKeys = {
   products: (campusId?: string) => ["home", "products", campusId ?? "all"] as const,
   categories: ["home", "categories"] as const,
   vendors: (campusId?: string) => ["home", "vendors", campusId ?? "all"] as const,
-  featured: (placement: string, campusId?: string) =>
-    ["home", "featured", placement, campusId ?? "all"] as const,
+  featured: (placement: string, campusId?: string, categoryId?: string) =>
+    ["home", "featured", placement, campusId ?? "all", categoryId ?? "all"] as const,
 };
 
 /** Only real (UUID) campus ids can be sent to the API. */
@@ -58,11 +58,16 @@ export function useHomeVendors(campusId?: string) {
 }
 
 /** Promo codes an admin featured in a storefront slot. */
-export function useFeaturedPromotions(placement: FeaturedPlacement, campusId?: string) {
+export function useFeaturedPromotions(
+  placement: FeaturedPlacement,
+  campusId?: string,
+  categoryId?: string
+) {
   const apiCampusId = toApiCampusId(campusId);
+  const apiCategoryId = toApiCampusId(categoryId); // same UUID check
   return useQuery({
-    queryKey: homeKeys.featured(placement, apiCampusId),
-    queryFn: () => fetchFeaturedPromotions(placement, apiCampusId),
+    queryKey: homeKeys.featured(placement, apiCampusId, apiCategoryId),
+    queryFn: () => fetchFeaturedPromotions(placement, apiCampusId, apiCategoryId),
     staleTime: 60_000,
   });
 }

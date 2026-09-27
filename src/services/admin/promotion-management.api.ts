@@ -46,6 +46,7 @@ function queryString(query: PromotionListQuery): string {
   set("type", query.type);
   set("status", query.status);
   set("campusId", query.campusId);
+  set("review", query.review);
   set("sortBy", query.sortBy);
   set("sortDir", query.sortDir);
   set("page", query.page);
@@ -120,6 +121,21 @@ export function createApiPromotionManagementService(): AdminPromotionManagementS
         ManagedPromotion
       >(`/admin/promotions/${id}/status`, { status });
       if (error) fail(error, "Couldn't update the promotion.");
+      return data;
+    },
+
+    async review(id, decision, note) {
+      if (decision === "reject" && !note?.trim()) {
+        throw new Error("Say why it is being rejected.");
+      }
+      const { data, error } = await apiClient.patch<
+        { decision: string; note?: string },
+        ManagedPromotion
+      >(`/admin/promotions/${id}/review`, {
+        decision,
+        ...(note?.trim() ? { note: note.trim() } : {}),
+      });
+      if (error) fail(error, "Couldn't review the promotion.");
       return data;
     },
 

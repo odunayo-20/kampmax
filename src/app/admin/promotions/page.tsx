@@ -54,6 +54,8 @@ interface Filters {
   search: string;
   type: ManagedPromotionType | "all";
   status: ManagedPromotionStatus | "all";
+  /** Only vendor promotions waiting for approval. */
+  review: "all" | "pending";
 }
 
 function parseInitialFilters(params: { get(name: string): string | null }): Filters {
@@ -71,6 +73,7 @@ function parseInitialFilters(params: { get(name: string): string | null }): Filt
     search: params.get("q") ?? "",
     type: validType,
     status: validStatus,
+    review: params.get("review") === "pending" ? "pending" : "all",
   };
 }
 
@@ -120,6 +123,7 @@ function PromotionsConsole() {
     if (filters.search.trim()) params.set("q", filters.search.trim());
     if (filters.type !== "all") params.set("type", filters.type);
     if (filters.status !== "all") params.set("status", filters.status);
+    if (filters.review !== "all") params.set("review", filters.review);
     const qs = params.toString();
     window.history.replaceState(null, "", qs ? `?${qs}` : "/admin/promotions");
   }, [filters]);
@@ -145,6 +149,7 @@ function PromotionsConsole() {
         search: search.trim() || undefined,
         type: filters.type,
         status: filters.status,
+        review: filters.review,
         sortBy: "startsAt",
         sortDir: "desc",
         page,
@@ -156,7 +161,7 @@ function PromotionsConsole() {
     } finally {
       setLoading(false);
     }
-  }, [search, filters.type, filters.status, page, pageSize]);
+  }, [search, filters.type, filters.status, filters.review, page, pageSize]);
 
   useEffect(() => {
     void loadList();
@@ -271,7 +276,8 @@ function PromotionsConsole() {
   const hasActiveFilters =
     filters.search.trim().length > 0 ||
     filters.type !== "all" ||
-    filters.status !== "all";
+    filters.status !== "all" ||
+    filters.review !== "all";
 
   return (
     <>
@@ -356,10 +362,30 @@ function PromotionsConsole() {
             </option>
           ))}
         </Select>
+        {((counts?.needsReview ?? 0) > 0 || filters.review === "pending") && (
+          <button
+            type="button"
+            aria-pressed={filters.review === "pending"}
+            onClick={() =>
+              patchFilters({ review: filters.review === "pending" ? "all" : "pending" })
+            }
+            className={cn(
+              "inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors",
+              filters.review === "pending"
+                ? "border-kampmax-warning bg-kampmax-warning/15 text-amber-800"
+                : "border-kampmax-border bg-white text-kampmax-text hover:bg-kampmax-muted/60"
+            )}
+          >
+            Needs review
+            <span className="rounded-full bg-kampmax-muted px-1.5 py-px text-[10px] font-semibold tabular-nums">
+              {counts?.needsReview ?? 0}
+            </span>
+          </button>
+        )}
         {hasActiveFilters && (
           <button
             type="button"
-            onClick={() => patchFilters({ search: "", type: "all", status: "all" })}
+            onClick={() => patchFilters({ search: "", type: "all", status: "all", review: "all" })}
             className="text-xs font-medium text-kampmax-blue hover:underline"
           >
             Clear filters
@@ -373,7 +399,7 @@ function PromotionsConsole() {
         error={error}
         hasActiveFilters={hasActiveFilters}
         onRetry={() => void loadList()}
-        onClearFilters={() => patchFilters({ search: "", type: "all", status: "all" })}
+        onClearFilters={() => patchFilters({ search: "", type: "all", status: "all", review: "all" })}
         onEdit={(p) => setFormTarget({ mode: "edit", p })}
         onDuplicate={(p) => void duplicate(p)}
         onSetStatus={(p, s) => void setStatus(p, s)}

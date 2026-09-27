@@ -41,3 +41,26 @@ export const PROMOTION_SORT_OPTIONS: { value: string; label: string }[] = [
 export function formatPromotionValue(discountType: "percentage" | "fixed_amount", discountValue: number): string {
   return discountType === "percentage" ? `${discountValue}%` : `₦${discountValue.toLocaleString("en-NG")}`;
 }
+/** What a vendor is told about their promotion's review, or null when approved. */
+export function reviewNotice(p: {
+  review?: "approved" | "pending" | "rejected";
+  reviewNote?: string;
+}): { tone: "warning" | "error"; title: string; body: string } | null {
+  if (p.review === "pending") {
+    return {
+      tone: "warning",
+      title: "Awaiting approval",
+      body: "Customers can't use this code until Kampmax approves it. Any edit sends it back for review.",
+    };
+  }
+  if (p.review === "rejected") {
+    return {
+      tone: "error",
+      title: "Not approved",
+      body: p.reviewNote
+        ? `${p.reviewNote} Edit the promotion to resubmit it.`
+        : "Edit the promotion to resubmit it.",
+    };
+  }
+  return null;
+}

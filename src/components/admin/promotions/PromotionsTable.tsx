@@ -22,7 +22,8 @@ import {
   PromotionStatusBadge,
   PromotionTypeIcon,
 } from "./PromotionBadges";
-import { discountLabel } from "./promotions-meta";
+import { StatusBadge } from "@/components/admin/StatusBadge";
+import { discountLabel, promotionUsageLabel, reviewBadge } from "./promotions-meta";
 import type { ManagedPromotion, ManagedPromotionStatus } from "@/types/admin";
 
 export interface PromotionsTableProps {
@@ -159,6 +160,14 @@ export function PromotionsTable(props: PromotionsTableProps) {
                         {p.vendorName && (
                           <span className="ml-2 font-sans normal-case">by {p.vendorName}</span>
                         )}
+                        {reviewBadge(p.review) && (
+                          <span className="ml-2 inline-block align-middle">
+                            <StatusBadge
+                              variant={reviewBadge(p.review)!.variant}
+                              label={reviewBadge(p.review)!.label}
+                            />
+                          </span>
+                        )}
                       </span>
                     </div>
                   </div>
@@ -199,8 +208,7 @@ export function PromotionsTable(props: PromotionsTableProps) {
                 </td>
 
                 <td className="hidden whitespace-nowrap px-3 py-2.5 tabular-nums md:table-cell">
-                  {p.usageCount}
-                  {p.usageLimit != null ? ` / ${p.usageLimit}` : ""}
+                  {promotionUsageLabel(p)}
                 </td>
 
                 <td className="px-3 py-2.5">
@@ -271,8 +279,7 @@ export function PromotionsTable(props: PromotionsTableProps) {
                 <span className="capitalize">{p.type.replace(/_/g, " ")}</span>
               </MetaCell>
               <MetaCell label="Usage">
-                {p.usageCount}
-                {p.usageLimit != null ? ` / ${p.usageLimit}` : ""}
+                {promotionUsageLabel(p)}
               </MetaCell>
               <MetaCell label="Runs">
                 <span className="tabular-nums">

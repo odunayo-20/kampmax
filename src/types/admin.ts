@@ -1591,6 +1591,8 @@ export interface PromotionTargeting {
   categoryIds: string[];
 }
 
+export type PromotionReview = "approved" | "pending" | "rejected";
+
 /** Who a promo code is open to. "New" / "returning" is per store. */
 export type PromotionEligibility =
   | "all_customers"
@@ -1622,6 +1624,13 @@ export interface ManagedPromotion {
   endsAt: string | null;
   /** Set when a vendor (not the platform) runs the promotion. */
   vendorName?: string | null;
+  /** Times its storefront slot was shown / clicked. */
+  views?: number;
+  clicks?: number;
+  /** A vendor's promotion is pending until an admin approves it. */
+  review?: PromotionReview;
+  /** Why a vendor promotion was rejected. */
+  reviewNote?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -1649,6 +1658,7 @@ export interface PromotionListQuery extends ListQuery {
   type?: ManagedPromotionType | "all";
   status?: ManagedPromotionStatus | "all";
   campusId?: string | "all";
+  review?: PromotionReview | "all";
   sortBy?: "name" | "startsAt" | "endsAt" | "usageCount";
   sortDir?: SortDir;
 }
@@ -1658,6 +1668,8 @@ export interface PromotionStatusCounts {
   byStatus: Record<ManagedPromotionStatus, number>;
   /** Active right now by calendar window. */
   liveNow: number;
+  /** Vendor promotions waiting for an admin's approval. */
+  needsReview?: number;
 }
 
 export interface PromotionTargetingOptions {

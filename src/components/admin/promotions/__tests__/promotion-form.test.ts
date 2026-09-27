@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { ManagedPromotion } from "@/types/admin";
 import {
   buildPromotionInput,
+  changeType,
   emptyPromotionForm,
   formFromPromotion,
+  targetListsFor,
   toggleTarget,
   validatePromotionForm,
   type PromotionFormState,
@@ -223,5 +225,157 @@ describe("formFromPromotion", () => {
   it("gives a promotion with no end date a default end date", () => {
     const form = formFromPromotion(promotion({ endsAt: null }));
     expect(form.endDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+const featured = (over: Partial<PromotionFormState> = {}): PromotionFormState => ({
+  ...emptyPromotionForm(new Date("2026-10-01T09:00:00")),
+  name: "Featured lamps",
+  type: "featured_product",
+  placement: "homepage_banner",
+  productIds: ["p1"],
+  ...over,
+});
+
+describe("featured slots", () => {
+  it("accepts a featured product with a placement", () => {
+    expect(validatePromotionForm(featured())).toEqual({});
+  });
+
+  it("does not ask for a code or discount", () => {
+    const errors = validatePromotionForm(featured({ code: "", discountValue: "" }));
+    expect(errors.code).toBeUndefined();
+    expect(errors.discountValue).toBeUndefined();
+  });
+
+  it("needs a storefront placement", () => {
+    expect(validatePromotionForm(featured({ placement: "none" })).placement).toBeDefined();
+  });
+
+  it("needs something to feature, by type", () => {
+    expect(validatePromotionForm(featured({ productIds: [] })).productIds).toMatch(/product/);
+    expect(
+      validatePromotionForm(featured({ type: "featured_vendor", productIds: [] })).vendorIds
+    ).toMatch(/vendor/);
+    expect(
+      validatePromotionForm(featured({ type: "campus_promotion", productIds: [] })).campusIds
+    ).toMatch(/campus/);
+  });
+
+  it("features at most 12 items", () => {
+    const many = Array.from({ length: 13 }, (_, n) => `p${n}`);
+    expect(validatePromotionForm(featured({ productIds: many })).productIds).toMatch(/at most 12/);
+    expect(
+      validatePromotionForm(featured({ productIds: many.slice(0, 12) })).productIds
+    ).toBeUndefined();
+  });
+
+  it("still checks the name and dates", () => {
+    const errors = validatePromotionForm(
+      featured({ name: "x", startDate: "2026-10-10", endDate: "2026-10-01" })
+    );
+    expect(errors.name).toBeDefined();
+    expect(errors.endDate).toBeDefined();
+  });
+
+  it("builds a payload with no code, discount or limits", () => {
+    const input = buildPromotionInput(
+      featured({
+        code: "leftover",
+        discountValue: "15",
+        minSpend: "1000",
+        maxDiscount: "500",
+        usageLimit: "10",
+        perUserLimit: "1",
+        eligibility: "new_customers",
+      })
+    );
+    expect(input).toMatchObject({
+      type: "featured_product",
+      code: null,
+      discountValue: null,
+      minSpend: null,
+      maxDiscount: null,
+      usageLimit: null,
+      perUserLimit: null,
+      eligibility: "all_customers",
+      placement: "homepage_banner",
+      targeting: { productIds: ["p1"], vendorIds: [], categoryIds: [], campusIds: [] },
+    });
+  });
+
+  it("sends only the target lists the type uses", () => {
+    const input = buildPromotionInput(
+      featured({ type: "featured_vendor", vendorIds: ["v1", "v2"], productIds: ["p1"] })
+    );
+    expect(input.targeting).toEqual({
+      campusIds: [],
+      vendorIds: ["v1", "v2"],
+      productIds: [],
+      categoryIds: [],
+    });
+  });
+
+  it("selects several vendors for a featured vendor slot", () => {
+    let form = featured({ type: "featured_vendor", productIds: [] });
+    form = toggleTarget(form, "vendorIds", "v1");
+    form = toggleTarget(form, "vendorIds", "v2");
+    expect(form.vendorIds).toEqual(["v1", "v2"]);
+  });
+
+  it("ignores targets the type does not use", () => {
+    const form = featured();
+    expect(toggleTarget(form, "vendorIds", "v1")).toBe(form);
+    const campaign = featured({ type: "campus_promotion", productIds: [] });
+    expect(toggleTarget(campaign, "productIds", "p1")).toBe(campaign);
+  });
+
+  it("lets a featured product also be limited to campuses", () => {
+    const form = toggleTarget(featured(), "campusIds", "c1");
+    expect(form.campusIds).toEqual(["c1"]);
+    expect(form.productIds).toEqual(["p1"]);
+    expect(targetListsFor("featured_product")).toEqual(["productIds", "campusIds"]);
+  });
+});
+
+describe("changeType", () => {
+  it("drops targets the new type cannot use", () => {
+    const form = { ...featured(), campusIds: ["c1"] };
+    const next = changeType(form, "campus_promotion");
+    expect(next.type).toBe("campus_promotion");
+    expect(next.productIds).toEqual([]);
+    expect(next.campusIds).toEqual(["c1"]);
+  });
+
+  it("keeps campuses and products when going back to a discount code", () => {
+    const next = changeType({ ...featured(), campusIds: ["c1"] }, "percentage_discount");
+    expect(next.campusIds).toEqual(["c1"]);
+    expect(next.productIds).toEqual(["p1"]);
+  });
+
+  it("keeps a discount code's targets when switching between discount types", () => {
+    const form = toggleTarget(valid(), "vendorIds", "v1");
+    expect(changeType(form, "fixed_discount").vendorIds).toEqual(["v1"]);
+  });
+});
+
+describe("formFromPromotion for featured slots", () => {
+  it("loads a featured product", () => {
+    const form = formFromPromotion(
+      promotion({
+        type: "featured_product",
+        code: null,
+        discountValue: null,
+        placement: "deals_page",
+        targeting: { campusIds: [], vendorIds: [], productIds: ["p1"], categoryIds: [] },
+      })
+    );
+    expect(form).toMatchObject({
+      type: "featured_product",
+      code: "",
+      discountValue: "",
+      placement: "deals_page",
+      productIds: ["p1"],
+    });
   });
 });

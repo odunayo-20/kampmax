@@ -6,6 +6,8 @@ import { formatDate, formatNaira } from "@/lib/utils";
 import { VENDOR_PROMOTION_DISCOUNT_LABELS, VENDOR_PROMOTION_ELIGIBILITY_LABELS } from "@/types/vendor-promotions";
 import type { VendorPromotion } from "@/types/vendor-promotions";
 import { PromotionStatusBadge } from "./PromotionStatusBadge";
+import { PromotionReviewBadge } from "./PromotionReviewBadge";
+import { reviewNotice } from "./promotions-meta";
 
 interface PromotionOverviewPanelProps {
   promotion: VendorPromotion;
@@ -28,8 +30,29 @@ export function PromotionOverviewPanel({ promotion, productTitles, categoryName 
           <h2 className="text-xl font-bold text-kampmax-text">{promotion.title}</h2>
           <p className="mt-0.5 text-xs text-kampmax-text-secondary">{promotion.id}</p>
         </div>
-        <PromotionStatusBadge status={promotion.status} />
+        <div className="flex items-center gap-1">
+          <PromotionStatusBadge status={promotion.status} />
+          <PromotionReviewBadge review={promotion.review} />
+        </div>
       </div>
+
+      {(() => {
+        const notice = reviewNotice(promotion);
+        if (!notice) return null;
+        return (
+          <div
+            role="status"
+            className={
+              notice.tone === "error"
+                ? "mt-3 rounded-lg border border-kampmax-error/30 bg-kampmax-error/10 px-3 py-2 text-sm text-red-700"
+                : "mt-3 rounded-lg border border-kampmax-warning/40 bg-kampmax-warning/10 px-3 py-2 text-sm text-amber-800"
+            }
+          >
+            <p className="font-medium">{notice.title}</p>
+            <p className="mt-0.5 text-xs">{notice.body}</p>
+          </div>
+        );
+      })()}
 
       {promotion.description && (
         <p className="mt-3 text-sm text-kampmax-text-secondary">{promotion.description}</p>
