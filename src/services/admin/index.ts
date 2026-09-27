@@ -364,14 +364,12 @@ import {
 export const notificationManagementService: AdminNotificationManagementService =
   createMockNotificationManagementService();
 
-import {
-  AdminSettingsConfigService,
-  createMockSettingsConfigService,
-} from "./settings-config.service";
+import type { AdminSettingsConfigService } from "./settings-config.service";
+import { createApiSettingsConfigService } from "./settings-config.api";
 
-/** /admin/settings console (sectioned config, in-memory persistence). */
+/** /admin/settings console: live, versioned, audit-logged platform configuration. */
 export const settingsConfigService: AdminSettingsConfigService =
-  createMockSettingsConfigService();
+  createApiSettingsConfigService();
 
 import {
   AdminRbacService,

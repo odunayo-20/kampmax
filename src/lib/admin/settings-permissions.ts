@@ -20,6 +20,7 @@
 
 import type {
   ResourcePermission,
+  SettingsAccessState,
   RolePermissionMatrix,
   SettingsSectionKey,
 } from "@/types/admin";
@@ -85,6 +86,22 @@ export function getSectionAccess(
   return {
     canView: !!row?.view,
     canEdit: !!granted,
+    requiresManage,
+  };
+}
+
+/**
+ * Per-section access from the server-decided flags returned with the
+ * settings state (the live API enforces the same rule on every write).
+ */
+export function sectionAccessFromServer(
+  access: SettingsAccessState,
+  section: SettingsSectionKey
+): SectionAccess {
+  const requiresManage = isHighRiskSettingsSection(section);
+  return {
+    canView: true,
+    canEdit: requiresManage ? access.canManage : access.canEdit,
     requiresManage,
   };
 }

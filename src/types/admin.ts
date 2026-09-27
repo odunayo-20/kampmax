@@ -3342,6 +3342,28 @@ export interface PlatformSettingsConfig {
   security: SecuritySettings;
 }
 
+/** Save bookkeeping for one section. `version` 0 means never saved (defaults). */
+export interface SettingsSectionMeta {
+  version: number;
+  updatedAt: string | null;
+  updatedBy: string | null;
+  isDefault: boolean;
+}
+
+/** What the signed-in operator may change, decided by the server. */
+export interface SettingsAccessState {
+  /** Operational sections (settings.update). */
+  canEdit: boolean;
+  /** Financial and security sections (settings.manage). */
+  canManage: boolean;
+}
+
+export interface PlatformSettingsState {
+  config: PlatformSettingsConfig;
+  meta: Record<SettingsSectionKey, SettingsSectionMeta>;
+  access: SettingsAccessState;
+}
+
 // ------------------------------------------------------------
 // RBAC - ROLES & PERMISSIONS (/admin/permissions)
 //

@@ -26,18 +26,16 @@ import {
   OrdersSectionForm,
   SecuritySectionForm,
 } from "@/components/admin/settings/section-forms";
-import { useAdminSession } from "@/lib/admin/admin-auth-context";
-import { useAdminRbacRole } from "@/hooks/admin/use-admin-rbac";
 import {
   usePlatformSettings,
   useResetSettingsSection,
   useSaveSettingsSection,
 } from "@/hooks/admin/use-admin-settings";
 import {
-  getSectionAccess,
-  getSettingsAccess,
   isHighRiskSettingsSection,
+  sectionAccessFromServer,
 } from "@/lib/admin/settings-permissions";
+import { SettingsForbiddenError } from "@/services/admin/settings-config.service";
 import { cn } from "@/lib/utils";
 import type {
   PlatformSettingsConfig,
@@ -54,10 +52,19 @@ interface ToastMessage {
   text: string;
 }
 
-function SettingsConsole() {
-  const { admin } = useAdminSession();
+function formatSavedAt(iso: string | null | undefined): string {
+  const d = iso ? new Date(iso) : null;
+  if (!d || Number.isNaN(d.getTime())) return "just now";
+  return d.toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
-  const roleQuery = useAdminRbacRole(admin?.role ?? "SUPER_ADMIN");
+function SettingsConsole() {
   const configQuery = usePlatformSettings();
   const saveMutation = useSaveSettingsSection();
   const resetMutation = useResetSettingsSection();
@@ -77,11 +84,13 @@ function SettingsConsole() {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const toastId = useRef(0);
 
-  function pushToast(tone: ToastMessage["tone"], text: string) {
+  const pushToast = useCallback((tone: ToastMessage["tone"], text: string) => {
     const id = ++toastId.current;
     setToasts((t) => [...t.slice(-2), { id, tone, text }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3800);
-  }
+  }, []);
+
+  const settings = configQuery.data ?? null;
 
   /** Warn once when leaving the page with unsaved changes. */
   useEffect(() => {
@@ -102,19 +111,25 @@ function SettingsConsole() {
       const label =
         SETTINGS_SECTIONS.find((s) => s.key === key)?.label ?? "Section";
       try {
-        await saveMutation.mutateAsync({ section: key, value });
-        pushToast(
-          "success",
-          `${label} settings saved (local mock - not persisted).`
-        );
+        await saveMutation.mutateAsync({
+          section: key,
+          value,
+          expectedVersion: settings?.meta[key]?.version,
+        });
+        pushToast("success", `${label} settings saved.`);
         setDirty(false);
         return true;
-      } catch {
-        pushToast("error", "Couldn't save this section. Try again.");
+      } catch (err) {
+        pushToast(
+          "error",
+          err instanceof Error && err.message
+            ? err.message
+            : "Couldn't save this section. Try again."
+        );
         return false;
       }
     },
-    [saveMutation, pushToast]
+    [saveMutation, pushToast, settings]
   );
 
   /**
@@ -140,14 +155,22 @@ function SettingsConsole() {
   const runReset = useCallback(
     async (key: SettingsSectionKey) => {
       try {
-        await resetMutation.mutateAsync(key);
-        pushToast("success", "Section reset to defaults (local mock).");
+        await resetMutation.mutateAsync({
+          section: key,
+          expectedVersion: settings?.meta[key]?.version,
+        });
+        pushToast("success", "Section reset to defaults.");
         setDirty(false);
-      } catch {
-        pushToast("error", "Couldn't reset this section.");
+      } catch (err) {
+        pushToast(
+          "error",
+          err instanceof Error && err.message
+            ? err.message
+            : "Couldn't reset this section."
+        );
       }
     },
-    [resetMutation, pushToast]
+    [resetMutation, pushToast, settings]
   );
 
   const resetSection = useCallback(
@@ -172,15 +195,31 @@ function SettingsConsole() {
     [dirty]
   );
 
-  if (roleQuery.isLoading || configQuery.isLoading)
-    return <LoadingSkeleton variant="detail" rows={8} />;
+  const desc =
+    "Platform configuration across identity, commerce, finance and security. Changes are saved to the platform, versioned and recorded in the audit trail.";
 
-  if (roleQuery.isError || configQuery.isError)
+  if (configQuery.isLoading) return <LoadingSkeleton variant="detail" rows={8} />;
+
+  if (configQuery.error instanceof SettingsForbiddenError) {
+    return (
+      <>
+        <AdminPageHeader title="Settings" description={desc} />
+        <div className="mt-4">
+          <ErrorState
+            title="Restricted area"
+            message="Your role doesn't have permission to view platform settings. Contact a Super Admin if you believe this is wrong."
+          />
+        </div>
+      </>
+    );
+  }
+
+  if (configQuery.isError || !settings) {
     return (
       <>
         <AdminPageHeader
           title="Settings"
-          description="Platform configuration across identity, commerce, finance and security. Values are mock/local only."
+          description={desc}
           actions={
             <Link
               href="/admin/audit-logs"
@@ -193,63 +232,26 @@ function SettingsConsole() {
         />
         <div className="mt-4">
           <ErrorState
-            onRetry={() => {
-              void roleQuery.refetch();
-              void configQuery.refetch();
-            }}
-          />
-        </div>
-      </>
-    );
-
-  const matrix = roleQuery.data?.permissions ?? null;
-  const config = configQuery.data ?? null;
-
-  if (!matrix || !config)
-    return (
-      <>
-        <AdminPageHeader
-          title="Settings"
-          description="Platform configuration across identity, commerce, finance and security. Values are mock/local only."
-        />
-        <div className="mt-4">
-          <ErrorState
-            message="Platform settings aren't available for this role."
-            onRetry={() => void roleQuery.refetch()}
-          />
-        </div>
-      </>
-    );
-
-  const settingsAccess = getSettingsAccess(matrix);
-
-  if (!settingsAccess.canView) {
-    return (
-      <>
-        <AdminPageHeader
-          title="Settings"
-          description="Platform configuration across identity, commerce, finance and security. Values are mock/local only."
-        />
-        <div className="mt-4">
-          <ErrorState
-            title="Restricted area"
-            message="Your role doesn't have permission to view platform settings. Contact a Super Admin if you believe this is wrong."
+            message={configQuery.error?.message}
+            onRetry={() => void configQuery.refetch()}
           />
         </div>
       </>
     );
   }
 
+  const { config, meta, access } = settings;
   const activeDef = SETTINGS_SECTIONS.find((s) => s.key === section)!;
-  const sectionAccess = getSectionAccess(matrix, section);
+  const sectionAccess = sectionAccessFromServer(access, section);
   const readOnly = !sectionAccess.canEdit;
   const saving = saveMutation.isPending || resetMutation.isPending;
+  const sectionMeta = meta[section];
 
   return (
     <>
       <AdminPageHeader
         title="Settings"
-        description="Platform configuration across identity, commerce, finance and security. Values are mock/local only."
+        description={desc}
         actions={
           <Link
             href="/admin/audit-logs"
@@ -270,7 +272,7 @@ function SettingsConsole() {
           {SETTINGS_SECTIONS.map((def) => {
             const Icon = def.icon;
             const active = section === def.key;
-            const secAccess = getSectionAccess(matrix, def.key);
+            const secAccess = sectionAccessFromServer(access, def.key);
             return (
               <button
                 key={def.key}
@@ -392,10 +394,12 @@ function SettingsConsole() {
           )}
 
           <div className="mt-5 flex flex-col gap-2">
-            <p className="flex items-start gap-2 rounded-lg border border-dashed border-amber-300 bg-amber-50/60 px-3 py-2.5 text-[11px] leading-snug text-amber-800">
-              <ShieldAlert className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
-              No backend persistence: every value lives in local state and
-              resets when the prototype reloads.
+            <p className="text-[11px] leading-snug text-kampmax-text-secondary">
+              {sectionMeta?.isDefault
+                ? "Using the built-in defaults - nothing has been saved for this section yet."
+                : `Last saved ${formatSavedAt(sectionMeta?.updatedAt)}${
+                    sectionMeta?.updatedBy ? ` by ${sectionMeta.updatedBy}` : ""
+                  } (version ${sectionMeta?.version}).`}
             </p>
             {sectionAccess.requiresManage && (
               <p className="flex items-start gap-2 rounded-lg border border-kampmax-error/30 bg-kampmax-error/5 px-3 py-2.5 text-[11px] leading-snug text-kampmax-error">
@@ -417,7 +421,7 @@ function SettingsConsole() {
             ? "Change security settings?"
             : "Change financial settings?"
         }
-        message="These settings affect sensitive platform controls. Applying them is recorded against your admin session in the prototype - the real backend will require the matching permission and leave an audit trail entry."
+        message="These settings affect sensitive platform controls. Applying them is recorded in the audit trail against your admin account."
         confirmLabel="Save changes"
         loading={saveMutation.isPending}
         onConfirm={() => {
