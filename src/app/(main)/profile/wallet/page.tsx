@@ -11,6 +11,7 @@ import { TransactionItem } from "@/components/wallet/TransactionItem";
 import { TransactionDetail } from "@/components/wallet/TransactionDetail";
 import { FundingModal } from "@/components/wallet/FundingModal";
 import { WithdrawModal } from "@/components/wallet/WithdrawModal";
+import { FinancialIdentityCard } from "@/components/wallet/FinancialIdentityCard";
 import { useAuth } from "@/lib/auth-context";
 import { getWallet, getWalletTransactions, depositToWallet, withdrawFromWallet } from "@/services/wallet";
 import { WalletTransaction, WalletTransactionType } from "@/types";
@@ -51,6 +52,7 @@ export default function WalletPage() {
             Contact support to set up your wallet
           </p>
         </div>
+        <FinancialIdentityCard />
       </PageContainer>
     );
   }
@@ -95,6 +97,8 @@ export default function WalletPage() {
         onTopUp={() => setShowFunding(true)}
         onWithdraw={() => setShowWithdraw(true)}
       />
+
+      <FinancialIdentityCard />
 
       {/* Stats */}
       <WalletStats transactions={txs} />
