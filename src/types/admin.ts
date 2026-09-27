@@ -1553,8 +1553,8 @@ export interface WithdrawalStatusCounts {
 // ------------------------------------------------------------
 // PROMOTION MANAGEMENT (/admin/promotions)
 // Discounts, deals, promo codes, featured placements and
-// campus campaigns. Mock only - no order-level discount
-// calculation is wired to the checkout yet.
+// campus campaigns. Live promotions are percentage or fixed-amount
+// promo codes redeemed at checkout; the other types are not supported.
 // ------------------------------------------------------------
 
 export type ManagedPromotionType =
@@ -1591,6 +1591,12 @@ export interface PromotionTargeting {
   categoryIds: string[];
 }
 
+/** Who a promo code is open to. "New" / "returning" is per store. */
+export type PromotionEligibility =
+  | "all_customers"
+  | "new_customers"
+  | "returning_customers";
+
 export interface ManagedPromotion {
   id: string; // prm-###
   name: string;
@@ -1606,8 +1612,16 @@ export interface ManagedPromotion {
   targeting: PromotionTargeting;
   usageCount: number;
   usageLimit: number | null;
+  /** Cap on the discount for one order (percentage codes). */
+  maxDiscount?: number | null;
+  /** Times one customer may redeem it. */
+  perUserLimit?: number | null;
+  eligibility?: PromotionEligibility;
   startsAt: string;
-  endsAt: string;
+  /** null = no end date. */
+  endsAt: string | null;
+  /** Set when a vendor (not the platform) runs the promotion. */
+  vendorName?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -1623,6 +1637,9 @@ export interface PromotionInput {
   placement: PromotionPlacement;
   targeting: PromotionTargeting;
   usageLimit: number | null;
+  maxDiscount?: number | null;
+  perUserLimit?: number | null;
+  eligibility?: PromotionEligibility;
   startsAt: string;
   endsAt: string;
 }

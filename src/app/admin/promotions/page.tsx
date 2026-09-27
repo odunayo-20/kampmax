@@ -197,12 +197,15 @@ function PromotionsConsole() {
         name: `${p.name} (copy)`,
         description: p.description,
         type: p.type,
-        code: null,
+        code: p.code ? `${p.code}-COPY`.slice(0, 50) : null,
         discountValue: p.discountValue,
         minSpend: p.minSpend,
         placement: p.placement,
         targeting: JSON.parse(JSON.stringify(p.targeting)),
         usageLimit: p.usageLimit,
+        maxDiscount: p.maxDiscount ?? null,
+        perUserLimit: p.perUserLimit ?? null,
+        eligibility: p.eligibility ?? "all_customers",
         startsAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
         endsAt: new Date(Date.now() + 31 * 24 * 3600 * 1000).toISOString(),
       });
@@ -274,7 +277,7 @@ function PromotionsConsole() {
     <>
       <AdminPageHeader
         title="Promotions"
-        description="Discounts, deals, promo codes and featured placements across the marketplace."
+        description="Promo codes customers redeem at checkout, run by Kampmax and by vendors."
         actions={
           <>
             {counts && (

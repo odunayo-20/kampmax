@@ -6,11 +6,24 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { cn } from "@/lib/utils";
 import {
+  PROMOTION_ELIGIBILITY_LABELS,
+  PROMOTION_PLACEMENT_CHOICES,
   PROMOTION_PLACEMENT_LABELS,
+  PROMOTION_TYPE_FILTER_ORDER,
   PROMOTION_TYPE_LABELS,
 } from "./promotions-meta";
+import {
+  buildPromotionInput,
+  emptyPromotionForm,
+  formFromPromotion,
+  toggleTarget,
+  validatePromotionForm,
+  type PromotionFormState,
+  type TargetList,
+} from "./promotion-form";
 import type {
   ManagedPromotion,
+  PromotionEligibility,
   PromotionInput,
   PromotionTargetingOptions,
 } from "@/types/admin";
@@ -25,54 +38,6 @@ interface PromotionFormDialogProps {
   onSubmit: (input: PromotionInput) => void;
 }
 
-const DISCOUNT_TYPES = ["percentage_discount", "fixed_discount", "promo_code"];
-
-function toDatePickerValue(iso: string): string {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-function emptyForm(): FormState {
-  const today = new Date();
-  const inTwoWeeks = new Date(today.getTime() + 14 * 24 * 3600 * 1000);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  return {
-    name: "",
-    description: "",
-    type: "percentage_discount",
-    code: "",
-    discountValue: "",
-    minSpend: "",
-    placement: "homepage_banner",
-    usageLimit: "",
-    startDate: fmt(today),
-    endDate: fmt(inTwoWeeks),
-    campusIds: [],
-    vendorIds: [],
-    productIds: [],
-    categoryIds: [],
-  };
-}
-
-interface FormState {
-  name: string;
-  description: string;
-  type: ManagedPromotion["type"];
-  code: string;
-  discountValue: string;
-  minSpend: string;
-  placement: ManagedPromotion["placement"];
-  usageLimit: string;
-  startDate: string;
-  endDate: string;
-  campusIds: string[];
-  vendorIds: string[];
-  productIds: string[];
-  categoryIds: string[];
-}
-
 export function PromotionFormDialog({
   open,
   promotion,
@@ -81,159 +46,40 @@ export function PromotionFormDialog({
   onClose,
   onSubmit,
 }: PromotionFormDialogProps) {
-  const [form, setForm] = useState<FormState>(emptyForm);
+  const [form, setForm] = useState<PromotionFormState>(() => emptyPromotionForm());
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!open) return;
     setErrors({});
-    if (promotion) {
-      setForm({
-        name: promotion.name,
-        description: promotion.description,
-        type: promotion.type,
-        code: promotion.code ?? "",
-        discountValue:
-          promotion.discountValue != null ? String(promotion.discountValue) : "",
-        minSpend: promotion.minSpend != null ? String(promotion.minSpend) : "",
-        placement: promotion.placement,
-        usageLimit:
-          promotion.usageLimit != null ? String(promotion.usageLimit) : "",
-        startDate: toDatePickerValue(promotion.startsAt),
-        endDate: toDatePickerValue(promotion.endsAt),
-        ...promotion.targeting,
-      });
-    } else {
-      setForm(emptyForm());
-    }
+    setForm(promotion ? formFromPromotion(promotion) : emptyPromotionForm());
   }, [open, promotion]);
 
   if (!open) return null;
 
-  const isDiscountType = DISCOUNT_TYPES.includes(form.type);
+  const isPercent = form.type === "percentage_discount";
 
-  function patch(next: Partial<FormState>) {
+  function patch(next: Partial<PromotionFormState>) {
     setForm((f) => ({ ...f, ...next }));
   }
 
-  function toggle(list: keyof Pick<FormState, "campusIds" | "vendorIds" | "productIds" | "categoryIds">, id: string) {
-    setForm((f) => {
-      const current = f[list];
-      return {
-        ...f,
-        [list]: current.includes(id)
-          ? current.filter((x) => x !== id)
-          : [...current, id],
-      };
-    });
-  }
-
   function submit() {
-    const nextErrors: Record<string, string> = {};
-    if (form.name.trim().length < 3) {
-      nextErrors.name = "Give the promotion a name (at least 3 characters).";
-    }
-    if (new Date(form.endDate).getTime() <= new Date(form.startDate).getTime()) {
-      nextErrors.endDate = "End date must be after the start date.";
-    }
-    if (isDiscountType) {
-      const v = Number(form.discountValue);
-      if (!form.discountValue || Number.isNaN(v)) {
-        nextErrors.discountValue =
-          form.type === "fixed_discount"
-            ? "Enter the naira amount to knock off."
-            : "Enter a discount percentage.";
-      } else if (
-        (form.type === "percentage_discount" || form.type === "promo_code") &&
-        (v < 1 || v > 90)
-      ) {
-        nextErrors.discountValue = "Percentage must be between 1 and 90.";
-      } else if (form.type === "fixed_discount" && v < 100) {
-        nextErrors.discountValue = "Fixed discounts start from N100.";
-      }
-    }
-    if (form.type === "promo_code" && form.code.trim().length < 4) {
-      nextErrors.code = "Codes need at least 4 characters (e.g. CAMPUS15).";
-    }
-    if (form.type === "featured_product" && form.productIds.length === 0) {
-      nextErrors.productIds = "Pick at least one product to feature.";
-    }
-    if (form.type === "featured_vendor" && form.vendorIds.length === 0) {
-      nextErrors.vendorIds = "Pick at least one vendor to feature.";
-    }
-    if (form.type === "campus_promotion" && form.campusIds.length === 0) {
-      nextErrors.campusIds = "Pick at least one campus.";
-    }
+    const nextErrors = validatePromotionForm(form);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
-
-    const num = (s: string): number | null => {
-      if (!s.trim()) return null;
-      const n = Number(s);
-      return Number.isNaN(n) ? null : n;
-    };
-
-    onSubmit({
-      name: form.name.trim(),
-      description: form.description.trim(),
-      type: form.type,
-      code: form.type === "promo_code" ? form.code.trim().toUpperCase() : null,
-      discountValue: isDiscountType ? num(form.discountValue) : null,
-      minSpend: num(form.minSpend),
-      placement: form.placement,
-      usageLimit: num(form.usageLimit),
-      targeting: {
-        campusIds: form.campusIds,
-        vendorIds: form.vendorIds,
-        productIds: form.productIds,
-        categoryIds: form.categoryIds,
-      },
-      startsAt: new Date(`${form.startDate}T00:00:00`).toISOString(),
-      endsAt: new Date(`${form.endDate}T23:59:59`).toISOString(),
-    });
+    onSubmit(buildPromotionInput(form));
   }
 
   const targetingFields: {
-    key: keyof Pick<
-      FormState,
-      "campusIds" | "vendorIds" | "productIds" | "categoryIds"
-    >;
+    key: TargetList;
     label: string;
     items: { id: string; name: string }[];
-    required: boolean;
     searchable?: boolean;
-    error?: string;
   }[] = [
-    {
-      key: "campusIds",
-      label: "Campuses",
-      items: options.campuses,
-      required: form.type === "campus_promotion",
-      error: errors.campusIds,
-    },
-    {
-      key: "vendorIds",
-      label: "Vendors",
-      items: options.vendors,
-      required: form.type === "featured_vendor",
-      searchable: true,
-      error: errors.vendorIds,
-    },
-    {
-      key: "productIds",
-      label: "Products",
-      items: options.products,
-      required: form.type === "featured_product",
-      searchable: true,
-      error: errors.productIds,
-    },
-    {
-      key: "categoryIds",
-      label: "Categories",
-      items: options.categories,
-      required: false,
-      error: errors.categoryIds,
-    },
+    { key: "campusIds", label: "Campuses", items: options.campuses },
+    { key: "vendorIds", label: "Vendor (pick one)", items: options.vendors, searchable: true },
+    { key: "productIds", label: "Products", items: options.products, searchable: true },
+    { key: "categoryIds", label: "Category (pick one)", items: options.categories },
   ];
 
   return (
@@ -255,8 +101,8 @@ export function PromotionFormDialog({
             {promotion ? `Edit “${promotion.name}”` : "New promotion"}
           </h2>
           <p className="mt-0.5 text-xs leading-relaxed text-kampmax-text-secondary">
-            Mock configuration only - discounts are not yet calculated against
-            real orders at checkout.
+            Customers enter the code at checkout. It applies to the items you
+            target, or to the whole basket when nothing is targeted.
           </p>
         </div>
 
@@ -273,92 +119,107 @@ export function PromotionFormDialog({
             <Select
               label="Type"
               value={form.type}
-              onChange={(e) =>
-                patch({ type: e.target.value as FormState["type"] })
-              }
+              onChange={(e) => patch({ type: e.target.value as PromotionFormState["type"] })}
             >
-              {(
-                Object.entries(PROMOTION_TYPE_LABELS) as [
-                  FormState["type"],
-                  string,
-                ][]
-              ).map(([value, label]) => (
+              {PROMOTION_TYPE_FILTER_ORDER.map((value) => (
                 <option key={value} value={value}>
-                  {label}
+                  {PROMOTION_TYPE_LABELS[value]}
                 </option>
               ))}
             </Select>
           </div>
 
-          {(isDiscountType || form.type === "promo_code") && (
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Input
-                label={
-                  form.type === "fixed_discount"
-                    ? "Amount off (₦)"
-                    : "Discount (%)"
-                }
-                type="number"
-                min={form.type === "fixed_discount" ? 100 : 1}
-                max={form.type === "fixed_discount" ? undefined : 90}
-                value={form.discountValue}
-                placeholder={form.type === "fixed_discount" ? "1500" : "15"}
-                error={errors.discountValue}
-                onChange={(e) => patch({ discountValue: e.target.value })}
-              />
-              {form.type === "promo_code" && (
-                <Input
-                  label="Code"
-                  value={form.code}
-                  placeholder="CAMPUS15"
-                  error={errors.code}
-                  onChange={(e) => patch({ code: e.target.value.toUpperCase() })}
-                />
-              )}
-              <Input
-                label="Min. spend (₦)"
-                hint="Optional"
-                type="number"
-                min={0}
-                value={form.minSpend}
-                placeholder="5000"
-                onChange={(e) => patch({ minSpend: e.target.value })}
-              />
-            </div>
-          )}
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Input
+              label={isPercent ? "Discount (%)" : "Amount off (₦)"}
+              type="number"
+              min={isPercent ? 1 : 100}
+              max={isPercent ? 90 : undefined}
+              value={form.discountValue}
+              placeholder={isPercent ? "15" : "1500"}
+              error={errors.discountValue}
+              onChange={(e) => patch({ discountValue: e.target.value })}
+            />
+            <Input
+              label="Code"
+              value={form.code}
+              placeholder="CAMPUS15"
+              error={errors.code}
+              onChange={(e) => patch({ code: e.target.value.toUpperCase() })}
+            />
+            <Input
+              label="Min. spend (₦)"
+              hint="Optional"
+              type="number"
+              min={0}
+              value={form.minSpend}
+              placeholder="5000"
+              onChange={(e) => patch({ minSpend: e.target.value })}
+            />
+          </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
+            {isPercent && (
+              <Input
+                label="Max discount (₦)"
+                hint="Optional - caps one order"
+                type="number"
+                min={1}
+                value={form.maxDiscount}
+                placeholder="2000"
+                error={errors.maxDiscount}
+                onChange={(e) => patch({ maxDiscount: e.target.value })}
+              />
+            )}
+            <Input
+              label="Usage limit"
+              hint="Optional - total redemptions"
+              type="number"
+              min={1}
+              value={form.usageLimit}
+              placeholder="200"
+              error={errors.usageLimit}
+              onChange={(e) => patch({ usageLimit: e.target.value })}
+            />
+            <Input
+              label="Per customer"
+              hint="Optional - times each can use it"
+              type="number"
+              min={1}
+              value={form.perUserLimit}
+              placeholder="1"
+              error={errors.perUserLimit}
+              onChange={(e) => patch({ perUserLimit: e.target.value })}
+            />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
             <Select
-              label="Placement"
-              value={form.placement}
-              onChange={(e) =>
-                patch({
-                  placement: e.target.value as FormState["placement"],
-                })
-              }
+              label="Who can use it"
+              value={form.eligibility}
+              onChange={(e) => patch({ eligibility: e.target.value as PromotionEligibility })}
             >
               {(
-                Object.entries(PROMOTION_PLACEMENT_LABELS) as [
-                  FormState["placement"],
-                  string,
-                ][]
+                Object.entries(PROMOTION_ELIGIBILITY_LABELS) as [PromotionEligibility, string][]
               ).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
                 </option>
               ))}
             </Select>
-            {!isDiscountType ? null : (
-              <Input
-                label="Usage limit"
-                hint="Optional - total redemptions"
-                type="number"
-                min={1}
-                value={form.usageLimit}
-                placeholder="200"
-                onChange={(e) => patch({ usageLimit: e.target.value })}
-              />
-            )}
+            <Select
+              label="Featured on storefront"
+              value={form.placement}
+              onChange={(e) =>
+                patch({ placement: e.target.value as PromotionFormState["placement"] })
+              }
+            >
+              {PROMOTION_PLACEMENT_CHOICES.map((value) => (
+                <option key={value} value={value}>
+                  {PROMOTION_PLACEMENT_LABELS[value]}
+                </option>
+              ))}
+            </Select>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -383,9 +244,7 @@ export function PromotionFormDialog({
               className="mb-1.5 block text-sm font-medium text-kampmax-text"
             >
               Description{" "}
-              <span className="font-normal text-kampmax-text-secondary">
-                (internal note)
-              </span>
+              <span className="font-normal text-kampmax-text-secondary">(internal note)</span>
             </label>
             <textarea
               id="promo-description"
@@ -402,7 +261,8 @@ export function PromotionFormDialog({
             <p className="text-xs font-semibold uppercase tracking-wide text-kampmax-text-secondary">
               Targeting{" "}
               <span className="font-normal normal-case">
-                - empty lists mean everyone / everything
+                - pick products, a category or a vendor, or leave empty for everything.
+                Campuses can be added to any of these.
               </span>
             </p>
             <div className="mt-3 space-y-3">
@@ -412,13 +272,9 @@ export function PromotionFormDialog({
                   label={field.label}
                   items={field.items}
                   selected={form[field.key]}
-                  required={field.required}
                   searchable={field.searchable}
-                  error={field.error}
-                  onToggle={(id) => toggle(field.key, id)}
-                  onClearAll={() =>
-                    setForm((f) => ({ ...f, [field.key]: [] }))
-                  }
+                  onToggle={(id) => setForm((f) => toggleTarget(f, field.key, id))}
+                  onClearAll={() => setForm((f) => ({ ...f, [field.key]: [] }))}
                 />
               ))}
             </div>
@@ -454,18 +310,14 @@ function ChipMultiSelect({
   label,
   items,
   selected,
-  required = false,
   searchable = false,
-  error,
   onToggle,
   onClearAll,
 }: {
   label: string;
   items: { id: string; name: string }[];
   selected: string[];
-  required?: boolean;
   searchable?: boolean;
-  error?: string;
   onToggle: (id: string) => void;
   onClearAll: () => void;
 }) {
@@ -480,23 +332,15 @@ function ChipMultiSelect({
   return (
     <div>
       <div className="mb-1 flex items-baseline justify-between gap-2">
-        <span className="text-sm font-medium text-kampmax-text">
-          {label}
-          {required && <span className="ml-1 text-kampmax-error">*</span>}
-        </span>
+        <span className="text-sm font-medium text-kampmax-text">{label}</span>
         <span className="text-[11px] tabular-nums text-kampmax-text-secondary">
           {selected.length === 0
-            ? `All ${label.toLowerCase()}`
+            ? `All ${label.replace(/ \(.*\)$/, "").toLowerCase()}`
             : `${selected.length} of ${items.length}`}
         </span>
       </div>
 
-      <div
-        className={cn(
-          "rounded-md border bg-white",
-          error ? "border-kampmax-error" : "border-kampmax-border"
-        )}
-      >
+      <div className="rounded-md border border-kampmax-border bg-white">
         <div className="flex items-center justify-between gap-2 px-2 pt-2">
           {searchable ? (
             <div className="relative flex-1">
@@ -547,20 +391,19 @@ function ChipMultiSelect({
                 >
                   {checked && <Check className="h-2.5 w-2.5" strokeWidth={3} />}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-kampmax-text">
-                  {item.name}
-                </span>
+                <span className="min-w-0 flex-1 truncate text-kampmax-text">{item.name}</span>
               </button>
             );
           })}
           {filtered.length === 0 && (
             <p className="px-2 py-1.5 text-xs text-kampmax-text-secondary">
-              No matches for “{query.trim()}”.
+              {items.length === 0
+                ? "Nothing to pick yet."
+                : `No matches for “${query.trim()}”.`}
             </p>
           )}
         </div>
       </div>
-      {error && <p className="mt-1 text-xs text-kampmax-error">{error}</p>}
     </div>
   );
 }

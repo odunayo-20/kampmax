@@ -192,17 +192,15 @@ import {
 export const financeManagementService: AdminFinanceManagementService =
   createFinanceManagementService();
 
-import {
-  AdminPromotionManagementService,
-  createPromotionManagementService,
-} from "./promotion-management.service";
+import type { AdminPromotionManagementService } from "./promotion-management.service";
+import { createApiPromotionManagementService } from "./promotion-management.api";
 
 import type { AdminFreelancerManagementService } from "./freelancer-management.service";
 import { createApiFreelancerManagementService } from "./freelancer-management.api";
 
 /** /admin/promotions console (campaigns, codes, featured placements). */
 export const promotionManagementService: AdminPromotionManagementService =
-  createPromotionManagementService();
+  createApiPromotionManagementService();
 
 export const productService: AdminProductService =
   createMockProductService(mockProducts);

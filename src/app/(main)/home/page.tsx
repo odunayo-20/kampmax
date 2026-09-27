@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { ProductCard, CategoryCard } from "@/components/marketplace";
 import { PageContainer, SectionHeader, HorizontalScroll } from "@/components/layout";
-import { VendorCard, QuickAction, ProductCardHorizontal } from "@/components/home";
+import { VendorCard, QuickAction, ProductCardHorizontal, FeaturedPromotions } from "@/components/home";
 import { useApp } from "@/lib/app-context";
 import { useAuth } from "@/lib/auth-context";
 import { useHomeCategories, useHomeProducts, useHomeVendors } from "@/hooks/use-home";
@@ -162,7 +162,11 @@ export default function HomePage() {
         </section>
       )}
 
+      {/* Promo codes featured by Kampmax */}
+      <FeaturedPromotions placement="homepage_banner" campusId={campusId} title="Promo codes for you" />
+
       {/* 7. Deals & Discounts — amber strategic: #FFFBEB / #F59E0B / #DC2626 */}
+      <FeaturedPromotions placement="deals_page" campusId={campusId} title="Deals & codes" />
       {featured.length > 0 ? (
         <section aria-label="Deals and discounts" className="rounded-[14px] bg-accent-50 border border-accent-100 p-4 sm:p-5">
           <SectionHeader

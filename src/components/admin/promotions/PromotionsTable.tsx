@@ -93,7 +93,7 @@ export function PromotionsTable(props: PromotionsTableProps) {
         message={
           hasActiveFilters
             ? "Try different search terms or filters."
-            : "Create a discount, promo code or featured placement to get started."
+            : "Create a promo code to get started."
         }
         action={
           hasActiveFilters ? (
@@ -156,6 +156,9 @@ export function PromotionsTable(props: PromotionsTableProps) {
                         ) : (
                           p.id.toUpperCase()
                         )}
+                        {p.vendorName && (
+                          <span className="ml-2 font-sans normal-case">by {p.vendorName}</span>
+                        )}
                       </span>
                     </div>
                   </div>
@@ -190,7 +193,9 @@ export function PromotionsTable(props: PromotionsTableProps) {
                 <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-kampmax-text-secondary">
                   <span title={p.startsAt}>{formatDateShort(p.startsAt)}</span>
                   {" → "}
-                  <span title={p.endsAt}>{formatDateShort(p.endsAt)}</span>
+                  <span title={p.endsAt ?? undefined}>
+                    {p.endsAt ? formatDateShort(p.endsAt) : "No end"}
+                  </span>
                 </td>
 
                 <td className="hidden whitespace-nowrap px-3 py-2.5 tabular-nums md:table-cell">
@@ -271,7 +276,7 @@ export function PromotionsTable(props: PromotionsTableProps) {
               </MetaCell>
               <MetaCell label="Runs">
                 <span className="tabular-nums">
-                  {formatDateShort(p.startsAt)} - {formatDateShort(p.endsAt)}
+                  {formatDateShort(p.startsAt)} - {p.endsAt ? formatDateShort(p.endsAt) : "No end"}
                 </span>
               </MetaCell>
               <MetaCell label="Target">

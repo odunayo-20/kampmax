@@ -11,12 +11,13 @@ import type { BadgeVariant } from "@/components/admin/StatusBadge";
 import type {
   ManagedPromotionStatus,
   ManagedPromotionType,
+  PromotionEligibility,
   PromotionPlacement,
 } from "@/types/admin";
 
 export const PROMOTION_TYPE_LABELS: Record<ManagedPromotionType, string> = {
-  percentage_discount: "Percentage discount",
-  fixed_discount: "Fixed discount",
+  percentage_discount: "Percentage code",
+  fixed_discount: "Fixed-amount code",
   promo_code: "Promo code",
   featured_product: "Featured product",
   featured_vendor: "Featured vendor",
@@ -86,6 +87,19 @@ export const PROMOTION_PLACEMENT_LABELS: Record<PromotionPlacement, string> = {
   none: "No placement",
 };
 
+/** The storefront slots that actually show promotions. */
+export const PROMOTION_PLACEMENT_CHOICES: PromotionPlacement[] = [
+  "none",
+  "homepage_banner",
+  "deals_page",
+];
+
+export const PROMOTION_ELIGIBILITY_LABELS: Record<PromotionEligibility, string> = {
+  all_customers: "Everyone",
+  new_customers: "New to the store",
+  returning_customers: "Returning customers",
+};
+
 export function promotionPlacementLabel(placement: PromotionPlacement): string {
   return PROMOTION_PLACEMENT_LABELS[placement] ?? placement;
 }
@@ -110,13 +124,10 @@ export function discountLabel(promotion: {
   }
 }
 
+/** The promotion types the platform actually supports. */
 export const PROMOTION_TYPE_FILTER_ORDER: ManagedPromotionType[] = [
   "percentage_discount",
   "fixed_discount",
-  "promo_code",
-  "featured_product",
-  "featured_vendor",
-  "campus_promotion",
 ];
 
 export const PROMOTION_STATUS_FILTER_ORDER: ManagedPromotionStatus[] = [

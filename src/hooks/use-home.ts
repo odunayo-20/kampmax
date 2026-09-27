@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchProducts } from "@/services/products";
 import { fetchCategories } from "@/services/categories";
 import { fetchVendors } from "@/services/users";
+import { fetchFeaturedPromotions, type FeaturedPlacement } from "@/services/featured-promotions";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -23,6 +24,8 @@ export const homeKeys = {
   products: (campusId?: string) => ["home", "products", campusId ?? "all"] as const,
   categories: ["home", "categories"] as const,
   vendors: (campusId?: string) => ["home", "vendors", campusId ?? "all"] as const,
+  featured: (placement: string, campusId?: string) =>
+    ["home", "featured", placement, campusId ?? "all"] as const,
 };
 
 /** Only real (UUID) campus ids can be sent to the API. */
@@ -51,5 +54,15 @@ export function useHomeVendors(campusId?: string) {
   return useQuery({
     queryKey: homeKeys.vendors(apiCampusId),
     queryFn: async () => live(await fetchVendors({ campusId: apiCampusId, limit: 10 })),
+  });
+}
+
+/** Promo codes an admin featured in a storefront slot. */
+export function useFeaturedPromotions(placement: FeaturedPlacement, campusId?: string) {
+  const apiCampusId = toApiCampusId(campusId);
+  return useQuery({
+    queryKey: homeKeys.featured(placement, apiCampusId),
+    queryFn: () => fetchFeaturedPromotions(placement, apiCampusId),
+    staleTime: 60_000,
   });
 }

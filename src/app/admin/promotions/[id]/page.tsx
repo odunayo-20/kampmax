@@ -22,6 +22,7 @@ import {
 } from "@/components/admin/promotions/PromotionBadges";
 import { PromotionFormDialog } from "@/components/admin/promotions/PromotionFormDialog";
 import {
+  PROMOTION_ELIGIBILITY_LABELS,
   discountLabel,
   promotionPlacementLabel,
 } from "@/components/admin/promotions/promotions-meta";
@@ -58,13 +59,7 @@ export default function AdminPromotionDetailPage({
       ]);
       setPromoId(id);
       setOptions(opts);
-      let found: ManagedPromotion | null = null;
-      for (const p of (await promotionManagementService.list({ pageSize: 500 })).items) {
-        if (p.id === id.trim().toLowerCase()) {
-          found = p;
-          break;
-        }
-      }
+      const found = await promotionManagementService.getById(id);
       setPromotion(found);
     } catch {
       setError(true);
@@ -192,12 +187,12 @@ export default function AdminPromotionDetailPage({
         />
         <SummaryTile
           label="Window"
-          value={`${new Date(promotion.startsAt).toLocaleDateString("en-NG", { day: "numeric", month: "short" })} - ${new Date(promotion.endsAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}`}
+          value={`${new Date(promotion.startsAt).toLocaleDateString("en-NG", { day: "numeric", month: "short" })} - ${promotion.endsAt ? new Date(promotion.endsAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" }) : "no end date"}`}
           icon={CalendarRange}
         />
         <SummaryTile
-          label="Placement"
-          value={promotionPlacementLabel(promotion.placement)}
+          label="Run by"
+          value={promotion.vendorName ?? "Kampmax"}
           icon={Layers}
         />
       </div>
@@ -220,6 +215,7 @@ export default function AdminPromotionDetailPage({
               nameFor={(id) =>
                 options?.campuses.find((c) => c.id === id)?.name ?? id.toUpperCase()
               }
+              hrefFor={(id) => `/admin/campuses/${id}`}
               emptyText="All campuses"
             />
             <TargetRow
@@ -265,7 +261,34 @@ export default function AdminPromotionDetailPage({
           <h2 className="mb-3 text-sm font-semibold text-kampmax-text">Configuration</h2>
           <dl className="space-y-2.5 text-sm">
             <InfoRow label="Type" value={<PromotionTypeBadge type={promotion.type} />} />
-            <InfoRow label="Placement" value={promotionPlacementLabel(promotion.placement)} />
+            <InfoRow
+              label="Featured on"
+              value={
+                promotion.placement === "none"
+                  ? "Not featured"
+                  : promotionPlacementLabel(promotion.placement)
+              }
+            />
+            <InfoRow
+              label="Who can use it"
+              value={PROMOTION_ELIGIBILITY_LABELS[promotion.eligibility ?? "all_customers"]}
+            />
+            <InfoRow
+              label="Max discount"
+              value={
+                promotion.maxDiscount != null
+                  ? `₦${promotion.maxDiscount.toLocaleString("en-NG")} per order`
+                  : "No cap"
+              }
+            />
+            <InfoRow
+              label="Per customer"
+              value={
+                promotion.perUserLimit != null
+                  ? `${promotion.perUserLimit} time${promotion.perUserLimit === 1 ? "" : "s"}`
+                  : "Unlimited"
+              }
+            />
             <InfoRow
               label="Min. spend"
               value={
@@ -274,7 +297,7 @@ export default function AdminPromotionDetailPage({
                   : "None"
               }
             />
-            {promotion.type === "promo_code" && (
+            {promotion.code && (
               <InfoRow
                 label="Code"
                 value={
