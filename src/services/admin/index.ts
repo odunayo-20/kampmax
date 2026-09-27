@@ -167,14 +167,12 @@ export const categoryManagementService: AdminCategoryManagementService =
   createApiCategoryManagementService();
 export { setCategoryTaxonomy } from "./category-management.api";
 
-import {
-  AdminOrderManagementService,
-  createOrderManagementService,
-} from "./order-management.service";
+import type { AdminOrderManagementService } from "./order-management.service";
+import { createApiOrderManagementService } from "./order-management.api";
 
-/** /admin/orders console (lifecycle inspection). */
+/** /admin/orders console (live order inspection, read-only). */
 export const orderManagementService: AdminOrderManagementService =
-  createOrderManagementService();
+  createApiOrderManagementService();
 
 import {
   AdminPaymentManagementService,

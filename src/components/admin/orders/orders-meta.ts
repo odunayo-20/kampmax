@@ -78,6 +78,8 @@ export function paymentMethodLabel(method: string): string {
   switch (method) {
     case "paystack":
       return "Paystack";
+    case "flutterwave":
+      return "Flutterwave";
     case "wallet":
       return "Kampmax Wallet";
     case "bank_transfer":

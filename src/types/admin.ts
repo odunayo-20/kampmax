@@ -1299,7 +1299,7 @@ export interface ManagedOrderItem {
 }
 
 export interface ManagedOrderPayment {
-  method: AdminOrder["paymentMethod"];
+  method: AdminOrder["paymentMethod"] | "flutterwave";
   status: ManagedOrderPaymentStatus;
   transactionId: string; // links to /admin/payments ledger
   paidAt: string | null;
@@ -1340,7 +1340,9 @@ export interface ManagedOrderNote {
   createdAt: string;
 }
 
-export interface ManagedOrder extends Omit<AdminOrder, "status" | "paymentStatus"> {
+export interface ManagedOrder
+  extends Omit<AdminOrder, "status" | "paymentStatus" | "paymentMethod"> {
+  paymentMethod: AdminOrder["paymentMethod"] | "flutterwave";
   status: ManagedOrderStatus;
   paymentStatus: ManagedOrderPaymentStatus;
 }
