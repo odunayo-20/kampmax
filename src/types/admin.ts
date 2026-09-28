@@ -2597,10 +2597,28 @@ export interface ManagedPayoutGatewayStatus {
   note: string;
 }
 
+export const MANAGED_PAYOUT_RESOLUTION_OUTCOMES = [
+  "successful",
+  "failed",
+  "reversed",
+] as const;
+export type ManagedPayoutResolutionOutcome =
+  (typeof MANAGED_PAYOUT_RESOLUTION_OUTCOMES)[number];
+
 export interface ManagedPayoutActionSupport {
-  /** No approve/process/retry/cancel/reverse endpoint exists in the prototype backend. */
+  /** True for a bank-transfer withdrawal — wallet settlements post automatically. */
   supported: boolean;
+  /** True only while this specific payout is a pending withdrawal. */
+  resolvable: boolean;
   note: string;
+}
+
+/** Records what actually happened to a pending withdrawal — there is no
+ * disbursement provider wired in to confirm this automatically. */
+export interface ResolvePayoutInput {
+  outcome: ManagedPayoutResolutionOutcome;
+  /** Required for failed/reversed — why the transfer did not land. */
+  reason?: string;
 }
 
 /** Real wallet account behind wallet-method payouts (wallet rows only). */

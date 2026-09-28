@@ -7,15 +7,18 @@
 // TanStack Query wrappers over the payout-management service.
 // Keys are NOT campus-scoped — payout records are restricted to full
 // operators (ADMIN/SUPER_ADMIN) at the nav-permission layer, so there
-// is no campus shard to leak across. Read-only namespace: the backend
-// exposes no payout-level mutations (approve/process/retry/cancel/
-// reverse are disbursement-backend concerns, not wired in here).
+// is no campus shard to leak across. Mostly read-only: the one mutation
+// (resolve) closes the gap left by having no disbursement provider wired
+// in — it lets an admin record what actually happened to a pending
+// bank-transfer withdrawal (approve/process/retry/cancel are still not
+// endpoints; a withdrawal is either resolved successful, failed or
+// reversed, once, by hand).
 // ============================================================
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminKeys } from "@/lib/query-keys";
 import { payoutManagementService } from "@/services/admin";
-import type { ManagedPayoutListQuery } from "@/types/admin";
+import type { ManagedPayoutListQuery, ResolvePayoutInput } from "@/types/admin";
 import { useAdminSession } from "@/lib/admin/admin-auth-context";
 
 function useActor() {
@@ -55,5 +58,18 @@ export function useAdminPayoutFacets() {
   return useQuery({
     queryKey: adminKeys.payouts.facets(),
     queryFn: () => payoutManagementService.getFacets(),
+  });
+}
+
+/** Records the real outcome of a pending bank-transfer withdrawal. */
+export function useResolvePayoutMutation() {
+  useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: ResolvePayoutInput }) =>
+      payoutManagementService.resolvePayout(id, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.payouts.all });
+    },
   });
 }

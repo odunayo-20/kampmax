@@ -273,14 +273,12 @@ import { createApiTransactionManagementService } from "./transaction-management.
 export const transactionManagementService: AdminTransactionManagementService =
   createApiTransactionManagementService();
 
-import {
-  AdminPayoutManagementService,
-  createPayoutManagementService,
-} from "./payout-management.service";
+import type { AdminPayoutManagementService } from "./payout-management.service";
+import { createApiPayoutManagementService } from "./payout-management.api";
 
-/** /admin/payouts console (Admin Vendor/Freelancer Payouts - read-only recipient payout ledger over the real wallet/vendor/freelancer payout stores). */
+/** /admin/payouts console: live read-only ledger (GET /admin/payouts) over wallet settlements and withdrawals owned by vendors and freelancers. */
 export const payoutManagementService: AdminPayoutManagementService =
-  createPayoutManagementService();
+  createApiPayoutManagementService();
 
 import type { FinanceManagementService } from "@/types/admin";
 import { createApiFinanceConsoleService } from "./finance-management.api";

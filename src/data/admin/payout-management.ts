@@ -362,6 +362,7 @@ const PAYOUT_GATEWAY = {
 
 const PAYOUT_ACTIONS = {
   supported: false,
+  resolvable: false,
   note: "No payout action endpoints exist in the prototype backend — there is no approve, process, retry, cancel or reverse for any vendor or freelancer payout. Records are shown exactly as recorded by their owning stores.",
 };
 

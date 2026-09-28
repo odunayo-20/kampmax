@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { useCallback, useRef, useState, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { adminErrorMessage } from "@/lib/admin/error-reporting";
+import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { LoadingSkeleton } from "@/components/admin/LoadingSkeleton";
 import {
   PayoutMethodBadge,
@@ -21,11 +22,15 @@ import {
   PayoutStatusBadge,
 } from "@/components/admin/payouts/PayoutBadges";
 import { formatPayoutDate } from "@/components/admin/payouts/payouts-meta";
-import { useAdminPayout } from "@/hooks/admin/use-admin-payouts";
+import {
+  useAdminPayout,
+  useResolvePayoutMutation,
+} from "@/hooks/admin/use-admin-payouts";
 import { formatNaira } from "@/lib/utils";
 import type {
   ManagedPayoutActivity,
   ManagedPayoutDetail,
+  ManagedPayoutResolutionOutcome,
 } from "@/types/admin";
 
 type TabKey = "overview" | "timeline";
@@ -43,6 +48,12 @@ export default function PayoutDetailPage() {
   );
 }
 
+interface ToastMessage {
+  id: number;
+  tone: "success" | "error";
+  text: string;
+}
+
 function PayoutDetailPageInner() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -50,6 +61,30 @@ function PayoutDetailPageInner() {
 
   const { data: detail, isLoading, error } = useAdminPayout(id);
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
+  const [confirmOutcome, setConfirmOutcome] =
+    useState<ManagedPayoutResolutionOutcome | null>(null);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const toastId = useRef(0);
+  const resolveMut = useResolvePayoutMutation();
+
+  const pushToast = useCallback((tone: ToastMessage["tone"], text: string) => {
+    const tid = ++toastId.current;
+    setToasts((t) => [...t.slice(-2), { id: tid, tone, text }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== tid)), 3800);
+  }, []);
+
+  async function resolvePayout(outcome: ManagedPayoutResolutionOutcome, reason: string) {
+    try {
+      await resolveMut.mutateAsync({
+        id,
+        input: { outcome, reason: reason.trim() || undefined },
+      });
+      setConfirmOutcome(null);
+      pushToast("success", `Payout marked ${outcome}.`);
+    } catch (err) {
+      pushToast("error", err instanceof Error ? err.message : "Couldn't record the outcome.");
+    }
+  }
 
   if (isLoading) return <DetailSkeleton />;
 
@@ -313,6 +348,28 @@ function PayoutDetailPageInner() {
               <ShieldAlert className="h-3.5 w-3.5" /> Actions
             </h3>
             <p className="text-sm text-kampmax-text-secondary">{actions.note}</p>
+            {actions.resolvable && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  onClick={() => setConfirmOutcome("successful")}
+                  className="inline-flex h-8 items-center rounded-md bg-kampmax-success px-3 text-xs font-medium text-white transition-colors hover:bg-kampmax-success/90"
+                >
+                  Mark successful
+                </button>
+                <button
+                  onClick={() => setConfirmOutcome("failed")}
+                  className="inline-flex h-8 items-center rounded-md border border-kampmax-error/40 bg-white px-3 text-xs font-medium text-kampmax-error transition-colors hover:bg-kampmax-error/5"
+                >
+                  Mark failed
+                </button>
+                <button
+                  onClick={() => setConfirmOutcome("reversed")}
+                  className="inline-flex h-8 items-center rounded-md border border-kampmax-border bg-white px-3 text-xs font-medium text-kampmax-text transition-colors hover:bg-kampmax-muted/60"
+                >
+                  Mark reversed
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -338,6 +395,55 @@ function PayoutDetailPageInner() {
               No timeline is recorded for this payout by the owning store.
             </p>
           )}
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={confirmOutcome !== null}
+        title={
+          confirmOutcome === "successful"
+            ? "Mark this payout successful?"
+            : confirmOutcome === "failed"
+              ? "Mark this payout failed?"
+              : "Mark this payout reversed?"
+        }
+        message={
+          confirmOutcome === "successful"
+            ? "Confirm only once you've verified the transfer landed in the recipient's bank account. This cannot be undone."
+            : "The debited amount is returned to the recipient's wallet immediately. This cannot be undone."
+        }
+        confirmLabel={
+          confirmOutcome === "successful"
+            ? "Mark successful"
+            : confirmOutcome === "failed"
+              ? "Mark failed"
+              : "Mark reversed"
+        }
+        tone={confirmOutcome === "successful" ? "default" : "warning"}
+        loading={resolveMut.isPending}
+        reasonLabel={
+          confirmOutcome && confirmOutcome !== "successful"
+            ? "Reason (recorded in the audit log)"
+            : undefined
+        }
+        onConfirm={(reason) => {
+          if (confirmOutcome) void resolvePayout(confirmOutcome, reason);
+        }}
+        onCancel={() => setConfirmOutcome(null)}
+      />
+
+      {toasts.length > 0 && (
+        <div className="fixed bottom-4 right-4 z-80 flex flex-col gap-2">
+          {toasts.map((t) => (
+            <div
+              key={t.id}
+              className={`rounded-md px-3.5 py-2 text-sm font-medium text-white shadow-lg ${
+                t.tone === "success" ? "bg-kampmax-success" : "bg-kampmax-error"
+              }`}
+            >
+              {t.text}
+            </div>
+          ))}
         </div>
       )}
     </>

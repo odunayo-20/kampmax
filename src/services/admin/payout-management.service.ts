@@ -5,6 +5,7 @@ import {
   ManagedPayoutListQuery,
   ManagedPayoutStatusCounts,
   Paginated,
+  ResolvePayoutInput,
 } from "@/types/admin";
 import { apiDelay, paginate } from "@/lib/admin/api";
 import {
@@ -24,6 +25,8 @@ export interface AdminPayoutManagementService {
   getById(id: string): Promise<ManagedPayoutDetail | null>;
   getCounts(): Promise<ManagedPayoutStatusCounts>;
   getFacets(): Promise<ManagedPayoutFacets>;
+  /** Records the real outcome of a pending bank-transfer withdrawal. */
+  resolvePayout(id: string, input: ResolvePayoutInput): Promise<ManagedPayoutDetail>;
 }
 
 // ------------------------------------------------------------
@@ -67,6 +70,42 @@ export function createPayoutManagementService(): AdminPayoutManagementService {
     async getFacets() {
       await apiDelay(60);
       return payoutFacets(payoutDataset.rows);
+    },
+
+    async resolvePayout(id, input) {
+      await apiDelay();
+      const detail = payoutDataset.byId.get(id);
+      if (!detail) throw new Error("Payout not found");
+      if (detail.payout.method !== "bank_transfer" || detail.payout.status !== "pending") {
+        throw new Error(
+          "Only a pending bank-transfer withdrawal can be resolved — wallet settlements post automatically."
+        );
+      }
+      const now = new Date().toISOString();
+      const reason = input.reason?.trim() || null;
+      detail.payout.status = input.outcome;
+      detail.payout.processedAt = now;
+      detail.payout.failedReason = input.outcome === "failed" ? reason ?? "Not recorded." : null;
+      detail.payout.reversalReason = input.outcome === "reversed" ? reason ?? "Not recorded." : null;
+      detail.actions = {
+        supported: true,
+        resolvable: false,
+        note: `This withdrawal was already marked ${input.outcome}; resolution is one-way.`,
+      };
+      detail.timeline = [
+        ...detail.timeline,
+        {
+          id: `${id}-resolved`,
+          kind: input.outcome === "successful" ? "completed" : input.outcome,
+          title: `Payout marked ${input.outcome} by an admin`,
+          meta:
+            input.outcome === "successful"
+              ? "Confirmed delivered to the bank account on record"
+              : reason ?? "Not recorded.",
+          at: now,
+        },
+      ];
+      return detail;
     },
   };
 }
