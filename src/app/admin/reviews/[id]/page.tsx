@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -14,12 +14,14 @@ import {
   Image as ImageIcon,
   MessageSquare,
   ShieldAlert,
+  ShieldCheck,
   Star,
   ThumbsUp,
   UserRound,
 } from "lucide-react";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { ErrorState } from "@/components/admin/ErrorState";
 import { LoadingSkeleton } from "@/components/admin/LoadingSkeleton";
 import { StatCard } from "@/components/admin/StatCard";
@@ -31,10 +33,31 @@ import {
 } from "@/components/admin/reviews/ReviewBadges";
 import {
   reviewReportReasonLabel,
+  reviewStatusLabel,
   reviewStatusSourceLabel,
 } from "@/components/admin/reviews/reviews-meta";
-import { useAdminReview } from "@/hooks/admin/use-admin-reviews";
-import type { ManagedReviewDetail, ManagedReviewReportView } from "@/types/admin";
+import {
+  useAdminReview,
+  useModerateReviewMutation,
+} from "@/hooks/admin/use-admin-reviews";
+import type {
+  ManagedReviewDetail,
+  ManagedReviewModerationStatus,
+  ManagedReviewReportView,
+} from "@/types/admin";
+
+interface ToastMessage {
+  id: number;
+  tone: "success" | "error";
+  text: string;
+}
+
+const MODERATION_STATUSES: ManagedReviewModerationStatus[] = [
+  "published",
+  "hidden",
+  "flagged",
+  "removed",
+];
 
 type DetailTab = "overview" | "reports";
 
@@ -48,8 +71,32 @@ export default function AdminReviewDetailPage() {
   const reviewId = typeof params.id === "string" ? params.id : "";
 
   const [tab, setTab] = useState<DetailTab>("overview");
+  const [confirmStatus, setConfirmStatus] =
+    useState<ManagedReviewModerationStatus | null>(null);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const toastId = useRef(0);
+  const moderateMut = useModerateReviewMutation();
 
   const { data: detail, isPending, isError, refetch } = useAdminReview(reviewId);
+
+  const pushToast = useCallback((tone: ToastMessage["tone"], text: string) => {
+    const tid = ++toastId.current;
+    setToasts((t) => [...t.slice(-2), { id: tid, tone, text }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== tid)), 3800);
+  }, []);
+
+  async function moderate(status: ManagedReviewModerationStatus, reason: string) {
+    try {
+      await moderateMut.mutateAsync({
+        id: reviewId,
+        input: { status, reason: reason.trim() || undefined },
+      });
+      setConfirmStatus(null);
+      pushToast("success", `Review marked ${status}.`);
+    } catch (err) {
+      pushToast("error", err instanceof Error ? err.message : "Couldn't moderate the review.");
+    }
+  }
 
   if (!reviewId) {
     return <ReviewNotFound />;
@@ -104,6 +151,27 @@ export default function AdminReviewDetailPage() {
                 {detail.entity.hrefLabel}
               </a>
             )}
+            {detail.actions.moderatable &&
+              MODERATION_STATUSES.filter((s) => s !== review.status).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setConfirmStatus(s)}
+                  className={cn(
+                    "inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium transition-colors",
+                    s === "published"
+                      ? "border-kampmax-success/40 bg-white text-kampmax-success hover:bg-kampmax-success/5"
+                      : s === "removed"
+                        ? "border-kampmax-error/40 bg-white text-kampmax-error hover:bg-kampmax-error/5"
+                        : "border-kampmax-border bg-white text-kampmax-text hover:bg-kampmax-muted/60"
+                  )}
+                >
+                  {s === "published" && <ShieldCheck className="h-3.5 w-3.5" />}
+                  {s === "hidden" && <ShieldAlert className="h-3.5 w-3.5" />}
+                  {s === "flagged" && <Flag className="h-3.5 w-3.5" />}
+                  {s === "removed" && <FileWarning className="h-3.5 w-3.5" />}
+                  {reviewStatusLabel(s)}
+                </button>
+              ))}
           </>
         }
       />
@@ -154,6 +222,43 @@ export default function AdminReviewDetailPage() {
         {tab === "overview" && <OverviewTab detail={detail} />}
         {tab === "reports" && <ReportsTab detail={detail} />}
       </div>
+
+      <ConfirmDialog
+        open={confirmStatus !== null}
+        title={confirmStatus ? `Mark this review ${confirmStatus}?` : ""}
+        message={
+          confirmStatus === "removed"
+            ? "The review is permanently hidden from every public page. This can be undone by re-moderating it, but the original decision is not preserved."
+            : "This updates the review's status immediately across the platform."
+        }
+        confirmLabel={confirmStatus ? reviewStatusLabel(confirmStatus) : "Confirm"}
+        tone={confirmStatus === "removed" ? "danger" : confirmStatus === "published" ? "default" : "warning"}
+        loading={moderateMut.isPending}
+        reasonLabel={
+          confirmStatus && confirmStatus !== "published"
+            ? "Reason (recorded on the review)"
+            : undefined
+        }
+        onConfirm={(reason) => {
+          if (confirmStatus) void moderate(confirmStatus, reason);
+        }}
+        onCancel={() => setConfirmStatus(null)}
+      />
+
+      {toasts.length > 0 && (
+        <div className="fixed bottom-4 right-4 z-80 flex flex-col gap-2">
+          {toasts.map((t) => (
+            <div
+              key={t.id}
+              className={`rounded-md px-3.5 py-2 text-sm font-medium text-white shadow-lg ${
+                t.tone === "success" ? "bg-kampmax-success" : "bg-kampmax-error"
+              }`}
+            >
+              {t.text}
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }
@@ -334,21 +439,15 @@ function ReportsTab({ detail }: { detail: ManagedReviewDetail }) {
       <div className="space-y-4">
         <div className="flex items-start gap-2.5 rounded-lg border border-kampmax-info/30 bg-kampmax-info/5 px-4 py-3 text-xs leading-relaxed text-kampmax-text-secondary">
           <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-kampmax-info" />
-          <p>
-            This review console is <span className="font-semibold text-kampmax-text">read-only</span>.
-            Neither review store exposes admin moderation transitions (no hide/restore/remove, no
-            report triage), so no actions are offered. See{" "}
-            <span className="font-mono">MODULE-41-REPORT.md</span> for the backend capabilities
-            these controls will ride on.
-          </p>
+          <p>{detail.statusNote}</p>
         </div>
 
         <div className="rounded-lg border border-dashed border-kampmax-border bg-white px-4 py-10 text-center">
           <FileWarning className="mx-auto h-6 w-6 text-kampmax-text-secondary/50" />
-          <p className="mt-2 text-sm font-medium text-kampmax-text">No reports on this review</p>
+          <p className="mt-2 text-sm font-medium text-kampmax-text">No report on this review</p>
           <p className="mx-auto mt-0.5 max-w-sm text-xs text-kampmax-text-secondary">
-            No report was filed against this review in the real store. The reported count is
-            never fabricated.
+            The review store keeps only the single most recent moderation reason, so at most one
+            report can ever be shown here — never fabricated beyond what it currently holds.
           </p>
         </div>
       </div>
@@ -360,8 +459,8 @@ function ReportsTab({ detail }: { detail: ManagedReviewDetail }) {
       <div className="flex items-start gap-2.5 rounded-lg border border-kampmax-info/30 bg-kampmax-info/5 px-4 py-3 text-xs leading-relaxed text-kampmax-text-secondary">
         <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-kampmax-info" />
         <p>
-          This review console is read-only — the stores expose no report triage, so reports are
-          surfaced as read-only evidence only.
+          The review store keeps only the single most recent moderation reason — a later report or
+          re-moderation will overwrite this entry, so no history beyond it exists.
         </p>
       </div>
 

@@ -1877,6 +1877,7 @@ export const MANAGED_REVIEW_TARGET_TYPES = [
   "product",
   "vendor",
   "freelancer",
+  "service_provider",
   "employer",
 ] as const;
 export type ManagedReviewTargetType =
@@ -1886,6 +1887,7 @@ export const MANAGED_REVIEW_STATUSES = [
   "published",
   "pending",
   "hidden",
+  "flagged",
   "removed",
 ] as const;
 export type ManagedReviewStatus = (typeof MANAGED_REVIEW_STATUSES)[number];
@@ -1994,6 +1996,24 @@ export interface ManagedReviewDetail {
   entity: ManagedReviewEntity;
   reports: ManagedReviewReportView[];
   statusNote: string;
+  actions: ManagedReviewActionSupport;
+}
+
+export interface ManagedReviewActionSupport {
+  moderatable: boolean;
+  note: string;
+}
+
+export type ManagedReviewModerationStatus =
+  | "published"
+  | "hidden"
+  | "flagged"
+  | "removed";
+
+/** Publishes, hides, flags or removes a review — real backend moderation. */
+export interface ModerateReviewInput {
+  status: ManagedReviewModerationStatus;
+  reason?: string;
 }
 
 export interface ManagedReviewListQuery extends ListQuery {

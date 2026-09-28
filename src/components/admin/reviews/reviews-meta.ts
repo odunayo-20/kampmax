@@ -19,6 +19,7 @@ export const REVIEW_STATUS_TABS: (ManagedReviewStatus | "all")[] = [
   "published",
   "pending",
   "hidden",
+  "flagged",
   "removed",
 ];
 
@@ -26,6 +27,7 @@ export const REVIEW_STATUS_LABELS: Record<ManagedReviewStatus, string> = {
   published: "Published",
   pending: "Pending",
   hidden: "Hidden",
+  flagged: "Flagged",
   removed: "Removed",
 };
 
@@ -37,6 +39,7 @@ export const REVIEW_STATUS_DOTS: Record<ManagedReviewStatus, string> = {
   published: "bg-kampmax-success",
   pending: "bg-kampmax-info",
   hidden: "bg-kampmax-warning",
+  flagged: "bg-kampmax-error",
   removed: "bg-kampmax-error",
 };
 
@@ -48,6 +51,8 @@ export function reviewStatusVariant(status: ManagedReviewStatus): BadgeVariant {
       return "info";
     case "hidden":
       return "warning";
+    case "flagged":
+      return "error";
     case "removed":
       return "error";
   }
@@ -83,6 +88,7 @@ export const REVIEW_TARGET_TYPE_OPTIONS: (ManagedReviewTargetType | "all")[] = [
   "product",
   "vendor",
   "freelancer",
+  "service_provider",
   "employer",
 ];
 
@@ -90,6 +96,7 @@ export const REVIEW_TARGET_TYPE_LABELS: Record<ManagedReviewTargetType, string> 
   product: "Product",
   vendor: "Vendor",
   freelancer: "Freelancer",
+  service_provider: "Service provider",
   employer: "Employer",
 };
 
@@ -107,6 +114,8 @@ export function reviewTargetTypeVariant(
       return "gold";
     case "freelancer":
       return "info";
+    case "service_provider":
+      return "blue";
     case "employer":
     default:
       return "neutral";

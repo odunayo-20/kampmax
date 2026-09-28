@@ -19,6 +19,7 @@ import type {
   ManagedReviewListQuery,
   ManagedReviewRow,
   ManagedReviewSortField,
+  ModerateReviewInput,
   Paginated,
 } from "@/types/admin";
 import {
@@ -42,10 +43,8 @@ export interface AdminReviewManagementService {
    * Derives vendor names from the real vendor store.
    */
   getVendorOptions(): Promise<{ id: string; name: string }[]>;
-  /**
-   * Moderation mutations are intentionally absent. The stores expose no
-   * admin transitions; previewing a hidden action would be fabrication.
-   */
+  /** Publishes, hides, flags or removes a review. Mock: in-memory only. */
+  moderateReview(id: string, input: ModerateReviewInput): Promise<ManagedReviewDetail>;
 }
 
 export function createReviewManagementService(): AdminReviewManagementService {
@@ -81,6 +80,16 @@ export function createReviewManagementService(): AdminReviewManagementService {
       const { rows } = buildReviewDataset();
       const { vendors } = computeReviewFacets(rows);
       return vendors.map((v) => ({ id: v.id, name: v.name }));
+    },
+
+    async moderateReview(id, input) {
+      const { details } = buildReviewDataset();
+      const detail = details.get(id);
+      if (!detail) throw new Error("Review not found");
+      detail.review.status = input.status;
+      detail.review.updatedAt = new Date().toISOString();
+      detail.statusNote = `Moderated to "${input.status}" in this session only (mock store — not persisted).`;
+      return detail;
     },
   };
 }

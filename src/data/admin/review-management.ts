@@ -92,6 +92,11 @@ function statusNoteOf(row: ManagedReviewRow): string {
 // NAME / LINK RESOLUTION
 // ------------------------------------------------------------
 
+const MOCK_ACTIONS = {
+  moderatable: false,
+  note: "No moderation endpoint exists over these mock stores — this is the frontend-only dataset superseded by the live /admin/reviews API.",
+};
+
 function commentPreview(comment: string): string {
   const trimmed = comment.trim();
   return trimmed.length > 140 ? `${trimmed.slice(0, 140)}…` : trimmed;
@@ -258,6 +263,7 @@ export function buildReviewDataset(): ReviewDataset {
       entity: entityOf(row.targetType, row.targetId),
       reports,
       statusNote: statusNoteOf(row),
+      actions: MOCK_ACTIONS,
     });
     rows.push(row);
   }
@@ -314,6 +320,7 @@ export function buildReviewDataset(): ReviewDataset {
       entity: entityOf(targetType, row.targetId),
       reports,
       statusNote: statusNoteOf(row),
+      actions: MOCK_ACTIONS,
     });
     rows.push(row);
   }
@@ -411,12 +418,14 @@ export function computeReviewCounts(rows: ManagedReviewRow[]): ManagedReviewCoun
     published: 0,
     pending: 0,
     hidden: 0,
+    flagged: 0,
     removed: 0,
   };
   const byTargetType: Record<ManagedReviewTargetType, number> = {
     product: 0,
     vendor: 0,
     freelancer: 0,
+    service_provider: 0,
     employer: 0,
   };
   let reported = 0;
@@ -448,6 +457,7 @@ const TARGET_TYPE_LABELS: Record<ManagedReviewTargetType, string> = {
   product: "Product",
   vendor: "Vendor",
   freelancer: "Freelancer",
+  service_provider: "Service provider",
   employer: "Employer",
 };
 

@@ -237,14 +237,12 @@ import { createApiCommunityService } from "./community.api";
 export const communityService: AdminCommunityService =
   createApiCommunityService();
 
-import {
-  AdminReviewManagementService,
-  createReviewManagementService,
-} from "./review-management.service";
+import type { AdminReviewManagementService } from "./review-management.service";
+import { createApiReviewManagementService } from "./review-management.api";
 
-/** /admin/reviews console (read-only, real-data review oversight). */
+/** /admin/reviews console: live read-only ledger (GET /admin/reviews) plus real moderation (PATCH /:id/moderate). */
 export const reviewManagementService: AdminReviewManagementService =
-  createReviewManagementService();
+  createApiReviewManagementService();
 
 export type { ManagedReviewSortField } from "./review-management.service";
 

@@ -4,17 +4,17 @@
 // ADMIN REVIEW MANAGEMENT HOOKS (Module 41)
 // ============================================================
 //
-// TanStack Query wrappers over the read-only review-management service.
+// TanStack Query wrappers over the review-management service.
 // Keys are scope-qualified by the acting operator's campus so a
 // campus-scoped admin's cache can never leak rows/counts across campus
-// boundaries. The console is deliberately read-only — no review store
-// exposes admin moderation transitions, so there are no mutation hooks.
+// boundaries. One real mutation: moderate (publish/hide/flag/remove),
+// backed by the real reviews store.
 // ============================================================
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminKeys } from "@/lib/query-keys";
 import { reviewManagementService } from "@/services/admin";
-import type { ManagedReviewListQuery } from "@/types/admin";
+import type { ManagedReviewListQuery, ModerateReviewInput } from "@/types/admin";
 import { useAdminSession } from "@/lib/admin/admin-auth-context";
 
 function useActor() {
@@ -54,5 +54,18 @@ export function useAdminReview(id: string) {
   return useQuery({
     queryKey: adminKeys.reviews.detail(id, admin.campusId),
     queryFn: () => reviewManagementService.getById(id),
+  });
+}
+
+/** Publishes, hides, flags or removes a review. */
+export function useModerateReviewMutation() {
+  useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: ModerateReviewInput }) =>
+      reviewManagementService.moderateReview(id, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.reviews.all });
+    },
   });
 }

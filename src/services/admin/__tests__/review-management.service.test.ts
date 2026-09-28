@@ -8,9 +8,14 @@
 // ============================================================
 
 import { describe, expect, it } from "vitest";
-import { reviewManagementService } from "@/services/admin";
+import { createReviewManagementService } from "@/services/admin/review-management.service";
 import { reviews } from "@/data/reviews";
 import { getAllProfileReviewsData } from "@/data/profile-reviews";
+
+// Tested directly against the mock factory (not the `@/services/admin`
+// barrel) so this suite keeps pinning the mock dataset regardless of which
+// implementation `index.ts` wires up for the live /admin/reviews console.
+const reviewManagementService = createReviewManagementService();
 
 // ---- Seed facts (computed live so tests can never contradict the store) ----
 const profileRows = getAllProfileReviewsData();
