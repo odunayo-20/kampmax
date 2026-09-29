@@ -250,7 +250,7 @@ export function createApiAnalyticsService(): AdminAnalyticsService {
       const [campusRes, vendorRes, categoryRes] = await Promise.all([
         apiClient.get<PaginatedResult<CampusListRow>>("/admin/campuses?limit=100&status=active"),
         apiClient.get<PaginatedResult<VendorRow>>("/admin/vendors?limit=200&status=active&sortBy=storeName&sortDir=asc"),
-        apiClient.get<PaginatedResult<CategoryListRow>>("/admin/categories?limit=100&status=active"),
+        apiClient.get<PaginatedResult<CategoryListRow>>("/categories?type=PRODUCT&limit=100"),
       ]);
 
       return {
@@ -271,6 +271,17 @@ export function createApiAnalyticsService(): AdminAnalyticsService {
       const qs = rangeQS(range);
       const prevQs = prevRangeQS(range);
 
+      let vendorUrl = "/admin/vendors?sortBy=revenue&sortDir=desc&limit=20";
+      let productUrl = "/admin/products?sortBy=revenue&sortDir=desc&limit=10";
+
+      if (query.campusId && query.campusId !== "all") {
+        vendorUrl += `&campusId=${encodeURIComponent(query.campusId)}`;
+        productUrl += `&campusId=${encodeURIComponent(query.campusId)}`;
+      }
+      if (query.categoryId && query.categoryId !== "all") {
+        productUrl += `&categoryId=${encodeURIComponent(query.categoryId)}`;
+      }
+
       // Parallel: current range + previous range (for deltas) + campus breakdown
       const [
         mktCurr,
@@ -289,8 +300,8 @@ export function createApiAnalyticsService(): AdminAnalyticsService {
         apiClient.get<UsersResponse>(`/analytics/admin/users?${prevQs}`),
         apiClient.get<FinancialResponse>(`/analytics/admin/financial?${qs}`),
         apiClient.get<CampusesResponse>("/analytics/admin/campuses"),
-        apiClient.get<PaginatedResult<VendorRow>>(`/admin/vendors?sortBy=revenue&sortDir=desc&limit=20`),
-        apiClient.get<PaginatedResult<ProductRow>>(`/admin/products?sortBy=revenue&sortDir=desc&limit=10`),
+        apiClient.get<PaginatedResult<VendorRow>>(vendorUrl),
+        apiClient.get<PaginatedResult<ProductRow>>(productUrl),
         apiClient.get<PaginatedResult<unknown>>("/admin/withdrawals?status=completed&limit=1"),
       ]);
 
