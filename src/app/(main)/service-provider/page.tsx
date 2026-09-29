@@ -1,16 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CalendarDays, ExternalLink, Images, Plus, Sparkles, Wrench, X } from "lucide-react";
 import { cn, timeAgo } from "@/lib/utils";
 import {
+  computeProfileCompletionFromLive,
   computeSpProfileCompletion,
+  fetchSpDashboardLive,
+  fetchSpReviewsSummaryLive,
   getSpDashboard,
   getSpReviewsSummary,
 } from "@/services/service-provider-dashboard";
 import { ServiceProviderMetricCard } from "@/components/service-provider/dashboard/ServiceProviderMetricCard";
 import { ServiceProviderVerificationBadge } from "@/components/service-provider/dashboard/ServiceProviderStatusBadge";
+import type {
+  ServiceProviderActivityEvent,
+  ServiceProviderDashboardMetric,
+  ServiceProviderDashboardRecord,
+  ServiceProviderProfileCompletion,
+  ServiceProviderReviewsSummary,
+} from "@/types/service-provider-dashboard";
 import type { ServiceProviderActivityKind } from "@/types/service-provider-dashboard";
 
 const ACTIVITY_ICON: Record<ServiceProviderActivityKind, string> = {
@@ -30,10 +40,52 @@ const ACTIVITY_ICON: Record<ServiceProviderActivityKind, string> = {
 };
 
 export default function ServiceProviderOverviewPage() {
-  const [dashboard] = useState(() => getSpDashboard());
-  const [completion] = useState(() => computeSpProfileCompletion());
-  const [reviews] = useState(() => getSpReviewsSummary());
+  const [dashboard, setDashboard] = useState<{
+    record: ServiceProviderDashboardRecord;
+    metrics: ServiceProviderDashboardMetric[];
+    activity: ServiceProviderActivityEvent[];
+  } | null>(() => getSpDashboard());
+  const [completion, setCompletion] = useState<ServiceProviderProfileCompletion>(() => computeSpProfileCompletion());
+  const [reviews, setReviews] = useState<ServiceProviderReviewsSummary>(() => getSpReviewsSummary());
+  const [loading, setLoading] = useState(!dashboard);
   const [showWelcome, setShowWelcome] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchSpDashboardLive()
+      .then((live) => {
+        if (cancelled) return;
+        setDashboard(live);
+        setCompletion(computeProfileCompletionFromLive(live.record));
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.warn("Falling back to cached dashboard data:", err);
+        if (cancelled) return;
+        setLoading(false);
+      });
+
+    fetchSpReviewsSummaryLive()
+      .then((revs) => {
+        if (cancelled) return;
+        setReviews(revs);
+      })
+      .catch((err) => {
+        console.warn("Falling back to cached reviews data:", err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (loading && !dashboard) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-primary-600/20 border-t-primary-600" />
+      </div>
+    );
+  }
 
   if (!dashboard) {
     return (

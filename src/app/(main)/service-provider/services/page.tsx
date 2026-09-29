@@ -1,15 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus, Wrench, Edit, Trash2, Clock, MapPin, Power, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui";
 import { cn, formatNaira } from "@/lib/utils";
 import {
+  fetchSpServicesLive,
   getSpServices,
   removeSpDashboardService,
   setSpDashboardServiceStatus,
+  setSpDashboardServiceStatusLive,
 } from "@/services/service-provider-dashboard";
 import { spServiceCategoryName } from "@/data/service-categories";
 import { useCategories } from "@/hooks/use-taxonomy";
@@ -49,18 +51,41 @@ export default function ServicesPage() {
   const router = useRouter();
   // Loads the SERVICE tree so category ids below resolve to names.
   useCategories("SERVICE");
-  const [services, setServices] = useState(() => getSpServices());
+  const [services, setServices] = useState<ServiceProviderDashboardService[]>(() => getSpServices());
   const [error, setError] = useState<string | null>(null);
 
-  function refresh() {
+  async function refresh() {
+    try {
+      const liveServices = await fetchSpServicesLive();
+      if (liveServices.length > 0 || services.length === 0) {
+        setServices(liveServices);
+        return;
+      }
+    } catch {
+      // Fallback
+    }
     setServices(getSpServices());
   }
 
-  function toggleStatus(service: ServiceProviderDashboardService) {
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  async function toggleStatus(service: ServiceProviderDashboardService) {
     const next = service.status === "active" ? "inactive" : "active";
-    const res = setSpDashboardServiceStatus(service.id, next as "active" | "inactive");
-    if (res.ok) refresh();
-    else setError(res.error ?? "Unable to update the service."); 
+    setError(null);
+    try {
+      const res = await setSpDashboardServiceStatusLive(service.id, next as "active" | "inactive");
+      if (res.ok) {
+        await refresh();
+        return;
+      }
+    } catch {
+      // Fallback to local
+    }
+    const localRes = setSpDashboardServiceStatus(service.id, next as "active" | "inactive");
+    if (localRes.ok) refresh();
+    else setError(localRes.error ?? "Unable to update the service.");
   }
 
   function remove(service: ServiceProviderDashboardService) {

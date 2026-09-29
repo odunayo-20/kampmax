@@ -847,3 +847,19 @@ export function markSpNotificationsRead(all: boolean, id?: string): void {
     if (item && !item.read) item.read = true;
   }
 }
+
+// ── Live Backend API exports ─────────────────────────────────
+export {
+  fetchSpDashboardLive,
+  fetchSpProfileRecordLive,
+  updateSpProfileLive,
+  fetchSpServicesLive,
+  addSpDashboardServiceLive,
+  updateSpDashboardServiceLive,
+  setSpDashboardServiceStatusLive,
+  fetchSpAvailabilityLive,
+  updateSpAvailabilityLive,
+  fetchSpReviewsSummaryLive,
+  buildDashboardRecordFromLive,
+  computeProfileCompletionFromLive,
+} from "./service-provider-dashboard.api";

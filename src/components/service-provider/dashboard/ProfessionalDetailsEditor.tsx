@@ -1,10 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertCircle, BadgeCheck, Save } from "lucide-react";
 import { Button, Input } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import { getSpProfileRecord, updateSpProfile } from "@/services/service-provider-dashboard";
+import {
+  fetchSpProfileRecordLive,
+  getSpProfileRecord,
+  updateSpProfile,
+  updateSpProfileLive,
+} from "@/services/service-provider-dashboard";
 import type { ServiceProviderDashboardProfileState } from "@/types/service-provider-dashboard";
 
 const EMPTY: ServiceProviderDashboardProfileState = {
@@ -26,19 +31,72 @@ export function ProfessionalDetailsEditor({ onSaved }: { onSaved?: () => void })
     () => ({ ...EMPTY, ...getSpProfileRecord()?.profile })
   );
   const [form, setForm] = useState<ServiceProviderDashboardProfileState>(initial);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchSpProfileRecordLive()
+      .then((record) => {
+        if (!cancelled && record?.profile) {
+          setForm((prev) => ({
+            ...prev,
+            ...record.profile,
+            displayName: record.profile.displayName || prev.displayName,
+            bio: record.profile.bio || prev.bio,
+            description: record.profile.description || prev.description,
+            yearsExperience: record.profile.yearsExperience ?? prev.yearsExperience,
+          }));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const set = <K extends keyof ServiceProviderDashboardProfileState>(key: K, value: ServiceProviderDashboardProfileState[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
-  function handleSave() {
+  async function handleSave() {
     if (!form.displayName.trim()) {
       setError("Display name is required.");
       setNotice(null);
       return;
     }
     setError(null);
+    setSaving(true);
+
+    try {
+      const liveRes = await updateSpProfileLive({
+        displayName: form.displayName.trim(),
+        bio: form.bio?.trim(),
+        description: form.description?.trim(),
+        yearsExperience: form.yearsExperience,
+      });
+
+      if (liveRes.ok) {
+        updateSpProfile({
+          displayName: form.displayName.trim(),
+          tagline: form.tagline?.trim(),
+          bio: form.bio?.trim(),
+          description: form.description?.trim(),
+          yearsExperience: form.yearsExperience,
+          languages: form.languages,
+          qualifications: form.qualifications,
+          certifications: form.certifications,
+        });
+        setNotice("Profile saved to live server.");
+        onSaved?.();
+        return;
+      }
+    } catch {
+      // Fallback to local
+    } finally {
+      setSaving(false);
+    }
+
     const res = updateSpProfile({
       displayName: form.displayName.trim(),
       tagline: form.tagline?.trim(),

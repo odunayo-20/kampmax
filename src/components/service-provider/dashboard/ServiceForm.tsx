@@ -47,7 +47,9 @@ export function ServiceForm({
   initial?: ServiceProviderDashboardService;
   onSubmit: (
     input: ServiceProviderServiceInput
-  ) => { ok: boolean; error?: string; service?: ServiceProviderDashboardService };
+  ) =>
+    | { ok: boolean; error?: string; service?: ServiceProviderDashboardService }
+    | Promise<{ ok: boolean; error?: string; service?: ServiceProviderDashboardService }>;
   onCancel?: () => void;
 }) {
   const [form, setForm] = useState<ServiceProviderServiceInput>({
@@ -66,11 +68,11 @@ export function ServiceForm({
   const set = <K extends keyof ServiceProviderServiceInput>(key: K, value: ServiceProviderServiceInput[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!form.name.trim()) return setError("Service name is required.");
     if (!form.categoryId) return setError("Choose a category for this service.");
     setError(null);
-    const res = onSubmit(form);
+    const res = await onSubmit(form);
     if (!res.ok) setError(res.error ?? "Unable to save the service.");
   }
 

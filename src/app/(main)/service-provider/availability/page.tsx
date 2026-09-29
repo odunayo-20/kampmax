@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertCircle, Check } from "lucide-react";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -8,8 +8,10 @@ import { StepAvailability } from "@/components/service-provider/StepAvailability
 import { StepLocation } from "@/components/service-provider/StepLocation";
 import { StepPricing } from "@/components/service-provider/StepPricing";
 import {
+  fetchSpAvailabilityLive,
   getSpAvailability,
   updateSpAvailability,
+  updateSpAvailabilityLive,
   updateSpLocation,
   updateSpPricing,
 } from "@/services/service-provider-dashboard";
@@ -22,8 +24,33 @@ export default function AvailabilityPage() {
     if (!src) return null;
     return buildDraft(src);
   });
+  const [loading, setLoading] = useState(!draft);
   const [saved, setSaved] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchSpAvailabilityLive()
+      .then((live) => {
+        if (cancelled) return;
+        setDraft(buildDraft(live));
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (loading && !draft) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-primary-600/20 border-t-primary-600" />
+      </div>
+    );
+  }
 
   if (!draft) {
     return (
@@ -52,8 +79,20 @@ export default function AvailabilityPage() {
     return draft!;
   }
 
-  function saveAvailability() {
+  async function saveAvailability() {
     const d = getDraft();
+    if (d.availability?.days) {
+      try {
+        const liveRes = await updateSpAvailabilityLive(d.availability.days);
+        if (liveRes.ok) {
+          updateSpAvailability(d.availability);
+          applyResult(true, undefined, "Weekly schedule saved to live server.");
+          return;
+        }
+      } catch {
+        // Fallback
+      }
+    }
     const res = updateSpAvailability(d.availability ?? {});
     applyResult(res.ok, res.error, "Weekly schedule saved.");
   }

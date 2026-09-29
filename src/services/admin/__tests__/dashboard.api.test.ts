@@ -138,8 +138,8 @@ describe("createApiDashboardService (live dashboard)", () => {
       getMock.mockResolvedValue({ data: null, error: null });
       await service.getOverview("unilag");
 
-      const calledWithUnilag = getMock.mock.calls.some(([url]: [string]) =>
-        url.includes("campusId=unilag")
+      const calledWithUnilag = getMock.mock.calls.some((call: unknown[]) =>
+        typeof call[0] === "string" && call[0].includes("campusId=unilag")
       );
       expect(calledWithUnilag).toBe(true);
     });

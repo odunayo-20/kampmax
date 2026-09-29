@@ -1,17 +1,49 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ExternalLink, Image as ImageIcon, MapPin, Wallet, User } from "lucide-react";
 import { ProfessionalDetailsEditor } from "@/components/service-provider/dashboard/ProfessionalDetailsEditor";
 import { ServiceProviderVerificationBadge } from "@/components/service-provider/dashboard/ServiceProviderStatusBadge";
-import { getSpAvailability, getSpProfileRecord, getSpSettings } from "@/services/service-provider-dashboard";
+import {
+  fetchSpAvailabilityLive,
+  fetchSpProfileRecordLive,
+  getSpAvailability,
+  getSpProfileRecord,
+  getSpSettings,
+} from "@/services/service-provider-dashboard";
 import { formatNaira } from "@/lib/utils";
+import type { ServiceProviderDashboardRecord } from "@/types/service-provider-dashboard";
 
 export default function ProfilePage() {
-  const [record] = useState(() => getSpProfileRecord());
-  const [areas] = useState(() => getSpAvailability());
+  const [record, setRecord] = useState<ServiceProviderDashboardRecord | null>(() => getSpProfileRecord());
+  const [areas, setAreas] = useState<any>(() => getSpAvailability());
   const [settings] = useState(() => getSpSettings());
+  const [loading, setLoading] = useState(!record);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      fetchSpProfileRecordLive().catch(() => null),
+      fetchSpAvailabilityLive().catch(() => null),
+    ]).then(([liveProfile, liveAvailability]) => {
+      if (cancelled) return;
+      if (liveProfile) setRecord(liveProfile);
+      if (liveAvailability) setAreas(liveAvailability);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (loading && !record) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-primary-600/20 border-t-primary-600" />
+      </div>
+    );
+  }
 
   if (!record || !areas) {
     return (

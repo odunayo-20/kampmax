@@ -2,13 +2,26 @@
 
 import { useRouter } from "next/navigation";
 import { ServiceForm } from "@/components/service-provider/dashboard/ServiceForm";
-import { addSpDashboardService } from "@/services/service-provider-dashboard";
+import {
+  addSpDashboardService,
+  addSpDashboardServiceLive,
+} from "@/services/service-provider-dashboard";
 import type { ServiceProviderServiceInput } from "@/types/service-provider-dashboard";
 
 export default function NewServicePage() {
   const router = useRouter();
 
-  function handleSubmit(input: ServiceProviderServiceInput) {
+  async function handleSubmit(input: ServiceProviderServiceInput) {
+    try {
+      const liveRes = await addSpDashboardServiceLive(input);
+      if (liveRes.ok) {
+        addSpDashboardService(input);
+        router.push("/service-provider/services");
+        return { ok: true };
+      }
+    } catch {
+      // Fallback
+    }
     const res = addSpDashboardService(input);
     if (res.ok) router.push("/service-provider/services");
     return res;
