@@ -189,11 +189,11 @@ function proposalBody(input: ProposalInput) {
     coverLetter: input.coverLetter,
     proposedAmount: input.proposedAmount,
     estimatedDeliveryDays: deliveryToDays(input.delivery),
-    screeningAnswers: input.screeningAnswers.map((a) => ({
+    screeningAnswers: (input.screeningAnswers ?? []).map((a) => ({
       questionId: a.questionId,
       answer: a.answer,
     })),
-    mediaIds: input.attachments.map((a) => a.id),
+    mediaIds: (input.attachments ?? []).map((a) => a.id),
   };
 }
 
