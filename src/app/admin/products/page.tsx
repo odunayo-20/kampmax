@@ -156,9 +156,16 @@ function AdminProductsPageInner() {
         campusService.list(),
       ]);
       setCounts(nextCounts);
-      setFacets(nextFacets);
+      const campusOptions = campuses.map((c) => ({
+        id: c.id,
+        name: c.shortName || c.name,
+      }));
+      setFacets({
+        ...nextFacets,
+        campuses: campusOptions.length > 0 ? campusOptions : nextFacets.campuses,
+      });
       setCampusNames(
-        Object.fromEntries(campuses.map((c) => [c.id, c.shortName]))
+        Object.fromEntries(campuses.map((c) => [c.id, c.shortName || c.name]))
       );
     } catch {
       /* non-critical metadata */

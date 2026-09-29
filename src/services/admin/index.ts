@@ -39,7 +39,8 @@ import type { AdminUserManagementService } from "./user-management.service";
 import { createApiUserManagementService } from "./user-management.api";
 import type { AdminCampusManagementService } from "./campus-management.service";
 import { createApiCampusManagementService } from "./campus-management.api";
-import { AdminCampusService, createMockCampusService } from "./campuses.service";
+import { AdminCampusService } from "./campuses.service";
+import { createApiCampusService } from "./campuses.api";
 import { AdminVendorService, createMockVendorService } from "./vendors.service";
 import type { AdminVendorManagementService } from "./vendor-management.service";
 import { createApiVendorManagementService } from "./vendor-management.api";
@@ -131,7 +132,7 @@ export const campusManagementService: AdminCampusManagementService =
 export type { ManagedCampusSortField } from "./campus-management.service";
 
 export const campusService: AdminCampusService =
-  createMockCampusService(mockCampuses);
+  createApiCampusService();
 
 export const vendorService: AdminVendorService =
   createMockVendorService(mockVendors);
