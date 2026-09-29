@@ -34,6 +34,7 @@ import {
   Database,
   EyeOff,
   Fingerprint,
+  Loader2,
   ScrollText,
   ShieldAlert,
   ShieldCheck,
@@ -51,13 +52,12 @@ import {
   hasAuditFilters,
   type AuditFilterState,
 } from "@/components/admin/audit-logs/AuditLogFilters";
-import {
-  AUDIT_ACTION_FILTER_ORDER,
-  isSecurityAction,
-} from "@/components/admin/audit-logs/audit-logs-meta";
 import { LoadingSkeleton } from "@/components/admin/LoadingSkeleton";
 import { ErrorState } from "@/components/admin/ErrorState";
-import { useAdminAuditActors } from "@/hooks/admin/use-admin-audit-trail";
+import {
+  useAdminAuditActors,
+  useAdminAuditChainVerify,
+} from "@/hooks/admin/use-admin-audit-trail";
 import {
   useAdminSecurityEvents,
   useAdminSecurityMetrics,
@@ -66,12 +66,9 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { useAdminSession } from "@/lib/admin/admin-auth-context";
 import { canAccessSecurityCenter } from "@/lib/admin/security-access";
 import { cn } from "@/lib/utils";
-import type { AdminAuditEvent } from "@/types/admin";
+import type { ManagedAuditLogEntry } from "@/types/admin";
 
 const PAGE_SIZE = 15;
-
-/** Actions the backend classifies as security-sensitive (drives the subset tab). */
-const SECURITY_ACTIONS = AUDIT_ACTION_FILTER_ORDER.filter(isSecurityAction);
 
 type SecurityTab = "overview" | "security" | "privileged";
 
@@ -177,6 +174,8 @@ function OverviewPanel() {
     <div className="space-y-3">
       <AuditLogMetrics metrics={metrics.data} loading={metrics.isLoading} />
 
+      <ChainIntegrityCard />
+
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <section className="rounded-lg border border-kampmax-border bg-white p-4">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-kampmax-text">
@@ -186,13 +185,13 @@ function OverviewPanel() {
           <ul className="mt-3 space-y-2 text-[13px] leading-snug text-kampmax-text-secondary">
             <li className="flex gap-2">
               <Database className="mt-0.5 h-3.5 w-3.5 shrink-0 text-kampmax-blue" aria-hidden />
-              Immutable audit events for every privileged admin action, with backend-assigned
-              severity and result.
+              Immutable, SHA-256 hash-chained audit events for every privileged admin action, with
+              backend-computed severity and result.
             </li>
             <li className="flex gap-2">
               <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-kampmax-error" aria-hidden />
-              A backend-classified security subset — suspensions, deactivations and state resets
-              (8 actions).
+              A backend-classified security subset — real login attempts (succeeded and failed)
+              plus account-access changes (suspensions, deactivations, state resets).
             </li>
             <li className="flex gap-2">
               <Users className="mt-0.5 h-3.5 w-3.5 shrink-0 text-kampmax-blue" aria-hidden />
@@ -207,18 +206,13 @@ function OverviewPanel() {
             Not yet provided by the backend
           </h2>
           <p className="mt-2 text-[13px] text-kampmax-text-secondary">
-            These surfaces do not exist in the prototype backend and are deliberately omitted
-            here rather than shown as zeroes or fabricated. Each is tracked in{" "}
-            <code className="rounded bg-kampmax-muted px-1 py-0.5 text-[11px]">
-              MODULE-51-BACKEND-GAPS.md
-            </code>
-            .
+            These surfaces do not exist in the backend and are deliberately omitted here rather
+            than shown as zeroes or fabricated.
           </p>
           <ul className="mt-3 grid grid-cols-1 gap-2 text-[12px] leading-snug text-kampmax-text-secondary sm:grid-cols-2">
             {[
               "Session inventory & revocation",
-              "Failed-login / ATO records",
-              "IP & device tracking",
+              "IP & device fingerprinting",
               "Risk scores & suspicious activity",
               "Security alerts & incidents",
               "Rate-limit / MFA events",
@@ -253,6 +247,67 @@ function OverviewPanel() {
         />
       </div>
     </div>
+  );
+}
+
+/** Recomputes the real SHA-256 hash chain on demand — genuine tamper-evidence, not a simulated check. */
+function ChainIntegrityCard() {
+  const verify = useAdminAuditChainVerify();
+
+  return (
+    <section className="rounded-lg border border-kampmax-border bg-white p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Fingerprint className="h-4 w-4 text-kampmax-blue" aria-hidden />
+          <div>
+            <h2 className="text-sm font-semibold text-kampmax-text">Hash-chain integrity</h2>
+            <p className="text-xs text-kampmax-text-secondary">
+              Recomputes the SHA-256 chain across every audit row and reports the first tampered
+              entry, if any.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => void verify.refetch()}
+          disabled={verify.isFetching}
+          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-kampmax-border bg-white px-3 text-xs font-medium text-kampmax-text transition-colors hover:bg-kampmax-muted/60 disabled:opacity-60"
+        >
+          {verify.isFetching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+          {verify.isFetching ? "Verifying…" : "Verify now"}
+        </button>
+      </div>
+
+      {verify.data && (
+        <div
+          className={cn(
+            "mt-3 flex items-center gap-2 rounded-md border px-3 py-2 text-xs",
+            verify.data.valid
+              ? "border-kampmax-success/30 bg-kampmax-success/5 text-kampmax-success"
+              : "border-kampmax-error/30 bg-kampmax-error/5 text-kampmax-error"
+          )}
+        >
+          {verify.data.valid ? (
+            <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          ) : (
+            <ShieldAlert className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          )}
+          {verify.data.valid
+            ? `Chain intact across ${verify.data.checked.toLocaleString("en-NG")} entries.`
+            : `Chain broken at entry ${verify.data.brokenAtId}.`}
+          {verify.data.legacyRows > 0 && (
+            <span className="text-kampmax-text-secondary">
+              ({verify.data.legacyRows} legacy row{verify.data.legacyRows === 1 ? "" : "s"} predate
+              hashing)
+            </span>
+          )}
+        </div>
+      )}
+
+      {verify.isError && (
+        <p className="mt-3 text-xs text-kampmax-error">Couldn&apos;t verify the chain. Try again.</p>
+      )}
+    </section>
   );
 }
 
@@ -338,7 +393,7 @@ function SecurityEventsList({ scope }: { scope: "security" | "privileged" }) {
     setPage(1);
   }
 
-  function openEvent(event: AdminAuditEvent) {
+  function openEvent(event: ManagedAuditLogEntry) {
     router.push(`/admin/audit-logs/${event.id}`);
   }
 
@@ -360,7 +415,6 @@ function SecurityEventsList({ scope }: { scope: "security" | "privileged" }) {
         actorsLoading={actors.isLoading}
         onChange={(next) => setFilters(next)}
         onReset={clearFilters}
-        actions={scope === "security" ? SECURITY_ACTIONS : undefined}
       />
 
       <AuditLogsTable

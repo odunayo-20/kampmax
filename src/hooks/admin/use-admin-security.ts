@@ -25,7 +25,7 @@ import { useQuery } from "@tanstack/react-query";
 import { adminKeys } from "@/lib/query-keys";
 import { adminAuditTrailService } from "@/services/admin";
 import { useAdminSession } from "@/lib/admin/admin-auth-context";
-import type { AdminAuditQuery } from "@/types/admin";
+import type { ManagedAuditLogQuery } from "@/types/admin";
 
 const SECURITY_GC_TIME = 60 * 1000;
 
@@ -52,7 +52,7 @@ export function useAdminSecurityMetrics() {
  * backend-classified security subset (suspensions / deactivations /
  * state resets); without it, returns all privileged admin activity.
  */
-export function useAdminSecurityEvents(query?: AdminAuditQuery) {
+export function useAdminSecurityEvents(query?: ManagedAuditLogQuery) {
   useActor();
   return useQuery({
     queryKey: adminKeys.security.events(query ?? {}),

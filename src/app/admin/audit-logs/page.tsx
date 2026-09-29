@@ -21,7 +21,7 @@ import {
 } from "@/hooks/admin/use-admin-audit-trail";
 import { useDebounce } from "@/hooks/use-debounce";
 import { LoadingSkeleton } from "@/components/admin/LoadingSkeleton";
-import type { AdminAuditEvent } from "@/types/admin";
+import type { ManagedAuditLogEntry } from "@/types/admin";
 
 const PAGE_SIZE = 15;
 
@@ -97,7 +97,7 @@ function AuditLogsConsole() {
     setPage(1);
   }
 
-  function openEvent(event: AdminAuditEvent) {
+  function openEvent(event: ManagedAuditLogEntry) {
     router.push(`/admin/audit-logs/${event.id}`);
   }
 

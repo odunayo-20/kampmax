@@ -378,18 +378,21 @@ import {
 /** /admin/permissions console (role matrices, in-memory persistence). */
 export const rbacService: AdminRbacService = createMockRbacService();
 
-import {
-  AdminAuditTrailService,
-  createAdminAuditTrailService,
-} from "./audit-trail.service";
+import type { AdminAuditLogService } from "@/types/admin";
+import { createApiAuditLogService } from "./audit-log.api";
 
 /**
- * /admin/audit-logs console (Module 48). READ-ONLY window over the
- * append-only audit trail; records are written by the real mutation
- * services, never by the UI.
+ * /admin/audit-logs + /admin/security consoles: live, read-only window
+ * over the real, SHA-256 hash-chained audit_logs table (GET
+ * /admin/audit-logs/*). Records are written by the real mutation
+ * services via AuditService, never by the UI.
+ *
+ * Supersedes the old `audit-trail.service.ts` mock (an in-memory,
+ * per-session store) — that file is kept in place only because several
+ * other still-mock consoles and its own dedicated test still write to it
+ * directly via recordAdminAuditEvent().
  */
-export const adminAuditTrailService: AdminAuditTrailService =
-  createAdminAuditTrailService();
+export const adminAuditTrailService: AdminAuditLogService = createApiAuditLogService();
 
 export const notificationService: AdminNotificationService =
   createMockNotificationService(mockNotifications);

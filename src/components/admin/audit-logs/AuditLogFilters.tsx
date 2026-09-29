@@ -1,28 +1,21 @@
 "use client";
 
 import { Search, RotateCcw } from "lucide-react";
-import {
-  AUDIT_ACTION_FILTER_ORDER,
-  AUDIT_RESOURCE_FILTER_ORDER,
-  AUDIT_RESOURCE_LABELS,
-  auditActionLabel,
-} from "./audit-logs-meta";
+import { AUDIT_RESULT_ORDER, AUDIT_SEVERITY_ORDER, auditResultLabel } from "./audit-logs-meta";
 import type {
-  AdminAuditAction,
-  AdminAuditEventActor,
-  AdminAuditQuery,
-  AdminAuditResourceType,
-  AdminAuditResult,
-  AdminAuditSeverity,
+  ManagedAuditLogActor,
+  ManagedAuditLogQuery,
+  ManagedAuditLogResult,
+  ManagedAuditLogSeverity,
 } from "@/types/admin";
 
 export interface AuditFilterState {
   search: string;
-  action: AdminAuditAction | "all";
-  resourceType: AdminAuditResourceType | "all";
-  result: AdminAuditResult | "all";
-  severity: AdminAuditSeverity | "all";
-  actorId: string | "all";
+  action: string;
+  resourceType: string;
+  result: ManagedAuditLogResult | "all";
+  severity: ManagedAuditLogSeverity | "all";
+  actorId: string;
   dateFrom: string;
   dateTo: string;
 }
@@ -38,19 +31,9 @@ export const DEFAULT_AUDIT_FILTERS: AuditFilterState = {
   dateTo: "",
 };
 
-export const AUDIT_SEVERITY_ORDER: AdminAuditSeverity[] = [
-  "critical",
-  "high",
-  "medium",
-  "low",
-  "informational",
-];
-
-export const AUDIT_RESULT_ORDER: AdminAuditResult[] = ["success", "failed", "denied"];
-
 /** Builds a server query from the URL-persisted filter state. */
-export function auditQueryFromFilter(state: AuditFilterState): AdminAuditQuery {
-  const query: AdminAuditQuery = {};
+export function auditQueryFromFilter(state: AuditFilterState): ManagedAuditLogQuery {
+  const query: ManagedAuditLogQuery = {};
   const search = state.search.trim();
   if (search) query.search = search;
   if (state.action !== "all") query.action = state.action;
@@ -64,17 +47,15 @@ export function auditQueryFromFilter(state: AuditFilterState): AdminAuditQuery {
 }
 
 export function hasAuditFilters(state: AuditFilterState): boolean {
-  return Object.keys(auditQueryFromFilter(state)).some((k) => k !== undefined);
+  return Object.keys(auditQueryFromFilter(state)).length > 0;
 }
 
 interface AuditLogFiltersProps {
   state: AuditFilterState;
-  actors: AdminAuditEventActor[];
+  actors: ManagedAuditLogActor[];
   actorsLoading: boolean;
   onChange: (next: AuditFilterState) => void;
   onReset: () => void;
-  /** Restrict the action dropdown (e.g. the Security Center's security subset). */
-  actions?: AdminAuditAction[];
 }
 
 const SELECT_CLASS =
@@ -83,14 +64,13 @@ const SELECT_CLASS =
 const LABEL_CLASS =
   "block text-[11px] font-medium uppercase tracking-wide text-kampmax-text-secondary";
 
-/** Server-side filter bar (search is debounced + URL-persisted by the page). */
+/** Server-side filter bar (search is debounced + URL-persisted by the page). Action/resource are free-text — the real vocabulary is open-ended, not a fixed dropdown. */
 export function AuditLogFilters({
   state,
   actors,
   actorsLoading,
   onChange,
   onReset,
-  actions = AUDIT_ACTION_FILTER_ORDER,
 }: AuditLogFiltersProps) {
   const set = (patch: Partial<AuditFilterState>) => onChange({ ...state, ...patch });
 
@@ -107,50 +87,16 @@ export function AuditLogFilters({
             type="search"
             value={state.search}
             onChange={(e) => set({ search: e.target.value })}
-            placeholder="Event, actor, resource…"
+            placeholder="Action, resource, actor…"
             className="h-9 w-full rounded-md border border-kampmax-border bg-white pl-9 pr-2.5 text-[13px] text-kampmax-text placeholder:text-kampmax-text-secondary focus:outline-none focus:ring-1 focus:ring-kampmax-blue"
           />
         </div>
 
         <label>
-          <span className={LABEL_CLASS}>Action</span>
-          <select
-            value={state.action}
-            onChange={(e) => set({ action: e.target.value as AdminAuditAction | "all" })}
-            className={SELECT_CLASS}
-          >
-            <option value="all">All actions</option>
-            {actions.map((a) => (
-              <option key={a} value={a}>
-                {auditActionLabel(a)}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          <span className={LABEL_CLASS}>Resource</span>
-          <select
-            value={state.resourceType}
-            onChange={(e) =>
-              set({ resourceType: e.target.value as AdminAuditResourceType | "all" })
-            }
-            className={SELECT_CLASS}
-          >
-            <option value="all">All resources</option>
-            {AUDIT_RESOURCE_FILTER_ORDER.map((r) => (
-              <option key={r} value={r}>
-                {AUDIT_RESOURCE_LABELS[r]}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label>
           <span className={LABEL_CLASS}>Severity</span>
           <select
             value={state.severity}
-            onChange={(e) => set({ severity: e.target.value as AdminAuditSeverity | "all" })}
+            onChange={(e) => set({ severity: e.target.value as AuditFilterState["severity"] })}
             className={SELECT_CLASS}
           >
             <option value="all">All severities</option>
@@ -166,13 +112,13 @@ export function AuditLogFilters({
           <span className={LABEL_CLASS}>Result</span>
           <select
             value={state.result}
-            onChange={(e) => set({ result: e.target.value as AdminAuditResult | "all" })}
+            onChange={(e) => set({ result: e.target.value as AuditFilterState["result"] })}
             className={SELECT_CLASS}
           >
             <option value="all">All results</option>
             {AUDIT_RESULT_ORDER.map((r) => (
               <option key={r} value={r}>
-                {r.charAt(0).toUpperCase() + r.slice(1)}
+                {auditResultLabel(r)}
               </option>
             ))}
           </select>

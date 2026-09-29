@@ -3,10 +3,10 @@
 import { CalendarDays, ScrollText, ShieldAlert, ShieldX, XCircle } from "lucide-react";
 import { StatCard } from "@/components/admin/StatCard";
 import { Skeleton } from "@/components/admin/LoadingSkeleton";
-import type { AdminAuditMetrics } from "@/types/admin";
+import type { ManagedAuditLogMetrics } from "@/types/admin";
 
 interface AuditLogMetricsProps {
-  metrics?: AdminAuditMetrics;
+  metrics?: ManagedAuditLogMetrics;
   loading: boolean;
 }
 

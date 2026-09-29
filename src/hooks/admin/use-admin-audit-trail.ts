@@ -16,7 +16,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { adminKeys } from "@/lib/query-keys";
 import { adminAuditTrailService } from "@/services/admin";
-import type { AdminAuditQuery } from "@/types/admin";
+import type { ManagedAuditLogQuery } from "@/types/admin";
 import { useAdminSession } from "@/lib/admin/admin-auth-context";
 
 const AUDIT_GC_TIME = 60 * 1000;
@@ -29,7 +29,7 @@ function useActor() {
   return admin;
 }
 
-export function useAdminAuditEvents(query?: AdminAuditQuery) {
+export function useAdminAuditEvents(query?: ManagedAuditLogQuery) {
   useActor();
   return useQuery({
     queryKey: adminKeys.auditTrail.list(query ?? {}),
@@ -63,5 +63,16 @@ export function useAdminAuditActors() {
     queryKey: adminKeys.auditTrail.actors(),
     queryFn: () => adminAuditTrailService.getActorOptions(),
     gcTime: AUDIT_GC_TIME,
+  });
+}
+
+/** Recomputes the real SHA-256 hash chain across every audit row and reports the first tampered one, if any. */
+export function useAdminAuditChainVerify() {
+  useActor();
+  return useQuery({
+    queryKey: [...adminKeys.auditTrail.all, "verify"],
+    queryFn: () => adminAuditTrailService.verifyChain(),
+    gcTime: AUDIT_GC_TIME,
+    enabled: false,
   });
 }

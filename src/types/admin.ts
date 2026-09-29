@@ -3829,6 +3829,100 @@ export interface AdminActingContext {
 }
 
 // ------------------------------------------------------------
+// AUDIT LOG (/admin/audit-logs, /admin/security) — live,
+// GET /admin/audit-logs/*
+//
+// Real replacement for the "AUDIT TRAIL" section above. That section's
+// in-memory mock is still load-bearing for other still-mock consoles and
+// its own dedicated test, so it's left exactly as-is; this is a parallel,
+// honestly-scoped type family for the real `audit_logs` table (tamper-
+// evident, SHA-256 hash-chained — see AuditService).
+//
+// Severity, "is a security event" and result are not real columns and no
+// row is ever written for a denied attempt (nothing to log if the action
+// never happened) — they're a deterministic classification of the real
+// action string, computed once server-side so every console reads the
+// same answer. `action`/`resourceType` are open strings, not a closed
+// enum: the real schema has no CHECK constraint and the real vocabulary
+// (auth.login.failed, wallet.adjustment, order.status.change, …) already
+// spans far more values than any bootstrap enum could enumerate.
+// ------------------------------------------------------------
+
+export type ManagedAuditLogSeverity = "low" | "medium" | "high" | "critical";
+export type ManagedAuditLogResult = "success" | "failed" | "denied";
+
+export interface ManagedAuditLogActor {
+  type: "admin" | "system";
+  id: string;
+  name: string;
+}
+
+export interface ManagedAuditLogResource {
+  type: string;
+  id: string;
+}
+
+export interface ManagedAuditLogEntry {
+  id: string;
+  at: string;
+  action: string;
+  actor: ManagedAuditLogActor;
+  resource: ManagedAuditLogResource;
+  result: ManagedAuditLogResult;
+  severity: ManagedAuditLogSeverity;
+  /** True for the backend-classified security-relevant subset (real login events + account-access changes). */
+  isSecurityEvent: boolean;
+  previousValue: Record<string, unknown> | null;
+  newValue: Record<string, unknown> | null;
+  metadata: Record<string, unknown> | null;
+  ipAddress: string | null;
+}
+
+export type ManagedAuditLogSortField = "at" | "severity" | "action" | "actor" | "resource";
+
+export interface ManagedAuditLogQuery extends ListQuery {
+  search?: string;
+  action?: string | "all";
+  resourceType?: string | "all";
+  actorId?: string | "all";
+  severity?: ManagedAuditLogSeverity | "all";
+  result?: ManagedAuditLogResult | "all";
+  /** ISO date (yyyy-mm-dd) inclusive range over `at`. */
+  dateFrom?: string;
+  dateTo?: string;
+  /** Restrict to the backend-classified security-event subset. Consumed by the Security Center. */
+  securityOnly?: boolean;
+  sortBy?: ManagedAuditLogSortField;
+  sortDir?: SortDir;
+}
+
+export interface ManagedAuditLogMetrics {
+  total: number;
+  today: number;
+  highSeverity: number;
+  securityEvents: number;
+  failed: number;
+  /** Always 0 today — no attempt that gets refused is ever logged, so this is an honest, not fabricated, zero. */
+  denied: number;
+}
+
+export interface ManagedAuditLogChainStatus {
+  checked: number;
+  legacyRows: number;
+  valid: boolean;
+  brokenAtId: string | null;
+}
+
+export interface AdminAuditLogService {
+  list(query?: ManagedAuditLogQuery): Promise<Paginated<ManagedAuditLogEntry>>;
+  getById(id: string): Promise<ManagedAuditLogEntry | null>;
+  getMetrics(): Promise<ManagedAuditLogMetrics>;
+  getActorOptions(): Promise<ManagedAuditLogActor[]>;
+  /** Recomputes the SHA-256 chain across all entries; reports the first tampered row if any. */
+  verifyChain(): Promise<ManagedAuditLogChainStatus>;
+}
+
+// ------------------------------------------------------------
 // FREELANCER MANAGEMENT (/admin/freelancers console)
 // Admin console for discovering, inspecting, and managing
 // freelancer profiles and their marketplace services.
