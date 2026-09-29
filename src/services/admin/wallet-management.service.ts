@@ -1,11 +1,8 @@
-import { apiDelay, applySearch, applySort, paginate } from "@/lib/admin/api";
-import {
-  buildFinanceOverview,
-  buildFinanceTransactions,
-  buildWithdrawalDetail,
-} from "@/data/admin/finance";
+import { apiDelay } from "@/lib/admin/api";
+import { buildWithdrawalDetail } from "@/data/admin/finance";
 import { mockWithdrawals } from "@/data/admin/commerce";
 import { createMockWithdrawalService } from "./withdrawals.service";
+import { createApiWalletLedgerService } from "./wallet-management.api";
 import type {
   FinanceOverview,
   FinanceTxnQuery,
@@ -63,50 +60,12 @@ const ALL_WITHDRAWAL_STATUSES: WithdrawalStatus[] = [
 const PENDING_SETTLEMENT: WithdrawalStatus[] = ["pending", "processing", "approved"];
 
 export function createFinanceManagementService(): AdminFinanceManagementService {
-  const transactions = buildFinanceTransactions();
-  const overview = buildFinanceOverview(transactions);
+  const ledger = createApiWalletLedgerService();
   const withdrawalService = createMockWithdrawalService(mockWithdrawals);
 
   return {
-    async getOverview() {
-      await apiDelay();
-      return structuredCopy(overview);
-    },
-
-    async listTransactions(query = {}) {
-      await apiDelay();
-
-      let out = structuredCopy(transactions);
-
-      if (query.type && query.type !== "all") {
-        out = out.filter((t) => t.type === query.type);
-      }
-      if (query.status && query.status !== "all") {
-        out = out.filter((t) => t.status === query.status);
-      }
-      if (query.pool && query.pool !== "all") {
-        out = out.filter((t) => t.pool === query.pool);
-      }
-
-      const search = query.search?.trim().toLowerCase();
-      if (search) {
-        out = applySearch(out, search as string, (t) => [
-          t.id,
-          t.ownerName,
-          t.reference,
-          t.orderId,
-        ]);
-      }
-
-      const sortBy = query.sortBy ?? "createdAt";
-      const sortDir = query.sortDir ?? "desc";
-      out = applySort(out, sortBy, sortDir, {
-        createdAt: (t) => new Date(t.createdAt).getTime(),
-        amount: (t) => t.amount,
-      });
-
-      return paginate(out, query, 15);
-    },
+    getOverview: ledger.getOverview,
+    listTransactions: ledger.listTransactions,
 
     async listWithdrawals(query = {}) {
       return withdrawalService.list(query);

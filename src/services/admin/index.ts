@@ -16,13 +16,7 @@ import { mockActivityItems, mockDailyMetrics, mockGrowthSeries, mockNotification
 import { mockCampuses } from "@/data/admin/campuses";
 import { mockUsers, mockVendors } from "@/data/admin/people";
 import { mockCategories, mockProducts } from "@/data/admin/catalog";
-import {
-  mockOrders,
-  mockPayments,
-  mockWalletAccounts,
-  mockWalletTxns,
-  mockWithdrawals,
-} from "@/data/admin/commerce";
+import { mockOrders, mockPayments, mockWithdrawals } from "@/data/admin/commerce";
 import { mockPromotions } from "@/data/admin/growth";
 import { mockDisputes, mockPosts, mockReports, mockReviews } from "@/data/admin/content";
 import { DashboardService, createMockDashboardService } from "./dashboard.service";
@@ -58,7 +52,6 @@ import {
 } from "./catalog.service";
 import { AdminOrderService, createMockOrderService } from "./orders.service";
 import { AdminPaymentService, createMockPaymentService } from "./payments.service";
-import { AdminWalletService, createMockWalletService } from "./wallet.service";
 import {
   AdminWithdrawalService,
   createMockWithdrawalService,
@@ -192,6 +185,13 @@ import {
 export const financeManagementService: AdminFinanceManagementService =
   createFinanceManagementService();
 
+import type { AdminWalletAccountsService } from "./wallet-accounts.api";
+import { createApiWalletAccountsService } from "./wallet-accounts.api";
+
+/** /admin/wallet console: live vendor/customer wallet accounts, freeze/unfreeze and manual adjustments (GET/PATCH/POST /admin/wallets/accounts/*). */
+export const walletAccountsService: AdminWalletAccountsService =
+  createApiWalletAccountsService();
+
 import type { AdminPromotionManagementService } from "./promotion-management.service";
 import { createApiPromotionManagementService } from "./promotion-management.api";
 
@@ -212,11 +212,6 @@ export const orderService: AdminOrderService = createMockOrderService(mockOrders
 
 export const paymentService: AdminPaymentService =
   createMockPaymentService(mockPayments);
-
-export const walletService: AdminWalletService = createMockWalletService(
-  mockWalletAccounts,
-  mockWalletTxns
-);
 
 export const withdrawalService: AdminWithdrawalService =
   createMockWithdrawalService(mockWithdrawals);

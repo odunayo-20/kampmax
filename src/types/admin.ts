@@ -791,6 +791,13 @@ export interface PaymentRecord {
 
 // ------------------------------------------------------------
 // WALLET
+//
+// WalletAccount / AdminWalletTxn below back the still-mock /admin/withdrawals
+// console (see wallet-management.service.ts / withdrawals.service.ts).
+// AdminWalletAccount* further down is the real, live shape used by
+// /admin/wallet's account list and freeze/adjust actions
+// (GET/PATCH/POST /admin/wallets/accounts/*) — kept separate rather than
+// reshaping the type above out from under withdrawals.
 // ------------------------------------------------------------
 
 export type WalletOwnerType = "user" | "vendor";
@@ -810,7 +817,7 @@ export interface WalletAccount {
 }
 
 export type WalletTxnDirection = "credit" | "debit";
-export type WalletTxnStatus = "completed" | "pending" | "failed";
+export type WalletTxnStatus = "completed" | "pending" | "failed" | "reversed";
 
 export interface AdminWalletTxn {
   id: string;
@@ -831,6 +838,44 @@ export interface AdminWalletTxn {
   reference: string;
   status: WalletTxnStatus;
   createdAt: string;
+}
+
+/** Real admin wallet accounts (GET /admin/wallets/accounts) — the platform's own wallet is a singleton shown in FinanceOverview, not listed here. */
+export type AdminWalletAccountOwnerType = "vendor" | "customer";
+export type AdminWalletAccountStatus = "active" | "frozen";
+
+export interface AdminWalletAccount {
+  id: string;
+  ownerType: AdminWalletAccountOwnerType;
+  ownerId: string;
+  ownerName: string;
+  /** Null when the wallet's owning user no longer exists (a deleted/test account) — the wallet still holds a real balance. */
+  ownerEmail: string | null;
+  balance: number;
+  heldBalance: number;
+  status: AdminWalletAccountStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminWalletAccountQuery extends ListQuery {
+  search?: string;
+  ownerType?: AdminWalletAccountOwnerType | "all";
+  status?: AdminWalletAccountStatus | "all";
+  sortBy?: "balance" | "createdAt";
+  sortDir?: SortDir;
+}
+
+export interface AdminWalletAdjustInput {
+  direction: "credit" | "debit";
+  amount: number;
+  reason: string;
+}
+
+export interface AdminWalletSetStatusInput {
+  status: AdminWalletAccountStatus;
+  /** Required when freezing. */
+  reason?: string;
 }
 
 // ------------------------------------------------------------
@@ -1475,14 +1520,15 @@ export interface PaymentStatusCounts {
 // WALLET & FINANCE (/admin/wallet, /admin/withdrawals)
 // ------------------------------------------------------------
 
+/** Mirrors the real WalletTransactionType enum (GET /admin/wallets/transactions). */
 export type ManagedFinanceTxnType =
-  | "purchase"
+  | "credit"
+  | "debit"
   | "refund"
-  | "vendor_payout"
-  | "wallet_funding"
+  | "commission"
+  | "settlement"
   | "withdrawal"
-  | "platform_fee"
-  | "loyalty_reward";
+  | "adjustment";
 
 /** Which books a transaction touches - kept explicit so the console
  *  can always separate platform float from vendor and customer money.
@@ -1494,7 +1540,7 @@ export interface ManagedFinanceTxn {
   type: ManagedFinanceTxnType;
   pool: FinanceFundPool;
   ownerName: string;
-  ownerType: WalletOwnerType;
+  ownerType: WalletOwnerType | "platform";
   direction: WalletTxnDirection; // relative to the owning wallet
   amount: number;
   status: WalletTxnStatus;

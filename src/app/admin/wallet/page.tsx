@@ -15,6 +15,7 @@ import {
   type FinanceTxnFilterState,
 } from "@/components/admin/wallet/TransactionsFilters";
 import { TransactionsTable } from "@/components/admin/wallet/TransactionsTable";
+import { WalletAccountsSection } from "@/components/admin/wallet/WalletAccountsSection";
 import { financeManagementService } from "@/services/admin";
 import type {
   FinanceOverview,
@@ -23,13 +24,13 @@ import type {
 } from "@/types/admin";
 
 const VALID_TYPES = [
-  "purchase",
+  "credit",
+  "debit",
   "refund",
-  "vendor_payout",
-  "wallet_funding",
+  "commission",
+  "settlement",
   "withdrawal",
-  "platform_fee",
-  "loyalty_reward",
+  "adjustment",
 ] as const;
 type ValidType = (typeof VALID_TYPES)[number];
 
@@ -201,6 +202,8 @@ export default function AdminWalletPage() {
           </div>
         )}
       </section>
+
+      <WalletAccountsSection />
     </>
   );
 }

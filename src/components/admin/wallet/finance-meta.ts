@@ -7,13 +7,13 @@ import type {
 } from "@/types/admin";
 
 export const FINANCE_TYPE_LABELS: Record<ManagedFinanceTxnType, string> = {
-  purchase: "Purchase",
+  credit: "Credit",
+  debit: "Debit",
   refund: "Refund",
-  vendor_payout: "Vendor payout",
-  wallet_funding: "Wallet funding",
+  commission: "Commission",
+  settlement: "Settlement",
   withdrawal: "Withdrawal",
-  platform_fee: "Platform fee",
-  loyalty_reward: "Loyalty reward",
+  adjustment: "Adjustment",
 };
 
 export function financeTypeLabel(type: ManagedFinanceTxnType): string {
@@ -49,6 +49,8 @@ export function txnStatusVariant(status: WalletTxnStatus): BadgeVariant {
       return "warning";
     case "failed":
       return "error";
+    case "reversed":
+      return "neutral";
   }
 }
 
@@ -56,6 +58,7 @@ export const TXN_STATUS_LABELS: Record<WalletTxnStatus, string> = {
   completed: "Completed",
   pending: "Pending",
   failed: "Failed",
+  reversed: "Reversed",
 };
 
 export function withdrawalStatusVariant(status: WithdrawalStatus): BadgeVariant {
