@@ -42,7 +42,7 @@ export default function AdminNotificationsPage() {
     <>
       <AdminPageHeader
         title="Notifications"
-        description="Administer the shared in-app notification store. In-app is the only wired delivery channel."
+        description="Administer the shared in-app notification store. Broadcasts can optionally also send a real email."
         actions={
           <button
             type="button"

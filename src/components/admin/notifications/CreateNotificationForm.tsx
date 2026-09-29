@@ -54,6 +54,7 @@ export function CreateNotificationForm({
   const [campusId, setCampusId] = useState("");
   const [userId, setUserId] = useState("");
   const [actionUrl, setActionUrl] = useState("");
+  const [sendEmail, setSendEmail] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const preview = useAdminAudiencePreview(
@@ -97,6 +98,7 @@ export function CreateNotificationForm({
       userId: audience === "specific_user" ? userId.trim() || null : null,
       campusId: audience === "campus" ? campusId || null : null,
       actionUrl: actionUrl.trim() || null,
+      sendEmail,
     };
     createMutation.mutate(input, {
       onSuccess: () => onCreated(),
@@ -123,8 +125,8 @@ export function CreateNotificationForm({
         Create in-app notification
       </h1>
       <p className="mt-0.5 text-xs text-kampmax-text-secondary">
-        Dispatches a real record to the shared in-app notification store. No
-        email, SMS or push channel is wired.
+        Dispatches a real record to the shared in-app notification store, with an optional real
+        email via Resend. No SMS or push channel is wired.
       </p>
 
       <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -211,6 +213,24 @@ export function CreateNotificationForm({
                 <p className="mt-1 text-xs text-kampmax-error">{errors.actionUrl}</p>
               )}
             </div>
+
+            {/* Send email */}
+            <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-kampmax-border px-3 py-2.5">
+              <input
+                type="checkbox"
+                checked={sendEmail}
+                onChange={(e) => setSendEmail(e.target.checked)}
+                className="mt-0.5 h-3.5 w-3.5 accent-kampmax-blue"
+              />
+              <span className="text-xs">
+                <span className="font-medium text-kampmax-text">Also send email</span>
+                <span className="block text-kampmax-text-secondary">
+                  Emails every recipient who has email notifications enabled, via the real Resend
+                  integration. Recipients without an email on file or with email disabled are
+                  skipped — the in-app record above is always written regardless.
+                </span>
+              </span>
+            </label>
           </div>
 
           {/* Audience */}

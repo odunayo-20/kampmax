@@ -3445,12 +3445,16 @@ export interface ManagedNotificationBroadcastInput {
   campusId?: string | null;
   /** Safe internal route only (validated server-side too). */
   actionUrl?: string | null;
+  /** Also email every recipient who has email notifications enabled, via the real Resend integration. */
+  sendEmail?: boolean;
 }
 
 export interface ManagedNotificationBroadcastResult {
   created: number;
   notificationIds: string[];
   channel: "in_app";
+  emailsSent: number;
+  emailsFailed: number;
 }
 
 export interface AdminNotificationBroadcastService {
