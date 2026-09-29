@@ -7,7 +7,7 @@ import { MapPin, Star, Clock, Calendar, CheckCircle, Shield, BadgeCheck, Wrench,
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { formatNaira } from "@/lib/utils";
-import { getSpPublicProfile } from "@/services/service-provider";
+import { getSpPublicProfile, getSpPublicProfileLive } from "@/services/service-provider";
 import { getSpProfileByUserId } from "@/data/service-provider";
 import type { ServiceProviderProfile } from "@/types/service-provider";
 
@@ -44,7 +44,7 @@ export default function ServiceProviderPublicProfilePage() {
     const loadProfile = async () => {
       setLoading(true);
       try {
-        const data = getSpPublicProfile(slug);
+        const data = await getSpPublicProfileLive(slug);
         if (data) {
           setProfile(data);
         } else {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   AlertCircle,
@@ -21,6 +21,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import {
+  fetchProviderBookingByIdLive,
   formatBookingDate,
   formatBookingDay,
   formatBookingTime,
@@ -44,11 +45,37 @@ export function ServiceProviderBookingDetailView({ bookingId }: { bookingId: str
   const [booking, setBooking] = useState<ServiceBooking | null>(() =>
     getProviderBooking(bookingId)
   );
+  const [loading, setLoading] = useState(!booking);
   const [acceptOpen, setAcceptOpen] = useState(false);
   const [declineOpen, setDeclineOpen] = useState(false);
   const [completeOpen, setCompleteOpen] = useState(false);
   const [busyAction, setBusyAction] = useState<"start" | null>(null);
   const [error, setError] = useState<BookingError | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchProviderBookingByIdLive(bookingId)
+      .then((live) => {
+        if (!cancelled && live) {
+          setBooking(live);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [bookingId]);
+
+  if (loading && !booking) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-primary-600/20 border-t-primary-600" />
+      </div>
+    );
+  }
 
   if (!booking) {
     return (

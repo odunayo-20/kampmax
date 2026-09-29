@@ -14,6 +14,7 @@ import {
   updateSpAvailabilityLive,
   updateSpLocation,
   updateSpPricing,
+  updateSpProfileLive,
 } from "@/services/service-provider-dashboard";
 import type { ServiceProviderOnboardingDraft, ServiceProviderOnboardingStepId } from "@/types/service-provider";
 import type { ServiceProviderDashboardRecord } from "@/types/service-provider-dashboard";
@@ -97,9 +98,17 @@ export default function AvailabilityPage() {
     applyResult(res.ok, res.error, "Weekly schedule saved.");
   }
 
-  function saveLocation() {
+  async function saveLocation() {
     const d = getDraft();
     const l = d.location ?? {};
+    try {
+      await updateSpProfileLive({
+        locationCity: l.serviceCities?.[0] || undefined,
+        serviceRadius: l.serviceRadiusKm ? String(l.serviceRadiusKm) : undefined,
+      });
+    } catch {
+      // ignore
+    }
     const res = updateSpLocation({
       type: l.type,
       primaryCampusId: l.primaryCampusId,

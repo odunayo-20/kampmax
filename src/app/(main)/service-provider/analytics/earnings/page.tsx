@@ -7,7 +7,7 @@ import { SpAnalyticsPeriodBar } from "@/components/service-provider/analytics/Sp
 import { SpAnalyticsKpiCards } from "@/components/service-provider/analytics/SpAnalyticsKpiCards";
 import { SpAnalyticsTrendChart } from "@/components/service-provider/analytics/SpAnalyticsTrendChart";
 import { SpAnalyticsCategoryChart } from "@/components/service-provider/analytics/SpAnalyticsCategoryChart";
-import { getSpAnalyticsEarnings } from "@/services/service-provider-analytics";
+import { getSpAnalyticsEarnings, getSpAnalyticsEarningsLive } from "@/services/service-provider-analytics";
 import { SP_ANALYTICS_PERIOD } from "@/types/service-provider-analytics";
 import type { SpAnalyticsEarnings, SpAnalyticsPeriod } from "@/types/service-provider-analytics";
 
@@ -21,9 +21,14 @@ export default function AnalyticsEarningsPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      setData(getSpAnalyticsEarnings(period));
+      const liveData = await getSpAnalyticsEarningsLive(period);
+      setData(liveData);
     } catch {
-      setData(null);
+      try {
+        setData(getSpAnalyticsEarnings(period));
+      } catch {
+        setData(null);
+      }
     } finally {
       setLoading(false);
     }

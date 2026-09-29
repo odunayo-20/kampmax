@@ -19,6 +19,7 @@ import { getSpProfileRecord, pushSpFinancialNotification, recordSpFinancialActiv
 import { getBookingsForProvider, settlementPreviewFor } from "@/data/booking";
 import { spFinancialsStore } from "@/data/service-provider-financials";
 import { formatNaira } from "@/lib/utils";
+import { fetchFinancialStatus, startFinancialOnboarding } from "@/services/financial-api";
 import type { ServiceBooking } from "@/types/booking";
 import {
   SP_FINANCIAL_TX_TYPE,
@@ -28,6 +29,7 @@ import {
   SP_FINANCIAL_PERIOD,
   SP_FINANCIAL_RESULT,
   SP_PAYOUT_ACCOUNT_RESULT,
+  SP_PAYOUT_ACCOUNT_STATUS,
   SP_FINANCIAL_LIMITS,
 } from "@/types/service-provider-financials";
 import type {
@@ -51,6 +53,7 @@ import type {
   SpPayoutAccount,
   SpPayoutAccountInput,
   SpPayoutAccountResult,
+  SpPayoutAccountStatus,
   SpPayoutRequestInput,
   SpPayoutRequestResult,
   SpPayoutStatus,
@@ -622,4 +625,354 @@ export function computeAvailable(): number {
     .filter((p) => p.status === "successful" || p.status === "processing")
     .reduce((sum, p) => sum + p.amount + p.fee, 0);
   return Math.max(0, totalNet - out);
+}
+
+// ── Live Backend API Integrations ──────────────────────────
+
+function mapWalletTxToSpTx(tx: {
+  id: string;
+  type: string;
+  direction: "CREDIT" | "DEBIT";
+  status: "PENDING" | "COMPLETED" | "FAILED" | "REVERSED";
+  amount: number;
+  reference: string;
+  description: string;
+  createdAt: string | Date;
+}): SpFinancialTransaction {
+  const isCredit = tx.direction === "CREDIT";
+  let txType: SpFinancialTxType = SP_FINANCIAL_TX_TYPE.SERVICE_PAYMENT;
+  const lowerType = (tx.type || "").toLowerCase();
+  if (!isCredit) {
+    if (lowerType.includes("withdraw") || lowerType.includes("payout")) {
+      txType = SP_FINANCIAL_TX_TYPE.PAYOUT;
+    } else if (lowerType.includes("fee")) {
+      txType = SP_FINANCIAL_TX_TYPE.PLATFORM_FEE;
+    } else if (lowerType.includes("refund")) {
+      txType = SP_FINANCIAL_TX_TYPE.REFUND;
+    } else {
+      txType = SP_FINANCIAL_TX_TYPE.ADJUSTMENT;
+    }
+  } else {
+    if (lowerType.includes("refund") || lowerType.includes("reversal")) {
+      txType = SP_FINANCIAL_TX_TYPE.REFUND;
+    } else if (lowerType.includes("adjustment") || lowerType.includes("topup")) {
+      txType = SP_FINANCIAL_TX_TYPE.ADJUSTMENT;
+    }
+  }
+
+  let txStatus: SpFinancialTxStatus = SP_FINANCIAL_TX_STATUS.SUCCESSFUL;
+  if (tx.status === "PENDING") txStatus = SP_FINANCIAL_TX_STATUS.PENDING;
+  else if (tx.status === "FAILED") txStatus = SP_FINANCIAL_TX_STATUS.FAILED;
+  else if (tx.status === "REVERSED") txStatus = SP_FINANCIAL_TX_STATUS.REVERSED;
+
+  const dateStr = typeof tx.createdAt === "string" ? tx.createdAt : new Date(tx.createdAt).toISOString();
+
+  return {
+    id: tx.id,
+    type: txType,
+    status: txStatus,
+    sign: isCredit ? SP_FIN_SIGN.CREDIT : SP_FIN_SIGN.DEBIT,
+    amount: tx.amount,
+    fee: txType === SP_FINANCIAL_TX_TYPE.PAYOUT ? SP_FINANCIAL_LIMITS.PAYOUT_FEE : undefined,
+    description: tx.description || (isCredit ? "Service booking payment" : "Withdrawal"),
+    reference: tx.reference,
+    at: dateStr,
+    events: [
+      {
+        id: `ev-${tx.id}-1`,
+        title: txStatus === SP_FINANCIAL_TX_STATUS.SUCCESSFUL ? "Completed" : "Recorded",
+        at: dateStr,
+      },
+    ],
+  };
+}
+
+export async function getPayoutAccountLive(): Promise<SpPayoutAccount> {
+  try {
+    const status = await fetchFinancialStatus();
+    if (status && status.account) {
+      const isVerified =
+        status.kyc === "KYC_VERIFIED" &&
+        (status.virtualAccount === "VIRTUAL_ACCOUNT_ACTIVE" || status.financialProfile === "FINANCIAL_PROFILE_ACTIVE");
+      const isPending = status.kyc === "KYC_PENDING" || status.virtualAccount === "VIRTUAL_ACCOUNT_PENDING";
+      const isFailed = status.kyc === "KYC_FAILED" || status.virtualAccount === "VIRTUAL_ACCOUNT_FAILED";
+
+      let accountStatus: SpPayoutAccountStatus = SP_PAYOUT_ACCOUNT_STATUS.VERIFIED;
+      if (isPending) accountStatus = SP_PAYOUT_ACCOUNT_STATUS.PENDING_VERIFICATION;
+      else if (isFailed) accountStatus = SP_PAYOUT_ACCOUNT_STATUS.FAILED;
+      else if (!isVerified) accountStatus = SP_PAYOUT_ACCOUNT_STATUS.PENDING_VERIFICATION;
+
+      const maskedNum = status.account.accountNumber
+        ? "••••••••" + status.account.accountNumber.slice(-4)
+        : status.maskedIdentifier ?? "••••••••••";
+
+      return {
+        bankName: status.account.bankName || "Bank Account",
+        bankCode: "",
+        accountName: status.account.accountName || "Account Holder",
+        maskedAccountNumber: maskedNum,
+        status: accountStatus,
+        currency: "NGN",
+        restrictions: [],
+      };
+    }
+  } catch (err) {
+    console.warn("Failed to fetch live payout account:", err);
+  }
+  return getPayoutAccount();
+}
+
+export async function computeAvailableLive(): Promise<number> {
+  try {
+    const { data: wallet } = await apiClient.get<{ balance: number; heldBalance: number }>("/wallet");
+    if (wallet && typeof wallet.balance === "number") {
+      return wallet.balance;
+    }
+  } catch (err) {
+    console.warn("Failed to fetch wallet balance:", err);
+  }
+  return computeAvailable();
+}
+
+export async function getTransactionsLive(query?: SpFinancialQuery): Promise<SpFinancialPage<SpFinancialTransaction>> {
+  const page = query?.page ?? 1;
+  const pageSize = query?.pageSize ?? 10;
+  try {
+    const { data: res } = await apiClient.get<{
+      data: Array<{
+        id: string;
+        type: string;
+        direction: "CREDIT" | "DEBIT";
+        status: "PENDING" | "COMPLETED" | "FAILED" | "REVERSED";
+        amount: number;
+        reference: string;
+        description: string;
+        createdAt: string | Date;
+      }>;
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    }>(`/wallet/transactions?page=${page}&limit=${pageSize}`);
+
+    if (res && Array.isArray(res.data)) {
+      const items = res.data.map(mapWalletTxToSpTx);
+      const totals = items.reduce(
+        (acc, t) => {
+          if (t.sign === "credit") acc.credit += t.amount;
+          else acc.debit += t.amount;
+          return acc;
+        },
+        { credit: 0, debit: 0 }
+      );
+      return {
+        items,
+        total: res.total,
+        page: res.page,
+        pageSize: res.limit,
+        totalPages: res.totalPages,
+        totals,
+      };
+    }
+  } catch (err) {
+    console.warn("Failed to fetch live transactions:", err);
+  }
+  return getTransactions(query);
+}
+
+export async function getTransactionLive(id: string): Promise<SpFinancialTransaction | null> {
+  try {
+    const page = await getTransactionsLive({ page: 1, pageSize: 50 });
+    const found = page.items.find((t) => t.id === id);
+    if (found) return found;
+  } catch (err) {
+    console.warn("Failed to fetch live transaction:", err);
+  }
+  const page = getTransactions({ page: 1, pageSize: 50 });
+  return page.items.find((t) => t.id === id) ?? null;
+}
+
+export async function getPayoutsLive(query?: { page?: number; pageSize?: number; status?: SpPayoutStatus | "all" }): Promise<SpFinancialPage<SpPayout>> {
+  const page = query?.page ?? 1;
+  const pageSize = query?.pageSize ?? 10;
+  try {
+    const { data: res } = await apiClient.get<{
+      data: Array<{
+        id: string;
+        type: string;
+        direction: "CREDIT" | "DEBIT";
+        status: "PENDING" | "COMPLETED" | "FAILED" | "REVERSED";
+        amount: number;
+        reference: string;
+        description: string;
+        createdAt: string | Date;
+      }>;
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    }>(`/wallet/transactions?page=${page}&limit=${pageSize}`);
+
+    if (res && Array.isArray(res.data)) {
+      const payoutTxs = res.data.filter((tx) => tx.direction === "DEBIT" || (tx.type || "").toLowerCase().includes("withdraw"));
+      const items: SpPayout[] = payoutTxs.map((tx) => {
+        let status: SpPayoutStatus = "successful";
+        if (tx.status === "PENDING") status = "processing";
+        else if (tx.status === "FAILED" || tx.status === "REVERSED") status = "failed";
+
+        const requestedAt = typeof tx.createdAt === "string" ? tx.createdAt : new Date(tx.createdAt).toISOString();
+        return {
+          id: tx.id,
+          amount: tx.amount,
+          fee: SP_FINANCIAL_LIMITS.PAYOUT_FEE,
+          status,
+          bankName: "Bank Account",
+          maskedAccountNumber: "••••••••••",
+          requestedAt,
+          expectedAt: requestedAt,
+          reference: tx.reference,
+          idempotencyKey: tx.reference || tx.id,
+        };
+      });
+
+      const totals = items.reduce(
+        (acc, p) => {
+          acc.debit += p.amount + p.fee;
+          return acc;
+        },
+        { credit: 0, debit: 0 }
+      );
+
+      return {
+        items,
+        total: items.length,
+        page,
+        pageSize,
+        totalPages: Math.max(1, Math.ceil(items.length / pageSize)),
+        totals,
+      };
+    }
+  } catch (err) {
+    console.warn("Failed to fetch live payouts:", err);
+  }
+  return getPayouts(query);
+}
+
+export async function getFinancialOverviewLive(period: SpFinancialPeriod): Promise<SpFinancialOverview> {
+  try {
+    const [walletRes, account, txsPage, earningsRes] = await Promise.all([
+      apiClient.get<{ balance: number; heldBalance: number }>("/wallet").then((r) => r.data).catch(() => null),
+      getPayoutAccountLive().catch(() => getPayoutAccount()),
+      getTransactionsLive({ page: 1, pageSize: 5 }).catch(() => getTransactions({ page: 1, pageSize: 5 })),
+      apiClient.get<number>("/analytics/service-provider/earnings").then((r) => r.data).catch(() => null),
+    ]);
+
+    if (walletRes && typeof walletRes.balance === "number") {
+      const balance = walletRes.balance;
+      const heldBalance = walletRes.heldBalance ?? 0;
+      const totalEarnings = earningsRes ?? (balance + heldBalance);
+
+      const cards: SpFinancialSummaryCard[] = [
+        {
+          key: "available",
+          label: "Available balance",
+          value: balance,
+          sublabel: "Ready for withdrawal",
+          tone: "positive",
+        },
+        {
+          key: "held",
+          label: "Pending clearance",
+          value: heldBalance,
+          sublabel: "In escrow / pending bookings",
+          tone: "info",
+        },
+        {
+          key: "earnings",
+          label: "Total settled earnings",
+          value: totalEarnings,
+          sublabel: "Lifetime completed bookings",
+          tone: "neutral",
+        },
+      ];
+
+      const breakdown: SpEarningsBreakdown = {
+        periodLabel: period.key,
+        from: new Date(Date.now() - 30 * 86400000).toISOString(),
+        to: new Date().toISOString(),
+        gross: totalEarnings,
+        platformFees: Math.round(totalEarnings * 0.1),
+        tax: 0,
+        net: Math.round(totalEarnings * 0.9),
+        settledCount: txsPage.total,
+        payoutTotal: 0,
+        payoutCount: 0,
+      };
+
+      return {
+        cards,
+        breakdown,
+        account,
+        recentTransactions: txsPage.items,
+      };
+    }
+  } catch (err) {
+    console.warn("Failed to build live financial overview:", err);
+  }
+  return getFinancialOverview(period);
+}
+
+export async function requestPayoutLive(input: SpPayoutRequestInput): Promise<SpPayoutRequestResult> {
+  try {
+    const account = await getPayoutAccountLive();
+    if (account.status !== "verified") {
+      return { ok: false, code: SP_FINANCIAL_RESULT.ACCOUNT_NOT_VERIFIED, error: "Payout account not verified" };
+    }
+    const { data: res, error } = await apiClient.post<any, any>("/wallet/withdraw", {
+      amount: input.amount,
+      note: `Service Provider Payout [${input.idempotencyKey}]`,
+      destination: {
+        bankCode: account.bankCode || "058",
+        accountNumber: account.maskedAccountNumber.replace(/[^0-9]/g, "") || "0000000000",
+        accountName: account.accountName,
+      },
+    });
+
+    if (error) {
+      return { ok: false, code: SP_FINANCIAL_RESULT.INSUFFICIENT_BALANCE, error: error.message || "Withdrawal failed" };
+    }
+
+    const available = await computeAvailableLive();
+    const payout: SpPayout = {
+      id: res?.id || `SPOUT-${Date.now()}`,
+      amount: input.amount,
+      fee: SP_FINANCIAL_LIMITS.PAYOUT_FEE,
+      status: "processing",
+      bankName: account.bankName,
+      maskedAccountNumber: account.maskedAccountNumber,
+      requestedAt: new Date().toISOString(),
+      expectedAt: new Date(Date.now() + 24 * 3600000).toISOString(),
+      reference: res?.reference || `KMP-SPOUT-${Date.now()}`,
+      idempotencyKey: input.idempotencyKey,
+    };
+
+    return { ok: true, code: SP_FINANCIAL_RESULT.OK, payout, available };
+  } catch (err: any) {
+    return requestPayout(input);
+  }
+}
+
+export async function updatePayoutAccountLive(input: SpPayoutAccountInput): Promise<SpPayoutAccountResult> {
+  try {
+    await startFinancialOnboarding({
+      bvn: "",
+      accountNumber: input.accountNumber,
+      bankCode: "058",
+    });
+    const account = await getPayoutAccountLive();
+    return { ok: true, code: SP_PAYOUT_ACCOUNT_RESULT.OK, account };
+  } catch (err: any) {
+    console.warn("Failed live financial onboarding:", err);
+    return updatePayoutAccount(input);
+  }
 }

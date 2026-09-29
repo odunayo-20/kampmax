@@ -536,3 +536,14 @@ export function bookingStatusLabel(status: ServiceBooking["status"]): string {
 export function getBookingProviderCatalog(providerId: string) {
   return getMarketplaceProvider(providerId);
 }
+
+// ── Live Provider Booking API exports ────────────────────────
+export {
+  fetchProviderBookingsLive,
+  fetchProviderBookingByIdLive,
+  acceptProviderBookingLive,
+  rejectProviderBookingLive,
+  fetchProviderBookingSummaryLive,
+  mapBackendBookingToFrontend,
+  mapBackendBookingStatus,
+} from "./service-provider-booking.api";

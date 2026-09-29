@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { X, AlertCircle, Ban } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { declineBooking } from "@/services/booking";
+import { declineBooking, rejectProviderBookingLive } from "@/services/booking";
 import type { BookingError, ServiceBooking } from "@/types/booking";
 
 const REASONS = [
@@ -36,17 +36,32 @@ export function DeclineBookingModal({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
-  function submit() {
+  async function submit() {
     if (busy) return;
     if (!reason) {
       setError({ code: "422", message: "Choose a reason so the customer knows why." });
       return;
     }
+    const finalReason = reason === "Other" ? note.trim() || "Other" : reason;
     setBusy(true);
     setError(null);
+    try {
+      const liveRes = await rejectProviderBookingLive(booking.id, finalReason);
+      if (liveRes.ok) {
+        declineBooking({
+          id: booking.id,
+          reason: finalReason,
+        });
+        setBusy(false);
+        onComplete(liveRes.booking);
+        return;
+      }
+    } catch {
+      // Fallback
+    }
     const result = declineBooking({
       id: booking.id,
-      reason: reason === "Other" ? note.trim() || "Other" : reason,
+      reason: finalReason,
     });
     setBusy(false);
     if (result.ok) {

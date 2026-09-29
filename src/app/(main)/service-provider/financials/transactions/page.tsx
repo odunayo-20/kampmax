@@ -7,7 +7,7 @@ import { SpTransactionsToolbar } from "@/components/service-provider/financials/
 import { SpTransactionTable } from "@/components/service-provider/financials/SpTransactionTable";
 import { SpPagination } from "@/components/service-provider/financials/SpPagination";
 import { SpFinancialsSkeleton } from "@/components/service-provider/financials/SpFinancialsSkeleton";
-import { getTransactions } from "@/services/service-provider-financials";
+import { getTransactions, getTransactionsLive } from "@/services/service-provider-financials";
 import type { SpFinancialQuery, SpFinancialTransaction, SpFinancialPage } from "@/types/service-provider-financials";
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -46,10 +46,15 @@ export default function TransactionsPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const result = getTransactions(query);
+      const result = await getTransactionsLive(query);
       setData(result);
     } catch {
-      setData(null);
+      try {
+        const result = getTransactions(query);
+        setData(result);
+      } catch {
+        setData(null);
+      }
     } finally {
       setLoading(false);
     }

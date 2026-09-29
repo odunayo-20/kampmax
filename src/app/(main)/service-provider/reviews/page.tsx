@@ -1,13 +1,32 @@
 "use client";
-
-import { useState } from "react";
+ 
+import { useEffect, useState } from "react";
 import { Star } from "lucide-react";
 import { cn, timeAgo } from "@/lib/utils";
-import { getSpReviewsSummary } from "@/services/service-provider-dashboard";
-import type { ServiceProviderReview } from "@/types/service-provider-dashboard";
+import { fetchSpReviewsSummaryLive, getSpReviewsSummary } from "@/services/service-provider-dashboard";
+import type { ServiceProviderReviewsSummary, ServiceProviderReview } from "@/types/service-provider-dashboard";
 
 export default function ReviewsPage() {
-  const [summary] = useState(() => getSpReviewsSummary());
+  const [summary, setSummary] = useState<ServiceProviderReviewsSummary>(() => getSpReviewsSummary());
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetchSpReviewsSummaryLive()
+      .then((liveSummary) => {
+        if (!cancelled) {
+          setSummary(liveSummary);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="space-y-6">

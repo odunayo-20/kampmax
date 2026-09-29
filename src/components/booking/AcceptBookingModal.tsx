@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { X, AlertCircle, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { acceptBooking } from "@/services/booking";
+import { acceptBooking, acceptProviderBookingLive } from "@/services/booking";
 import type { BookingError, ServiceBooking } from "@/types/booking";
 
 export function AcceptBookingModal({
@@ -30,7 +30,7 @@ export function AcceptBookingModal({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
-  function submit() {
+  async function submit() {
     if (busy) return;
     const parsed = Number(amount);
     if (isRange && (!Number.isFinite(parsed) || parsed <= 0)) {
@@ -39,6 +39,20 @@ export function AcceptBookingModal({
     }
     setBusy(true);
     setError(null);
+    try {
+      const liveRes = await acceptProviderBookingLive(booking.id, isRange ? parsed : undefined);
+      if (liveRes.ok) {
+        acceptBooking({
+          id: booking.id,
+          finalFee: isRange ? parsed : undefined,
+        });
+        setBusy(false);
+        onComplete(liveRes.booking);
+        return;
+      }
+    } catch {
+      // Fallback
+    }
     const result = acceptBooking({
       id: booking.id,
       finalFee: isRange ? parsed : undefined,

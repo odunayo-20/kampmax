@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
+  fetchProviderBookingSummaryLive,
+  fetchProviderBookingsLive,
   getProviderBookingSummary,
   getProviderBookings,
   type ProviderBookingFilter,
@@ -11,7 +13,7 @@ import { BookingListCard } from "./BookingListCard";
 import { BookingEmptyState } from "./BookingEmptyState";
 import { BookingFilters } from "./BookingFilters";
 import { BookingPagination } from "./BookingPagination";
-import type { BookingListQuery } from "@/types/booking";
+import type { BookingListQuery, BookingPageResult } from "@/types/booking";
 
 const TABS: { key: ProviderBookingFilter; label: string }[] = [
   { key: "pending", label: "Pending" },
@@ -37,8 +39,33 @@ export function ServiceProviderBookingsView() {
     [tab, page, filters]
   );
 
-  const result = useMemo(() => getProviderBookings(query), [query]);
-  const summary = useMemo(() => getProviderBookingSummary(), []);
+  const localResult = useMemo(() => getProviderBookings(query), [query]);
+  const localSummary = useMemo(() => getProviderBookingSummary(), []);
+
+  const [liveResult, setLiveResult] = useState<BookingPageResult | null>(null);
+  const [liveSummary, setLiveSummary] = useState<ReturnType<typeof getProviderBookingSummary> | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchProviderBookingsLive(query)
+      .then((res) => {
+        if (!cancelled) setLiveResult(res);
+      })
+      .catch(() => {});
+
+    fetchProviderBookingSummaryLive()
+      .then((res) => {
+        if (!cancelled) setLiveSummary(res);
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [query]);
+
+  const result = liveResult ?? localResult;
+  const summary = liveSummary ?? localSummary;
 
   function switchTab(next: ProviderBookingFilter) {
     setTab(next);

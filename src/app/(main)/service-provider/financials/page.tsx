@@ -8,7 +8,7 @@ import { SpFinancialSummaryCards } from "@/components/service-provider/financial
 import { SpFinancialsPeriodBar } from "@/components/service-provider/financials/SpFinancialsPeriodBar";
 import { SpPayoutAccountCard } from "@/components/service-provider/financials/SpPayoutAccountCard";
 import { SpTransactionTable } from "@/components/service-provider/financials/SpTransactionTable";
-import { getFinancialOverview } from "@/services/service-provider-financials";
+import { getFinancialOverview, getFinancialOverviewLive } from "@/services/service-provider-financials";
 import { SP_FINANCIAL_PERIOD } from "@/types/service-provider-financials";
 import type { SpFinancialPeriod, SpFinancialOverview } from "@/types/service-provider-financials";
 
@@ -24,11 +24,17 @@ export default function FinancialsOverviewPage() {
   const fetchOverview = useCallback(async () => {
     setLoading(true);
     try {
-      const data = getFinancialOverview(period);
+      const data = await getFinancialOverviewLive(period);
       setOverview(data);
       setError(null);
     } catch {
-      setError("You don't have access to financials");
+      try {
+        const data = getFinancialOverview(period);
+        setOverview(data);
+        setError(null);
+      } catch {
+        setError("You don't have access to financials");
+      }
     } finally {
       setLoading(false);
     }

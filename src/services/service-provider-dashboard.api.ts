@@ -537,6 +537,7 @@ export async function updateSpProfileLive(
     profileImageId: string;
     locationCity: string;
     locationState: string;
+    serviceRadius: string;
   }>
 ): Promise<{ ok: boolean; error?: string; record?: ServiceProviderDashboardRecord }> {
   const payload: Record<string, unknown> = {};
@@ -547,6 +548,7 @@ export async function updateSpProfileLive(
   if (patch.profileImageId !== undefined) payload.profileImageId = patch.profileImageId;
   if (patch.locationCity !== undefined) payload.locationCity = patch.locationCity;
   if (patch.locationState !== undefined) payload.locationState = patch.locationState;
+  if (patch.serviceRadius !== undefined) payload.serviceRadius = patch.serviceRadius;
 
   const { data, error } = await apiClient.patch<Record<string, unknown>, BackendSpProfile>(
     "/service-provider/profile/me",

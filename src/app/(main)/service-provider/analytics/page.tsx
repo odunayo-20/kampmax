@@ -11,7 +11,7 @@ import { SpAnalyticsTrendChart } from "@/components/service-provider/analytics/S
 import { SpAnalyticsCategoryChart } from "@/components/service-provider/analytics/SpAnalyticsCategoryChart";
 import { SpAnalyticsFunnelCard } from "@/components/service-provider/analytics/SpAnalyticsFunnelCard";
 import { SpAnalyticsPeakDayCard } from "@/components/service-provider/analytics/SpAnalyticsPeakDayCard";
-import { getSpAnalyticsOverview } from "@/services/service-provider-analytics";
+import { getSpAnalyticsOverview, getSpAnalyticsOverviewLive } from "@/services/service-provider-analytics";
 import { SP_ANALYTICS_PERIOD } from "@/types/service-provider-analytics";
 import type { SpAnalyticsOverview, SpAnalyticsPeriod } from "@/types/service-provider-analytics";
 
@@ -27,11 +27,17 @@ export default function AnalyticsOverviewPage() {
   const fetchOverview = useCallback(async () => {
     setLoading(true);
     try {
-      const data = getSpAnalyticsOverview(period);
+      const data = await getSpAnalyticsOverviewLive(period);
       setOverview(data);
       setError(null);
     } catch {
-      setError("You don't have access to analytics");
+      try {
+        const data = getSpAnalyticsOverview(period);
+        setOverview(data);
+        setError(null);
+      } catch {
+        setError("You don't have access to analytics");
+      }
     } finally {
       setLoading(false);
     }

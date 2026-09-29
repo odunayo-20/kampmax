@@ -448,6 +448,55 @@ export function getSpPublicProfile(slug: string): ServiceProviderProfile | undef
   return serviceProviderProfiles.find((p) => p.slug === slug);
 }
 
+export async function getSpPublicProfileLive(slug: string): Promise<ServiceProviderProfile | undefined> {
+  try {
+    // If it's a UUID, fetch by ID
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
+    if (isUuid) {
+      const { data } = await apiClient.get<any>(`/service-provider/profile/${slug}`);
+      if (data) {
+        return {
+          id: data.id,
+          userId: data.userId,
+          slug: data.slug || slug,
+          displayName: data.displayName || "Service Provider",
+          description: data.bio || "",
+          type: (data.providerType || "independent") as any,
+          secondaryCategoryIds: [],
+          services: [],
+          location: {
+            type: "both",
+            primaryCampusId: data.locationCity || "Main Campus",
+            additionalCampusIds: [],
+            serviceCities: [data.locationCity, data.locationState].filter(Boolean) as string[],
+            serviceRadiusKm: Number(data.serviceRadius) || 10,
+          },
+          availability: {
+            days: [],
+            bookingPreference: "instant",
+          },
+          pricing: {
+            travelFee: 0,
+            emergencyFee: 0,
+            minimumBookingQuantity: 1,
+          },
+          portfolio: [],
+          verification: {
+            status: (data.verificationStatus?.toLowerCase() || "approved") as any,
+          },
+          rating: 5.0,
+          totalBookings: 0,
+          verified: data.verificationStatus === "VERIFIED",
+          specialties: Array.isArray(data.specialties) ? data.specialties : [],
+        };
+      }
+    }
+  } catch {
+    // Fall back to local mock
+  }
+  return getSpPublicProfile(slug);
+}
+
 export function getSpCategories() {
   // Reuse existing categories for now; backend would have service-specific taxonomy
   return categories;

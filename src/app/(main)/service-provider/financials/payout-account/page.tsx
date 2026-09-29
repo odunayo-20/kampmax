@@ -6,7 +6,7 @@ import { SpFinancialsSubnav } from "@/components/service-provider/financials/SpF
 import { SpFinancialsSkeleton } from "@/components/service-provider/financials/SpFinancialsSkeleton";
 import { SpPayoutAccountCard } from "@/components/service-provider/financials/SpPayoutAccountCard";
 import { SpPayoutAccountForm } from "@/components/service-provider/financials/SpPayoutAccountForm";
-import { getPayoutAccount, updatePayoutAccount } from "@/services/service-provider-financials";
+import { getPayoutAccount, getPayoutAccountLive, updatePayoutAccount, updatePayoutAccountLive } from "@/services/service-provider-financials";
 import type { SpPayoutAccount, SpPayoutAccountInput, SpPayoutAccountResult } from "@/types/service-provider-financials";
 
 const MISSING_ACCOUNT: SpPayoutAccount = {
@@ -27,23 +27,36 @@ export default function PayoutAccountPage() {
 
   useEffect(() => {
     let mounted = true;
-    try {
-      const acct = getPayoutAccount();
-      if (mounted) setAccount(acct);
-    } catch {
-      if (mounted) setError("You don't have access to payout settings");
-    } finally {
-      if (mounted) setLoading(false);
-    }
+    getPayoutAccountLive()
+      .then((acct) => {
+        if (mounted) setAccount(acct);
+      })
+      .catch(() => {
+        try {
+          const acct = getPayoutAccount();
+          if (mounted) setAccount(acct);
+        } catch {
+          if (mounted) setError("You don't have access to payout settings");
+        }
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
     return () => {
       mounted = false;
     };
   }, []);
 
-  const handleSubmit = (input: SpPayoutAccountInput): SpPayoutAccountResult => {
-    const res = updatePayoutAccount(input);
-    if (res.ok && res.account) setAccount(res.account);
-    return res;
+  const handleSubmit = async (input: SpPayoutAccountInput): Promise<SpPayoutAccountResult> => {
+    try {
+      const res = await updatePayoutAccountLive(input);
+      if (res.ok && res.account) setAccount(res.account);
+      return res;
+    } catch {
+      const res = updatePayoutAccount(input);
+      if (res.ok && res.account) setAccount(res.account);
+      return res;
+    }
   };
 
   if (loading) return <SpFinancialsSkeleton />;

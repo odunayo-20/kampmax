@@ -9,7 +9,7 @@ import type { SpPayoutAccount, SpPayoutAccountInput, SpPayoutAccountResult } fro
 
 interface SpPayoutAccountFormProps {
   account: SpPayoutAccount;
-  onSubmit: (input: SpPayoutAccountInput) => SpPayoutAccountResult;
+  onSubmit: (input: SpPayoutAccountInput) => SpPayoutAccountResult | Promise<SpPayoutAccountResult>;
   onCancel: () => void;
 }
 
@@ -38,15 +38,19 @@ export function SpPayoutAccountForm({ account, onSubmit, onCancel }: SpPayoutAcc
     return Object.keys(next).length === 0;
   };
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    const res = onSubmit({
-      bankName: bankName.trim(),
-      accountNumber: accountNumber.trim(),
-      accountName: accountName.trim(),
-    });
-    setResult(res);
+    try {
+      const res = await Promise.resolve(onSubmit({
+        bankName: bankName.trim(),
+        accountNumber: accountNumber.trim(),
+        accountName: accountName.trim(),
+      }));
+      setResult(res);
+    } catch (err: any) {
+      setResult({ ok: false, code: "error" as any, error: err?.message ?? "Update failed" });
+    }
   };
 
   return (

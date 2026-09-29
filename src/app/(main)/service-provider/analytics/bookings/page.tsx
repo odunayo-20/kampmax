@@ -6,7 +6,7 @@ import { SpAnalyticsSubnav } from "@/components/service-provider/analytics/SpAna
 import { SpAnalyticsSkeleton } from "@/components/service-provider/analytics/SpAnalyticsSkeleton";
 import { SpAnalyticsPeriodBar } from "@/components/service-provider/analytics/SpAnalyticsPeriodBar";
 import { SpAnalyticsBookingsTable } from "@/components/service-provider/analytics/SpAnalyticsBookingsTable";
-import { getSpAnalyticsBookings } from "@/services/service-provider-analytics";
+import { getSpAnalyticsBookings, getSpAnalyticsBookingsLive } from "@/services/service-provider-analytics";
 import { SP_ANALYTICS_PERIOD } from "@/types/service-provider-analytics";
 import type { SpAnalyticsBookingsPage, SpAnalyticsBookingsTableRow, SpAnalyticsPeriod } from "@/types/service-provider-analytics";
 
@@ -21,9 +21,14 @@ export default function AnalyticsBookingsPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      setData(getSpAnalyticsBookings(period));
+      const liveData = await getSpAnalyticsBookingsLive(period);
+      setData(liveData);
     } catch {
-      setData(null);
+      try {
+        setData(getSpAnalyticsBookings(period));
+      } catch {
+        setData(null);
+      }
     } finally {
       setLoading(false);
     }

@@ -8,7 +8,16 @@ import { SpPayoutsTable } from "@/components/service-provider/financials/SpPayou
 import { SpPayoutRequestModal } from "@/components/service-provider/financials/SpPayoutRequestModal";
 import { SpPagination } from "@/components/service-provider/financials/SpPagination";
 import { SpFinancialsSkeleton } from "@/components/service-provider/financials/SpFinancialsSkeleton";
-import { getPayouts, getPayoutAccount, requestPayout, computeAvailable } from "@/services/service-provider-financials";
+import {
+  getPayouts,
+  getPayoutsLive,
+  getPayoutAccount,
+  getPayoutAccountLive,
+  requestPayout,
+  requestPayoutLive,
+  computeAvailable,
+  computeAvailableLive,
+} from "@/services/service-provider-financials";
 import type { SpPayout, SpPayoutStatus, SpPayoutAccount, SpPayoutRequestInput, SpPayoutRequestResult, SpFinancialPage } from "@/types/service-provider-financials";
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -27,14 +36,15 @@ export default function PayoutsPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [payoutsRes] = await Promise.all([
-        Promise.resolve(getPayouts({ page, pageSize, status: statusFilter })),
-        Promise.resolve(getPayoutAccount()),
-        Promise.resolve(computeAvailable()),
-      ]);
+      const payoutsRes = await getPayoutsLive({ page, pageSize, status: statusFilter });
       setData(payoutsRes);
     } catch {
-      setData(null);
+      try {
+        const payoutsRes = getPayouts({ page, pageSize, status: statusFilter });
+        setData(payoutsRes);
+      } catch {
+        setData(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -43,14 +53,20 @@ export default function PayoutsPage() {
   const fetchMeta = useCallback(async () => {
     try {
       const [acct, avail] = await Promise.all([
-        Promise.resolve(getPayoutAccount()),
-        Promise.resolve(computeAvailable()),
+        getPayoutAccountLive(),
+        computeAvailableLive(),
       ]);
       setAccount(acct);
       setAvailable(avail);
     } catch {
-      setAccount(null);
-      setAvailable(0);
+      try {
+        const [acct, avail] = [getPayoutAccount(), computeAvailable()];
+        setAccount(acct);
+        setAvailable(avail);
+      } catch {
+        setAccount(null);
+        setAvailable(0);
+      }
     }
   }, []);
 
@@ -72,13 +88,22 @@ export default function PayoutsPage() {
     setModalOpen(true);
   };
 
-  const handleModalSubmit = (input: SpPayoutRequestInput): SpPayoutRequestResult => {
-    const res = requestPayout(input);
-    if (res.ok) {
-      fetchData();
-      fetchMeta();
+  const handleModalSubmit = async (input: SpPayoutRequestInput): Promise<SpPayoutRequestResult> => {
+    try {
+      const res = await requestPayoutLive(input);
+      if (res.ok) {
+        fetchData();
+        fetchMeta();
+      }
+      return res;
+    } catch {
+      const res = requestPayout(input);
+      if (res.ok) {
+        fetchData();
+        fetchMeta();
+      }
+      return res;
     }
-    return res;
   };
 
   const handleModalClose = () => {

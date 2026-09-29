@@ -12,7 +12,7 @@ import type { SpPayoutAccount, SpPayoutRequestInput, SpPayoutRequestResult } fro
 interface SpPayoutRequestModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (input: SpPayoutRequestInput) => SpPayoutRequestResult;
+  onSubmit: (input: SpPayoutRequestInput) => SpPayoutRequestResult | Promise<SpPayoutRequestResult>;
   account: SpPayoutAccount;
   available: number;
 }
@@ -72,7 +72,7 @@ export function SpPayoutRequestModal({ isOpen, onClose, onSubmit, account, avail
     setPhase("confirm");
   };
 
-  const handleConfirmSubmit = (e: FormEvent) => {
+  const handleConfirmSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const err = validateAmount(amountVal);
     if (err) {
@@ -87,11 +87,16 @@ export function SpPayoutRequestModal({ isOpen, onClose, onSubmit, account, avail
     setPhase("submitting");
     setError(undefined);
 
-    const res = onSubmit({ amount: amountVal, idempotencyKey, confirmed: true });
-    if (res.ok) {
-      setPhase("success");
-    } else {
-      setError(res.error ?? "Your payout could not be requested. Please try again in a moment.");
+    try {
+      const res = await Promise.resolve(onSubmit({ amount: amountVal, idempotencyKey, confirmed: true }));
+      if (res.ok) {
+        setPhase("success");
+      } else {
+        setError(res.error ?? "Your payout could not be requested. Please try again in a moment.");
+        setPhase("error");
+      }
+    } catch (err: any) {
+      setError(err?.message ?? "Your payout could not be requested. Please try again in a moment.");
       setPhase("error");
     }
   };
