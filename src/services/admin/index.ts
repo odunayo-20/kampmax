@@ -12,8 +12,7 @@
 // No component or page code changes required.
 // ============================================================
 
-import { mockActivityItems, mockDailyMetrics, mockGrowthSeries, mockSettings, mockTopProducts, mockCampusSales, mockLowStock } from "@/data/admin/system";
-import { mockCampuses } from "@/data/admin/campuses";
+import { mockSettings } from "@/data/admin/system";
 import { mockUsers, mockVendors } from "@/data/admin/people";
 import { mockCategories, mockProducts } from "@/data/admin/catalog";
 import { mockOrders, mockPayments, mockWithdrawals } from "@/data/admin/commerce";
@@ -78,29 +77,8 @@ import {
 import { createApiNotificationService } from "./notifications.api";
 import { AdminSettingService, createMockSettingService } from "./settings.service";
 
-// Live API dashboard service — calls NestJS backend analytics endpoints.
-// Mock sources are passed as fallback for endpoints not yet implemented
-// (chart time-series, activity feed) so those sections keep rendering.
-export const dashboardService: DashboardService =
-  createApiDashboardService({
-    users: mockUsers,
-    vendors: mockVendors,
-    products: mockProducts,
-    orders: mockOrders,
-    payments: mockPayments,
-    withdrawals: mockWithdrawals,
-    disputes: mockDisputes,
-    reviews: mockReviews,
-    reports: mockReports,
-    campuses: mockCampuses,
-    dailyMetrics: mockDailyMetrics,
-    growthSeries: mockGrowthSeries,
-    campusSales: mockCampusSales,
-    topProducts: mockTopProducts,
-    lowStock: mockLowStock,
-    recentOrders: mockOrders.slice(0, 12),
-    activity: mockActivityItems,
-  });
+// Live API dashboard service — calls NestJS backend analytics + admin endpoints.
+export const dashboardService: DashboardService = createApiDashboardService();
 
 export const userService: AdminUserService = createMockUserService(mockUsers);
 
