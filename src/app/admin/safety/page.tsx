@@ -38,7 +38,7 @@ function parseInitialFilters(params: URLSearchParams): SafetyFilterState {
   const rawTarget = params.get("target");
   const rawReason = params.get("reason");
   const validStatus = SAFETY_STATUS_TABS as (TrustSafetyReportStatus | "all")[];
-  const validSource = ["all", "storefront_review", "profile_review", "campus_post"] as (
+  const validSource = ["all", "review", "campus_post"] as (
     | TrustSafetySource
     | "all"
   )[];
@@ -196,15 +196,9 @@ function AdminSafetyPageInner() {
         </span>
         <span className="text-kampmax-border">•</span>
         <span>
-          {SAFETY_SOURCE_LABELS.storefront_review}{" "}
+          {SAFETY_SOURCE_LABELS.review}{" "}
           <strong className="font-semibold tabular-nums">
-            {countsData?.bySource.storefront_review ?? "…"}
-          </strong>
-        </span>
-        <span>
-          {SAFETY_SOURCE_LABELS.profile_review}{" "}
-          <strong className="font-semibold tabular-nums">
-            {countsData?.bySource.profile_review ?? "…"}
+            {countsData?.bySource.review ?? "…"}
           </strong>
         </span>
         <span>

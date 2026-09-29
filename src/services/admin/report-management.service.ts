@@ -23,6 +23,7 @@ import type {
   TrustSafetyReportRow,
   TrustSafetySortField,
   Paginated,
+  UpdateSafetyReportStatusInput,
 } from "@/types/admin";
 import {
   buildTrustSafetyDataset,
@@ -44,10 +45,11 @@ export interface AdminTrustSafetyService {
   /** Distinct reason values present in real rows, for the reason filter. */
   getReasonOptions(): Promise<{ reason: string; count: number }[]>;
   /**
-   * Moderation mutations are intentionally absent — see module header.
-   * Actions in the UI deep-link into Modules 35-41 consoles (reports = why,
-   * those consoles = how), which is what the stores can honestly support.
+   * Moves a campus-post report through review. Review-sourced reports have
+   * no equivalent here — resolving one means moderating the review itself
+   * in the /admin/reviews console.
    */
+  setReportStatus(id: string, input: UpdateSafetyReportStatusInput): Promise<TrustSafetyReportDetail>;
 }
 
 export function createTrustSafetyService(): AdminTrustSafetyService {
@@ -83,6 +85,19 @@ export function createTrustSafetyService(): AdminTrustSafetyService {
       const dataset = buildTrustSafetyDataset();
       const { reasons } = computeTrustSafetyFacets(dataset);
       return reasons.map((r) => ({ reason: r.reason, count: r.count }));
+    },
+
+    async setReportStatus(id, input) {
+      const dataset = buildTrustSafetyDataset();
+      const detail = dataset.details.get(id);
+      if (!detail) throw new Error("Report not found");
+      if (!detail.resolvable) {
+        throw new Error(
+          "Review-sourced reports resolve by moderating the review in /admin/reviews, not here."
+        );
+      }
+      detail.status = input.status;
+      return detail;
     },
   };
 }

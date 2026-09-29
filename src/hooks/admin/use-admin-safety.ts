@@ -4,17 +4,21 @@
 // ADMIN TRUST & SAFETY HOOKS (Module 42)
 // ============================================================
 //
-// TanStack Query wrappers over the read-only trust-safety service.
+// TanStack Query wrappers over the trust-safety service.
 // Keys are scope-qualified by the acting operator's campus so a
 // campus-scoped admin's cache can never leak rows/counts across campus
-// boundaries. The console is deliberately read-only — no report store
-// exposes report-level triage transitions, so there are no mutation hooks.
+// boundaries. One real mutation: moving a campus-post report through
+// review (open -> reviewing -> resolved/dismissed) — a flagged review
+// resolves separately, by moderating the review itself.
 // ============================================================
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminKeys } from "@/lib/query-keys";
 import { trustSafetyService } from "@/services/admin";
-import type { TrustSafetyReportListQuery } from "@/types/admin";
+import type {
+  TrustSafetyReportListQuery,
+  UpdateSafetyReportStatusInput,
+} from "@/types/admin";
 import { useAdminSession } from "@/lib/admin/admin-auth-context";
 
 function useActor() {
@@ -56,5 +60,18 @@ export function useAdminSafetyReport(id: string) {
   return useQuery({
     queryKey: adminKeys.trustSafety.detail(id, admin.campusId),
     queryFn: () => trustSafetyService.getById(id),
+  });
+}
+
+/** Moves a campus-post report through review (reviewing/resolved/dismissed). */
+export function useSetSafetyReportStatusMutation() {
+  useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UpdateSafetyReportStatusInput }) =>
+      trustSafetyService.setReportStatus(id, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.trustSafety.all });
+    },
   });
 }

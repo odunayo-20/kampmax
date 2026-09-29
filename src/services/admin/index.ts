@@ -246,14 +246,12 @@ export const reviewManagementService: AdminReviewManagementService =
 
 export type { ManagedReviewSortField } from "./review-management.service";
 
-import {
-  AdminTrustSafetyService,
-  createTrustSafetyService,
-} from "./report-management.service";
+import type { AdminTrustSafetyService } from "./report-management.service";
+import { createApiTrustSafetyService } from "./report-management.api";
 
-/** /admin/safety console (Trust & Safety - read-only, real report data). */
+/** /admin/safety console: live ledger (GET /admin/safety) over flagged reviews and campus-post reports, with real post-report status moves. */
 export const trustSafetyService: AdminTrustSafetyService =
-  createTrustSafetyService();
+  createApiTrustSafetyService();
 
 export type { TrustSafetySortField } from "./report-management.service";
 

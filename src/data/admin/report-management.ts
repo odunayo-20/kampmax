@@ -228,7 +228,7 @@ export function buildTrustSafetyDataset(): TrustSafetyDataset {
     const row: TrustSafetyReportRow = {
       ...base,
       id: r.id,
-      source: "storefront_review",
+      source: "review",
       reason: r.reason,
       details: r.details ?? null,
       createdAt: r.createdAt,
@@ -264,7 +264,7 @@ export function buildTrustSafetyDataset(): TrustSafetyDataset {
       const row: TrustSafetyReportRow = {
         ...base,
         id,
-        source: "profile_review",
+        source: "review",
         reason: r.reason,
         details: r.details ?? null,
         createdAt: r.createdAt,
@@ -353,6 +353,9 @@ export function buildTrustSafetyDataset(): TrustSafetyDataset {
           createdAt: x.createdAt,
           reporterName: x.reporterName,
         })),
+      // No moderation endpoint exists over this mock dataset — superseded by
+      // the live /admin/safety API.
+      resolvable: false,
     });
   }
 
@@ -442,15 +445,12 @@ export function sortTrustSafetyReports(
 // ------------------------------------------------------------
 
 const STATUSES: TrustSafetyReportStatus[] = ["open", "reviewing", "resolved", "dismissed"];
-const SOURCES: TrustSafetySource[] = [
-  "storefront_review",
-  "profile_review",
-  "campus_post",
-];
+const SOURCES: TrustSafetySource[] = ["review", "campus_post"];
 const TARGET_TYPES: TrustSafetyTargetType[] = [
   "product",
   "vendor",
   "freelancer",
+  "service_provider",
   "employer",
   "post",
 ];
@@ -465,8 +465,7 @@ export function computeTrustSafetyCounts(
     dismissed: 0,
   };
   const bySource: Record<TrustSafetySource, number> = {
-    storefront_review: 0,
-    profile_review: 0,
+    review: 0,
     campus_post: 0,
   };
   const byReason = new Map<string, number>();
@@ -474,6 +473,7 @@ export function computeTrustSafetyCounts(
     product: 0,
     vendor: 0,
     freelancer: 0,
+    service_provider: 0,
     employer: 0,
     post: 0,
   };

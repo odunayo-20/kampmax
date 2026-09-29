@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
   ArrowLeft,
   BadgeCheck,
+  CheckCircle2,
   Clock,
+  Eye,
   ExternalLink,
   FileWarning,
   Flag,
@@ -15,9 +17,11 @@ import {
   Link2,
   ShieldAlert,
   UserRound,
+  XCircle,
 } from "lucide-react";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { ErrorState } from "@/components/admin/ErrorState";
 import { LoadingSkeleton } from "@/components/admin/LoadingSkeleton";
 import { StatCard } from "@/components/admin/StatCard";
@@ -31,8 +35,20 @@ import {
   safetyStatusLabel,
   safetyTargetTypeLabel,
 } from "@/components/admin/safety/safety-meta";
-import { useAdminSafetyReport } from "@/hooks/admin/use-admin-safety";
-import type { TrustSafetyReportDetail } from "@/types/admin";
+import {
+  useAdminSafetyReport,
+  useSetSafetyReportStatusMutation,
+} from "@/hooks/admin/use-admin-safety";
+import type {
+  TrustSafetyReportDetail,
+  TrustSafetyResolutionStatus,
+} from "@/types/admin";
+
+interface ToastMessage {
+  id: number;
+  tone: "success" | "error";
+  text: string;
+}
 
 type DetailTab = "overview" | "evidence" | "actions";
 
@@ -47,8 +63,32 @@ export default function AdminSafetyReportPage() {
   const reportId = typeof params.id === "string" ? params.id : "";
 
   const [tab, setTab] = useState<DetailTab>("overview");
+  const [confirmStatus, setConfirmStatus] =
+    useState<TrustSafetyResolutionStatus | null>(null);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const toastId = useRef(0);
+  const setStatusMut = useSetSafetyReportStatusMutation();
 
   const { data: detail, isPending, isError, refetch } = useAdminSafetyReport(reportId);
+
+  const pushToast = useCallback((tone: ToastMessage["tone"], text: string) => {
+    const tid = ++toastId.current;
+    setToasts((t) => [...t.slice(-2), { id: tid, tone, text }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== tid)), 3800);
+  }, []);
+
+  async function resolve(status: TrustSafetyResolutionStatus, note: string) {
+    try {
+      await setStatusMut.mutateAsync({
+        id: reportId,
+        input: { status, note: note.trim() || undefined },
+      });
+      setConfirmStatus(null);
+      pushToast("success", `Report marked ${status}.`);
+    } catch (err) {
+      pushToast("error", err instanceof Error ? err.message : "Couldn't update the report.");
+    }
+  }
 
   if (!reportId) {
     return <SafetyReportNotFound />;
@@ -134,8 +174,41 @@ export default function AdminSafetyReportPage() {
       <div className="mt-4" role="tabpanel">
         {tab === "overview" && <OverviewTab detail={detail} />}
         {tab === "evidence" && <EvidenceTab detail={detail} />}
-        {tab === "actions" && <ActionsTab detail={detail} />}
+        {tab === "actions" && (
+          <ActionsTab detail={detail} onResolve={(status) => setConfirmStatus(status)} />
+        )}
       </div>
+
+      <ConfirmDialog
+        open={confirmStatus !== null}
+        title={confirmStatus ? `Move this report to "${safetyStatusLabel(confirmStatus)}"?` : ""}
+        message="This updates the post report's status immediately in the community moderation queue."
+        confirmLabel={confirmStatus ? safetyStatusLabel(confirmStatus) : "Confirm"}
+        tone={confirmStatus === "dismissed" ? "default" : confirmStatus === "resolved" ? "default" : "warning"}
+        loading={setStatusMut.isPending}
+        reasonLabel={
+          confirmStatus === "reviewing" ? undefined : "Note (recorded on the report)"
+        }
+        onConfirm={(note) => {
+          if (confirmStatus) void resolve(confirmStatus, note);
+        }}
+        onCancel={() => setConfirmStatus(null)}
+      />
+
+      {toasts.length > 0 && (
+        <div className="fixed bottom-4 right-4 z-80 flex flex-col gap-2">
+          {toasts.map((t) => (
+            <div
+              key={t.id}
+              className={`rounded-md px-3.5 py-2 text-sm font-medium text-white shadow-lg ${
+                t.tone === "success" ? "bg-kampmax-success" : "bg-kampmax-error"
+              }`}
+            >
+              {t.text}
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }
@@ -316,10 +389,8 @@ function EvidenceTab({ detail }: { detail: TrustSafetyReportDetail }) {
 
 function getSourceEvidenceNote(detail: TrustSafetyReportDetail): string {
   switch (detail.source) {
-    case "storefront_review":
-      return "Evidence here is the reported storefront review and its comment.";
-    case "profile_review":
-      return "Evidence here is the reported profile review and its comment.";
+    case "review":
+      return "Evidence here is the reported review and its comment.";
     case "campus_post":
       return "Evidence here is the reported campus post and its content.";
     default:
@@ -331,7 +402,19 @@ function getSourceEvidenceNote(detail: TrustSafetyReportDetail): string {
 // Moderation actions tab
 // ------------------------------------------------------------
 
-function ActionsTab({ detail }: { detail: TrustSafetyReportDetail }) {
+const RESOLUTION_STATUSES: { status: TrustSafetyResolutionStatus; icon: typeof Eye }[] = [
+  { status: "reviewing", icon: Eye },
+  { status: "resolved", icon: CheckCircle2 },
+  { status: "dismissed", icon: XCircle },
+];
+
+function ActionsTab({
+  detail,
+  onResolve,
+}: {
+  detail: TrustSafetyReportDetail;
+  onResolve: (status: TrustSafetyResolutionStatus) => void;
+}) {
   const targetLinks: { label: string; href: string; note: string }[] = [];
 
   if (detail.adminHref) {
@@ -350,7 +433,7 @@ function ActionsTab({ detail }: { detail: TrustSafetyReportDetail }) {
     note:
       detail.source === "campus_post"
         ? "Campus Feed console (posts, comments, events)."
-        : "Reviews & Moderation console (storefront + profile reviews).",
+        : "Reviews & Moderation console — publish, hide, flag or remove the review.",
   });
   targetLinks.push({
     label: "Open reporter record",
@@ -362,20 +445,54 @@ function ActionsTab({ detail }: { detail: TrustSafetyReportDetail }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-2.5 rounded-lg border border-kampmax-info/30 bg-kampmax-info/5 px-4 py-3 text-xs leading-relaxed text-kampmax-text-secondary">
-        <FileWarning className="mt-0.5 h-4 w-4 shrink-0 text-kampmax-info" />
-        <p>
-          This console is <span className="font-semibold text-kampmax-text">read-only</span>.
-          No Kampmax store exposes report-level triage (resolve/dismiss/escalate, assignee,
-          notes, history, severity) or in-console moderation transitions for the reported
-          targets. Reports = why; the specialized consoles = how. Until the backend ships those
-          endpoints, moderation actions deep-link to the existing consoles instead of being
-          fabricated here. See{" "}
-          <span className="font-mono">MODULE-42-BACKEND-GAPS.md</span>.
-        </p>
-      </div>
+      {detail.resolvable ? (
+        <>
+          <div className="flex items-start gap-2.5 rounded-lg border border-kampmax-info/30 bg-kampmax-info/5 px-4 py-3 text-xs leading-relaxed text-kampmax-text-secondary">
+            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-kampmax-info" />
+            <p>
+              This is a real campus-post report — moving it through review updates the actual
+              moderation queue (open → reviewing → resolved/dismissed), audit-logged.
+            </p>
+          </div>
+          <section aria-label="Move report status" className="rounded-lg border border-kampmax-border bg-white">
+            <div className="border-b border-kampmax-border px-4 py-3">
+              <h2 className="text-sm font-semibold text-kampmax-text">Move through review</h2>
+            </div>
+            <div className="flex flex-wrap gap-2 px-4 py-3.5">
+              {RESOLUTION_STATUSES.filter((r) => r.status !== detail.status).map(({ status, icon: Icon }) => (
+                <button
+                  key={status}
+                  onClick={() => onResolve(status)}
+                  className={cn(
+                    "inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium transition-colors",
+                    status === "resolved"
+                      ? "border-kampmax-success/40 bg-white text-kampmax-success hover:bg-kampmax-success/5"
+                      : status === "dismissed"
+                        ? "border-kampmax-border bg-white text-kampmax-text hover:bg-kampmax-muted/60"
+                        : "border-kampmax-warning/40 bg-white text-kampmax-warning hover:bg-kampmax-warning/5"
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {safetyStatusLabel(status)}
+                </button>
+              ))}
+            </div>
+          </section>
+        </>
+      ) : (
+        <div className="flex items-start gap-2.5 rounded-lg border border-kampmax-info/30 bg-kampmax-info/5 px-4 py-3 text-xs leading-relaxed text-kampmax-text-secondary">
+          <FileWarning className="mt-0.5 h-4 w-4 shrink-0 text-kampmax-info" />
+          <p>
+            This report comes from a flagged review, which has no separate status of its own to
+            move through here — resolve it by moderating the review itself (publish, hide or
+            remove it) in the Reviews console, linked below. The review store also keeps only the
+            single most recent report, so this entry disappears once the review is moderated away
+            from flagged.
+          </p>
+        </div>
+      )}
 
-      <section aria-label="Available moderation actions" className="rounded-lg border border-kampmax-border bg-white">
+      <section aria-label="Related consoles" className="rounded-lg border border-kampmax-border bg-white">
         <div className="border-b border-kampmax-border px-4 py-3">
           <h2 className="text-sm font-semibold text-kampmax-text">Deep links</h2>
         </div>

@@ -2040,11 +2040,12 @@ export interface ManagedReviewListQuery extends ListQuery {
 // hold (reason, details, reporter, created) plus honest statuses derived
 // from the reported target's OWN real moderation state (where one exists).
 
-export const TRUST_SAFETY_SOURCES = [
-  "storefront_review",
-  "profile_review",
-  "campus_post",
-] as const;
+/**
+ * "review" covers every real reviews-table report (product/vendor/freelancer/
+ * service-provider — one real `reviews` table, not the separate storefront vs
+ * profile split the old mock stores implied). "campus_post" is post_reports.
+ */
+export const TRUST_SAFETY_SOURCES = ["review", "campus_post"] as const;
 export type TrustSafetySource = (typeof TRUST_SAFETY_SOURCES)[number];
 
 export const TRUST_SAFETY_STATUSES = [
@@ -2059,6 +2060,7 @@ export type TrustSafetyTargetType =
   | "product"
   | "vendor"
   | "freelancer"
+  | "service_provider"
   | "employer"
   | "post";
 
@@ -2149,6 +2151,16 @@ export interface TrustSafetyReportDetail extends TrustSafetyReportRow {
     createdAt: string;
     reporterName: string;
   }[];
+  /** True only for campus_post — a review report resolves via /admin/reviews. */
+  resolvable: boolean;
+}
+
+export type TrustSafetyResolutionStatus = "reviewing" | "resolved" | "dismissed";
+
+/** Moves a campus-post report through review — real post_reports workflow. */
+export interface UpdateSafetyReportStatusInput {
+  status: TrustSafetyResolutionStatus;
+  note?: string;
 }
 
 export interface TrustSafetyReportListQuery extends ListQuery {

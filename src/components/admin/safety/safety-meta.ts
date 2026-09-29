@@ -12,14 +12,12 @@ import type {
 
 export const SAFETY_SOURCE_TABS: (TrustSafetySource | "all")[] = [
   "all",
-  "storefront_review",
-  "profile_review",
+  "review",
   "campus_post",
 ];
 
 export const SAFETY_SOURCE_LABELS: Record<TrustSafetySource, string> = {
-  storefront_review: "Storefront review",
-  profile_review: "Profile review",
+  review: "Review",
   campus_post: "Campus post",
 };
 
@@ -29,10 +27,8 @@ export function safetySourceLabel(source: TrustSafetySource): string {
 
 export function safetySourceVariant(source: TrustSafetySource): BadgeVariant {
   switch (source) {
-    case "storefront_review":
+    case "review":
       return "blue";
-    case "profile_review":
-      return "info";
     case "campus_post":
       return "gold";
   }
@@ -86,6 +82,7 @@ export const SAFETY_TARGET_TYPE_OPTIONS: (TrustSafetyTargetType | "all")[] = [
   "product",
   "vendor",
   "freelancer",
+  "service_provider",
   "employer",
   "post",
 ];
@@ -94,6 +91,7 @@ export const SAFETY_TARGET_TYPE_LABELS: Record<TrustSafetyTargetType, string> = 
   product: "Product",
   vendor: "Vendor",
   freelancer: "Freelancer",
+  service_provider: "Service provider",
   employer: "Employer",
   post: "Post",
 };
@@ -112,6 +110,8 @@ export function safetyTargetTypeVariant(
       return "gold";
     case "freelancer":
       return "info";
+    case "service_provider":
+      return "blue";
     case "employer":
       return "neutral";
     case "post":

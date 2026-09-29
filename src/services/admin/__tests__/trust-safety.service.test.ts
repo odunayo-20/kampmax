@@ -18,10 +18,15 @@ import {
   sortTrustSafetyReports,
   type TrustSafetyDataset,
 } from "@/data/admin/report-management";
-import { trustSafetyService } from "@/services/admin";
+import { createTrustSafetyService } from "@/services/admin/report-management.service";
 import { reviewReports } from "@/data/reviews";
 import { getReportedPosts } from "@/data/posts";
 import type { TrustSafetyReportRow } from "@/types/admin";
+
+// Tested directly against the mock factory (not the `@/services/admin`
+// barrel) so this suite keeps pinning the mock dataset regardless of which
+// implementation `index.ts` wires up for the live /admin/safety console.
+const trustSafetyService = createTrustSafetyService();
 
 function makeRow(
   partial: Partial<TrustSafetyReportRow> &
@@ -51,7 +56,7 @@ function makeRow(
 const rows: TrustSafetyReportRow[] = [
   makeRow({
     id: "rr1",
-    source: "storefront_review",
+    source: "review",
     status: "open",
     reason: "fake",
     createdAt: "2025-01-01T00:00:00Z",
@@ -64,7 +69,7 @@ const rows: TrustSafetyReportRow[] = [
   }),
   makeRow({
     id: "rr2",
-    source: "storefront_review",
+    source: "review",
     status: "open",
     reason: "fake",
     createdAt: "2025-01-02T00:00:00Z",
@@ -77,7 +82,7 @@ const rows: TrustSafetyReportRow[] = [
   }),
   makeRow({
     id: "prv-1-rep-0",
-    source: "profile_review",
+    source: "review",
     status: "reviewing",
     reason: "inappropriate",
     createdAt: "2025-01-03T00:00:00Z",
@@ -90,7 +95,7 @@ const rows: TrustSafetyReportRow[] = [
   }),
   makeRow({
     id: "prv-2-rep-0",
-    source: "profile_review",
+    source: "review",
     status: "resolved",
     reason: "spam",
     createdAt: "2025-01-04T00:00:00Z",
@@ -154,6 +159,7 @@ function datasetOf(dataRows: TrustSafetyReportRow[]): TrustSafetyDataset {
         reporter: { id: r.reporterUserId, name: r.reporterName, campusName: null },
         entity: null,
         relatedReports: [],
+        resolvable: r.source === "campus_post",
       },
     ])
   );
@@ -180,8 +186,7 @@ describe("trustSafetyService (live stores)", () => {
       dismissed: 0,
     });
     expect(counts.bySource).toEqual({
-      storefront_review: 0,
-      profile_review: 0,
+      review: 0,
       campus_post: 0,
     });
 
@@ -228,11 +233,11 @@ describe("filterTrustSafetyReports", () => {
     expect(open.total).toBe(5);
     expect(open.items.every((r) => r.status === "open")).toBe(true);
 
-    const profile = filterTrustSafetyReports(datasetOf(rows), {
-      source: "profile_review",
+    const review = filterTrustSafetyReports(datasetOf(rows), {
+      source: "review",
     });
-    expect(profile.total).toBe(2);
-    expect(profile.items.every((r) => r.source === "profile_review")).toBe(true);
+    expect(review.total).toBe(4);
+    expect(review.items.every((r) => r.source === "review")).toBe(true);
 
     const spam = filterTrustSafetyReports(datasetOf(rows), { reason: "spam" });
     expect(spam.total).toBe(3);
@@ -282,14 +287,14 @@ describe("computeTrustSafetyCounts", () => {
       dismissed: 0,
     });
     expect(counts.bySource).toEqual({
-      storefront_review: 2,
-      profile_review: 2,
+      review: 4,
       campus_post: 3,
     });
     expect(counts.byTargetType).toEqual({
       product: 2,
       vendor: 0,
       freelancer: 1,
+      service_provider: 0,
       employer: 1,
       post: 3,
     });
