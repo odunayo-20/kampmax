@@ -1,311 +1,247 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, ArrowDownToLine, Search } from "lucide-react";
-import { formatNairaCompact } from "@/lib/utils";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
+import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { ArrowDownToLine } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
-import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
-import { LoadingSkeleton } from "@/components/admin/LoadingSkeleton";
+import { adminErrorMessage } from "@/lib/admin/error-reporting";
 import { Pagination } from "@/components/admin/Pagination";
 import {
-  RejectWithdrawalDialog,
-} from "@/components/admin/wallet/RejectWithdrawalDialog";
+  CustomerWithdrawalsFilters,
+  DEFAULT_CUSTOMER_WITHDRAWAL_FILTERS,
+  type CustomerWithdrawalFilterState,
+} from "@/components/admin/withdrawals/CustomerWithdrawalsFilters";
+import { CustomerWithdrawalsTable } from "@/components/admin/withdrawals/CustomerWithdrawalsTable";
+import { CUSTOMER_WITHDRAWAL_STATUS_TABS } from "@/components/admin/withdrawals/withdrawals-meta";
+import { useDebounce } from "@/hooks/use-debounce";
 import {
-  WithdrawalsTable,
-} from "@/components/admin/wallet/WithdrawalsTable";
-import { financeManagementService } from "@/services/admin";
-import type {
-  Paginated,
-  WithdrawalAction,
-  WithdrawalRequest,
-  WithdrawalStatus,
-  WithdrawalStatusCounts,
-} from "@/types/admin";
+  useAdminWithdrawalCounts,
+  useAdminWithdrawals,
+} from "@/hooks/admin/use-admin-withdrawals";
+import type { CustomerWithdrawalSortField, CustomerWithdrawalStatus, SortDir } from "@/types/admin";
+import { formatNaira, formatNairaCompact } from "@/lib/utils";
 
-const VALID_STATUSES: WithdrawalStatus[] = [
-  "pending",
-  "processing",
-  "approved",
-  "completed",
-  "rejected",
-  "failed",
-];
-
-type QuickAction = Extract<
-  WithdrawalAction,
-  "start_processing" | "approve" | "mark_completed" | "mark_failed"
->;
-
-function parseInitialFilters(): { search: string; status: WithdrawalStatus | "all" } {
-  if (typeof window === "undefined") return { search: "", status: "all" };
-  const params = new URLSearchParams(window.location.search);
-  const status = params.get("status") as WithdrawalStatus;
+function parseInitialFilters(params: URLSearchParams): CustomerWithdrawalFilterState {
+  const rawStatus = params.get("status");
+  const validStatus = CUSTOMER_WITHDRAWAL_STATUS_TABS as (CustomerWithdrawalStatus | "all")[];
   return {
     search: params.get("q") ?? "",
-    status: VALID_STATUSES.includes(status) ? status : "all",
+    status:
+      rawStatus && validStatus.includes(rawStatus as CustomerWithdrawalStatus | "all")
+        ? (rawStatus as CustomerWithdrawalStatus | "all")
+        : "all",
   };
 }
 
+function parseInitialPage(params: URLSearchParams): number {
+  const rawPage = Number.parseInt(params.get("page") ?? "", 10);
+  return Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
+}
+
 export default function AdminWithdrawalsPage() {
-  const [filters, setFilters] = useState(parseInitialFilters);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(15);
+  return (
+    <Suspense fallback={<WithdrawalsSkeleton />}>
+      <AdminWithdrawalsPageInner />
+    </Suspense>
+  );
+}
 
-  const [list, setList] = useState<Paginated<WithdrawalRequest> | null>(null);
-  const [counts, setCounts] = useState<WithdrawalStatusCounts | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+function AdminWithdrawalsPageInner() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
 
-  const [acting, setActing] = useState(false);
-  const [reasonTarget, setReasonTarget] = useState<{
-    w: WithdrawalRequest;
-    mode: "reject" | "fail";
-  } | null>(null);
-  const [confirmTarget, setConfirmTarget] = useState<{
-    w: WithdrawalRequest;
-    action: Exclude<QuickAction, "mark_failed">;
-  } | null>(null);
+  const [filters, setFilters] = useState<CustomerWithdrawalFilterState>(() =>
+    parseInitialFilters(new URLSearchParams(searchParams.toString()))
+  );
+  const [sortBy, setSortBy] = useState<CustomerWithdrawalSortField>("createdAt");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [page, setPage] = useState(() => parseInitialPage(new URLSearchParams(searchParams.toString())));
+  const [pageSize] = useState(15);
 
-  const loadList = useCallback(async () => {
-    setLoading(true);
-    setError(false);
-    try {
-      const result = await financeManagementService.listWithdrawals({
-        search: filters.search.trim() || undefined,
-        status: filters.status,
-        sortBy: "requestedAt",
-        sortDir: "desc",
-        page,
-        pageSize,
-      });
-      setList(result);
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  }, [filters, page, pageSize]);
-
-  useEffect(() => {
-    void loadList();
-  }, [loadList]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const c = await financeManagementService.getWithdrawalCounts();
-        if (!cancelled) setCounts(c);
-      } catch {
-        /* non-critical */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [list]);
-
-  function patchFilters(patch: Partial<{ search: string; status: WithdrawalStatus | "all" }>) {
-    setFilters((f) => ({ ...f, ...patch }));
-    setPage(1);
-
-    const params = new URLSearchParams();
-    const next = { ...filters, ...patch };
-    if (next.search.trim()) params.set("q", next.search.trim());
-    if (next.status !== "all") params.set("status", next.status);
-    const qs = params.toString();
-    window.history.replaceState(null, "", qs ? `/admin/withdrawals?${qs}` : "/admin/withdrawals");
-  }
-
-  const runAct = useCallback(
-    async (w: WithdrawalRequest, action: WithdrawalAction, note?: string) => {
-      setActing(true);
-      try {
-        await financeManagementService.actOnWithdrawal(w.id, action, note);
-        await loadList();
-      } catch {
-        setError(true);
-      } finally {
-        setActing(false);
-      }
-    },
-    [loadList]
+  const debouncedSearch = useDebounce(filters.search.trim(), 350);
+  const query = useMemo(
+    () => ({
+      search: debouncedSearch,
+      status: filters.status === "all" ? undefined : filters.status,
+      sortBy,
+      sortDir,
+      page,
+      pageSize,
+    }),
+    [debouncedSearch, filters, sortBy, sortDir, page, pageSize]
   );
 
-  const showPendingBanner =
-    counts != null && counts.byStatus.pending > 0 && filters.status !== "pending";
+  const { data, isLoading, error, refetch } = useAdminWithdrawals(query);
+  const countsQuery = useAdminWithdrawalCounts();
+
+  const urlParams = searchParams.toString();
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const sp = new URLSearchParams();
+      if (filters.search.trim()) sp.set("q", filters.search.trim());
+      if (filters.status !== "all") sp.set("status", filters.status);
+      if (page > 1) sp.set("page", String(page));
+      const next = sp.toString();
+      if (next !== urlParams) router.replace(`${pathname}?${next}`, { scroll: false });
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [filters, page, urlParams, router, pathname]);
+
+  const patchFilters = useCallback((patch: Partial<CustomerWithdrawalFilterState>) => {
+    setFilters((f) => ({ ...f, ...patch }));
+    setPage(1);
+  }, []);
+
+  const toggleSort = useCallback(
+    (field: CustomerWithdrawalSortField) => {
+      if (field === sortBy) {
+        setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+      } else {
+        setSortBy(field);
+        setSortDir("desc");
+      }
+      setPage(1);
+    },
+    [sortBy]
+  );
+
+  const counts = countsQuery.data ?? null;
+  const hasActiveFilters = filters.search.trim() !== "" || filters.status !== "all";
 
   return (
     <>
       <AdminPageHeader
         title="Withdrawals"
-        description="Vendor payout requests - money leaving vendor payable into bank accounts."
+        description="Customer wallet withdrawals — refunds and store credit cashed out to a bank account. Vendor and freelancer earnings live on the Payouts console."
         actions={
-          counts && (
-            <>
-              <span className="hidden h-9 items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 text-xs font-medium text-amber-700 sm:inline-flex">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                {formatNairaCompact(counts.pendingAmount)} awaiting payout
-              </span>
-              <span className="hidden h-9 items-center gap-1.5 rounded-md border border-kampmax-border bg-white px-3 text-xs font-medium text-kampmax-text-secondary lg:inline-flex">
-                <ArrowDownToLine className="h-3.5 w-3.5 opacity-60" />
-                {formatNairaCompact(counts.completedAmount)} completed all-time
-              </span>
-            </>
-          )
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-kampmax-border bg-white px-3 py-1.5 text-xs font-medium text-kampmax-text-secondary">
+            <ArrowDownToLine className="h-3.5 w-3.5" />
+            {counts ? `${counts.all} records · ${formatNairaCompact(counts.totalVolume)}` : "…"}
+          </span>
         }
       />
 
-      {showPendingBanner && counts && (
-        <button
-          type="button"
-          onClick={() => patchFilters({ status: "pending" })}
-          className="mb-3 flex w-full items-center justify-between gap-3 rounded-lg border border-kampmax-warning/40 bg-kampmax-warning/10 px-4 py-2.5 text-left transition-colors hover:bg-kampmax-warning/20"
-        >
-          <span className="flex min-w-0 items-center gap-2 text-sm text-amber-700">
-            <AlertTriangle className="h-4 w-4 shrink-0" />
-            <span className="truncate">
-              {counts.byStatus.pending} new request
-              {counts.byStatus.pending === 1 ? "" : "s"} waiting for review ·{" "}
-              {formatNairaCompact(counts.byStatus.pending)} total
-            </span>
-          </span>
-          <span className="shrink-0 text-xs font-medium text-kampmax-blue">Review now</span>
-        </button>
-      )}
+      <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-lg border border-kampmax-border bg-white px-4 py-2.5 text-xs text-kampmax-text-secondary">
+        <span>
+          Pending{" "}
+          <strong className="font-semibold tabular-nums text-kampmax-warning">
+            {counts?.byStatus.pending ?? "…"}
+          </strong>
+        </span>
+        <span>
+          Successful{" "}
+          <strong className="font-semibold tabular-nums text-kampmax-success">
+            {counts?.byStatus.successful ?? "…"}
+          </strong>
+        </span>
+        <span>
+          Failed{" "}
+          <strong className="font-semibold tabular-nums text-kampmax-error">
+            {counts?.byStatus.failed ?? "…"}
+          </strong>
+        </span>
+        <span>
+          Reversed <strong className="font-semibold tabular-nums">{counts?.byStatus.reversed ?? "…"}</strong>
+        </span>
+        <span className="text-kampmax-border">•</span>
+        <span>
+          Total volume{" "}
+          <strong className="font-semibold tabular-nums">
+            {counts ? formatNaira(counts.totalVolume) : "…"}
+          </strong>
+        </span>
+      </div>
 
-      <WithdrawalsSection
-        list={list}
-        loading={loading}
-        error={error}
-        hasActiveFilters={filters.search.trim().length > 0 || filters.status !== "all"}
-        onRetry={() => void loadList()}
-        onClearFilters={() => patchFilters({ search: "", status: "all" })}
+      <div className="mb-4 flex items-start gap-2 rounded-lg border border-kampmax-border bg-kampmax-surface-hover/50 px-4 py-2.5 text-xs text-kampmax-text-secondary">
+        <span>
+          <strong className="font-medium">Scope note:</strong> this console covers customer wallet
+          withdrawals only. No disbursement provider is wired into the prototype backend, so a
+          withdrawal starts pending and stays there until an admin confirms with the bank and records
+          the real outcome.
+        </span>
+      </div>
+
+      <CustomerWithdrawalsFilters
         filters={filters}
-        onFilterChange={patchFilters}
-        onAct={(w, action) => {
-          if (action === "mark_failed") {
-            setReasonTarget({ w, mode: "fail" });
-          } else {
-            setConfirmTarget({ w, action });
-          }
-        }}
-        onReject={(w) => setReasonTarget({ w, mode: "reject" })}
+        onChange={patchFilters}
+        counts={
+          counts?.byStatus ?? { successful: 0, pending: 0, failed: 0, reversed: 0 }
+        }
       />
 
-      {list && list.totalPages > 1 && (
-        <div className="mt-3 flex justify-center">
-          <Pagination
-            page={list.page}
-            pageSize={list.pageSize}
-            total={list.total}
-            totalPages={list.totalPages}
-            onPageChange={setPage}
-            onPageSizeChange={(n) => {
-              setPage(1);
-              setPageSize(n);
-            }}
-          />
+      {hasActiveFilters && (
+        <div className="mt-2 flex items-center gap-2">
+          <button
+            onClick={() => patchFilters(DEFAULT_CUSTOMER_WITHDRAWAL_FILTERS)}
+            className="rounded-md border border-kampmax-border px-2.5 py-1 text-xs font-medium text-kampmax-text-muted hover:text-kampmax-text"
+          >
+            Clear all filters
+          </button>
         </div>
       )}
 
-      {/* Mutations */}
-      <RejectWithdrawalDialog
-        open={reasonTarget != null}
-        withdrawal={reasonTarget?.w ?? null}
-        mode={reasonTarget?.mode ?? "reject"}
-        working={acting}
-        onClose={() => setReasonTarget(null)}
-        onConfirm={async (w, note) => {
-          await runAct(w, reasonTarget?.mode === "fail" ? "mark_failed" : "reject", note);
-          setReasonTarget(null);
-        }}
-      />
+      <div className="mt-4">
+        {isLoading && !data ? (
+          <div className="space-y-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-14 animate-pulse rounded-lg bg-kampmax-surface-hover" />
+            ))}
+          </div>
+        ) : error ? (
+          <div className="rounded-lg border border-kampmax-error/30 bg-kampmax-error/5 p-6 text-center">
+            <p className="text-sm font-medium text-kampmax-error">Failed to load withdrawals</p>
+            <p className="mt-1 text-xs text-kampmax-text-muted">{adminErrorMessage(error)}</p>
+            <button
+              onClick={() => void refetch()}
+              className="mt-3 rounded-md bg-kampmax-primary px-4 py-1.5 text-xs font-medium text-white hover:bg-kampmax-primary/90"
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <>
+            <CustomerWithdrawalsTable
+              rows={data?.items ?? []}
+              sortBy={sortBy}
+              sortDir={sortDir}
+              onSort={toggleSort}
+              onOpen={(id) => router.push(`/admin/withdrawals/${id}`)}
+              emptyHint={
+                hasActiveFilters
+                  ? "No withdrawals match the current filters."
+                  : "No customer withdrawal records exist in the real wallet ledger yet."
+              }
+            />
 
-      <ConfirmDialog
-        open={confirmTarget != null}
-        title={
-          confirmTarget?.action === "mark_completed"
-            ? "Mark as completed?"
-            : confirmTarget?.action === "approve"
-              ? "Approve withdrawal?"
-              : "Mark as processing?"
-        }
-        message={
-          confirmTarget == null
-            ? ""
-            : confirmTarget.action === "mark_completed"
-              ? `Confirm the bank transfer of ${formatNairaCompact(confirmTarget.w.amount + confirmTarget.w.fee)} to ${confirmTarget.w.vendorName} (${confirmTarget.w.bankName} ${confirmTarget.w.accountNumberMasked}) is complete.`
-              : `${confirmTarget.w.vendorName} · ${formatNairaCompact(confirmTarget.w.amount)} to ${confirmTarget.w.bankName}. This moves vendor payable forward - funds stay reconciled in the wallet console.`
-        }
-        tone={confirmTarget?.action === "start_processing" ? "default" : "warning"}
-        loading={acting}
-        confirmLabel={
-          confirmTarget?.action === "mark_completed"
-            ? "Yes, mark completed"
-            : confirmTarget?.action === "approve"
-              ? "Approve"
-              : "Mark processing"
-        }
-        onConfirm={async () => {
-          if (!confirmTarget) return;
-          await runAct(confirmTarget.w, confirmTarget.action);
-          setConfirmTarget(null);
-        }}
-        onCancel={() => setConfirmTarget(null)}
-      />
+            {data && data.totalPages > 1 && (
+              <div className="mt-4 flex justify-end">
+                <Pagination
+                  page={data.page}
+                  pageSize={data.pageSize}
+                  total={data.total}
+                  totalPages={data.totalPages}
+                  onPageChange={setPage}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </>
   );
 }
 
-interface WithdrawalsSectionProps {
-  list: Paginated<WithdrawalRequest> | null;
-  loading: boolean;
-  error: boolean;
-  hasActiveFilters: boolean;
-  onRetry: () => void;
-  onClearFilters: () => void;
-  filters: { search: string; status: WithdrawalStatus | "all" };
-  onFilterChange: (patch: Partial<{ search: string; status: WithdrawalStatus | "all" }>) => void;
-  onAct: (w: WithdrawalRequest, action: QuickAction) => void;
-  onReject: (w: WithdrawalRequest) => void;
-}
-
-function WithdrawalsSection(props: WithdrawalsSectionProps) {
-  const { filters, onFilterChange, list, ...rest } = props;
-
+function WithdrawalsSkeleton() {
   return (
     <>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <div className="w-full sm:w-64">
-          <Input
-            value={filters.search}
-            placeholder="Search vendor, bank, request id…"
-            leftIcon={<Search className="h-4 w-4" />}
-            aria-label="Search withdrawals"
-            onChange={(e) => onFilterChange({ search: e.target.value })}
-          />
-        </div>
-        <Select
-          value={filters.status}
-          aria-label="Filter by withdrawal status"
-          onChange={(e) =>
-            onFilterChange({ status: e.target.value as WithdrawalStatus | "all" })
-          }
-          className="w-auto"
-        >
-          <option value="all">All statuses</option>
-          {VALID_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {s.charAt(0).toUpperCase() + s.slice(1)}
-            </option>
-          ))}
-        </Select>
+      <div className="mb-6 h-10 w-48 animate-pulse rounded bg-kampmax-surface-hover" />
+      <div className="mb-4 h-6 w-full animate-pulse rounded bg-kampmax-surface-hover" />
+      <div className="space-y-3">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="h-14 animate-pulse rounded-lg bg-kampmax-surface-hover" />
+        ))}
       </div>
-
-      <WithdrawalsTable page={list} {...rest} />
     </>
   );
 }

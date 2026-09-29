@@ -192,6 +192,13 @@ import { createApiWalletAccountsService } from "./wallet-accounts.api";
 export const walletAccountsService: AdminWalletAccountsService =
   createApiWalletAccountsService();
 
+import type { AdminCustomerWithdrawalManagementService } from "./withdrawal-management.api";
+import { createApiWithdrawalManagementService } from "./withdrawal-management.api";
+
+/** /admin/withdrawals console: live customer wallet withdrawals (GET/PATCH /admin/withdrawals/*) — the slice of bank-transfer withdrawals Payouts excludes (vendor/freelancer earnings only). */
+export const withdrawalManagementService: AdminCustomerWithdrawalManagementService =
+  createApiWithdrawalManagementService();
+
 import type { AdminPromotionManagementService } from "./promotion-management.service";
 import { createApiPromotionManagementService } from "./promotion-management.api";
 

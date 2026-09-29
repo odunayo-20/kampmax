@@ -2746,6 +2746,82 @@ export interface ManagedPayoutListQuery extends ListQuery {
 }
 
 // ------------------------------------------------------------
+// CUSTOMER WITHDRAWALS (/admin/withdrawals) — live, GET/PATCH /admin/withdrawals/*
+//
+// The one slice of WITHDRAWAL-type wallet_transactions ManagedPayout
+// deliberately excludes: a customer (not a vendor or freelancer) cashing
+// out a refund or store credit to their bank account. Same mechanism and
+// same honesty as Payouts (no disbursement provider wired in — an admin
+// resolves a pending withdrawal by hand), so the activity/action/gateway
+// shapes are reused rather than duplicated.
+// ------------------------------------------------------------
+
+export const CUSTOMER_WITHDRAWAL_STATUSES = [
+  "successful",
+  "pending",
+  "failed",
+  "reversed",
+] as const;
+export type CustomerWithdrawalStatus = (typeof CUSTOMER_WITHDRAWAL_STATUSES)[number];
+
+export type CustomerWithdrawalSortField = "createdAt" | "amount";
+
+export interface ManagedCustomerWithdrawal {
+  id: string;
+  sourceRecordId: string;
+  customerId: string;
+  customerName: string;
+  customerEmail: string | null;
+  status: CustomerWithdrawalStatus;
+  sourceStatus: string;
+  statusNote: string;
+  bankName: string | null;
+  maskedAccountNumber: string | null;
+  amount: number;
+  currency: "NGN";
+  createdAt: string;
+  processedAt: string | null;
+  failedReason: string | null;
+  reversalReason: string | null;
+}
+
+export interface ManagedCustomerWithdrawalDetail {
+  withdrawal: ManagedCustomerWithdrawal;
+  timeline: ManagedPayoutActivity[];
+  gateway: ManagedPayoutGatewayStatus;
+  actions: ManagedPayoutActionSupport;
+}
+
+export interface ManagedCustomerWithdrawalStatusCounts {
+  all: number;
+  byStatus: Record<CustomerWithdrawalStatus, number>;
+  totalVolume: number;
+  successfulVolume: number;
+  pendingVolume: number;
+}
+
+export const CUSTOMER_WITHDRAWAL_RESOLUTION_OUTCOMES = [
+  "successful",
+  "failed",
+  "reversed",
+] as const;
+export type CustomerWithdrawalResolutionOutcome =
+  (typeof CUSTOMER_WITHDRAWAL_RESOLUTION_OUTCOMES)[number];
+
+/** Required for failed/reversed — why the transfer did not land. */
+export interface ResolveCustomerWithdrawalInput {
+  outcome: CustomerWithdrawalResolutionOutcome;
+  reason?: string;
+}
+
+export interface ManagedCustomerWithdrawalListQuery extends ListQuery {
+  search?: string;
+  status?: CustomerWithdrawalStatus | "all";
+  sortBy?: CustomerWithdrawalSortField;
+  sortDir?: SortDir;
+}
+
+// ------------------------------------------------------------
 // FINANCE RECONCILIATION & REPORTS (/admin/finance) [Module 46]
 // ------------------------------------------------------------
 // Read-only reconciliation + reporting layer. Every value is derived from the

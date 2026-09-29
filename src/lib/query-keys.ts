@@ -542,6 +542,26 @@ export const adminKeys = {
     detail: (id: string) => ["admin", "payouts", "detail", id] as const,
   } as const,
   /**
+   * Admin customer-withdrawals key factory. Withdrawals from a customer's
+   * own wallet to a bank account — the WITHDRAWAL slice `payouts` above
+   * deliberately excludes (that key covers vendor/freelancer earnings only).
+   * Not campus-scoped, same reasoning as payouts. One real mutation:
+   * resolving a pending withdrawal.
+   */
+  withdrawals: {
+    all: ["admin", "withdrawals"] as const,
+    list: (query: {
+      search?: string;
+      status?: string;
+      sortBy?: string;
+      sortDir?: "asc" | "desc";
+      page?: number;
+      pageSize?: number;
+    }) => ["admin", "withdrawals", "list", query] as const,
+    counts: () => ["admin", "withdrawals", "counts"] as const,
+    detail: (id: string) => ["admin", "withdrawals", "detail", id] as const,
+  } as const,
+  /**
    * Admin finance reconciliation & reports key factory (Module 46).
    * Read-only platform finance surface derived from the real orders,
    * wallet, vendor/freelancer/service-provider financials stores.
