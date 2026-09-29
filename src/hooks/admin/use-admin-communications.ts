@@ -19,9 +19,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminKeys } from "@/lib/query-keys";
 import { adminCommunicationService } from "@/services/admin";
 import type {
-  ManagedAdminNotificationQuery,
-  ManagedAdminNotificationAudience,
-  ManagedAdminNotificationCreateInput,
+  ManagedNotificationQuery,
+  NotificationBroadcastAudience,
+  ManagedNotificationBroadcastInput,
 } from "@/types/admin";
 import { useAdminSession } from "@/lib/admin/admin-auth-context";
 
@@ -41,7 +41,7 @@ export function useAdminNotificationOverview() {
   });
 }
 
-export function useAdminNotificationList(query?: ManagedAdminNotificationQuery) {
+export function useAdminNotificationList(query?: ManagedNotificationQuery) {
   useActor();
   return useQuery({
     queryKey: adminKeys.notifications.list(query ?? {}),
@@ -59,7 +59,7 @@ export function useAdminNotificationDetail(id: string | null) {
 }
 
 export function useAdminAudiencePreview(
-  audience: ManagedAdminNotificationAudience,
+  audience: NotificationBroadcastAudience,
   campusId?: string | null,
   userId?: string | null
 ) {
@@ -72,11 +72,11 @@ export function useAdminAudiencePreview(
 }
 
 export function useAdminCreateNotification() {
-  const admin = useActor();
+  useActor();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: ManagedAdminNotificationCreateInput) =>
-      adminCommunicationService.create(input, { actor: admin }),
+    mutationFn: (input: ManagedNotificationBroadcastInput) =>
+      adminCommunicationService.create(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminKeys.notifications.all });
     },

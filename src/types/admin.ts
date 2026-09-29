@@ -3333,6 +3333,140 @@ export interface AdminCommunicationService {
 }
 
 // ------------------------------------------------------------
+// ADMIN NOTIFICATIONS (/admin/notifications*) — live, GET/POST /admin/notifications/*
+//
+// Real replacement for the "ADMIN COMMUNICATIONS" section above. That
+// section's own comments claimed to run against "the REAL Module 26A
+// notification store" — they never did; every read and write there hits
+// frontend-local mock arrays (@/data/notifications, @/data/users), never
+// a network call. This section mirrors the actual backend Notification
+// entity / NotificationType enum exactly instead — notably, the real
+// schema has no "category" dimension at all, so this drops it rather
+// than inventing one. The section above is left as-is: it still backs
+// an audit-trail test exercising a real console action in isolation.
+// ------------------------------------------------------------
+
+export const MANAGED_NOTIFICATION_TYPES = [
+  "ORDER",
+  "PAYMENT",
+  "MESSAGE",
+  "FOLLOW",
+  "LIKE",
+  "COMMENT",
+  "VENDOR",
+  "ADMIN",
+  "SYSTEM",
+  "LOYALTY",
+  "JOB",
+  "PROPOSAL",
+  "ENGAGEMENT",
+  "VERIFICATION",
+  "PROFILE",
+  "REVIEW",
+] as const;
+export type NotificationRecordType = (typeof MANAGED_NOTIFICATION_TYPES)[number];
+
+/** Types an admin may broadcast: platform-wide notices only — never a domain type (orders, payments, reviews, …) the owning module authors instead. */
+export const ADMIN_BROADCASTABLE_NOTIFICATION_TYPES = ["ADMIN", "SYSTEM"] as const;
+export type AdminBroadcastableNotificationType =
+  (typeof ADMIN_BROADCASTABLE_NOTIFICATION_TYPES)[number];
+
+export type NotificationBroadcastAudience =
+  | "specific_user"
+  | "all_users"
+  | "customers"
+  | "vendors"
+  | "campus";
+
+export type ManagedNotificationReadState = "all" | "unread" | "read";
+
+export interface ManagedNotificationRow {
+  id: string;
+  title: string;
+  body: string;
+  type: NotificationRecordType;
+  data: Record<string, unknown> | null;
+  recipientId: string;
+  recipientName: string;
+  recipientHref: string;
+  read: boolean;
+  createdAt: string;
+}
+
+export interface ManagedNotificationCounts {
+  total: number;
+  unread: number;
+  read: number;
+  recipients: number;
+  byType: Record<NotificationRecordType, number>;
+}
+
+export interface ManagedNotificationOverview {
+  counts: ManagedNotificationCounts;
+  platformUsers: number;
+  /** True in this prototype — only the in-app channel is wired for admin broadcasts. */
+  inAppOnly: boolean;
+  deliveryNote: string;
+  campusBreakdown: { campusId: string; count: number }[];
+}
+
+export interface ManagedNotificationQuery extends ListQuery {
+  search?: string;
+  type?: NotificationRecordType | "all";
+  read?: ManagedNotificationReadState;
+}
+
+export interface ManagedNotificationAudienceUser {
+  userId: string;
+  name: string;
+  /** "vendor" comes from a real vendors profile row, not an RBAC role — every account also carries the baseline STUDENT role. */
+  role: string;
+  campusId: string | null;
+  verified: boolean;
+  href: string;
+}
+
+export interface ManagedNotificationAudiencePreview {
+  audience: NotificationBroadcastAudience;
+  campusId: string | null;
+  label: string;
+  channel: "in_app";
+  recipients: number;
+  users: ManagedNotificationAudienceUser[];
+  note: string;
+}
+
+export interface ManagedNotificationBroadcastInput {
+  title: string;
+  body: string;
+  type: AdminBroadcastableNotificationType;
+  audience: NotificationBroadcastAudience;
+  userId?: string | null;
+  campusId?: string | null;
+  /** Safe internal route only (validated server-side too). */
+  actionUrl?: string | null;
+}
+
+export interface ManagedNotificationBroadcastResult {
+  created: number;
+  notificationIds: string[];
+  channel: "in_app";
+}
+
+export interface AdminNotificationBroadcastService {
+  getOverview(): Promise<ManagedNotificationOverview>;
+  list(query?: ManagedNotificationQuery): Promise<Paginated<ManagedNotificationRow>>;
+  getById(id: string): Promise<ManagedNotificationRow | null>;
+  getAudiencePreview(
+    audience: NotificationBroadcastAudience,
+    campusId?: string | null,
+    userId?: string | null
+  ): Promise<ManagedNotificationAudiencePreview>;
+  /** Real in-app dispatch: writes one record per recipient in the shared store. */
+  create(input: ManagedNotificationBroadcastInput): Promise<ManagedNotificationBroadcastResult>;
+}
+
+// ------------------------------------------------------------
 // PLATFORM SETTINGS (/admin/settings)
 //
 // Structured, sectioned config. The prototype keeps values in

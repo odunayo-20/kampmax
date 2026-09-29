@@ -1,134 +1,113 @@
 import {
+  Award,
   Bell,
-  CreditCard,
-  GraduationCap,
-  Info,
-  Layers,
-  Megaphone,
+  Briefcase,
+  Handshake,
+  Heart,
   MessageSquareText,
   Package,
   Receipt,
+  Send,
   ShieldCheck,
-  ShoppingCart,
-  Tags,
+  Sparkles,
+  Star,
+  Store,
+  ThumbsUp,
+  UserCircle,
+  UserPlus,
   type LucideIcon,
 } from "lucide-react";
 import type { BadgeVariant } from "@/components/admin/StatusBadge";
-import type { NotificationType, NotificationCategory } from "@/types";
 import type {
-  ManagedAdminNotificationAudience,
-  ManagedAdminNotificationQuery,
+  ManagedNotificationQuery,
+  NotificationRecordType,
+  NotificationBroadcastAudience,
 } from "@/types/admin";
-import { ADMIN_COMPOSABLE_NOTIFICATIONS } from "@/data/admin/communication-management";
 
 // ------------------------------------------------------------
-// TYPE MAPS
+// TYPE MAPS — mirror the real NotificationType enum exactly (no invented category)
 // ------------------------------------------------------------
 
-export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
-  order_update: "Order",
-  message: "Message",
-  marketplace: "Marketplace",
-  campus: "Campus",
-  payments: "Payment",
-  account: "Account",
-  promotion: "Promotion",
-  booking_update: "Booking",
-  system: "System",
+export const NOTIFICATION_TYPE_LABELS: Record<NotificationRecordType, string> = {
+  ORDER: "Order",
+  PAYMENT: "Payment",
+  MESSAGE: "Message",
+  FOLLOW: "Follow",
+  LIKE: "Like",
+  COMMENT: "Comment",
+  VENDOR: "Vendor",
+  ADMIN: "Admin notice",
+  SYSTEM: "System",
+  LOYALTY: "Loyalty",
+  JOB: "Job",
+  PROPOSAL: "Proposal",
+  ENGAGEMENT: "Engagement",
+  VERIFICATION: "Verification",
+  PROFILE: "Profile",
+  REVIEW: "Review",
 };
 
-export function notificationTypeLabel(type: NotificationType): string {
+export function notificationTypeLabel(type: NotificationRecordType): string {
   return NOTIFICATION_TYPE_LABELS[type] ?? type;
 }
 
-export const NOTIFICATION_TYPE_ICONS: Record<NotificationType, LucideIcon> = {
-  order_update: ShoppingCart,
-  message: MessageSquareText,
-  marketplace: Megaphone,
-  campus: GraduationCap,
-  payments: Receipt,
-  account: ShieldCheck,
-  promotion: Megaphone,
-  booking_update: Package,
-  system: Layers,
+export const NOTIFICATION_TYPE_ICONS: Record<NotificationRecordType, LucideIcon> = {
+  ORDER: Package,
+  PAYMENT: Receipt,
+  MESSAGE: MessageSquareText,
+  FOLLOW: UserPlus,
+  LIKE: ThumbsUp,
+  COMMENT: MessageSquareText,
+  VENDOR: Store,
+  ADMIN: Send,
+  SYSTEM: Sparkles,
+  LOYALTY: Award,
+  JOB: Briefcase,
+  PROPOSAL: Handshake,
+  ENGAGEMENT: Heart,
+  VERIFICATION: ShieldCheck,
+  PROFILE: UserCircle,
+  REVIEW: Star,
 };
 
-export function notificationTypeIcon(type: NotificationType): LucideIcon {
+export function notificationTypeIcon(type: NotificationRecordType): LucideIcon {
   return NOTIFICATION_TYPE_ICONS[type] ?? Bell;
 }
 
-export function notificationTypeVariant(type: NotificationType): BadgeVariant {
+export function notificationTypeVariant(type: NotificationRecordType): BadgeVariant {
   switch (type) {
-    case "order_update":
+    case "ORDER":
       return "success";
-    case "payments":
+    case "PAYMENT":
       return "gold";
-    case "campus":
+    case "VERIFICATION":
       return "info";
-    case "promotion":
+    case "ADMIN":
       return "blue";
-    case "account":
-      return "warning";
-    case "system":
+    case "SYSTEM":
       return "neutral";
     default:
       return "neutral";
   }
 }
 
-export const NOTIFICATION_TYPE_FILTER_ORDER: NotificationType[] = [
-  "system",
-  "order_update",
-  "marketplace",
-  "campus",
-  "payments",
-  "account",
-  "promotion",
-];
-
-// ------------------------------------------------------------
-// CATEGORY MAPS
-// ------------------------------------------------------------
-
-export const NOTIFICATION_CATEGORY_LABELS: Record<NotificationCategory, string> = {
-  orders: "Orders",
-  messages: "Messages",
-  marketplace: "Marketplace",
-  campus: "Campus",
-  payments: "Payments",
-  account: "Account",
-  promotions: "Promotions",
-  bookings: "Bookings",
-};
-
-export function notificationCategoryLabel(c: NotificationCategory): string {
-  return NOTIFICATION_CATEGORY_LABELS[c] ?? c;
-}
-
-export const NOTIFICATION_CATEGORY_ICONS: Record<NotificationCategory, LucideIcon> = {
-  orders: ShoppingCart,
-  messages: MessageSquareText,
-  marketplace: Megaphone,
-  campus: GraduationCap,
-  payments: Receipt,
-  account: ShieldCheck,
-  promotions: Tags,
-  bookings: Package,
-};
-
-export function notificationCategoryIcon(c: NotificationCategory): LucideIcon {
-  return NOTIFICATION_CATEGORY_ICONS[c] ?? Bell;
-}
-
-export const NOTIFICATION_CATEGORY_FILTER_ORDER: NotificationCategory[] = [
-  "orders",
-  "messages",
-  "marketplace",
-  "campus",
-  "payments",
-  "account",
-  "promotions",
-  "bookings",
+export const NOTIFICATION_TYPE_FILTER_ORDER: NotificationRecordType[] = [
+  "ADMIN",
+  "SYSTEM",
+  "ORDER",
+  "PAYMENT",
+  "VENDOR",
+  "VERIFICATION",
+  "JOB",
+  "PROPOSAL",
+  "ENGAGEMENT",
+  "REVIEW",
+  "PROFILE",
+  "LOYALTY",
+  "MESSAGE",
+  "FOLLOW",
+  "LIKE",
+  "COMMENT",
 ];
 
 // ------------------------------------------------------------
@@ -147,7 +126,7 @@ export function readStateVariant(read: boolean): BadgeVariant {
 // AUDIENCE
 // ------------------------------------------------------------
 
-export const AUDIENCE_LABELS: Record<ManagedAdminNotificationAudience, string> = {
+export const AUDIENCE_LABELS: Record<NotificationBroadcastAudience, string> = {
   specific_user: "Selected user",
   all_users: "All platform users",
   customers: "Customers (students)",
@@ -155,11 +134,11 @@ export const AUDIENCE_LABELS: Record<ManagedAdminNotificationAudience, string> =
   campus: "Campus users",
 };
 
-export function audienceLabel(audience: ManagedAdminNotificationAudience): string {
+export function audienceLabel(audience: NotificationBroadcastAudience): string {
   return AUDIENCE_LABELS[audience] ?? audience;
 }
 
-export const AUDIENCE_FILTER_ORDER: ManagedAdminNotificationAudience[] = [
+export const AUDIENCE_FILTER_ORDER: NotificationBroadcastAudience[] = [
   "all_users",
   "customers",
   "vendors",
@@ -168,23 +147,13 @@ export const AUDIENCE_FILTER_ORDER: ManagedAdminNotificationAudience[] = [
 ];
 
 // ------------------------------------------------------------
-// COMPOSABLE TYPES (for the create form)
-// ------------------------------------------------------------
-
-export const COMPOSABLE_TYPES = ADMIN_COMPOSABLE_NOTIFICATIONS.map((c) => c.type);
-export const COMPOSABLE_CATEGORIES = ADMIN_COMPOSABLE_NOTIFICATIONS.map((c) => c.category);
-
-// ------------------------------------------------------------
 // FILTER HELPERS
 // ------------------------------------------------------------
 
-export function hasActiveNotificationFilters(
-  query: ManagedAdminNotificationQuery
-): boolean {
+export function hasActiveNotificationFilters(query: ManagedNotificationQuery): boolean {
   return (
     (query.search?.trim().length ?? 0) > 0 ||
     (query.type !== undefined && query.type !== "all") ||
-    (query.category !== undefined && query.category !== "all") ||
     (query.read !== undefined && query.read !== "all")
   );
 }

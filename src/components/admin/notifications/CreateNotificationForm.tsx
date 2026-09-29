@@ -11,38 +11,27 @@ import {
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Label } from "@/components/ui/Label";
-import {
-  StatusBadge,
-  badgeVariantClasses,
-} from "@/components/admin/StatusBadge";
+import { StatusBadge } from "@/components/admin/StatusBadge";
 import { cn } from "@/lib/utils";
 import {
   AUDIENCE_LABELS,
   AUDIENCE_FILTER_ORDER,
   NOTIFICATION_TYPE_LABELS,
-  NOTIFICATION_CATEGORY_LABELS,
 } from "./notifications-meta";
 import {
   useAdminCreateNotification,
   useAdminAudiencePreview,
 } from "@/hooks/admin/use-admin-communications";
+import { useAdminUserCampuses } from "@/hooks/admin/use-admin-users";
 import {
-  ADMIN_COMPOSABLE_NOTIFICATIONS,
-  NOTIFICATION_TITLE_MAX,
-  NOTIFICATION_BODY_MAX,
-  REAL_CAMPAIGN_CAMPUSES,
-} from "@/data/admin/communication-management";
-import {
-  useAdminSession,
-} from "@/lib/admin/admin-auth-context";
-import type {
-  ManagedAdminNotificationAudience,
-  ManagedAdminNotificationCreateInput,
+  ADMIN_BROADCASTABLE_NOTIFICATION_TYPES,
+  type AdminBroadcastableNotificationType,
+  type ManagedNotificationBroadcastInput,
+  type NotificationBroadcastAudience,
 } from "@/types/admin";
-import type {
-  NotificationType,
-  NotificationCategory,
-} from "@/types";
+
+const TITLE_MAX = 200;
+const BODY_MAX = 1000;
 
 interface CreateNotificationFormProps {
   onCreated: () => void;
@@ -53,19 +42,15 @@ export function CreateNotificationForm({
   onCreated,
   onBack,
 }: CreateNotificationFormProps) {
-  const { admin } = useAdminSession();
   const createMutation = useAdminCreateNotification();
+  const campusesQuery = useAdminUserCampuses();
 
-  const [type, setType] = useState<NotificationType>(
-    ADMIN_COMPOSABLE_NOTIFICATIONS[0].type
-  );
-  const [category, setCategory] = useState<NotificationCategory>(
-    ADMIN_COMPOSABLE_NOTIFICATIONS[0].category
+  const [type, setType] = useState<AdminBroadcastableNotificationType>(
+    ADMIN_BROADCASTABLE_NOTIFICATION_TYPES[0]
   );
   const [title, setTitle] = useState("");
-  const [message, setMessage] = useState("");
-  const [audience, setAudience] =
-    useState<ManagedAdminNotificationAudience>("all_users");
+  const [body, setBody] = useState("");
+  const [audience, setAudience] = useState<NotificationBroadcastAudience>("all_users");
   const [campusId, setCampusId] = useState("");
   const [userId, setUserId] = useState("");
   const [actionUrl, setActionUrl] = useState("");
@@ -80,16 +65,9 @@ export function CreateNotificationForm({
   function validate(): boolean {
     const next: Record<string, string> = {};
     if (!title.trim()) next.title = "Title is required.";
-    if (title.trim().length > NOTIFICATION_TITLE_MAX)
-      next.title = `Max ${NOTIFICATION_TITLE_MAX} characters.`;
-    if (!message.trim()) next.message = "Message is required.";
-    if (message.trim().length > NOTIFICATION_BODY_MAX)
-      next.message = `Max ${NOTIFICATION_BODY_MAX} characters.`;
-
-    const valid = ADMIN_COMPOSABLE_NOTIFICATIONS.some(
-      (c) => c.type === type && c.category === category
-    );
-    if (!valid) next.type = "This type/category pair is not available for admin compose.";
+    if (title.trim().length > TITLE_MAX) next.title = `Max ${TITLE_MAX} characters.`;
+    if (!body.trim()) next.body = "Message is required.";
+    if (body.trim().length > BODY_MAX) next.body = `Max ${BODY_MAX} characters.`;
 
     if (audience === "specific_user" && !userId.trim()) {
       next.userId = "Enter a user ID to target.";
@@ -111,11 +89,10 @@ export function CreateNotificationForm({
 
   function handleSubmit() {
     if (!validate()) return;
-    const input: ManagedAdminNotificationCreateInput = {
+    const input: ManagedNotificationBroadcastInput = {
       title: title.trim(),
-      message: message.trim(),
+      body: body.trim(),
       type,
-      category,
       audience,
       userId: audience === "specific_user" ? userId.trim() || null : null,
       campusId: audience === "campus" ? campusId || null : null,
@@ -146,50 +123,31 @@ export function CreateNotificationForm({
         Create in-app notification
       </h1>
       <p className="mt-0.5 text-xs text-kampmax-text-secondary">
-        Dispatches a real record to the shared in-app notification store
-        (Module 26A). No email, SMS or push channel is wired.
+        Dispatches a real record to the shared in-app notification store. No
+        email, SMS or push channel is wired.
       </p>
 
       <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Form */}
         <div className="lg:col-span-2 space-y-4">
           <div className="rounded-lg border border-kampmax-border bg-white p-5 space-y-4">
-            {/* Type / Category */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Type</Label>
-                <Select
-                  value={type}
-                  onChange={(e) => {
-                    const t = e.target.value as NotificationType;
-                    setType(t);
-                    const match = ADMIN_COMPOSABLE_NOTIFICATIONS.find((c) => c.type === t);
-                    if (match) setCategory(match.category);
-                  }}
-                >
-                  {[...new Set(ADMIN_COMPOSABLE_NOTIFICATIONS.map((c) => c.type))].map((t) => (
-                    <option key={t} value={t}>
-                      {NOTIFICATION_TYPE_LABELS[t]}
-                    </option>
-                  ))}
-                </Select>
-                {errors.type && (
-                  <p className="mt-1 text-xs text-kampmax-error">{errors.type}</p>
-                )}
-              </div>
-              <div>
-                <Label>Category</Label>
-                <Select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value as NotificationCategory)}
-                >
-                  {[...new Set(ADMIN_COMPOSABLE_NOTIFICATIONS.map((c) => c.category))].map((c) => (
-                    <option key={c} value={c}>
-                      {NOTIFICATION_CATEGORY_LABELS[c]}
-                    </option>
-                  ))}
-                </Select>
-              </div>
+            {/* Type */}
+            <div>
+              <Label>Type</Label>
+              <Select
+                value={type}
+                onChange={(e) => setType(e.target.value as AdminBroadcastableNotificationType)}
+              >
+                {ADMIN_BROADCASTABLE_NOTIFICATION_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {NOTIFICATION_TYPE_LABELS[t]}
+                  </option>
+                ))}
+              </Select>
+              <p className="mt-1 text-[11px] text-kampmax-text-secondary">
+                Admin broadcasts are restricted to these two platform-wide notice types — domain
+                types (orders, payments, reviews, …) are authored by their owning module instead.
+              </p>
             </div>
 
             {/* Title */}
@@ -197,8 +155,8 @@ export function CreateNotificationForm({
               <Label>Title</Label>
               <Input
                 value={title}
-                placeholder="e.g. New semester promo is live"
-                maxLength={NOTIFICATION_TITLE_MAX}
+                placeholder="e.g. Scheduled maintenance tonight"
+                maxLength={TITLE_MAX}
                 onChange={(e) => setTitle(e.target.value)}
               />
               <div className="mt-1 flex items-center justify-between">
@@ -208,35 +166,35 @@ export function CreateNotificationForm({
                   <span />
                 )}
                 <span className="text-[11px] tabular-nums text-kampmax-text-secondary">
-                  {title.length}/{NOTIFICATION_TITLE_MAX}
+                  {title.length}/{TITLE_MAX}
                 </span>
               </div>
             </div>
 
-            {/* Message */}
+            {/* Body */}
             <div>
               <Label>Message</Label>
               <textarea
                 rows={5}
-                maxLength={NOTIFICATION_BODY_MAX}
-                value={message}
+                maxLength={BODY_MAX}
+                value={body}
                 placeholder="What should recipients know? Keep it short and actionable."
-                onChange={(e) => setMessage(e.target.value)}
+                onChange={(e) => setBody(e.target.value)}
                 className={cn(
                   "w-full resize-none rounded-lg border bg-white px-3 py-2.5 text-sm transition-colors focus:outline-none focus:ring-1",
-                  errors.message
+                  errors.body
                     ? "border-kampmax-error focus:ring-kampmax-error"
                     : "border-kampmax-border focus:ring-kampmax-blue"
                 )}
               />
               <div className="mt-1 flex items-center justify-between">
-                {errors.message ? (
-                  <p className="text-xs text-kampmax-error">{errors.message}</p>
+                {errors.body ? (
+                  <p className="text-xs text-kampmax-error">{errors.body}</p>
                 ) : (
                   <span />
                 )}
                 <span className="text-[11px] tabular-nums text-kampmax-text-secondary">
-                  {message.length}/{NOTIFICATION_BODY_MAX}
+                  {body.length}/{BODY_MAX}
                 </span>
               </div>
             </div>
@@ -283,7 +241,7 @@ export function CreateNotificationForm({
               </div>
             </div>
 
-            {/* Campus ID (campus audience) */}
+            {/* Campus (campus audience) */}
             {audience === "campus" && (
               <div>
                 <Label>Campus</Label>
@@ -292,8 +250,10 @@ export function CreateNotificationForm({
                   onChange={(e) => setCampusId(e.target.value)}
                 >
                   <option value="">Select campus…</option>
-                  {REAL_CAMPAIGN_CAMPUSES.map((c) => (
-                    <option key={c} value={c}>{c}</option>
+                  {(campusesQuery.data ?? []).map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}
+                    </option>
                   ))}
                 </Select>
                 {errors.campusId && (
@@ -308,7 +268,7 @@ export function CreateNotificationForm({
                 <Label>Recipient user ID</Label>
                 <Input
                   value={userId}
-                  placeholder="u1"
+                  placeholder="8aa9deb4-78d1-4e49-a96a-f0b43f7c15a1"
                   onChange={(e) => setUserId(e.target.value)}
                 />
                 {errors.userId && (
@@ -393,7 +353,8 @@ export function CreateNotificationForm({
             <span>
               Dispatch writes one record per recipient directly to the shared
               notification store. The recipient&apos;s notification bell and
-              the user-facing notification center update immediately.
+              the user-facing notification center update immediately. A
+              recipient who disabled in-app notifications entirely is skipped.
             </span>
           </div>
         </div>

@@ -4,20 +4,15 @@ import { Search } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import {
-  NOTIFICATION_CATEGORY_FILTER_ORDER,
   NOTIFICATION_TYPE_FILTER_ORDER,
-  notificationCategoryLabel,
   notificationTypeLabel,
   hasActiveNotificationFilters,
 } from "./notifications-meta";
-import type {
-  ManagedAdminNotificationQuery,
-} from "@/types/admin";
-import type { NotificationType, NotificationCategory } from "@/types";
+import type { ManagedNotificationQuery, NotificationRecordType } from "@/types/admin";
 
 interface NotificationFiltersProps {
-  query: ManagedAdminNotificationQuery;
-  onQueryChange: (query: ManagedAdminNotificationQuery) => void;
+  query: ManagedNotificationQuery;
+  onQueryChange: (query: ManagedNotificationQuery) => void;
 }
 
 export function NotificationFilters({
@@ -31,7 +26,7 @@ export function NotificationFilters({
       <div className="w-full sm:w-64">
         <Input
           value={query.search ?? ""}
-          placeholder="Search title or message…"
+          placeholder="Search title or body…"
           leftIcon={<Search className="h-4 w-4" />}
           aria-label="Search notifications"
           onChange={(e) =>
@@ -45,7 +40,7 @@ export function NotificationFilters({
         onChange={(e) =>
           onQueryChange({
             ...query,
-            type: (e.target.value || "all") as NotificationType | "all",
+            type: (e.target.value || "all") as NotificationRecordType | "all",
             page: 1,
           })
         }
@@ -55,25 +50,6 @@ export function NotificationFilters({
         {NOTIFICATION_TYPE_FILTER_ORDER.map((t) => (
           <option key={t} value={t}>
             {notificationTypeLabel(t)}
-          </option>
-        ))}
-      </Select>
-      <Select
-        value={query.category ?? "all"}
-        aria-label="Filter by category"
-        onChange={(e) =>
-          onQueryChange({
-            ...query,
-            category: (e.target.value || "all") as NotificationCategory | "all",
-            page: 1,
-          })
-        }
-        className="w-auto h-9 text-xs"
-      >
-        <option value="all">All categories</option>
-        {NOTIFICATION_CATEGORY_FILTER_ORDER.map((c) => (
-          <option key={c} value={c}>
-            {notificationCategoryLabel(c)}
           </option>
         ))}
       </Select>

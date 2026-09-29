@@ -18,7 +18,7 @@ import {
   readStateVariant,
 } from "./notifications-meta";
 import { useAdminNotificationDetail } from "@/hooks/admin/use-admin-communications";
-import type { ManagedAdminNotificationRow } from "@/types/admin";
+import type { ManagedNotificationRow } from "@/types/admin";
 
 interface NotificationDetailProps {
   id: string;
@@ -38,10 +38,12 @@ function DetailContent({
   row,
   onBack,
 }: {
-  row: ManagedAdminNotificationRow;
+  row: ManagedNotificationRow;
   onBack: () => void;
 }) {
   const Icon = notificationTypeIcon(row.type);
+  const actionUrl =
+    row.data && typeof row.data.actionUrl === "string" ? row.data.actionUrl : null;
 
   return (
     <>
@@ -68,18 +70,18 @@ function DetailContent({
       <h1 className="mt-3 text-lg font-bold text-kampmax-text">{row.title}</h1>
       <p className="mt-0.5 font-mono text-xs text-kampmax-text-secondary">{row.id}</p>
 
-      {/* Message */}
+      {/* Body */}
       <div className="mt-4 rounded-lg border border-kampmax-border bg-white px-5 py-4">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-kampmax-text-secondary">
           Message
         </h2>
         <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-kampmax-text">
-          {row.message}
+          {row.body}
         </p>
       </div>
 
       {/* Meta grid */}
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <MetaCard label="Recipient">
           <div className="flex items-center gap-2">
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-kampmax-muted text-kampmax-text-secondary">
@@ -116,14 +118,6 @@ function DetailContent({
             {formatDateTime(row.createdAt)}
           </p>
         </MetaCard>
-
-        <MetaCard label="Group">
-          {row.groupId ? (
-            <p className="text-sm font-mono text-kampmax-text">{row.groupId}</p>
-          ) : (
-            <p className="text-xs text-kampmax-text-secondary">Single record — no batch grouping</p>
-          )}
-        </MetaCard>
       </div>
 
       {/* Action link */}
@@ -131,13 +125,13 @@ function DetailContent({
         <h2 className="text-xs font-semibold uppercase tracking-wider text-kampmax-text-secondary">
           Action link
         </h2>
-        {row.actionUrl ? (
+        {actionUrl ? (
           <a
-            href={row.actionUrl}
+            href={actionUrl}
             className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-kampmax-text hover:underline"
           >
             <ExternalLink className="h-3.5 w-3.5" />
-            {row.actionUrl}
+            {actionUrl}
           </a>
         ) : (
           <p className="mt-2 text-xs text-kampmax-text-secondary">
@@ -150,7 +144,7 @@ function DetailContent({
       <div className="mt-4 flex items-start gap-2 rounded-lg border border-kampmax-border bg-kampmax-muted/30 px-4 py-3 text-xs text-kampmax-text-secondary">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         <span>
-          This notification lives in the shared in-app store (Module 26A). Read
+          This notification lives in the shared in-app notification store. Read
           state is the only delivery signal available — no email, SMS or push
           provider is integrated.
         </span>

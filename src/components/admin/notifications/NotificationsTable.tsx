@@ -19,18 +19,18 @@ import {
   previewText,
 } from "./notifications-meta";
 import type {
-  ManagedAdminNotificationRow,
+  ManagedNotificationRow,
   Paginated,
 } from "@/types/admin";
 
 export interface NotificationsTableProps {
-  data: Paginated<ManagedAdminNotificationRow> | undefined;
+  data: Paginated<ManagedNotificationRow> | undefined;
   loading: boolean;
   error: boolean;
   hasActiveFilters: boolean;
   onRetry: () => void;
   onClearFilters: () => void;
-  onView: (row: ManagedAdminNotificationRow) => void;
+  onView: (row: ManagedNotificationRow) => void;
   onPageChange: (page: number) => void;
 }
 
@@ -101,8 +101,8 @@ export function NotificationsTable(props: NotificationsTableProps) {
                     <p className="truncate font-medium text-kampmax-text" title={r.title}>
                       {r.title}
                     </p>
-                    <p className="mt-0.5 truncate text-xs text-kampmax-text-secondary" title={r.message}>
-                      {previewText(r.message, 64)}
+                    <p className="mt-0.5 truncate text-xs text-kampmax-text-secondary" title={r.body}>
+                      {previewText(r.body, 64)}
                     </p>
                   </td>
 
@@ -175,7 +175,7 @@ export function NotificationsTable(props: NotificationsTableProps) {
             </div>
 
             <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-kampmax-text-secondary">
-              {previewText(r.message, 110)}
+              {previewText(r.body, 110)}
             </p>
 
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-dashed border-kampmax-border pt-2 text-[11px] text-kampmax-text-secondary">
@@ -207,7 +207,7 @@ function TypeBadge({
   type,
   compact,
 }: {
-  type: ManagedAdminNotificationRow["type"];
+  type: ManagedNotificationRow["type"];
   compact?: boolean;
 }) {
   const Icon = notificationTypeIcon(type);

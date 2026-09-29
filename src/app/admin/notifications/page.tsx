@@ -9,14 +9,14 @@ import { NotificationFilters } from "@/components/admin/notifications/Notificati
 import { NotificationsTable } from "@/components/admin/notifications/NotificationsTable";
 import { useAdminNotificationList } from "@/hooks/admin/use-admin-communications";
 import type {
-  ManagedAdminNotificationQuery,
-  ManagedAdminNotificationRow,
+  ManagedNotificationQuery,
+  ManagedNotificationRow,
 } from "@/types/admin";
 
 export default function AdminNotificationsPage() {
   const router = useRouter();
 
-  const [query, setQuery] = useState<ManagedAdminNotificationQuery>({
+  const [query, setQuery] = useState<ManagedNotificationQuery>({
     page: 1,
     pageSize: 10,
   });
@@ -34,7 +34,7 @@ export default function AdminNotificationsPage() {
     []
   );
 
-  function handleView(row: ManagedAdminNotificationRow) {
+  function handleView(row: ManagedNotificationRow) {
     router.push(`/admin/notifications/${row.id}`);
   }
 
@@ -66,7 +66,6 @@ export default function AdminNotificationsPage() {
         hasActiveFilters={
           (query.search?.trim().length ?? 0) > 0 ||
           (query.type !== undefined && query.type !== "all") ||
-          (query.category !== undefined && query.category !== "all") ||
           (query.read !== undefined && query.read !== "all")
         }
         onRetry={() => void refetch()}

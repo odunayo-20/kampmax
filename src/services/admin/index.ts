@@ -287,14 +287,21 @@ export const financeConsoleService: FinanceManagementService =
 
 export type { ManagedFinanceReportId } from "@/types/admin";
 
-import {
-  AdminCommunicationService,
-  createAdminCommunicationService,
-} from "./communication-management.service";
+import type { AdminNotificationBroadcastService } from "@/types/admin";
+import { createApiNotificationBroadcastService } from "./notification-broadcast.api";
 
-/** /admin/notifications console (Admin Communications - read-only over the real Module 26A in-app notification store + real user registry, with real in-app dispatch via pushNotificationRecord). */
-export const adminCommunicationService: AdminCommunicationService =
-  createAdminCommunicationService();
+/**
+ * /admin/notifications console: live read-only ledger (GET /admin/notifications)
+ * over the real in-app notification store, plus a real broadcast action
+ * (POST /admin/notifications, in-app only — no email/push).
+ *
+ * Superseds the old `communication-management.service.ts` mock, whose
+ * comments claimed to already be real but never made a network call — that
+ * file is kept in place only because an audit-trail test still imports it
+ * directly to exercise a real console action in isolation.
+ */
+export const adminCommunicationService: AdminNotificationBroadcastService =
+  createApiNotificationBroadcastService();
 
 import type { AdminDisputeManagementService } from "./dispute-management.service";
 import { createApiDisputeManagementService } from "./dispute-management.api";
