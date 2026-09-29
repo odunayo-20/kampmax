@@ -5,3 +5,4 @@ export { PriceTag } from "@/components/atoms/PriceTag";
 export { Input, type InputProps } from "./Input";
 export { PasswordInput, type PasswordInputProps } from "./PasswordInput";
 export { Select, type SelectProps } from "./Select";
+export { Logo, LogoIcon } from "./Logo";

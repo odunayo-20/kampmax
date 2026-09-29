@@ -119,17 +119,15 @@ function TrustRow() {
   );
 }
 
+import { Logo } from "@/components/ui/Logo";
+
 function FooterBrand() {
   const { selectedCampus } = useApp();
 
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <Link href="/home" className="inline-flex items-center gap-1.5">
-          <span className="text-xl font-bold text-kampmax-navy tracking-tight">
-            Kampmax
-          </span>
-        </Link>
+        <Logo size="md" href="/home" />
         <p className="text-sm text-kampmax-text-secondary mt-2 max-w-sm leading-relaxed">
           Your campus marketplace and platform for buying, selling, working and
           hiring.

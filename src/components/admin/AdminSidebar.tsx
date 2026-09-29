@@ -100,6 +100,8 @@ function SidebarFooter({ collapsed }: { collapsed: boolean }) {
   );
 }
 
+import { LogoIcon } from "@/components/ui/Logo";
+
 export function AdminSidebar() {
   const { collapsed, toggleCollapsed } = useAdminUI();
 
@@ -117,12 +119,12 @@ export function AdminSidebar() {
           collapsed && "justify-center px-0"
         )}
       >
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-kampmax-gold text-sm font-black text-kampmax-navy">
-          K
-        </div>
+        <LogoIcon size={collapsed ? 28 : 30} />
         {!collapsed && (
           <div className="leading-tight">
-            <p className="text-sm font-bold tracking-tight text-white">Kampmax</p>
+            <p className="text-sm font-bold tracking-tight text-white">
+              Kamp<span className="text-primary-400">max</span>
+            </p>
             <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
               Operations Console
             </p>

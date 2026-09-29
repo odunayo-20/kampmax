@@ -24,6 +24,8 @@ const navLinks = [
   { href: "/chat", icon: MessageCircle, label: "Chat" },
 ];
 
+import { Logo } from "@/components/ui/Logo";
+
 export function DesktopNavigation() {
   const pathname = usePathname();
   const { itemCount } = useCart();
@@ -42,11 +44,9 @@ export function DesktopNavigation() {
       <div className="max-w-[1280px] mx-auto flex items-center justify-between h-[60px] px-6">
         {/* Left: Logo + Nav */}
         <div className="flex items-center gap-8">
-          <Link href="/home" className="flex items-center gap-1.5 mr-4">
-            <span className="text-xl font-bold text-kampmax-navy tracking-tight">
-              Kampmax
-            </span>
-          </Link>
+          <div className="mr-4">
+            <Logo size="md" href="/home" />
+          </div>
 
           <nav className="flex items-center gap-1">
             {navLinks.map((link) => {

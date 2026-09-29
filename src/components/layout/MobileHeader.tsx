@@ -9,6 +9,8 @@ import { Avatar } from "@/components/ui";
 import { NotificationBell } from "@/components/notifications";
 import { cn } from "@/lib/utils";
 
+import { Logo } from "@/components/ui/Logo";
+
 export function MobileHeader() {
   const { itemCount } = useCart();
   const { selectedCampus } = useApp();
@@ -17,14 +19,7 @@ export function MobileHeader() {
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-neutral-200 lg:hidden">
       <div className="max-w-lg mx-auto flex items-center justify-between h-[56px] px-4">
-        <Link
-          href="/home"
-          className="flex items-center gap-1.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-1"
-        >
-          <span className="text-[19px] font-extrabold text-primary-900 tracking-tight">
-            Kampmax
-          </span>
-        </Link>
+        <Logo size="sm" href="/home" />
 
         <div className="flex items-center gap-1">
           <Link

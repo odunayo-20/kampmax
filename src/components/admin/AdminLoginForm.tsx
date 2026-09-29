@@ -28,6 +28,8 @@ function safeReturnTo(value: string | null): string {
   return value;
 }
 
+import { Logo, LogoIcon } from "@/components/ui/Logo";
+
 export function AdminLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -65,12 +67,12 @@ export function AdminLoginForm() {
     <div className="flex min-h-screen bg-kampmax-bg">
       {/* Brand panel */}
       <div className="hidden w-1/2 flex-col justify-between bg-kampmax-navy p-10 lg:flex">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-kampmax-gold text-sm font-black text-kampmax-navy">
-            K
-          </div>
+        <div className="flex items-center gap-3">
+          <LogoIcon size={36} />
           <div className="leading-tight">
-            <p className="text-sm font-bold text-white">Kampmax</p>
+            <p className="text-base font-bold text-white">
+              Kamp<span className="text-primary-400">max</span>
+            </p>
             <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
               Operations Console
             </p>
@@ -94,11 +96,9 @@ export function AdminLoginForm() {
       {/* Form panel */}
       <div className="flex w-full flex-col items-center justify-center px-4 py-10 lg:w-1/2">
         <div className="w-full max-w-sm">
-          <div className="mb-6 flex flex-col items-start gap-3 lg:hidden">
-            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-kampmax-gold text-sm font-black text-kampmax-navy">
-              K
-            </div>
-            <p className="text-lg font-bold text-kampmax-text">Kampmax Admin</p>
+          <div className="mb-6 flex flex-col items-start gap-2 lg:hidden">
+            <Logo size="md" />
+            <p className="text-xs text-kampmax-text-secondary">Operations Console</p>
           </div>
 
           <div className="mb-6">
