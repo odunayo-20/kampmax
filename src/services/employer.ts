@@ -270,10 +270,10 @@ export async function getEmployerDashboardAccessApi(): Promise<EmployerAccess> {
  * Endpoint: PATCH /employers/me
  */
 export async function updateEmployerProfileApi(
-  patch: Partial<EmployerOnboardingDraft>
+  patch: Partial<EmployerOnboardingDraft> | Record<string, unknown>
 ): Promise<{ profile: EmployerBackendProfile | null; error: ApiError | null }> {
   const { data, error } = await apiClient.patch<
-    Partial<EmployerOnboardingDraft>,
+    Partial<EmployerOnboardingDraft> | Record<string, unknown>,
     EmployerBackendProfile
   >("/employers/me", patch);
   if (!error && data) return { profile: data, error: null };

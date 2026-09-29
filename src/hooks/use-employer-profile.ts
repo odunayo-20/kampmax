@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { employerKeys, dashboardKeys } from "@/lib/query-keys";
 import {
   getEmployerOnboardingDraftForUser,
+  updateEmployerProfileApi,
   updateEmployerProfileForUser,
 } from "@/services/employer";
 import { computeEmployerCompletion } from "@/services/employer";
@@ -43,11 +44,23 @@ export function useUpdateEmployerProfile() {
 
   return useMutation({
     mutationFn: async (payload: EmployerProfileUpdatePayload) => {
-      await delay(400);
+      await delay(200);
       const result = updateEmployerProfileForUser(payload);
       if (!result.success) {
         throw new Error(result.error ?? "Could not save changes.");
       }
+
+      // Live backend sync
+      updateEmployerProfileApi({
+        displayName: payload.profile?.displayName,
+        companyName: payload.organization?.name,
+        companyDescription: payload.organization?.description || payload.profile?.about,
+        industry: payload.organization?.industry || payload.profile?.industry,
+        websiteUrl: payload.organization?.website || payload.profile?.website,
+        location: payload.location?.city ? `${payload.location.city}, ${payload.location.state || ""}`.trim() : undefined,
+        campusId: payload.location?.campusId,
+      }).catch(() => {});
+
       return result;
     },
     onSuccess: () => {
