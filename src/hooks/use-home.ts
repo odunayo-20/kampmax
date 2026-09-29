@@ -19,9 +19,12 @@ function live<T>(res: { data: T; error: unknown }): T {
   return res.data;
 }
 
+import { getMarketplaceServicesApi } from "@/services/service-marketplace";
+
 export const homeKeys = {
   all: ["home"] as const,
   products: (campusId?: string) => ["home", "products", campusId ?? "all"] as const,
+  services: (campusId?: string) => ["home", "services", campusId ?? "all"] as const,
   categories: ["home", "categories"] as const,
   vendors: (campusId?: string) => ["home", "vendors", campusId ?? "all"] as const,
   featured: (placement: string, campusId?: string, categoryId?: string) =>
@@ -39,6 +42,17 @@ export function useHomeProducts(campusId?: string) {
     queryKey: homeKeys.products(apiCampusId),
     queryFn: async () =>
       live(await fetchProducts({ campusId: apiCampusId, status: "ACTIVE", limit: 40 })),
+  });
+}
+
+export function useHomeServices(campusId?: string) {
+  const apiCampusId = toApiCampusId(campusId);
+  return useQuery({
+    queryKey: homeKeys.services(apiCampusId),
+    queryFn: async () => {
+      const page = await getMarketplaceServicesApi({ campusId: apiCampusId });
+      return page.items;
+    },
   });
 }
 

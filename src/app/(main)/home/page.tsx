@@ -4,14 +4,16 @@ import Link from "next/link";
 import {
   Search, TrendingUp, Star, Clock, Zap,
   ShoppingBag, Wallet, MessageCircle,
-  MapPin, Store as StoreIcon
+  MapPin, Store as StoreIcon, Wrench, Sparkles, ArrowRight
 } from "lucide-react";
 import { ProductCard, CategoryCard } from "@/components/marketplace";
 import { PageContainer, SectionHeader, HorizontalScroll } from "@/components/layout";
 import { VendorCard, QuickAction, ProductCardHorizontal, FeaturedPromotions } from "@/components/home";
+import { ServiceCard } from "@/components/service-marketplace/ServiceCard";
+import { getProviderById } from "@/services/service-marketplace";
 import { useApp } from "@/lib/app-context";
 import { useAuth } from "@/lib/auth-context";
-import { useHomeCategories, useHomeProducts, useHomeVendors } from "@/hooks/use-home";
+import { useHomeCategories, useHomeProducts, useHomeServices, useHomeVendors } from "@/hooks/use-home";
 import { useUnreadMessageCount } from "@/hooks/use-messages";
 import { useCart } from "@/lib/cart-context";
 
@@ -22,10 +24,12 @@ export default function HomePage() {
   const unreadMessagesQuery = useUnreadMessageCount();
 
   const productsQuery = useHomeProducts(campusId);
+  const servicesQuery = useHomeServices(campusId);
   const categoriesQuery = useHomeCategories();
   const vendorsQuery = useHomeVendors(campusId);
 
   const products = productsQuery.data ?? [];
+  const services = servicesQuery.data ?? [];
   const categories = categoriesQuery.data ?? [];
   const vendors = vendorsQuery.data ?? [];
   const recommended = products.slice(0, 8);
@@ -64,11 +68,11 @@ export default function HomePage() {
         <div className="mt-4">
           <Link
             href="/search"
-            aria-label="Search products, vendors, food and categories"
+            aria-label="Search products, services, vendors, food and categories"
             className="group flex items-center gap-3 h-[46px] pl-4 pr-4 bg-white border border-neutral-200 rounded-[10px] text-neutral-600 text-sm shadow-[0_1px_2px_rgba(16,24,40,0.06)] hover:border-primary-600/30 hover:shadow-[0_4px_12px_rgba(16,24,40,0.08)] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-1"
           >
             <Search className="h-[18px] w-[18px] text-neutral-500 group-hover:text-primary-600 transition-colors shrink-0" aria-hidden />
-            <span className="truncate">Search products, vendors, food...</span>
+            <span className="truncate">Search products, services, vendors, food...</span>
             <span className="ml-auto hidden sm:inline-flex text-[11px] font-medium px-2 py-1 rounded-md bg-neutral-50 text-neutral-600 border border-neutral-200">
               Press / to search
             </span>
@@ -76,13 +80,18 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 3. Quick Actions — feel like actions, not stats */}
+      {/* 3. Quick Actions — includes Services prominently */}
       <section aria-label="Quick actions">
-        <div className="grid grid-cols-4 gap-2.5 sm:gap-3">
+        <div className="grid grid-cols-5 gap-2 sm:gap-3">
           <QuickAction
             href="/marketplace"
             icon={<ShoppingBag className="h-5 w-5" />}
             label="Buy"
+          />
+          <QuickAction
+            href="/services"
+            icon={<Wrench className="h-5 w-5 text-primary-600" />}
+            label="Services"
           />
           <QuickAction
             href="/marketplace?sell=true"
@@ -116,7 +125,50 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 5. Recommended for you — primary product discovery, grid (most attention) */}
+      {/* 5. Campus Services for Customers — High Prominence */}
+      <section aria-label="Campus Services" className="space-y-3">
+        <SectionHeader
+          title="Campus Services & Gigs"
+          subtitle={`Hire trusted student & campus pros at ${selectedCampus.abbreviation}`}
+          icon={<Wrench className="h-4 w-4 text-primary-600" aria-hidden />}
+          action={{ label: "Explore services", href: "/services" }}
+        />
+        {services.length > 0 ? (
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+            {services.slice(0, 4).map((service) => (
+              <ServiceCard
+                key={service.id}
+                service={service}
+                provider={getProviderById(service.providerId)}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-[10px] border border-dashed border-neutral-200 bg-white p-6 sm:p-8 text-center">
+            {servicesQuery.isPending ? (
+              <p className="text-sm text-neutral-500">Loading campus services…</p>
+            ) : (
+              <div className="flex flex-col items-center justify-center space-y-2">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-50 text-primary-600">
+                  <Wrench className="h-5 w-5" />
+                </div>
+                <p className="text-sm font-medium text-neutral-900">Discover Campus Services</p>
+                <p className="text-xs text-neutral-500 max-w-sm">
+                  Laundry, tech repairs, hair styling, photography, tutoring, and more from verified campus providers.
+                </p>
+                <Link
+                  href="/services"
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-primary-700 transition-colors"
+                >
+                  Browse all services <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* 6. Recommended for you — primary product discovery, grid (most attention) */}
       {recommended.length > 0 ? (
         <section aria-label="Recommended for you">
           <SectionHeader

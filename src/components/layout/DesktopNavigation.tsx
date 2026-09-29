@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Home, Store, GraduationCap, MessageCircle, Briefcase,
+  Home, Store, GraduationCap, MessageCircle, Briefcase, Wrench,
   MapPin, Search, ShoppingCart, ChevronDown
 } from "lucide-react";
 import { useCart } from "@/lib/cart-context";
@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 const navLinks = [
   { href: "/home", icon: Home, label: "Home" },
   { href: "/marketplace", icon: Store, label: "Market" },
+  { href: "/services", icon: Wrench, label: "Services" },
   { href: "/jobs", icon: Briefcase, label: "Jobs" },
   { href: "/community", icon: GraduationCap, label: "Community" },
   { href: "/chat", icon: MessageCircle, label: "Chat" },
