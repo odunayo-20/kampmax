@@ -351,12 +351,11 @@ export type { ManagedJobSortField } from "./job-management.service";
 
 import {
   AdminAnalyticsService,
-  createMockAnalyticsService,
 } from "./analytics.service";
+import { createApiAnalyticsService } from "./analytics.api";
 
-/** /admin/reports console (platform analytics). */
 export const analyticsService: AdminAnalyticsService =
-  createMockAnalyticsService();
+  createApiAnalyticsService();
 
 import {
   AdminNotificationManagementService,
