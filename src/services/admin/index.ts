@@ -12,7 +12,7 @@
 // No component or page code changes required.
 // ============================================================
 
-import { mockActivityItems, mockDailyMetrics, mockGrowthSeries, mockNotifications, mockSettings, mockTopProducts, mockCampusSales, mockLowStock } from "@/data/admin/system";
+import { mockActivityItems, mockDailyMetrics, mockGrowthSeries, mockSettings, mockTopProducts, mockCampusSales, mockLowStock } from "@/data/admin/system";
 import { mockCampuses } from "@/data/admin/campuses";
 import { mockUsers, mockVendors } from "@/data/admin/people";
 import { mockCategories, mockProducts } from "@/data/admin/catalog";
@@ -73,8 +73,8 @@ import {
 } from "./content.service";
 import {
   AdminNotificationService,
-  createMockNotificationService,
 } from "./notifications.service";
+import { createApiNotificationService } from "./notifications.api";
 import { AdminSettingService, createMockSettingService } from "./settings.service";
 
 // Live API dashboard service — calls NestJS backend analytics endpoints.
@@ -398,7 +398,7 @@ import { createApiAuditLogService } from "./audit-log.api";
 export const adminAuditTrailService: AdminAuditLogService = createApiAuditLogService();
 
 export const notificationService: AdminNotificationService =
-  createMockNotificationService(mockNotifications);
+  createApiNotificationService();
 
 export const settingService: AdminSettingService =
   createMockSettingService(mockSettings);

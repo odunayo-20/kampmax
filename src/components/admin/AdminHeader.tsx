@@ -15,8 +15,14 @@ import {
 import { cn, timeAgo } from "@/lib/utils";
 import { useAdminSession } from "@/lib/admin/admin-auth-context";
 import { useAdminUI } from "@/lib/admin/admin-ui-context";
-import { notificationService } from "@/services/admin";
-import type { AdminNotification } from "@/types/admin";
+import {
+  useAdminNotificationList,
+  useAdminNotificationOverview,
+} from "@/hooks/admin/use-admin-communications";
+import {
+  notificationTypeIcon,
+  notificationTypeLabel,
+} from "@/components/admin/notifications/notifications-meta";
 import { AdminBreadcrumbs } from "./AdminBreadcrumbs";
 
 const ROLE_LABELS = {
@@ -46,34 +52,21 @@ function useOutsideClose(onClose: () => void) {
   return ref;
 }
 
-function notificationTone(status: AdminNotification["status"]): "info" | "warning" | "error" | "neutral" {
-  switch (status) {
-    case "scheduled":
-      return "warning";
-    case "draft":
-      return "neutral";
-    default:
-      return "info";
-  }
-}
-
 export function AdminHeader() {
   const router = useRouter();
   const { setMobileNavOpen } = useAdminUI();
   const { admin, admins, switchAccount, logout } = useAdminSession();
 
-  const [notifications, setNotifications] = useState<AdminNotification[] | null>(null);
-  useEffect(() => {
-    let mounted = true;
-    // Real broadcast history from the notification service - no hardcoded alerts.
-    notificationService
-      .list()
-      .then((rows) => mounted && setNotifications(rows))
-      .catch(() => mounted && setNotifications([]));
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  const { data: notifData, isLoading: notifLoading } = useAdminNotificationList({
+    page: 1,
+    pageSize: 5,
+  });
+  const { data: notifOverview } = useAdminNotificationOverview();
+
+  const notifications = notifData?.items;
+  const alertCount =
+    notifOverview?.counts.unread ??
+    (notifications ? notifications.filter((n) => !n.read).length : 0);
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -87,7 +80,6 @@ export function AdminHeader() {
   if (!admin) return null;
 
   const isSuperAdmin = admin.role === "SUPER_ADMIN";
-  const alertCount = notifications?.length ?? 0;
 
   async function handleSignOut() {
     await logout();
@@ -150,7 +142,7 @@ export function AdminHeader() {
         )}
       </div>
 
-      {/* Notifications (real broadcast history) */}
+      {/* Notifications (real in-app notifications store) */}
       <div className="relative" ref={notifRef}>
         <button
           type="button"
@@ -170,9 +162,16 @@ export function AdminHeader() {
         {notifOpen && (
           <div className="absolute right-0 top-11 z-40 w-80 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-lg border border-kampmax-border bg-white shadow-lg">
             <div className="flex items-center justify-between border-b border-kampmax-border px-3.5 py-2.5">
-              <p className="text-sm font-semibold text-kampmax-text">
-                Broadcasts &amp; alerts
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold text-kampmax-text">
+                  Notifications
+                </p>
+                {alertCount > 0 && (
+                  <span className="rounded-full bg-kampmax-blue/10 px-1.5 py-0.5 text-[10px] font-semibold text-kampmax-blue">
+                    {alertCount} unread
+                  </span>
+                )}
+              </div>
               <Link
                 href="/admin/notifications"
                 onClick={() => setNotifOpen(false)}
@@ -181,7 +180,7 @@ export function AdminHeader() {
                 View all
               </Link>
             </div>
-            {!notifications ? (
+            {notifLoading ? (
               <div className="space-y-2 p-3.5">
                 {Array.from({ length: 3 }).map((_, i) => (
                   <div key={i} className="flex gap-2">
@@ -190,38 +189,58 @@ export function AdminHeader() {
                   </div>
                 ))}
               </div>
-            ) : notifications.length === 0 ? (
+            ) : !notifications || notifications.length === 0 ? (
               <p className="px-3.5 py-6 text-center text-sm text-kampmax-text-secondary">
                 No notifications yet.
               </p>
             ) : (
-              <ul className="divide-y divide-kampmax-border/70">
-                {notifications.slice(0, 4).map((n) => (
-                  <li key={n.id}>
-                    <Link
-                      href="/admin/notifications"
-                      onClick={() => setNotifOpen(false)}
-                      className="flex w-full flex-col gap-0.5 px-3.5 py-2.5 text-left transition-colors hover:bg-kampmax-muted/50"
-                    >
-                      <span className="flex items-center gap-2 text-sm font-medium text-kampmax-text">
-                        <span
-                          aria-hidden
-                          className={cn(
-                            "h-1.5 w-1.5 shrink-0 rounded-full",
-                            notificationTone(n.status) === "error" && "bg-kampmax-error",
-                            notificationTone(n.status) === "warning" && "bg-kampmax-warning",
-                            notificationTone(n.status) === "info" && "bg-kampmax-info",
-                            notificationTone(n.status) === "neutral" && "bg-kampmax-text-secondary/50"
+              <ul className="divide-y divide-kampmax-border/70 max-h-80 overflow-y-auto">
+                {notifications.slice(0, 5).map((n) => {
+                  const TypeIcon = notificationTypeIcon(n.type);
+                  return (
+                    <li key={n.id}>
+                      <Link
+                        href={`/admin/notifications/${n.id}`}
+                        onClick={() => setNotifOpen(false)}
+                        className={cn(
+                          "flex w-full flex-col gap-0.5 px-3.5 py-2.5 text-left transition-colors hover:bg-kampmax-muted/50",
+                          !n.read && "bg-kampmax-blue/[0.03]"
+                        )}
+                      >
+                        <span className="flex items-center justify-between gap-2 text-sm font-medium text-kampmax-text">
+                          <span className="flex items-center gap-2 min-w-0">
+                            <span
+                              aria-hidden
+                              className={cn(
+                                "h-1.5 w-1.5 shrink-0 rounded-full",
+                                !n.read ? "bg-kampmax-blue" : "bg-transparent"
+                              )}
+                            />
+                            <span className={cn("truncate", !n.read && "font-semibold")}>
+                              {n.title}
+                            </span>
+                          </span>
+                          <span className="shrink-0 text-[10px] text-kampmax-text-secondary">
+                            {timeAgo(n.createdAt)}
+                          </span>
+                        </span>
+                        <span className="line-clamp-1 pl-3.5 text-xs text-kampmax-text-secondary">
+                          {n.body}
+                        </span>
+                        <span className="flex items-center gap-1.5 pl-3.5 text-[10px] text-kampmax-text-secondary/70">
+                          <TypeIcon className="h-3 w-3" />
+                          <span>{notificationTypeLabel(n.type)}</span>
+                          {n.recipientName && (
+                            <>
+                              <span>·</span>
+                              <span className="truncate">{n.recipientName}</span>
+                            </>
                           )}
-                        />
-                        <span className="truncate">{n.title}</span>
-                      </span>
-                      <span className="pl-3.5 text-xs text-kampmax-text-secondary">
-                        {n.status} · {timeAgo(n.sentAt)}
-                      </span>
-                    </Link>
-                  </li>
-                ))}
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>
