@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import {
   createBooking,
+  createCustomerBookingLive,
   formatBookingDay,
   formatBookingTime,
   getBookingLocationOptions,
@@ -197,6 +198,7 @@ export function BookingFlow({ serviceId }: { serviceId: string }) {
       )}`;
     }
 
+    // Synchronously create in local state and asynchronously sync to backend API
     const result = createBooking({
       serviceId,
       startAt: selectedSlot.startAt,
@@ -206,6 +208,15 @@ export function BookingFlow({ serviceId }: { serviceId: string }) {
       customerPhone: phone.trim(),
       idempotencyKey: idempotencyRef.current,
     });
+
+    createCustomerBookingLive({
+      providerId: provider.id,
+      serviceId,
+      scheduledDate: selectedSlot.startAt,
+      scheduledTime: formatBookingTime(selectedSlot.startAt),
+      durationMinutes: service.durationMinutes || 60,
+      customerNotes: notes.trim() || undefined,
+    }).catch(() => {});
 
     setSubmitting(false);
 

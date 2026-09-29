@@ -537,13 +537,18 @@ export function getBookingProviderCatalog(providerId: string) {
   return getMarketplaceProvider(providerId);
 }
 
-// ── Live Provider Booking API exports ────────────────────────
+// ── Live Provider & Customer Booking API exports ────────────
 export {
   fetchProviderBookingsLive,
   fetchProviderBookingByIdLive,
   acceptProviderBookingLive,
   rejectProviderBookingLive,
   fetchProviderBookingSummaryLive,
+  fetchCustomerBookingsLive,
+  fetchCustomerBookingByIdLive,
+  createCustomerBookingLive,
+  cancelCustomerBookingLive,
+  confirmCustomerBookingCompletionLive,
   mapBackendBookingToFrontend,
   mapBackendBookingStatus,
 } from "./service-provider-booking.api";

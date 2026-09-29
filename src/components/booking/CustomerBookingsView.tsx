@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import { PageContainer } from "@/components/layout/PageContainer";
 import {
+  fetchCustomerBookingsLive,
   getCustomerBookingCounts,
   getCustomerBookings,
 } from "@/services/booking";
@@ -14,7 +15,7 @@ import { BookingListCard } from "./BookingListCard";
 import { BookingEmptyState } from "./BookingEmptyState";
 import { BookingFilters } from "./BookingFilters";
 import { BookingPagination } from "./BookingPagination";
-import type { BookingListFilter, BookingListQuery } from "@/types/booking";
+import type { BookingListFilter, BookingListQuery, BookingPageResult } from "@/types/booking";
 
 const TABS: { key: BookingListFilter; label: string }[] = [
   { key: "upcoming", label: "Upcoming" },
@@ -38,6 +39,7 @@ export function CustomerBookingsView() {
   const [tab, setTab] = useState<BookingListFilter>("upcoming");
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [liveResult, setLiveResult] = useState<BookingPageResult | null>(null);
 
   const userId = user?.id ?? "u1";
 
@@ -46,8 +48,24 @@ export function CustomerBookingsView() {
     [tab, page, filters]
   );
 
-  const result = useMemo(() => getCustomerBookings(query), [query, userId]);
+  const localResult = useMemo(() => getCustomerBookings(query), [query, userId]);
   const counts = useMemo(() => getCustomerBookingCounts(), [userId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchCustomerBookingsLive(query)
+      .then((res) => {
+        if (!cancelled && (res.items.length > 0 || localResult.items.length === 0)) {
+          setLiveResult(res);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [query, localResult.items.length]);
+
+  const result = liveResult || localResult;
 
   function switchTab(next: BookingListFilter) {
     if (!isActiveTab(next)) return;

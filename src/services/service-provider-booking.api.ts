@@ -420,3 +420,110 @@ export async function fetchProviderBookingSummaryLive(): Promise<{
       bookings.filter((b) => b.status === "CANCELLED" || b.status === "REJECTED").length,
   };
 }
+
+// ── Customer Live Booking APIs ────────────────────────────────
+
+export async function fetchCustomerBookingsLive(
+  query: BookingListQuery = {}
+): Promise<BookingPageResult> {
+  const limit = query.limit || 12;
+  const page = query.page || 1;
+
+  const res = await apiClient.get<BackendBookingEntity[]>("/service-provider/bookings/customer/me");
+  if (res.error || !res.data) {
+    return { items: [], page: 1, limit, total: 0, totalPages: 1 };
+  }
+
+  let items = res.data.map(mapBackendBookingToFrontend);
+
+  if (query.status && query.status !== "all") {
+    if (query.status === "upcoming") {
+      items = items.filter((b) => b.status === "confirmed" || b.status === "pending");
+    } else if (query.status === "cancelled") {
+      items = items.filter((b) => b.status === "cancelled" || b.status === "declined");
+    } else {
+      items = items.filter((b) => b.status === query.status);
+    }
+  }
+
+  if (query.search) {
+    const s = query.search.toLowerCase();
+    items = items.filter(
+      (b) =>
+        b.serviceName.toLowerCase().includes(s) ||
+        b.customer?.name?.toLowerCase().includes(s) ||
+        b.bookingReference.toLowerCase().includes(s)
+    );
+  }
+
+  const total = items.length;
+  const totalPages = Math.ceil(total / limit) || 1;
+  const start = (page - 1) * limit;
+  const paged = items.slice(start, start + limit);
+
+  return {
+    items: paged,
+    page,
+    limit,
+    total,
+    totalPages,
+  };
+}
+
+export async function fetchCustomerBookingByIdLive(
+  bookingId: string
+): Promise<ServiceBooking | null> {
+  const res = await apiClient.get<BackendBookingEntity>(
+    `/service-provider/bookings/customer/${bookingId}`
+  );
+  if (res.error || !res.data) {
+    return null;
+  }
+  return mapBackendBookingToFrontend(res.data);
+}
+
+export async function createCustomerBookingLive(input: {
+  providerId: string;
+  serviceId: string;
+  scheduledDate: string | Date;
+  scheduledTime: string;
+  durationMinutes?: number;
+  customerNotes?: string;
+}): Promise<{ booking: ServiceBooking | null; error: string | null }> {
+  const res = await apiClient.post<any, BackendBookingEntity>(
+    "/service-provider/bookings",
+    input
+  );
+  if (res.error || !res.data) {
+    return { booking: null, error: res.error?.message || "Failed to create booking" };
+  }
+  return { booking: mapBackendBookingToFrontend(res.data), error: null };
+}
+
+export async function cancelCustomerBookingLive(
+  bookingId: string,
+  reason?: string
+): Promise<{ success: boolean; error: string | null }> {
+  const res = await apiClient.post(
+    `/service-provider/bookings/${bookingId}/cancel`,
+    { reason }
+  );
+  if (res.error) {
+    return { success: false, error: res.error.message || "Failed to cancel booking" };
+  }
+  return { success: true, error: null };
+}
+
+export async function confirmCustomerBookingCompletionLive(
+  bookingId: string
+): Promise<{ success: boolean; error: string | null }> {
+  const res = await apiClient.post(
+    `/service-provider/bookings/${bookingId}/confirm-completion`,
+    {}
+  );
+  if (res.error) {
+    return { success: false, error: res.error.message || "Failed to confirm completion" };
+  }
+  return { success: true, error: null };
+}
+
