@@ -19,7 +19,8 @@ import { mockCategories, mockProducts } from "@/data/admin/catalog";
 import { mockOrders, mockPayments, mockWithdrawals } from "@/data/admin/commerce";
 import { mockPromotions } from "@/data/admin/growth";
 import { mockDisputes, mockPosts, mockReports, mockReviews } from "@/data/admin/content";
-import { DashboardService, createMockDashboardService } from "./dashboard.service";
+import { DashboardService } from "./dashboard.service";
+import { createApiDashboardService } from "./dashboard.api";
 
 export type { ChartRange } from "./dashboard.service";
 import type { AdminAuthService } from "./auth.service";
@@ -76,8 +77,11 @@ import {
 } from "./notifications.service";
 import { AdminSettingService, createMockSettingService } from "./settings.service";
 
+// Live API dashboard service — calls NestJS backend analytics endpoints.
+// Mock sources are passed as fallback for endpoints not yet implemented
+// (chart time-series, activity feed) so those sections keep rendering.
 export const dashboardService: DashboardService =
-  createMockDashboardService({
+  createApiDashboardService({
     users: mockUsers,
     vendors: mockVendors,
     products: mockProducts,
