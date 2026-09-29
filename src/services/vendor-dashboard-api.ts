@@ -95,6 +95,22 @@ export function fetchVendorOrderStatusCounts(): Promise<StatusCount[]> {
   return unwrap(apiClient.get<StatusCount[]>("/analytics/vendor/orders/status"));
 }
 
+export function fetchVendorSalesAnalytics(period?: string): Promise<any> {
+  return unwrap(apiClient.get<any>(`/analytics/vendor/sales${period ? `?period=${period}` : ""}`));
+}
+
+export function fetchVendorEarningsAnalytics(): Promise<any> {
+  return unwrap(apiClient.get<any>("/analytics/vendor/earnings"));
+}
+
+export function fetchVendorProductsAnalytics(): Promise<any> {
+  return unwrap(apiClient.get<any>("/analytics/vendor/products"));
+}
+
+export function fetchVendorCampusOrdersAnalytics(): Promise<any> {
+  return unwrap(apiClient.get<any>("/analytics/vendor/orders/by-campus"));
+}
+
 export async function fetchVendorRecentOrders(limit = 5): Promise<VendorRecentOrder[]> {
   const page = await unwrap(
     apiClient.get<Paginated<BackendVendorOrder>>(`/orders/vendor?limit=${limit}`)

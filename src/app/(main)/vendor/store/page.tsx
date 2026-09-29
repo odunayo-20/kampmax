@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Store as StoreIcon,
@@ -23,8 +23,10 @@ import { cn, isValidEmail, isValidPhone } from "@/lib/utils";
 import { getCampuses } from "@/services/campus";
 import { getCategories } from "@/services/categories";
 import {
+  fetchMyStoreApi,
   getStore,
   updateStore,
+  updateStoreApi,
   uploadBranding,
   removeBranding,
 } from "@/services/vendor-dashboard";
@@ -44,6 +46,18 @@ export default function StoreManagementPage() {
   const storeSlug = getVendorAccess().storeSlug;
   const [store, setStore] = useState<VendorStore | null>(() => getStore());
 
+  useEffect(() => {
+    let cancelled = false;
+    fetchMyStoreApi().then((live) => {
+      if (!cancelled && live) {
+        setStore(live);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   if (!store) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
@@ -55,6 +69,11 @@ export default function StoreManagementPage() {
   }
 
   function save(patch: Partial<VendorStore>): boolean {
+    updateStoreApi(patch).then((res) => {
+      if (res.ok && res.store) {
+        setStore(res.store);
+      }
+    });
     const res = updateStore(patch);
     if (res.ok && res.store) {
       setStore(res.store);

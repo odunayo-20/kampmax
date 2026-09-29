@@ -1,25 +1,43 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Check, Info, Package, Zap, RotateCcw, Eye, Banknote, Bell, MessageSquare } from "lucide-react";
+import { ArrowLeft, Check, Info, Package, Zap, RotateCcw, Eye, Banknote, Bell, MessageSquare, Loader2 } from "lucide-react";
 import { SettingsToggle, SettingsRow, SettingsGroup } from "@/components/profile/SettingsGroup";
-import { getStoreSettings, updateStoreSettings } from "@/services/vendor";
+import { getStoreSettings, getStoreSettingsLive, updateStoreSettingsLive } from "@/services/vendor";
 import { StoreSettings } from "@/types";
 
 export default function StoreSettingsPage() {
   const router = useRouter();
-  const initial = getStoreSettings();
-  const [settings, setSettings] = useState<StoreSettings>(initial);
-  const [minOrder, setMinOrder] = useState(initial.minOrderAmount.toString());
+  const [settings, setSettings] = useState<StoreSettings>(() => getStoreSettings());
+  const [minOrder, setMinOrder] = useState(() => getStoreSettings().minOrderAmount.toString());
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getStoreSettingsLive().then((live) => {
+      if (!cancelled) {
+        setSettings(live);
+        setMinOrder(live.minOrderAmount.toString());
+        setLoading(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function update(key: keyof StoreSettings, value: boolean | number) {
     setSettings((s) => ({ ...s, [key]: value }));
   }
 
-  function handleSave() {
-    updateStoreSettings({ ...settings, minOrderAmount: Number(minOrder) || 0 });
+  async function handleSave() {
+    setSaving(true);
+    const updated = await updateStoreSettingsLive({ ...settings, minOrderAmount: Number(minOrder) || 0 });
+    setSettings(updated);
+    setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
