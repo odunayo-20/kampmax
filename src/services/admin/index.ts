@@ -170,7 +170,7 @@ export { setCategoryTaxonomy } from "./category-management.api";
 import type { AdminOrderManagementService } from "./order-management.service";
 import { createApiOrderManagementService } from "./order-management.api";
 
-/** /admin/orders console (live order inspection, read-only). */
+/** /admin/orders console: live inspection plus cancel/advance/dispute actions. */
 export const orderManagementService: AdminOrderManagementService =
   createApiOrderManagementService();
 
@@ -294,14 +294,12 @@ import {
 export const adminCommunicationService: AdminCommunicationService =
   createAdminCommunicationService();
 
-import {
-  AdminDisputeManagementService,
-  createMockDisputeManagementService,
-} from "./dispute-management.service";
+import type { AdminDisputeManagementService } from "./dispute-management.service";
+import { createApiDisputeManagementService } from "./dispute-management.api";
 
-/** /admin/disputes console (case resolution + refund placeholders). */
+/** /admin/disputes console: live case log (GET /admin/disputes) over disputed orders — open/resolve happens on the Orders console. */
 export const disputeManagementService: AdminDisputeManagementService =
-  createMockDisputeManagementService();
+  createApiDisputeManagementService();
 
 /** /admin/freelancers console: live directory + moderation API. */
 export const freelancerManagementService: AdminFreelancerManagementService =

@@ -1,13 +1,8 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import {
-  CheckCircle2,
-  CircleAlert,
-  Scale,
-  XCircle,
-} from "lucide-react";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { CircleAlert, Scale } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Pagination } from "@/components/admin/Pagination";
 import { Input } from "@/components/ui/Input";
@@ -16,11 +11,8 @@ import { LoadingSkeleton } from "@/components/admin/LoadingSkeleton";
 import { cn } from "@/lib/utils";
 import { useDebounce } from "@/hooks/use-debounce";
 import { DisputesTable } from "@/components/admin/disputes/DisputesTable";
-import { DisputeDetailDialog } from "@/components/admin/disputes/DisputeDetailDialog";
 import {
-  DISPUTE_REASON_FILTER_ORDER,
   DISPUTE_STATUS_FILTER_ORDER,
-  disputeReasonLabel,
   disputeStatusLabel,
 } from "@/components/admin/disputes/disputes-meta";
 import { disputeManagementService } from "@/services/admin";
@@ -28,7 +20,6 @@ import { communityCampusOptions } from "@/data/admin/community";
 import type {
   CommunitySectionCounts,
   ManagedDispute,
-  ManagedDisputeReason,
   ManagedDisputeStatus,
   Paginated,
 } from "@/types/admin";
@@ -41,12 +32,6 @@ export default function AdminDisputesPage() {
   );
 }
 
-interface ToastMessage {
-  id: number;
-  tone: "success" | "error";
-  text: string;
-}
-
 const CAMPUS_OPTIONS = communityCampusOptions();
 
 function parseInitialStatus(params: { get(name: string): string | null }) {
@@ -57,6 +42,7 @@ function parseInitialStatus(params: { get(name: string): string | null }) {
 }
 
 function DisputesConsole() {
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   // ----- filters -----
@@ -65,7 +51,6 @@ function DisputesConsole() {
   const [status, setStatus] = useState<ManagedDisputeStatus | "all">(() =>
     parseInitialStatus(searchParams)
   );
-  const [reason, setReason] = useState<ManagedDisputeReason | "all">("all");
   const [campusId, setCampusId] = useState("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
@@ -76,28 +61,6 @@ function DisputesConsole() {
     useState<CommunitySectionCounts<ManagedDisputeStatus> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-
-  // ----- overlays -----
-  const [detailTarget, setDetailTarget] = useState<string | null>(null);
-  const [
-    actionRequest,
-    setActionRequest,
-  ] = useState<
-    | { kind: "info" }
-    | { kind: "resolve" }
-    | { kind: "reject" }
-    | { kind: "refund" }
-    | null
-  >(null);
-
-  const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const toastId = useRef(0);
-
-  function pushToast(tone: ToastMessage["tone"], text: string) {
-    const id = ++toastId.current;
-    setToasts((t) => [...t.slice(-2), { id, tone, text }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3800);
-  }
 
   // Keep the URL shareable without re-render loops.
   useEffect(() => {
@@ -122,7 +85,6 @@ function DisputesConsole() {
       const result = await disputeManagementService.list({
         search: search || undefined,
         status,
-        reason,
         campusId,
         page,
         pageSize,
@@ -133,7 +95,7 @@ function DisputesConsole() {
     } finally {
       setLoading(false);
     }
-  }, [search, status, reason, campusId, page, pageSize]);
+  }, [search, status, campusId, page, pageSize]);
 
   useEffect(() => {
     void loadList();
@@ -144,13 +106,13 @@ function DisputesConsole() {
   }, [loadMeta]);
 
   const hasActiveFilters =
-    searchInput.trim().length > 0 || status !== "all" || reason !== "all" || campusId !== "all";
+    searchInput.trim().length > 0 || status !== "all" || campusId !== "all";
 
   return (
     <>
       <AdminPageHeader
         title="Disputes"
-        description="Resolve customer disputes end-to-end: request info, review evidence, record outcomes. Refunds are placeholders only."
+        description="Every order that has ever carried a dispute. A dispute is an order — open one, refund the customer or dismiss it from the order itself."
         actions={
           counts && (
             <div className="flex flex-wrap items-center gap-2">
@@ -163,7 +125,7 @@ function DisputesConsole() {
                 )}
               >
                 <CircleAlert className="h-3.5 w-3.5 opacity-70" />
-                {counts.byStatus.open + counts.byStatus.escalated} need action
+                {counts.byStatus.open} open
               </span>
               <span className="inline-flex h-9 items-center gap-1.5 rounded-md border border-kampmax-border bg-white px-3 text-xs font-medium text-kampmax-text-secondary">
                 <Scale className="h-3.5 w-3.5 opacity-60" />
@@ -209,10 +171,10 @@ function DisputesConsole() {
 
       {/* Filter toolbar */}
       <div className="my-3 flex flex-wrap items-center gap-2">
-        <div className="w-full sm:w-56">
+        <div className="w-full sm:w-64">
           <Input
             value={searchInput}
-            placeholder="Search case, order or party…"
+            placeholder="Search order, customer, vendor or reason…"
             aria-label="Search disputes"
             onChange={(e) => {
               setSearchInput(e.target.value);
@@ -220,22 +182,6 @@ function DisputesConsole() {
             }}
           />
         </div>
-        <Select
-          value={reason}
-          aria-label="Filter by reason"
-          onChange={(e) => {
-            setReason(e.target.value as ManagedDisputeReason | "all");
-            setPage(1);
-          }}
-          className="w-auto h-9 text-xs"
-        >
-          <option value="all">All reasons</option>
-          {DISPUTE_REASON_FILTER_ORDER.map((r) => (
-            <option key={r} value={r}>
-              {disputeReasonLabel(r)}
-            </option>
-          ))}
-        </Select>
         <Select
           value={campusId}
           aria-label="Filter by campus"
@@ -258,7 +204,6 @@ function DisputesConsole() {
             onClick={() => {
               setSearchInput("");
               setStatus("all");
-              setReason("all");
               setCampusId("all");
             }}
             className="text-xs font-medium text-kampmax-blue hover:underline"
@@ -278,10 +223,9 @@ function DisputesConsole() {
         onClearFilters={() => {
           setSearchInput("");
           setStatus("all");
-          setReason("all");
           setCampusId("all");
         }}
-        onView={(d) => setDetailTarget(d.id)}
+        onView={(d) => router.push(`/admin/orders/${d.id}`)}
       />
 
       {list && list.totalPages > 1 && (
@@ -298,36 +242,6 @@ function DisputesConsole() {
           className="mt-3 rounded-lg border border-kampmax-border bg-white"
         />
       )}
-
-      {/* Case detail with inline admin actions */}
-      <DisputeDetailDialog
-        disputeId={detailTarget}
-        onClose={() => setDetailTarget(null)}
-        onToast={pushToast}
-        onMutated={() => void Promise.all([loadList(), loadMeta()])}
-        actionRequest={actionRequest}
-        onActionHandled={() => setActionRequest(null)}
-      />
-
-      {/* Toasts */}
-      <div
-        aria-live="polite"
-        className="pointer-events-none fixed bottom-4 right-4 z-[80] flex flex-col items-end gap-2"
-      >
-        {toasts.map((t) => (
-          <div
-            key={t.id}
-            className="flex max-w-sm items-start gap-2 rounded-lg border border-kampmax-border bg-white px-3.5 py-2.5 text-sm shadow-lg animate-[kampmax-fade-in_.18s_ease-out]"
-          >
-            {t.tone === "success" ? (
-              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-kampmax-success" />
-            ) : (
-              <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-kampmax-error" />
-            )}
-            <span>{t.text}</span>
-          </div>
-        ))}
-      </div>
     </>
   );
 }
