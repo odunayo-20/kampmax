@@ -17,6 +17,7 @@ import {
   Package,
 } from "lucide-react";
 import { supportService } from "@/services/support";
+import { useAuth } from "@/lib/auth-context";
 import type {
   SupportTicket,
   SupportTicketDetail,
@@ -25,8 +26,6 @@ import type {
 } from "@/types/admin";
 import { StatusBadge, BadgeVariant } from "@/components/admin/StatusBadge";
 import { formatDate } from "@/lib/utils";
-
-const VENDOR_USER_ID = "v1";
 
 const CATEGORY_LABELS: Record<string, { label: string; icon: any }> = {
   payments: { label: "Payout & Financials", icon: DollarSign },
@@ -38,6 +37,8 @@ const CATEGORY_LABELS: Record<string, { label: string; icon: any }> = {
 };
 
 export default function VendorSupportPage() {
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
@@ -61,17 +62,14 @@ export default function VendorSupportPage() {
   const [sendingReply, setSendingReply] = useState(false);
 
   useEffect(() => {
-    loadTickets();
-  }, []);
+    if (userId) loadTickets();
+  }, [userId]);
 
   async function loadTickets() {
+    if (!userId) return;
     setLoading(true);
     try {
-      let userTickets = await supportService.listMine(VENDOR_USER_ID);
-      if (!userTickets || userTickets.length === 0) {
-        const res = await supportService.list();
-        userTickets = res.items || [];
-      }
+      const userTickets = await supportService.listMine(userId);
       setTickets(userTickets);
       if (userTickets.length > 0 && !selectedTicketId) {
         selectTicket(userTickets[0].id);
@@ -84,13 +82,11 @@ export default function VendorSupportPage() {
   }
 
   async function selectTicket(id: string) {
+    if (!userId) return;
     setSelectedTicketId(id);
     setLoadingDetail(true);
     try {
-      let detail = await supportService.getMine(VENDOR_USER_ID, id);
-      if (!detail) {
-        detail = await supportService.getById(id);
-      }
+      const detail = await supportService.getMine(userId, id);
       setSelectedTicketDetail(detail);
     } catch (err) {
       console.error("Failed to load ticket detail:", err);
@@ -101,11 +97,11 @@ export default function VendorSupportPage() {
 
   async function handleCreateTicket(e: React.FormEvent) {
     e.preventDefault();
-    if (!newSubject.trim() || !newDescription.trim()) return;
+    if (!userId || !newSubject.trim() || !newDescription.trim()) return;
 
     setSubmittingTicket(true);
     try {
-      const created = await supportService.createForCustomer(VENDOR_USER_ID, {
+      const created = await supportService.createForCustomer(userId, {
         category: newCategory,
         subject: newSubject.trim(),
         description: newDescription.trim(),
@@ -134,11 +130,11 @@ export default function VendorSupportPage() {
 
   async function handleSendReply(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedTicketId || !replyBody.trim()) return;
+    if (!userId || !selectedTicketId || !replyBody.trim()) return;
 
     setSendingReply(true);
     try {
-      await supportService.replyForCustomer(VENDOR_USER_ID, selectedTicketId, {
+      await supportService.replyForCustomer(userId, selectedTicketId, {
         body: replyBody.trim(),
       });
       setReplyBody("");

@@ -17,10 +17,10 @@
 // ============================================================
 
 import {
-  AdminRole,
   SupportAttachmentKind,
   SupportMessageVisibility,
   SupportPostedBy,
+  SupportStaffRole,
   SupportTicket,
   SupportTicketCategory,
   SupportTicketPriority,
@@ -39,13 +39,13 @@ import { daysAgoIso, intBetween, pick, seededRandom } from "@/lib/admin/api";
 // ------------------------------------------------------------
 
 /** Platform support operations team = ADMIN/SUPER_ADMIN staff registry. */
-export const SUPPORT_STAFF: { id: string; name: string; role: AdminRole; team: string }[] =
+export const SUPPORT_STAFF: { id: string; name: string; role: SupportStaffRole; team: string }[] =
   mockAdmins
     .filter((a) => a.role === "SUPER_ADMIN" || a.role === "ADMIN")
     .map((a) => ({
       id: a.id,
       name: a.name,
-      role: a.role,
+      role: a.role as SupportStaffRole,
       team: a.title ?? "Support",
     }));
 

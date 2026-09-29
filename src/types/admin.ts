@@ -4380,10 +4380,13 @@ export interface SupportCustomerRef {
   isVerified: boolean;
 }
 
+/** Real roles eligible for ticket assignment — a wider set than admin console login roles (AdminRole), since dedicated SUPPORT staff need not have console access. */
+export type SupportStaffRole = "SUPER_ADMIN" | "ADMIN" | "SUPPORT";
+
 export interface SupportAssignee {
   id: string;
   name: string;
-  role: AdminRole;
+  role: SupportStaffRole;
   activeTicketCount: number;
 }
 

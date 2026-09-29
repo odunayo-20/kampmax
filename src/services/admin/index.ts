@@ -388,21 +388,17 @@ export const notificationService: AdminNotificationService =
 export const settingService: AdminSettingService =
   createMockSettingService(mockSettings);
 
-import {
-  AdminSupportManagementService,
-  createMockSupportManagementService,
-} from "./support-management.service";
-import type { SupportCustomerService } from "@/types/admin";
+import type { AdminSupportManagementService } from "./support-management.service";
+import { createApiSupportManagementService } from "./support-management.api";
 
 /**
- * /admin/support console (Module 56). Ticket resolution built on a
- * deterministic dataset referencing the real user, order, vendor and
- * job stores. All mutations audit via Module 48 and customer-visible
- * replies dispatch real in-app notifications (Module 26A).
+ * /admin/support console (Module 56): live ticket store
+ * (GET/PATCH/POST /admin/support/tickets/*). Mutations audit via Module 48
+ * and customer-visible replies dispatch real in-app notifications.
  *
- * The SAME store instance backs the customer support portal
- * (`/support`, Customer Support module): customer-created cases and
- * replies land here and appear in the admin console immediately.
+ * The SAME database rows back the customer support portal (`/support`,
+ * services/support.ts) through its own real endpoint
+ * (GET/POST /support/tickets) — one record, two real HTTP surfaces.
  */
-export const supportManagementService: AdminSupportManagementService &
-  SupportCustomerService = createMockSupportManagementService();
+export const supportManagementService: AdminSupportManagementService =
+  createApiSupportManagementService();
