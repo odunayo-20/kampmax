@@ -13,7 +13,7 @@
 // ============================================================
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { adminKeys } from "@/lib/query-keys";
+import { adminKeys, notificationKeys } from "@/lib/query-keys";
 import { supportManagementService } from "@/services/admin";
 import type {
   SupportAssignInput,
@@ -71,6 +71,8 @@ function useSupportTreeInvalidator() {
   return {
     invalidate: () => {
       void queryClient.invalidateQueries({ queryKey: adminKeys.support.all });
+      void queryClient.invalidateQueries({ queryKey: adminKeys.notifications.all });
+      void queryClient.invalidateQueries({ queryKey: notificationKeys.all });
     },
   };
 }

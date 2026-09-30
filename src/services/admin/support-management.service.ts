@@ -285,11 +285,31 @@ export function createMockSupportManagementService(): AdminSupportManagementServ
       // Real in-app notification to the requester (Module 26A store).
       pushNotificationRecord({
         userId: ticket.customer.id,
-        type: "system",
-        category: "account",
-        title: "Kampmax support updated your ticket",
-        message: `"${ticket.subject}" — ${ctx.actor.name} replied.`,
+        type: "messages",
+        category: "messages",
+        title: "Kampmax support replied to your ticket",
+        message: `"${ticket.subject}" — ${ctx.actor.name}: "${input.body.slice(0, 60)}"`,
         actionUrl: `/support/${ticket.id}`,
+      });
+      if (ticket.customer.id !== "u1") {
+        pushNotificationRecord({
+          userId: "u1",
+          type: "messages",
+          category: "messages",
+          title: "Kampmax support replied to your ticket",
+          message: `"${ticket.subject}" — ${ctx.actor.name}: "${input.body.slice(0, 60)}"`,
+          actionUrl: `/support/${ticket.id}`,
+        });
+      }
+
+      // Real in-app notification to the admin console bell
+      pushNotificationRecord({
+        userId: "admin",
+        type: "messages",
+        category: "messages",
+        title: "Support Response Dispatched",
+        message: `Replied to ${ticket.customer.name} on #${ticket.id}`,
+        actionUrl: `/admin/support/${ticket.id}`,
       });
     }
     recordAdminAuditEvent({

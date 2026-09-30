@@ -23,6 +23,7 @@ import {
   notificationTypeIcon,
   notificationTypeLabel,
 } from "@/components/admin/notifications/notifications-meta";
+import { markNotificationRead, markAllNotificationsRead } from "@/data/notifications";
 import { AdminBreadcrumbs } from "./AdminBreadcrumbs";
 
 const ROLE_LABELS = {
@@ -172,13 +173,27 @@ export function AdminHeader() {
                   </span>
                 )}
               </div>
-              <Link
-                href="/admin/notifications"
-                onClick={() => setNotifOpen(false)}
-                className="text-xs font-medium text-kampmax-blue hover:underline"
-              >
-                View all
-              </Link>
+              <div className="flex items-center gap-2.5">
+                {alertCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      notifications?.forEach((n) => markNotificationRead(n.id));
+                      markAllNotificationsRead("admin");
+                    }}
+                    className="text-xs font-semibold text-kampmax-blue hover:underline"
+                  >
+                    Mark all read
+                  </button>
+                )}
+                <Link
+                  href="/admin/notifications"
+                  onClick={() => setNotifOpen(false)}
+                  className="text-xs font-medium text-kampmax-text-secondary hover:text-kampmax-blue hover:underline"
+                >
+                  View all
+                </Link>
+              </div>
             </div>
             {notifLoading ? (
               <div className="space-y-2 p-3.5">
@@ -200,11 +215,14 @@ export function AdminHeader() {
                   return (
                     <li key={n.id}>
                       <Link
-                        href={`/admin/notifications/${n.id}`}
-                        onClick={() => setNotifOpen(false)}
+                        href={n.actionUrl || `/admin/notifications/${n.id}`}
+                        onClick={() => {
+                          markNotificationRead(n.id);
+                          setNotifOpen(false);
+                        }}
                         className={cn(
                           "flex w-full flex-col gap-0.5 px-3.5 py-2.5 text-left transition-colors hover:bg-kampmax-muted/50",
-                          !n.read && "bg-kampmax-blue/[0.03]"
+                          !n.read ? "bg-kampmax-blue/[0.05]" : "bg-white opacity-85"
                         )}
                       >
                         <span className="flex items-center justify-between gap-2 text-sm font-medium text-kampmax-text">
@@ -212,11 +230,11 @@ export function AdminHeader() {
                             <span
                               aria-hidden
                               className={cn(
-                                "h-1.5 w-1.5 shrink-0 rounded-full",
-                                !n.read ? "bg-kampmax-blue" : "bg-transparent"
+                                "h-2 w-2 shrink-0 rounded-full",
+                                !n.read ? "bg-kampmax-blue ring-2 ring-kampmax-blue/20" : "bg-neutral-300"
                               )}
                             />
-                            <span className={cn("truncate", !n.read && "font-semibold")}>
+                            <span className={cn("truncate", !n.read ? "font-bold text-kampmax-text" : "font-normal text-kampmax-text/80")}>
                               {n.title}
                             </span>
                           </span>
@@ -224,10 +242,10 @@ export function AdminHeader() {
                             {timeAgo(n.createdAt)}
                           </span>
                         </span>
-                        <span className="line-clamp-1 pl-3.5 text-xs text-kampmax-text-secondary">
-                          {n.body}
+                        <span className={cn("line-clamp-1 pl-4 text-xs", !n.read ? "text-kampmax-text/90 font-medium" : "text-kampmax-text-secondary")}>
+                          {n.message}
                         </span>
-                        <span className="flex items-center gap-1.5 pl-3.5 text-[10px] text-kampmax-text-secondary/70">
+                        <span className="flex items-center gap-1.5 pl-4 text-[10px] text-kampmax-text-secondary/70">
                           <TypeIcon className="h-3 w-3" />
                           <span>{notificationTypeLabel(n.type)}</span>
                           {n.recipientName && (
@@ -236,6 +254,9 @@ export function AdminHeader() {
                               <span className="truncate">{n.recipientName}</span>
                             </>
                           )}
+                          <span className="ml-auto font-medium text-[9px] uppercase tracking-wider text-neutral-400">
+                            {n.read ? "Read" : "New"}
+                          </span>
                         </span>
                       </Link>
                     </li>

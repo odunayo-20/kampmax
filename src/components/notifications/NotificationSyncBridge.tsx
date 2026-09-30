@@ -4,17 +4,13 @@ import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { subscribeToNotificationChanges } from "@/data/notifications";
-import { notificationKeys } from "@/lib/query-keys";
+import { adminKeys, notificationKeys, supportKeys } from "@/lib/query-keys";
 
 /**
  * Bridges the authoritative in-memory notification store to the TanStack
- * Query cache. Because there is no backend push channel (WebSockets/SSE not
- * supported), the store's mutation events are the freshness signal — any
- * push/read/delete through the notification services invalidates the whole
- * notification key tree, so badges, dropdowns and the center stay in sync
- * without polling.
- *
- * Rendering null; it is mounted once at the app root.
+ * Query cache. When notifications are pushed, read, or deleted, this invalidates
+ * both customer and admin notification query trees, along with support ticket threads,
+ * so bell badges, dropdowns, and message feeds update immediately in real-time.
  */
 export function NotificationSyncBridge() {
   const queryClient = useQueryClient();
@@ -25,6 +21,8 @@ export function NotificationSyncBridge() {
   useEffect(() => {
     return subscribeToNotificationChanges(() => {
       queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+      queryClient.invalidateQueries({ queryKey: adminKeys.notifications.all });
+      queryClient.invalidateQueries({ queryKey: supportKeys.all });
     });
   }, [queryClient]);
 

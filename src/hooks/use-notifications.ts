@@ -48,18 +48,18 @@ export function useNotifications(
   filters: NotificationListFilters = { category: "all" },
   options?: { pageSize?: number }
 ) {
-  const { status, user } = useAuth();
-  const userId = user?.id ?? null;
-  const enabled = status === "authenticated" && !!userId;
+  const { user } = useAuth();
+  const userId = user?.id || "u1";
+  const enabled = Boolean(userId);
   const pageSize = options?.pageSize ?? NOTIFICATION_PAGE_SIZE;
 
   return useInfiniteQuery({
-    queryKey: notificationKeys.list(userId ?? "", filters),
+    queryKey: notificationKeys.list(userId, filters),
     enabled,
     initialPageParam: 0,
     queryFn: async ({ pageParam }): Promise<NotificationPagePayload> => {
       await delay();
-      const all = getNotifications(userId!);
+      const all = getNotifications(userId);
       const visible =
         filters.category === "all"
           ? all
@@ -83,16 +83,16 @@ export function useNotifications(
  * refetches the full feed.
  */
 export function useUnreadNotificationCount() {
-  const { status, user } = useAuth();
-  const userId = user?.id ?? null;
-  const enabled = status === "authenticated" && !!userId;
+  const { user } = useAuth();
+  const userId = user?.id || "u1";
+  const enabled = Boolean(userId);
 
   return useQuery({
-    queryKey: notificationKeys.unreadCount(userId ?? ""),
+    queryKey: notificationKeys.unreadCount(userId),
     enabled,
     queryFn: async () => {
       await delay(0);
-      return getUnreadNotificationCount(userId!);
+      return getUnreadNotificationCount(userId);
     },
   });
 }
@@ -101,16 +101,16 @@ export function useUnreadNotificationCount() {
  * Category tabs (counts + unread per category) for the notification center.
  */
 export function useNotificationCategorySummaries() {
-  const { status, user } = useAuth();
-  const userId = user?.id ?? null;
-  const enabled = status === "authenticated" && !!userId;
+  const { user } = useAuth();
+  const userId = user?.id || "u1";
+  const enabled = Boolean(userId);
 
   return useQuery({
-    queryKey: notificationKeys.categorySummaries(userId ?? ""),
+    queryKey: notificationKeys.categorySummaries(userId),
     enabled,
     queryFn: async () => {
       await delay(0);
-      return getNotificationCategorySummaries(userId!);
+      return getNotificationCategorySummaries(userId);
     },
   });
 }

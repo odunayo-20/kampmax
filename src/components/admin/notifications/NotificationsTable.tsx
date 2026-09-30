@@ -18,6 +18,7 @@ import {
   readStateVariant,
   previewText,
 } from "./notifications-meta";
+import { markNotificationRead } from "@/data/notifications";
 import type {
   ManagedNotificationRow,
   Paginated,
@@ -94,15 +95,26 @@ export function NotificationsTable(props: NotificationsTableProps) {
               {items.map((r) => (
                 <tr
                   key={r.id}
-                  onClick={() => onView(r)}
-                  className="cursor-pointer transition-colors hover:bg-kampmax-muted/40"
+                  onClick={() => {
+                    markNotificationRead(r.id);
+                    onView(r);
+                  }}
+                  className={cn(
+                    "cursor-pointer transition-colors hover:bg-kampmax-muted/40",
+                    !r.read && "bg-kampmax-blue/[0.03]"
+                  )}
                 >
                   <td className="max-w-[280px] px-4 py-2.5">
-                    <p className="truncate font-medium text-kampmax-text" title={r.title}>
-                      {r.title}
-                    </p>
-                    <p className="mt-0.5 truncate text-xs text-kampmax-text-secondary" title={r.body}>
-                      {previewText(r.body, 64)}
+                    <div className="flex items-center gap-2">
+                      {!r.read && (
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-kampmax-blue" />
+                      )}
+                      <p className={cn("truncate text-kampmax-text", !r.read ? "font-bold" : "font-medium")} title={r.title}>
+                        {r.title}
+                      </p>
+                    </div>
+                    <p className="mt-0.5 truncate text-xs text-kampmax-text-secondary" title={r.message || r.body}>
+                      {previewText(r.message || r.body, 64)}
                     </p>
                   </td>
 
@@ -142,8 +154,16 @@ export function NotificationsTable(props: NotificationsTableProps) {
                       role="button"
                       tabIndex={0}
                       title="View details"
-                      onClick={() => onView(r)}
-                      onKeyDown={(e) => e.key === "Enter" && onView(r)}
+                      onClick={() => {
+                        markNotificationRead(r.id);
+                        onView(r);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          markNotificationRead(r.id);
+                          onView(r);
+                        }
+                      }}
                       className="inline-flex cursor-pointer rounded-md p-1.5 text-kampmax-text-secondary transition-colors hover:bg-kampmax-muted"
                     >
                       <Eye className="h-3.5 w-3.5" />
@@ -161,11 +181,17 @@ export function NotificationsTable(props: NotificationsTableProps) {
         {items.map((r) => (
           <li
             key={r.id}
-            onClick={() => onView(r)}
-            className="cursor-pointer rounded-lg border border-kampmax-border bg-white p-3 transition-colors active:bg-kampmax-muted/50"
+            onClick={() => {
+              markNotificationRead(r.id);
+              onView(r);
+            }}
+            className={cn(
+              "cursor-pointer rounded-lg border border-kampmax-border bg-white p-3 transition-colors active:bg-kampmax-muted/50",
+              !r.read && "border-l-4 border-l-kampmax-blue bg-kampmax-blue/[0.02]"
+            )}
           >
             <div className="flex items-start justify-between gap-2">
-              <p className="min-w-0 text-sm font-medium leading-snug text-kampmax-text">
+              <p className={cn("min-w-0 text-sm leading-snug text-kampmax-text", !r.read ? "font-bold" : "font-medium")}>
                 {r.title}
               </p>
               <StatusBadge
@@ -175,7 +201,7 @@ export function NotificationsTable(props: NotificationsTableProps) {
             </div>
 
             <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-kampmax-text-secondary">
-              {previewText(r.body, 110)}
+              {previewText(r.message || r.body, 110)}
             </p>
 
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-dashed border-kampmax-border pt-2 text-[11px] text-kampmax-text-secondary">

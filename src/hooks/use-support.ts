@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
-import { supportKeys } from "@/lib/query-keys";
+import { adminKeys, notificationKeys, supportKeys } from "@/lib/query-keys";
 import { supportService } from "@/services/support";
 import type {
   SupportCustomerCreateInput,
@@ -58,6 +58,8 @@ export function useCreateSupportTicket() {
       supportService.createForCustomer(userId!, input),
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: supportKeys.all });
+      queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+      queryClient.invalidateQueries({ queryKey: adminKeys.notifications.all });
     },
   });
 }
@@ -76,6 +78,8 @@ export function useReplySupportTicket(ticketId: string) {
       supportService.replyForCustomer(userId!, ticketId, input),
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: supportKeys.all });
+      queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+      queryClient.invalidateQueries({ queryKey: adminKeys.notifications.all });
     },
   });
 }
