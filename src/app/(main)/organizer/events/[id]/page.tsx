@@ -300,8 +300,9 @@ function RevenueTab({
       ) : (
         <div className="space-y-2">
           <p className="rounded-xl bg-neutral-100 p-3 text-xs text-neutral-600">
-            Ticket money is held safely by Kampmax until the event ends, then you can release it to
-            your wallet.
+            Ticket money is held safely by Kampmax while the event runs. Once it ends, your share is
+            paid into your Kampmax wallet automatically. If it hasn&apos;t arrived yet, you can release
+            it below. From your wallet you can withdraw to your bank (identity verification required).
           </p>
           <button
             onClick={() => settle.mutate()}
@@ -309,7 +310,7 @@ function RevenueTab({
             className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 text-sm font-bold text-white disabled:opacity-50"
           >
             {settle.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            {r.canSettle ? `Release ${naira(r.net)} to wallet` : "Available after the event ends"}
+            {r.canSettle ? `Release ${naira(r.net)} to wallet now` : "Paid out automatically after the event ends"}
           </button>
           {settle.isError && <p role="alert" className="text-xs text-error-700">{settle.error.message}</p>}
         </div>
