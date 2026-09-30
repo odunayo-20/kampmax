@@ -489,6 +489,14 @@ export interface ReportedPost {
 // EVENT
 // ============================================================
 
+export interface CampusEventTicketTier {
+  id: string;
+  name: string;
+  price: number;
+  description?: string;
+  badge?: string;
+}
+
 export interface CampusEvent {
   id: string;
   campusId: string;
@@ -498,13 +506,62 @@ export interface CampusEvent {
   startDate: string;
   endDate: string;
   organizerId: string;
+  organizerName?: string;
   imageUrl?: string;
   attendees: string[];
   maxAttendees?: number;
   isVirtual: boolean;
   meetingLink?: string;
   tags?: string[];
+  ticketPrice?: number;
+  ticketTiers?: CampusEventTicketTier[];
+  distance?: string;
+  isFeatured?: boolean;
+  category?: string;
+  timeDisplay?: string;
   createdAt: string;
+}
+
+export interface NearbyPlace {
+  id: string;
+  name: string;
+  category: "food" | "stores" | "services" | "events";
+  address: string;
+  distance: string;
+  rating: number;
+  reviewCount: number;
+  imageUrl?: string;
+  coordinates: { x: number; y: number };
+  phone?: string;
+  isOpen?: boolean;
+  description?: string;
+  hours?: string;
+}
+
+export interface CommunityClub {
+  id: string;
+  name: string;
+  category: string;
+  memberCount: number;
+  isJoined?: boolean;
+  avatar: string;
+  description: string;
+  meetingInfo?: string;
+  recentActivity?: string;
+}
+
+export interface CampusCourse {
+  id: string;
+  title: string;
+  provider: string;
+  price: number;
+  duration: string;
+  rating: number;
+  enrolledCount: number;
+  category: string;
+  imageUrl: string;
+  distance?: string;
+  description?: string;
 }
 
 // ============================================================

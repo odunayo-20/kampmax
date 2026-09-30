@@ -23,11 +23,30 @@ function fail(error: ApiError, fallback: string): never {
   throw new Error(error.message || fallback);
 }
 
+function normalizeTicket<T extends SupportTicket>(ticket: T): T {
+  if (!ticket) return ticket;
+  return {
+    ...ticket,
+    category: ((ticket.category || "other").toLowerCase()) as SupportTicketCategory,
+    status: ((ticket.status || "open").toLowerCase()) as typeof ticket.status,
+  };
+}
+
+function normalizeDetail(detail: SupportTicketDetail | null): SupportTicketDetail | null {
+  if (!detail || !detail.ticket) return detail;
+  return {
+    ...detail,
+    ticket: normalizeTicket(detail.ticket),
+  };
+}
+
+import { pushUserNotification } from "@/services/notifications";
+
 export const supportService: SupportCustomerService = {
   async listMine() {
     const { data, error } = await apiClient.get<SupportTicket[]>("/support/tickets");
     if (error) fail(error, "Couldn't load your support requests.");
-    return data;
+    return (data || []).map(normalizeTicket);
   },
 
   async getMine(_userId, id) {
@@ -36,16 +55,70 @@ export const supportService: SupportCustomerService = {
     );
     if (error?.status === 404) return null;
     if (error) fail(error, "Couldn't load this request.");
-    return data;
+    return normalizeDetail(data);
   },
 
   async createForCustomer(_userId, input: SupportCustomerCreateInput) {
-    const { data, error } = await apiClient.post<SupportCustomerCreateInput, SupportTicketDetail>(
+    // 1. Ensure category is uppercase enum (ACCOUNT, MARKETPLACE, PAYMENTS, etc.)
+    const categoryUpper = (input.category || "OTHER").toUpperCase();
+
+    // 2. Format description with related reference if provided
+    let description = input.description.trim();
+    if (input.related) {
+      const refLabel =
+        input.related.kind === "order"
+          ? `Order #${input.related.id}`
+          : `Transaction Ref: ${input.related.id}`;
+      description = `${description}\n\n[Related Reference: ${refLabel}]`;
+    }
+
+    // 3. Build strictly whitelisted payload matching backend DTO (no `related` field)
+    const payload: {
+      category: string;
+      subject: string;
+      description: string;
+      attachments?: typeof input.attachments;
+    } = {
+      category: categoryUpper,
+      subject: input.subject.trim(),
+      description,
+    };
+
+    if (input.attachments && input.attachments.length > 0) {
+      payload.attachments = input.attachments;
+    }
+
+    const { data, error } = await apiClient.post<typeof payload, SupportTicketDetail>(
       "/support/tickets",
-      input
+      payload
     );
     if (error) fail(error, "Couldn't submit your request.");
-    return data;
+
+    const normalized = normalizeDetail(data)!;
+    const ticketId = normalized?.ticket?.id || "new";
+
+    // 4. Trigger in-app notification for both customer and admin support bell
+    if (_userId) {
+      pushUserNotification({
+        userId: _userId,
+        type: "system",
+        category: "account",
+        title: "Support Request Received",
+        message: `Your request "${input.subject}" has been submitted (#${ticketId}).`,
+        actionUrl: `/support/${ticketId}`,
+      });
+    }
+
+    pushUserNotification({
+      userId: "admin",
+      type: "system",
+      category: "account",
+      title: "New Support Ticket",
+      message: `Customer opened support ticket: "${input.subject}"`,
+      actionUrl: `/admin/support/${ticketId}`,
+    });
+
+    return normalized;
   },
 
   async replyForCustomer(_userId, id, input: SupportCustomerReplyInput) {
@@ -55,7 +128,29 @@ export const supportService: SupportCustomerService = {
     );
     if (error?.status === 404) return null;
     if (error) fail(error, "Couldn't send your reply.");
-    return data;
+
+    // Trigger in-app notification for both sides
+    if (_userId) {
+      pushUserNotification({
+        userId: _userId,
+        type: "messages",
+        category: "messages",
+        title: "Support Reply Sent",
+        message: `Your message was sent on ticket #${id}.`,
+        actionUrl: `/support/${id}`,
+      });
+    }
+
+    pushUserNotification({
+      userId: "admin",
+      type: "messages",
+      category: "messages",
+      title: "Customer Message on Ticket",
+      message: `New customer message on ticket #${id}: "${input.body.slice(0, 60)}"`,
+      actionUrl: `/admin/support/${id}`,
+    });
+
+    return normalizeDetail(data);
   },
 };
 

@@ -20,7 +20,7 @@ interface ProductCardProps {
 function conditionColor(condition: ProductCondition) {
   return condition === "New"
     ? "bg-primary-50 text-primary-700 border border-primary-100"
-    : "bg-accent-50 text-accent-700 border border-accent-100";
+    : "bg-amber-50 text-amber-700 border border-amber-100";
 }
 
 function discountPercent(original: number, current: number) {
@@ -71,17 +71,19 @@ export function ProductCard({
     <Link
       href={`/marketplace/${product.id}`}
       className={cn(
-        "bg-white rounded-[10px] border border-neutral-200 overflow-hidden group flex flex-col relative",
-        "hover:border-neutral-300 hover:shadow-[0_4px_12px_rgba(16,24,40,0.08)] transition-all duration-200",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-1",
+        "bg-white rounded-2xl border border-neutral-200/90 overflow-hidden group flex flex-col relative",
+        "hover:border-primary-300 hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-all duration-200",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600",
         className
       )}
     >
-      <div className="relative aspect-[1/1] bg-neutral-50 overflow-hidden">
+      {/* Product Image Frame */}
+      <div className="relative aspect-square bg-neutral-100/70 overflow-hidden">
         {imageSrc && !imgError ? (
           <img
             src={imageSrc}
             alt={product.title}
+            loading="lazy"
             onError={() => setImgError(true)}
             className={cn(
               "w-full h-full object-cover group-hover:scale-105 transition-transform duration-300",
@@ -99,61 +101,42 @@ export function ProductCard({
 
         {/* Top Badges */}
         {outOfStock && (
-          <div className="absolute top-2 left-2 z-10">
-            <span className="bg-neutral-900 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md leading-none shadow-sm">
+          <div className="absolute top-2.5 left-2.5 z-10">
+            <span className="bg-neutral-900 text-white text-[10px] font-bold px-2 py-0.5 rounded-full leading-none shadow-sm">
               Out of stock
             </span>
           </div>
         )}
         {!outOfStock && hasDiscount && (
-          <div className="absolute top-2 left-2 z-10">
-            <span className="bg-error-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md leading-none shadow-sm">
+          <div className="absolute top-2.5 left-2.5 z-10">
+            <span className="bg-rose-600 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full leading-none shadow-sm">
               -{discountPercent(product.originalPrice!, product.price)}%
             </span>
           </div>
         )}
 
-        {product.sponsored && (
-          <div className="absolute bottom-2 left-2 z-10">
-            <span className="rounded-md bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-neutral-600 shadow-sm">
-              Sponsored
-            </span>
-          </div>
-        )}
-
-        {/* Action Buttons Overlay on Hover */}
-        <div className="absolute top-2 right-2 flex flex-col gap-1.5 z-10">
+        {/* Wishlist Button */}
+        <div className="absolute top-2.5 right-2.5 flex flex-col gap-1.5 z-10">
           <button
             onClick={handleWishlistToggle}
             aria-label={saved ? "Remove from wishlist" : "Add to wishlist"}
             aria-pressed={saved}
-            className="p-1.5 rounded-full bg-white/90 backdrop-blur-sm border border-neutral-200 hover:bg-white hover:scale-105 transition-all focus-visible:outline-none shadow-sm"
+            className="p-1.5 rounded-full bg-white/80 backdrop-blur-md border border-neutral-200/80 hover:bg-white hover:scale-110 active:scale-95 transition-all focus-visible:outline-none shadow-2xs"
           >
             <Heart
               className={cn(
                 "w-3.5 h-3.5 transition-colors",
-                saved ? "fill-error-600 text-error-600" : "text-neutral-500 hover:text-error-600"
+                saved ? "fill-rose-600 text-rose-600" : "text-neutral-600 hover:text-rose-600"
               )}
             />
           </button>
-
-          {onQuickView && (
-            <button
-              onClick={handleQuickView}
-              aria-label="Quick View"
-              title="Quick View"
-              className="p-1.5 rounded-full bg-white/90 backdrop-blur-sm border border-neutral-200 hover:bg-white hover:scale-105 transition-all opacity-0 group-hover:opacity-100 focus-visible:outline-none shadow-sm"
-            >
-              <Eye className="w-3.5 h-3.5 text-neutral-600 hover:text-primary-600" />
-            </button>
-          )}
         </div>
 
         {/* Bottom Condition Badge */}
-        <div className="absolute bottom-2 left-2">
+        <div className="absolute bottom-2.5 left-2.5">
           <span
             className={cn(
-              "text-[10px] font-semibold px-1.5 py-0.5 rounded-md leading-none border shadow-sm backdrop-blur-sm",
+              "text-[9px] font-bold px-2 py-0.5 rounded-md leading-none border shadow-2xs backdrop-blur-xs bg-white/90",
               conditionColor(product.condition)
             )}
           >
@@ -162,33 +145,34 @@ export function ProductCard({
         </div>
       </div>
 
-      <div className="p-3 flex flex-col flex-1">
+      {/* Product Details */}
+      <div className="p-3.5 flex flex-col flex-1">
         {vendorName && (
           <div className="flex items-center gap-1 mb-1">
-            <span className="text-[11px] text-neutral-500 truncate">{vendorName}</span>
+            <span className="text-[11px] font-medium text-neutral-500 truncate">{vendorName}</span>
             {vendorVerified && <Verified className="w-3 h-3 text-primary-600 shrink-0" />}
           </div>
         )}
 
-        <h3 className="text-sm font-semibold text-neutral-900 line-clamp-2 leading-snug mb-1 group-hover:text-primary-600 transition-colors">
+        <h3 className="text-xs sm:text-sm font-bold text-neutral-900 line-clamp-2 leading-snug mb-1 group-hover:text-primary-600 transition-colors">
           {product.title}
         </h3>
 
         {product.location && (
-          <div className="flex items-center gap-0.5 mb-1.5">
+          <div className="flex items-center gap-1 mb-2">
             <MapPin className="w-3 h-3 text-neutral-400 shrink-0" />
-            <span className="text-[11px] text-neutral-500 truncate">{product.location}</span>
+            <span className="text-[10px] text-neutral-400 truncate">{product.location}</span>
           </div>
         )}
 
         <div className="mt-auto pt-1">
-          <div className="flex items-center justify-between gap-1">
+          <div className="flex items-center justify-between gap-1.5">
             <div className="flex items-baseline gap-1.5">
-              <span className="text-[15px] font-bold text-primary-900 tracking-tight">
+              <span className="text-sm sm:text-base font-extrabold text-neutral-900 tracking-tight">
                 {formatNaira(product.price)}
               </span>
               {hasDiscount && (
-                <span className="text-xs text-neutral-400 line-through">
+                <span className="text-[11px] text-neutral-400 line-through">
                   {formatNaira(product.originalPrice!)}
                 </span>
               )}
@@ -200,17 +184,15 @@ export function ProductCard({
               disabled={outOfStock}
               aria-label={outOfStock ? "Out of stock" : "Add to cart"}
               className={cn(
-                "p-1.5 rounded-lg border transition-all shrink-0 flex items-center gap-1 text-xs font-semibold",
-                outOfStock && "opacity-40 cursor-not-allowed hover:bg-neutral-50 hover:text-neutral-700 hover:border-neutral-200",
+                "p-1.5 rounded-xl border transition-all shrink-0 flex items-center justify-center text-xs font-semibold",
+                outOfStock && "opacity-40 cursor-not-allowed hover:bg-neutral-50",
                 addedToast
                   ? "bg-emerald-50 text-emerald-700 border-emerald-300"
                   : "bg-neutral-50 text-neutral-700 border-neutral-200 hover:bg-primary-600 hover:text-white hover:border-primary-600"
               )}
             >
               {addedToast ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-600" />
-                </>
+                <Check className="w-3.5 h-3.5 text-emerald-600" />
               ) : (
                 <ShoppingBag className="w-3.5 h-3.5" />
               )}
@@ -218,23 +200,14 @@ export function ProductCard({
           </div>
 
           {(product.rating || product.viewCount) && (
-            <div className="flex items-center gap-2 mt-1.5">
+            <div className="flex items-center gap-2 mt-1.5 pt-1.5 border-t border-neutral-100 text-[10px] text-neutral-400">
               {product.rating && (
-                <div className="flex items-center gap-0.5">
+                <div className="flex items-center gap-0.5 font-semibold text-neutral-800">
                   <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                  <span className="text-[11px] font-medium text-neutral-900">
-                    {product.rating}
-                  </span>
-                  {product.ratingCount && (
-                    <span className="text-[11px] text-neutral-500">
-                      ({product.ratingCount})
-                    </span>
-                  )}
+                  <span>{product.rating}</span>
                 </div>
               )}
-              {product.viewCount && (
-                <span className="text-[11px] text-neutral-500">{product.viewCount} views</span>
-              )}
+              {product.viewCount && <span>{product.viewCount} views</span>}
             </div>
           )}
         </div>

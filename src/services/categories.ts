@@ -52,8 +52,14 @@ export interface BackendPaginatedCategories {
   };
 }
 
-// In-memory cache for synchronous fallback access
-let cachedCategories: Category[] = [];
+import { categories as seededCategories } from "@/data/categories";
+import { products as allProducts } from "@/data/products";
+
+// In-memory cache initialized with real category counts from active products
+let cachedCategories: Category[] = seededCategories.map((cat) => ({
+  ...cat,
+  productCount: allProducts.filter((p) => p.categoryId === cat.id).length,
+}));
 
 /**
  * Fallback icon dictionary for categories based on name keywords.

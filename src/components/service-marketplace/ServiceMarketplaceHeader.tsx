@@ -11,6 +11,8 @@ import { Button } from "@/components/atoms/Button";
  * everything — authentication is only required for actions (favorite, book,
  * request quote, report). The brand deep-links back to /services.
  */
+import { Logo } from "@/components/ui/Logo";
+
 export function ServiceMarketplaceHeader() {
   const { status, user, logout } = useAuth();
   const router = useRouter();
@@ -22,27 +24,25 @@ export function ServiceMarketplaceHeader() {
   }
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-kampmax-border">
+    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-neutral-200/90 shadow-2xs">
       <div className="max-w-[1280px] mx-auto px-4 h-14 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-1 min-w-0">
-          <Link
-            href="/services"
-            className="inline-flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 rounded"
-            aria-label="Kampmax services"
-          >
-            <span className="w-8 h-8 rounded-lg bg-primary-600 flex items-center justify-center text-white">
-              <Wrench className="h-4 w-4" />
-            </span>
-            <span className="text-lg font-bold text-kampmax-navy hidden sm:inline">
-              Kampmax Services
-            </span>
-          </Link>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <Logo size="sm" href="/home" />
+          <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-xs font-bold border border-purple-200/60">
+            Services
+          </span>
           <Link
             href="/home"
-            className="inline-flex items-center gap-1.5 ml-3 px-3 py-2 rounded-md text-sm font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
+            className="inline-flex items-center gap-1.5 ml-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
           >
-            <Home className="h-4 w-4" />
+            <Home className="h-3.5 w-3.5" />
             Home
+          </Link>
+          <Link
+            href="/explore"
+            className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
+          >
+            Explore
           </Link>
         </div>
 

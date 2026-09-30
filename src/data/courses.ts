@@ -1,0 +1,43 @@
+import { CampusCourse } from "@/types";
+
+export const campusCourses: CampusCourse[] = [
+  {
+    id: "course-webdev",
+    title: "Web Development Course",
+    provider: "StartUp Academy RUGIPO",
+    price: 20000,
+    duration: "6 Weeks",
+    rating: 4.9,
+    enrolledCount: 148,
+    category: "Coding & Tech",
+    imageUrl: "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&auto=format&fit=crop&q=80",
+    distance: "2.0 km",
+    description: "Master HTML5, CSS3, Tailwind CSS, JavaScript, and React from scratch with real portfolio projects.",
+  },
+  {
+    id: "course-uiux",
+    title: "UI/UX & Product Design Masterclass",
+    provider: "Design Hub Studio",
+    price: 15000,
+    duration: "4 Weeks",
+    rating: 4.8,
+    enrolledCount: 95,
+    category: "Design",
+    imageUrl: "https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?w=600&auto=format&fit=crop&q=80",
+    distance: "1.1 km",
+    description: "Figma wireframing, mobile app prototyping, UX user research, and client design presentation skills.",
+  },
+  {
+    id: "course-crypto",
+    title: "Data Analysis with Python & Excel",
+    provider: "Analytics Lab",
+    price: 18000,
+    duration: "5 Weeks",
+    rating: 4.7,
+    enrolledCount: 82,
+    category: "Data Science",
+    imageUrl: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=600&auto=format&fit=crop&q=80",
+    distance: "0.8 km",
+    description: "Hands-on data visualization, Pandas, statistical modeling, and automated business reporting.",
+  },
+];

@@ -88,12 +88,13 @@ export const SUPPORT_CATEGORY_OPTIONS: SupportCategoryOption[] = [
 ];
 
 export function supportCategoryOption(
-  value: SupportTicketCategory
+  value: SupportTicketCategory | string
 ): SupportCategoryOption {
+  const norm = (value || "").toLowerCase();
   return (
-    SUPPORT_CATEGORY_OPTIONS.find((c) => c.value === value) ?? {
-      value,
-      title: value.replace(/_/g, " "),
+    SUPPORT_CATEGORY_OPTIONS.find((c) => c.value.toLowerCase() === norm) ?? {
+      value: norm as SupportTicketCategory,
+      title: (value || "").replace(/_/g, " "),
       description: "",
     }
   );

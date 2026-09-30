@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BadgeCheck, Clock, MapPin, Wrench } from "lucide-react";
+import { BadgeCheck, Clock, MapPin, Wrench, Star } from "lucide-react";
 import type { MarketplaceProvider, MarketplaceService } from "@/types/service-marketplace";
 import {
   getServicePriceDisplay,
@@ -9,7 +9,6 @@ import {
   getServiceLocationLabel,
 } from "@/services/service-marketplace";
 import { cn } from "@/lib/utils";
-import { ServiceRatingStars } from "./ServiceRatingStars";
 import { ServiceFavoriteButton } from "./ServiceFavoriteButton";
 
 interface ServiceCardProps {
@@ -18,49 +17,53 @@ interface ServiceCardProps {
   className?: string;
 }
 
-/**
- * Service listing card. Shows backend-authoritative pricing (never a computed
- * final price), the provider name + verification, rating, location, and a
- * clear "View service" CTA. Favouriting routes guests through login first.
- */
 export function ServiceCard({ service, provider, className }: ServiceCardProps) {
   const price = getServicePriceDisplay(service.pricingModel, service.price, service.priceMax);
 
   return (
     <article
       className={cn(
-        "bg-white rounded-[10px] border border-neutral-200 overflow-hidden group flex flex-col",
-        "hover:border-neutral-300 hover:shadow-[0_1px_2px_rgba(16,24,40,0.06)] transition-all duration-200",
+        "bg-white rounded-2xl border border-neutral-200/90 overflow-hidden group flex flex-col",
+        "hover:border-primary-300 hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-all duration-200",
         className
       )}
     >
       <Link
         href={`/services/${service.id}`}
-        className="relative aspect-[4/3] bg-neutral-50 overflow-hidden block flex-shrink-0"
+        className="relative aspect-[4/3] bg-neutral-100/80 overflow-hidden block shrink-0"
       >
         {service.imageUrl ? (
           <img
             src={service.imageUrl}
             alt={service.name}
             loading="lazy"
-            className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-neutral-400/40">
             <Wrench className="w-10 h-10" aria-hidden />
           </div>
         )}
-        <div className="absolute top-2 right-2">
+
+        <div className="absolute top-2.5 right-2.5">
           <ServiceFavoriteButton serviceId={service.id} />
         </div>
+
+        {service.tags?.[0] && (
+          <div className="absolute bottom-2.5 left-2.5">
+            <span className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-neutral-900/80 backdrop-blur-xs text-white">
+              {service.tags[0]}
+            </span>
+          </div>
+        )}
       </Link>
 
-      <div className="p-3 flex flex-col flex-1">
+      <div className="p-3.5 flex flex-col flex-1">
         {provider && (
           <div className="flex items-center gap-1 mb-1">
             <Link
               href={`/services/providers/${provider.id}`}
-              className="text-[11px] text-neutral-500 truncate hover:text-primary-600"
+              className="text-[11px] font-medium text-neutral-500 truncate hover:text-primary-600"
               onClick={(e) => e.stopPropagation()}
             >
               {provider.displayName}
@@ -73,52 +76,46 @@ export function ServiceCard({ service, provider, className }: ServiceCardProps) 
 
         <Link
           href={`/services/${service.id}`}
-          className="text-sm font-semibold text-neutral-900 line-clamp-2 leading-snug mb-1 group-hover:text-primary-600 transition-colors"
+          className="text-xs sm:text-sm font-bold text-neutral-900 line-clamp-2 leading-snug mb-1 group-hover:text-primary-600 transition-colors"
         >
           {service.name}
         </Link>
 
-        <div className="flex items-center gap-2 mb-2">
-          <ServiceRatingStars rating={provider?.rating} count={provider?.ratingCount} />
-        </div>
+        {provider?.rating && (
+          <div className="flex items-center gap-1 mb-2 text-[11px]">
+            <Star className="h-3 w-3 fill-amber-400 text-amber-400 shrink-0" />
+            <span className="font-bold text-neutral-900">{provider.rating}</span>
+            {provider.ratingCount && (
+              <span className="text-neutral-400">({provider.ratingCount})</span>
+            )}
+          </div>
+        )}
 
-        <div className="mt-auto">
-          <div className="flex items-baseline gap-2">
-            <span className="text-[15px] font-bold text-primary-900 tracking-tight">
+        <div className="mt-auto pt-1">
+          <div className="flex items-baseline gap-1">
+            <span className="text-sm sm:text-base font-extrabold text-neutral-900 tracking-tight">
               {price.label}
             </span>
           </div>
 
-          <div className="flex items-center gap-2 mt-1.5 text-[11px] text-neutral-500">
+          <div className="flex items-center gap-2 mt-1 text-[10px] text-neutral-400">
             <span className="inline-flex items-center gap-0.5">
-              <Clock className="w-3 h-3 text-neutral-400" aria-hidden />
+              <Clock className="w-3 h-3" aria-hidden />
               {getServiceDurationLabel(service.durationMinutes)}
             </span>
-            <span className="inline-flex items-center gap-0.5 min-w-0">
-              <MapPin className="w-3 h-3 text-neutral-400 shrink-0" aria-hidden />
-              <span className="truncate">{getServiceLocationLabel(service.locationType)}</span>
+            <span>•</span>
+            <span className="inline-flex items-center gap-0.5 truncate">
+              <MapPin className="w-3 h-3" aria-hidden />
+              <span>{getServiceLocationLabel(service.locationType)}</span>
             </span>
           </div>
 
-          {provider && (
-            <div className="flex items-center gap-1.5 mt-2">
-              <span className="inline-flex items-center gap-0.5 text-[11px] text-neutral-600 font-medium">
-                <MapPin className="w-3 h-3 text-neutral-400" aria-hidden />
-                {provider.primaryCampusId.toUpperCase()}
-              </span>
-              <span className="text-[11px] text-neutral-400">·</span>
-              <span className="text-[11px] text-neutral-500">
-                {provider.totalBookings} bookings
-              </span>
-            </div>
-          )}
-
-          <div className="mt-2.5 border-t border-neutral-100 pt-2.5">
+          <div className="mt-2.5 pt-2 border-t border-neutral-100">
             <Link
               href={`/services/${service.id}`}
-              className="inline-flex items-center justify-center w-full h-8 rounded-md bg-primary-600 text-white text-xs font-semibold hover:bg-[#1258C7] transition-colors"
+              className="inline-flex items-center justify-center w-full h-8 rounded-xl bg-primary-50 text-primary-700 text-xs font-bold hover:bg-primary-600 hover:text-white transition-colors shadow-2xs"
             >
-              View service
+              Book Service
             </Link>
           </div>
         </div>

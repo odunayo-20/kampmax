@@ -1,12 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { Search, ShieldCheck, Star, MapPin, Sparkles } from "lucide-react";
+import {
+  Search,
+  ShieldCheck,
+  Star,
+  MapPin,
+  Sparkles,
+  CheckCircle2,
+  Clock,
+  ArrowRight,
+  Filter,
+  UserCheck,
+  Zap,
+} from "lucide-react";
 import { useApp } from "@/lib/app-context";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useServiceMarketplace } from "@/hooks/useServiceMarketplace";
-import { SearchBar } from "@/components/molecules/SearchBar";
 import { ServiceCategoryChips } from "./ServiceCategoryChips";
 import { ServiceFilterSidebar } from "./ServiceFilterSidebar";
 import { ServiceFilterDrawer } from "./ServiceFilterDrawer";
@@ -16,6 +27,18 @@ import { ServiceCardSkeleton } from "./ServiceSkeletons";
 import { ServiceEmptyState } from "./ServiceEmptyState";
 import { ServicePagination } from "./ServicePagination";
 import { serviceSortLabel } from "./constants";
+import { marketplaceServiceProviders } from "@/data/service-marketplace";
+import { Avatar } from "@/components/ui";
+import { cn } from "@/lib/utils";
+
+const QUICK_SERVICE_TAGS = [
+  "Laptop Repair",
+  "Knotless Braids",
+  "Birthday Shoot",
+  "Math Tutoring",
+  "Laundry",
+  "Wig Revamp",
+];
 
 function FilteredSearchField({
   value,
@@ -25,7 +48,7 @@ function FilteredSearchField({
   onValueChange: (value: string) => void;
 }) {
   const [input, setInput] = useState(value);
-  const debouncedInput = useDebounce(input, 400);
+  const debouncedInput = useDebounce(input, 300);
 
   useEffect(() => setInput(value), [value]);
 
@@ -35,114 +58,142 @@ function FilteredSearchField({
   }, [debouncedInput]);
 
   return (
-    <SearchBar
-      placeholder="Search services, e.g. laptop repair, makeup..."
-      value={input}
-      onChange={setInput}
-    />
-  );
-}
-
-function HeroStats() {
-  const { selectedCampus } = useApp();
-  const items = [
-    { icon: Star, label: "High-rated providers", detail: "Real student reviews" },
-    { icon: ShieldCheck, label: "Verified only", detail: "Verification on offer" },
-    {
-      icon: MapPin,
-      label: `${selectedCampus.abbreviation} availability`,
-      detail: "Prices shown for your campus",
-    },
-  ];
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6">
-      {items.map((item) => (
-        <div
-          key={item.label}
-          className="flex items-center gap-3 bg-white/10 rounded-xl px-4 py-3 backdrop-blur-sm"
+    <div className="relative w-full">
+      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400 pointer-events-none" />
+      <input
+        type="text"
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        placeholder="Search services (e.g. screen fix, makeup, braids, maths tutoring)..."
+        className="w-full h-11 sm:h-12 pl-10 pr-4 rounded-2xl bg-white text-neutral-900 placeholder:text-neutral-400 text-sm border border-neutral-200/90 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+      />
+      {input && (
+        <button
+          onClick={() => setInput("")}
+          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-neutral-400 hover:text-neutral-600"
         >
-          <span className="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
-            <item.icon className="h-4.5 w-4.5" aria-hidden />
-          </span>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-white truncate">{item.label}</p>
-            <p className="text-xs text-white/70">{item.detail}</p>
-          </div>
-        </div>
-      ))}
+          Clear
+        </button>
+      )}
     </div>
   );
 }
 
-function FacilitiesRow() {
-  const facilities = [
-    {
-      icon: MapPin,
-      title: "Live campus availability",
-      body: "Only providers that offer services at your campus are shown.",
-    },
-    {
-      icon: ShieldCheck,
-      title: "Verified providers",
-      body: "Providers go through verification before their services go live.",
-    },
-    {
-      icon: Sparkles,
-      title: "Request a quote",
-      body: "Get custom pricing for services that don't have a fixed price.",
-    },
-  ];
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      {facilities.map((f) => (
-        <div
-          key={f.title}
-          className="flex items-start gap-3 bg-white rounded-[10px] border border-neutral-200 p-4"
-        >
-          <span className="w-10 h-10 rounded-lg bg-primary-50 text-primary-700 flex items-center justify-center shrink-0">
-            <f.icon className="h-5 w-5" aria-hidden />
-          </span>
-          <div>
-            <h3 className="text-sm font-bold text-neutral-900">{f.title}</h3>
-            <p className="text-xs text-neutral-500 mt-0.5 leading-relaxed">{f.body}</p>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
+function VerifiedProsReel({ campusId }: { campusId: string }) {
+  const providers = useMemo(() => {
+    return marketplaceServiceProviders.filter(
+      (p) =>
+        p.verified &&
+        (!campusId ||
+          p.primaryCampusId === campusId ||
+          p.additionalCampusIds?.includes(campusId))
+    );
+  }, [campusId]);
 
-function HowItWorks() {
-  const steps = [
-    { n: "1", title: "Find", body: "Search by keyword, category or campus filter." },
-    { n: "2", title: "Choose", body: "Compare prices, ratings and availability." },
-    {
-      n: "3",
-      title: "Book or request",
-      body: "Book a fixed-price service or request a custom quote.",
-    },
-  ];
+  if (providers.length === 0) return null;
+
   return (
-    <section className="mt-10">
-      <h2 className="text-lg font-bold text-neutral-900 mb-4">How it works</h2>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {steps.map((s) => (
-          <div key={s.n} className="flex gap-3 items-start bg-white rounded-[10px] border border-neutral-200 p-4">
-            <span className="w-8 h-8 rounded-full bg-primary-600 text-white text-sm font-bold flex items-center justify-center shrink-0">
-              {s.n}
-            </span>
-            <div>
-              <h3 className="text-sm font-semibold text-neutral-900">{s.title}</h3>
-              <p className="text-xs text-neutral-500 mt-0.5 leading-relaxed">{s.body}</p>
+    <section className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <UserCheck className="h-4 w-4 text-primary-600" />
+          <h2 className="text-sm font-bold text-neutral-900">
+            Top Verified Campus Pros
+          </h2>
+        </div>
+        <span className="text-xs text-neutral-500 font-medium">
+          {providers.length} verified
+        </span>
+      </div>
+
+      <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0">
+        {providers.map((p) => (
+          <Link
+            key={p.id}
+            href={`/services/providers/${p.id}`}
+            className="flex-shrink-0 w-[200px] sm:w-[220px] bg-white rounded-2xl border border-neutral-200/90 p-3.5 shadow-2xs hover:border-primary-300 hover:shadow-md transition-all group"
+          >
+            <div className="flex items-center gap-2.5 mb-2">
+              <Avatar
+                name={p.displayName}
+                size="md"
+                className="h-10 w-10 ring-1 ring-neutral-200"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1">
+                  <span className="text-xs sm:text-sm font-bold text-neutral-900 group-hover:text-primary-600 transition-colors truncate">
+                    {p.displayName}
+                  </span>
+                  <ShieldCheck className="h-3.5 w-3.5 text-primary-600 shrink-0" />
+                </div>
+                <div className="flex items-center gap-1 text-[11px] text-neutral-500 font-medium">
+                  <Star className="h-3 w-3 fill-amber-400 text-amber-400 shrink-0" />
+                  <span className="font-bold text-neutral-800">{p.rating}</span>
+                  <span>({p.ratingCount})</span>
+                </div>
+              </div>
             </div>
-          </div>
+
+            <div className="flex flex-wrap gap-1 pt-1.5 border-t border-neutral-100">
+              {p.specialties?.slice(0, 2).map((s) => (
+                <span
+                  key={s}
+                  className="text-[9px] font-semibold px-2 py-0.5 bg-neutral-100 text-neutral-600 rounded-md truncate max-w-[90px]"
+                >
+                  {s}
+                </span>
+              ))}
+            </div>
+          </Link>
         ))}
       </div>
     </section>
   );
 }
 
+function GuaranteeRow() {
+  const items = [
+    {
+      icon: ShieldCheck,
+      title: "Escrow Protection",
+      body: "Funds are released to providers only after you confirm job satisfaction.",
+    },
+    {
+      icon: UserCheck,
+      title: "Campus Verified",
+      body: "Providers are verified students or vetted local technicians.",
+    },
+    {
+      icon: Zap,
+      title: "Fast Turnaround",
+      body: "Get same-day emergency repairs, styling, and academic tutoring.",
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {items.map((item) => (
+        <div
+          key={item.title}
+          className="flex items-start gap-3 bg-white rounded-2xl border border-neutral-200/90 p-3.5 shadow-2xs"
+        >
+          <span className="w-9 h-9 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center shrink-0">
+            <item.icon className="h-4.5 w-4.5" />
+          </span>
+          <div>
+            <h3 className="text-xs font-bold text-neutral-900">{item.title}</h3>
+            <p className="text-[11px] text-neutral-500 mt-0.5 leading-snug">
+              {item.body}
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function ServicesBrowseView() {
+  const { selectedCampus } = useApp();
   const {
     filters,
     setFilter,
@@ -162,61 +213,110 @@ export function ServicesBrowseView() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const campusAbbr =
     campusOptions.find((c) => c.id === effectiveCampusId)?.abbreviation ??
-    effectiveCampusId.toUpperCase();
+    selectedCampus.abbreviation;
 
   return (
-    <div className="space-y-6">
-      {/* Hero */}
-      <section className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-primary-700 via-primary-600 to-[#0B3B8F] text-white p-6 sm:p-8">
-        <div className="max-w-2xl">
-          <h1 className="text-2xl sm:text-3xl font-bold leading-tight tracking-tight">
-            Find trusted services around you
-          </h1>
-          <p className="mt-2 text-sm sm:text-[15px] text-white/85">
-            Repairs, beauty, tutoring, printing, fitness and more — from verified
-            providers on your campus. No hidden costs.
-          </p>
-          <div className="mt-5">
-            <FilteredSearchField value={filters.q} onValueChange={(v) => setFilter("q", v)} />
+    <div className="space-y-6 pb-16">
+      {/* 1. Hero Search & Campus Banner */}
+      <section className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-primary-950 via-primary-900 to-indigo-950 text-white p-6 sm:p-8 shadow-xl border border-primary-800/40">
+        <div className="max-w-2xl space-y-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-white/10 text-white backdrop-blur-md border border-white/15">
+              <MapPin className="h-3.5 w-3.5 text-primary-400" />
+              <span>{selectedCampus.name} ({campusAbbr})</span>
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-400 text-neutral-950">
+              <Sparkles className="h-3 w-3" />
+              <span>Verified Campus Gigs & Services</span>
+            </span>
           </div>
-          <a
-            href="#results"
-            className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-white hover:text-white/90"
-          >
-            <Search className="h-4 w-4" aria-hidden />
-            Search all services
-          </a>
-          <HeroStats />
+
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight leading-tight">
+              Hire Trusted Student & Campus Pros
+            </h1>
+            <p className="text-xs sm:text-sm text-neutral-300 font-medium mt-1">
+              Tech repairs, hair & braids, photography, cleaning, academic tutoring, and event coverage.
+            </p>
+          </div>
+
+          {/* Search Input */}
+          <div className="pt-1">
+            <FilteredSearchField
+              value={filters.q}
+              onValueChange={(v) => setFilter("q", v)}
+            />
+          </div>
+
+          {/* Quick Tag Pills */}
+          <div className="flex items-center gap-1.5 flex-wrap pt-1">
+            <span className="text-[11px] font-semibold text-neutral-300">Popular:</span>
+            {QUICK_SERVICE_TAGS.map((tag) => (
+              <button
+                key={tag}
+                onClick={() => setFilter("q", tag)}
+                className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/10 transition-colors"
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* Category chips */}
-      <section aria-label="Browse services by category">
+      {/* 2. Top Verified Providers Highlight */}
+      <VerifiedProsReel campusId={effectiveCampusId} />
+
+      {/* 3. Category Filter Strip */}
+      <section aria-label="Browse services by category" className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-bold text-neutral-400 uppercase tracking-wider">
+            Departments
+          </h2>
+          <Link
+            href="/categories"
+            className="text-xs font-bold text-primary-600 hover:underline"
+          >
+            All Categories →
+          </Link>
+        </div>
         <ServiceCategoryChips categories={categories} />
       </section>
 
-      {/* Facilities */}
-      <FacilitiesRow />
+      {/* 4. Trust & Guarantee Badges */}
+      <GuaranteeRow />
 
-      {/* How it works */}
-      <HowItWorks />
-
-      {/* Results */}
-      <section id="results" className="scroll-mt-20 pt-2">
-        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+      {/* 5. Main Results Feed with Sidebar & Scalable Pagination */}
+      <section id="results" className="scroll-mt-20 pt-2 space-y-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
-            <h2 className="text-lg font-bold text-neutral-900">
-              {isLoading ? "Loading services…" : `${resultCount} service${resultCount === 1 ? "" : "s"}`}
+            <h2 className="text-lg sm:text-xl font-black text-neutral-900 tracking-tight">
+              {isLoading
+                ? "Loading services…"
+                : `${resultCount} service${resultCount === 1 ? "" : "s"} available`}
             </h2>
-            <p className="text-xs text-neutral-500 mt-0.5">
-              {campusAbbr} · Sorted by {serviceSortLabel(filters.sort)}
+            <p className="text-xs text-neutral-500">
+              Showing active services at {campusAbbr} · Sorted by {serviceSortLabel(filters.sort)}
             </p>
           </div>
-          <ServiceSortDropdown value={filters.sort} onChange={(s) => setFilter("sort", s)} />
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setDrawerOpen(true)}
+              className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-neutral-200 bg-white text-xs font-bold text-neutral-700 shadow-2xs hover:bg-neutral-50"
+            >
+              <Filter className="h-3.5 w-3.5" />
+              <span>Filters</span>
+            </button>
+            <ServiceSortDropdown
+              value={filters.sort}
+              onChange={(s) => setFilter("sort", s)}
+            />
+          </div>
         </div>
 
-        <div className="flex gap-5 items-start">
-          {/* Desktop sidebar */}
+        <div className="flex gap-6 items-start">
+          {/* Desktop Filter Sidebar */}
           <ServiceFilterSidebar
             filters={filters}
             onFilterChange={setFilter}
@@ -226,9 +326,10 @@ export function ServicesBrowseView() {
             campuses={campusOptions}
           />
 
+          {/* Service Cards Grid (Scalable 2-col mobile / 3-col desktop) */}
           <div className="flex-1 min-w-0">
             {isLoading ? (
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <ServiceCardSkeleton key={i} />
                 ))}
@@ -236,14 +337,20 @@ export function ServicesBrowseView() {
             ) : services.length === 0 ? (
               <ServiceEmptyState
                 hasFilters={Boolean(
-                  filters.q || filters.campusId || filters.ratingMin || filters.priceBucket || filters.locationType
+                  filters.q ||
+                    filters.campusId ||
+                    filters.ratingMin ||
+                    filters.priceBucket ||
+                    filters.locationType
                 )}
                 onClearFilters={clearFilters}
-                activeCampusLabel={campusOptions.find((c) => c.id === effectiveCampusId)?.name}
+                activeCampusLabel={
+                  campusOptions.find((c) => c.id === effectiveCampusId)?.name
+                }
               />
             ) : (
               <>
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
                   {services.map((service) => (
                     <ServiceCard
                       key={service.id}
@@ -252,34 +359,44 @@ export function ServicesBrowseView() {
                     />
                   ))}
                 </div>
-                <div className="mt-6">
-                  <ServicePagination
-                    page={currentPage}
-                    totalPages={totalPages}
-                    onChange={setPage}
-                  />
-                </div>
+
+                {/* Scalable Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="mt-8 pt-4 border-t border-neutral-100 flex justify-center">
+                    <ServicePagination
+                      page={currentPage}
+                      totalPages={totalPages}
+                      onChange={setPage}
+                    />
+                  </div>
+                )}
               </>
             )}
           </div>
         </div>
       </section>
 
-      {/* Become a provider */}
-      <section className="bg-white rounded-2xl border border-neutral-200 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-base font-bold text-neutral-900">
-            Are you a talented service provider?
+      {/* 6. Onboarding / Register as a Pro */}
+      <section className="rounded-3xl bg-gradient-to-r from-neutral-900 to-neutral-950 border border-neutral-800 p-6 sm:p-8 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 shadow-lg">
+        <div className="space-y-1">
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-primary-400 uppercase tracking-wider">
+            <Sparkles className="h-3.5 w-3.5" />
+            Earn on Campus
+          </span>
+          <h2 className="text-lg sm:text-xl font-black tracking-tight">
+            Offer laundry, tech repairs, styling or tutoring?
           </h2>
-          <p className="text-sm text-neutral-500 mt-1">
-            List your services on Kampmax and reach students on your campus.
+          <p className="text-xs sm:text-sm text-neutral-400 max-w-md">
+            Register as a service provider on Kampmax. Get booked directly by fellow students and build a trusted campus reputation.
           </p>
         </div>
+
         <Link
-          href="/service-provider/onboarding"
-          className="inline-flex items-center gap-1.5 shrink-0 px-4 py-2.5 rounded-lg bg-neutral-900 text-white text-sm font-semibold hover:bg-neutral-800"
+          href="/onboarding/service-provider"
+          className="inline-flex items-center gap-1.5 shrink-0 px-5 py-3 rounded-2xl bg-primary-600 hover:bg-primary-500 text-white text-xs font-black shadow-lg shadow-primary-950/50 active:scale-95 transition-all"
         >
-          Become a provider
+          <span>Register as a Service Pro</span>
+          <ArrowRight className="h-4 w-4" />
         </Link>
       </section>
 
@@ -306,7 +423,7 @@ interface ServiceCategoryViewProps {
   description?: string;
 }
 
-/** Category landing page — same browse machinery, locked to one category. */
+/** Category landing page — locked to one category */
 export function ServicesCategoryView({
   categoryId,
   categorySlug,
@@ -334,40 +451,47 @@ export function ServicesCategoryView({
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   return (
-    <div className="space-y-6">
-      {/* Banner */}
-      <section className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-primary-700 via-primary-600 to-[#0B3B8F] text-white p-6 sm:p-8">
-        <div className="max-w-xl">
+    <div className="space-y-6 pb-16">
+      {/* Category Banner */}
+      <section className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-primary-950 via-primary-900 to-indigo-950 text-white p-6 sm:p-8 shadow-xl">
+        <div className="max-w-xl space-y-2">
           <Link
             href="/services"
-            className="inline-flex items-center gap-1 text-xs font-semibold text-white/80 hover:text-white mb-3"
+            className="inline-flex items-center gap-1 text-xs font-bold text-white/80 hover:text-white mb-2"
           >
-            ← All services
+            ← All Services
           </Link>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{categoryName}</h1>
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">{categoryName}</h1>
           {description && (
-            <p className="mt-2 text-sm text-white/85">{description}</p>
+            <p className="text-xs sm:text-sm text-white/80 font-medium">{description}</p>
           )}
         </div>
       </section>
 
       {/* Results */}
-      <section id="results" className="scroll-mt-20">
-        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+      <section id="results" className="scroll-mt-20 space-y-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h2 className="text-lg font-bold text-neutral-900">
-              {isLoading ? "Loading…" : `${resultCount} ${resultCount === 1 ? "service" : "services"}`}
+              {isLoading ? "Loading…" : `${resultCount} ${resultCount === 1 ? "service" : "services"} found`}
             </h2>
-            <p className="text-xs text-neutral-500 mt-0.5">
+            <p className="text-xs text-neutral-500">
               Sorted by {serviceSortLabel(filters.sort)}
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setDrawerOpen(true)}
+              className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-neutral-200 bg-white text-xs font-bold text-neutral-700 shadow-2xs"
+            >
+              <Filter className="h-3.5 w-3.5" />
+              <span>Filters</span>
+            </button>
             <ServiceSortDropdown value={filters.sort} onChange={(s) => setFilter("sort", s)} />
           </div>
         </div>
 
-        <div className="flex gap-5 items-start">
+        <div className="flex gap-6 items-start">
           <ServiceFilterSidebar
             filters={filters}
             onFilterChange={setFilter}
@@ -379,19 +503,25 @@ export function ServicesCategoryView({
 
           <div className="flex-1 min-w-0">
             {isLoading ? (
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <ServiceCardSkeleton key={i} />
                 ))}
               </div>
             ) : services.length === 0 ? (
               <ServiceEmptyState
-                hasFilters={Boolean(filters.q || filters.campusId || filters.ratingMin || filters.priceBucket || filters.locationType)}
+                hasFilters={Boolean(
+                  filters.q ||
+                    filters.campusId ||
+                    filters.ratingMin ||
+                    filters.priceBucket ||
+                    filters.locationType
+                )}
                 onClearFilters={clearFilters}
               />
             ) : (
               <>
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
                   {services.map((service) => (
                     <ServiceCard
                       key={service.id}
@@ -400,9 +530,15 @@ export function ServicesCategoryView({
                     />
                   ))}
                 </div>
-                <div className="mt-6">
-                  <ServicePagination page={currentPage} totalPages={totalPages} onChange={setPage} />
-                </div>
+                {totalPages > 1 && (
+                  <div className="mt-8 pt-4 border-t border-neutral-100 flex justify-center">
+                    <ServicePagination
+                      page={currentPage}
+                      totalPages={totalPages}
+                      onChange={setPage}
+                    />
+                  </div>
+                )}
               </>
             )}
           </div>

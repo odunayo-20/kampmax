@@ -790,6 +790,27 @@ export function createMockSupportManagementService(): AdminSupportManagementServ
         actorName: customer.name,
         at: now,
       });
+
+      // Notify customer
+      pushNotificationRecord({
+        userId: customer.id,
+        type: "system",
+        category: "account",
+        title: "Support request created",
+        message: `Your request "${subject}" has been submitted (#${id}).`,
+        actionUrl: `/support/${id}`,
+      });
+
+      // Notify admin
+      pushNotificationRecord({
+        userId: "admin",
+        type: "system",
+        category: "account",
+        title: "New support ticket",
+        message: `${customer.name} opened ticket #${id}: "${subject}"`,
+        actionUrl: `/admin/support/${id}`,
+      });
+
       return customerDetailOf(ticket);
     },
 
@@ -826,6 +847,28 @@ export function createMockSupportManagementService(): AdminSupportManagementServ
           at: now,
         });
       }
+
+      // Notify admin
+      const targetAdmin = ticket.assigneeId || "admin";
+      pushNotificationRecord({
+        userId: targetAdmin,
+        type: "messages",
+        category: "messages",
+        title: "Customer replied to support ticket",
+        message: `${ticket.customer.name} replied on #${ticket.id}: "${input.body.slice(0, 80)}"`,
+        actionUrl: `/admin/support/${ticket.id}`,
+      });
+
+      // Notify customer confirmation
+      pushNotificationRecord({
+        userId,
+        type: "messages",
+        category: "messages",
+        title: "Support reply sent",
+        message: `Your message was sent to Support on #${ticket.id}.`,
+        actionUrl: `/support/${ticket.id}`,
+      });
+
       return customerDetailOf(touch(ticket, now));
     },
 
