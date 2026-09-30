@@ -8,6 +8,7 @@ import {
   User,
   Tag,
   CalendarCheck,
+  Ticket,
   Bell,
   type LucideIcon,
 } from "lucide-react";
@@ -76,6 +77,12 @@ export const NOTIFICATION_CATEGORY_META: Record<
     bg: "bg-primary-100",
     color: "text-primary-700",
   },
+  events: {
+    label: "Events",
+    icon: Ticket,
+    bg: "bg-kampmax-gold/10",
+    color: "text-kampmax-gold-dark",
+  },
 };
 
 const FALLBACK_CATEGORY_META: NotificationCategoryMeta = {
@@ -103,6 +110,7 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   account: "Account",
   promotion: "Promotion",
   booking_update: "Booking",
+  event: "Event",
   system: "System",
 };
 

@@ -66,6 +66,7 @@ export type NotificationType =
   | "account"
   | "promotion"
   | "booking_update"
+  | "event"
   | "system";
 
 export type NotificationCategory =
@@ -76,7 +77,8 @@ export type NotificationCategory =
   | "payments"
   | "account"
   | "promotions"
-  | "bookings";
+  | "bookings"
+  | "events";
 
 export type PostType =
   | "discussion"
@@ -485,42 +487,7 @@ export interface ReportedPost {
   createdAt: string;
 }
 
-// ============================================================
-// EVENT
-// ============================================================
-
-export interface CampusEventTicketTier {
-  id: string;
-  name: string;
-  price: number;
-  description?: string;
-  badge?: string;
-}
-
-export interface CampusEvent {
-  id: string;
-  campusId: string;
-  title: string;
-  description: string;
-  location: string;
-  startDate: string;
-  endDate: string;
-  organizerId: string;
-  organizerName?: string;
-  imageUrl?: string;
-  attendees: string[];
-  maxAttendees?: number;
-  isVirtual: boolean;
-  meetingLink?: string;
-  tags?: string[];
-  ticketPrice?: number;
-  ticketTiers?: CampusEventTicketTier[];
-  distance?: string;
-  isFeatured?: boolean;
-  category?: string;
-  timeDisplay?: string;
-  createdAt: string;
-}
+// Events and tickets live in types/event-ticketing.ts.
 
 export interface NearbyPlace {
   id: string;

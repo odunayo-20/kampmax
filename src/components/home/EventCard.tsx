@@ -1,19 +1,17 @@
 import Link from "next/link";
-import { Calendar, MapPin, Users, Video, Ticket } from "lucide-react";
-import { CampusEvent } from "@/types";
-import { formatDate, cn } from "@/lib/utils";
+import { Calendar, MapPin, Users } from "lucide-react";
+import type { EventItem } from "@/types/event-ticketing";
+import { eventDate, eventTime, priceLabel } from "@/components/events/event-format";
+import { cn } from "@/lib/utils";
 
 interface EventCardProps {
-  event: CampusEvent;
+  event: EventItem;
   className?: string;
 }
 
 export function EventCard({ event, className }: EventCardProps) {
-  const start = new Date(event.startDate);
-  const isUpcoming = start > new Date();
-  const spotsLeft = event.maxAttendees
-    ? event.maxAttendees - event.attendees.length
-    : null;
+  const spotsLeft = event.seatsLeft;
+  const almostFull = spotsLeft > 0 && spotsLeft <= 20;
 
   return (
     <Link
@@ -24,11 +22,11 @@ export function EventCard({ event, className }: EventCardProps) {
         className
       )}
     >
-      {/* Cover Image */}
       <div className="relative aspect-[16/10] bg-neutral-100 overflow-hidden">
-        {event.imageUrl ? (
+        {event.coverImageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={event.imageUrl}
+            src={event.coverImageUrl}
             alt={event.title}
             loading="lazy"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -39,37 +37,26 @@ export function EventCard({ event, className }: EventCardProps) {
           </div>
         )}
 
-        {/* Top Badges */}
-        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
-          {event.category && (
+        {event.category && (
+          <div className="absolute top-2.5 left-2.5">
             <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-neutral-900/80 backdrop-blur-xs text-white">
-              {event.category}
+              {event.category.name}
             </span>
-          )}
-          {event.isVirtual && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-600/90 text-white backdrop-blur-xs">
-              <Video className="h-2.5 w-2.5" />
-              Virtual
-            </span>
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Price Tag */}
         <div className="absolute bottom-2.5 right-2.5">
           <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-white/95 text-neutral-900 shadow-2xs backdrop-blur-xs">
-            {event.ticketPrice && event.ticketPrice > 0
-              ? `₦${event.ticketPrice.toLocaleString()}`
-              : "Free Entry"}
+            {priceLabel(event)}
           </span>
         </div>
       </div>
 
-      {/* Details */}
       <div className="p-3.5 flex flex-col flex-1 justify-between gap-2.5">
         <div>
           <div className="flex items-center gap-1.5 text-[11px] font-semibold text-primary-600 mb-1">
             <Calendar className="h-3.5 w-3.5 shrink-0" />
-            <span>{event.timeDisplay || formatDate(event.startDate)}</span>
+            <span>{eventDate(event.startsAt)} &middot; {eventTime(event.startsAt)}</span>
           </div>
 
           <h3 className="text-xs sm:text-sm font-bold text-neutral-900 line-clamp-2 leading-snug group-hover:text-primary-600 transition-colors">
@@ -85,10 +72,10 @@ export function EventCard({ event, className }: EventCardProps) {
         <div className="flex items-center justify-between pt-2 border-t border-neutral-100 text-[11px]">
           <div className="flex items-center gap-1 text-neutral-500 font-medium">
             <Users className="h-3.5 w-3.5 text-neutral-400" />
-            <span>{event.attendees.length} attending</span>
+            <span>{event.attendeeCount} attending</span>
           </div>
 
-          {spotsLeft !== null && spotsLeft <= 20 && (
+          {almostFull && (
             <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">
               {spotsLeft} spots left
             </span>

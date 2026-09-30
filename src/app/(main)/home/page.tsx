@@ -29,7 +29,7 @@ import {
 } from "@/components/home";
 import { ServiceCard } from "@/components/service-marketplace/ServiceCard";
 import { getProviderById } from "@/services/service-marketplace";
-import { getFeaturedEvent, getUpcomingEvents } from "@/data/events";
+import { useEvents } from "@/hooks/use-events";
 import { getAllOpportunities } from "@/data/opportunity";
 import { useApp } from "@/lib/app-context";
 import { useAuth } from "@/lib/auth-context";
@@ -49,6 +49,7 @@ export default function HomePage() {
   const servicesQuery = useHomeServices(campusId);
   const categoriesQuery = useHomeCategories();
   const vendorsQuery = useHomeVendors(campusId);
+  const eventsQuery = useEvents({ campusId: campusId || undefined, limit: 10 });
 
   const products = productsQuery.data ?? [];
   const services = servicesQuery.data ?? [];
@@ -65,8 +66,8 @@ export default function HomePage() {
 
   const greeting = getGreeting();
   const firstName = user?.name?.split(" ")[0] || "Daniel";
-  const featuredEvent = getFeaturedEvent(campusId);
-  const upcomingEvents = getUpcomingEvents(campusId);
+  const upcomingEvents = eventsQuery.data ?? [];
+  const featuredEvent = upcomingEvents.find((e) => e.isFeatured) ?? upcomingEvents[0];
   const opportunities = getAllOpportunities().slice(0, 4);
 
   return (

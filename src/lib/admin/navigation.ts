@@ -5,6 +5,7 @@ import {
   Bell,
   Building2,
   Briefcase,
+  CalendarCheck,
   GraduationCap,
   LayoutDashboard,
   Megaphone,
@@ -109,6 +110,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     label: "Moderation",
     items: [
       { key: "campusFeed", href: "/admin/campus", label: "Campus Feed", icon: GraduationCap },
+      { key: "eventOrganizers", href: "/admin/event-organizers", label: "Event Organizers", icon: CalendarCheck },
       { key: "reviews", href: "/admin/reviews", label: "Reviews", icon: Star },
       { key: "safety", href: "/admin/safety", label: "Trust & Safety", icon: ShieldAlert },
       { key: "disputes", href: "/admin/disputes", label: "Disputes", icon: Scale },

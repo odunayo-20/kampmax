@@ -39,7 +39,8 @@ export type AdminNavItemKey =
   | "jobs"
   | "verifications"
   | "security"
-  | "support";
+  | "support"
+  | "eventOrganizers";
 
 /**
  * Which sections each role can see. CAMPUS_ADMIN is scoped to their

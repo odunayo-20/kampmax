@@ -356,6 +356,31 @@ export function pushNotificationRecord(
   return notification;
 }
 
+/**
+ * Merges notifications that came from the backend into the store. Existing
+ * entries are never duplicated, and a server-side "read" flag is applied but
+ * never reverted, so a local read survives a slow round trip.
+ */
+export function upsertServerNotifications(
+  userId: string,
+  incoming: Array<Omit<Notification, "userId">>
+): void {
+  let changed = false;
+  for (const item of incoming) {
+    const existing = notifications.find(
+      (n) => n.id === item.id && n.userId === userId
+    );
+    if (!existing) {
+      notifications.unshift({ ...item, userId });
+      changed = true;
+    } else if (item.read && !existing.read) {
+      existing.read = true;
+      changed = true;
+    }
+  }
+  if (changed) emitNotificationsChanged();
+}
+
 export function markNotificationRead(notificationId: string): boolean {
   const n = notifications.find((n) => n.id === notificationId);
   if (!n || n.read) return false;

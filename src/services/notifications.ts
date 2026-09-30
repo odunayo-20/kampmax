@@ -31,6 +31,7 @@ const categoryLabels: Record<NotificationCategory, string> = {
   account: "Account",
   promotions: "Promotions",
   bookings: "Bookings",
+  events: "Events",
 };
 
 export { categoryLabels };
@@ -47,6 +48,7 @@ const CATEGORY_ORDER: NotificationCategory[] = [
   "messages",
   "marketplace",
   "bookings",
+  "events",
   "campus",
   "payments",
   "account",

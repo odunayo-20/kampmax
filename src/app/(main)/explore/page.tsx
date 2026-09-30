@@ -18,7 +18,9 @@ import {
   Star,
 } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
-import { events } from "@/data/events";
+import { useEvents } from "@/hooks/use-events";
+import { useDebounce } from "@/hooks/use-debounce";
+import { eventDate, eventTime, priceLabel } from "@/components/events/event-format";
 import { products } from "@/data/products";
 import { marketplaceServices } from "@/data/service-marketplace";
 import { getAllOpportunities } from "@/data/opportunity";
@@ -44,15 +46,9 @@ export default function ExplorePage() {
 
   const allOpportunities = useMemo(() => getAllOpportunities(), []);
 
-  const filteredEvents = useMemo(() => {
-    return events.filter(
-      (e) =>
-        !q ||
-        e.title.toLowerCase().includes(q) ||
-        e.location.toLowerCase().includes(q) ||
-        e.tags?.some((t) => t.toLowerCase().includes(q))
-    );
-  }, [q]);
+  const debouncedQ = useDebounce(q, 300);
+  const eventsQuery = useEvents({ q: debouncedQ || undefined, limit: 20 });
+  const filteredEvents = eventsQuery.data ?? [];
 
   const filteredProducts = useMemo(() => {
     return products.filter(
@@ -147,7 +143,7 @@ export default function ExplorePage() {
                 <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-neutral-900 shrink-0">
                   <img
                     src={
-                      event.imageUrl ||
+                      event.coverImageUrl ||
                       "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&auto=format&fit=crop&q=80"
                     }
                     alt={event.title}
@@ -164,12 +160,7 @@ export default function ExplorePage() {
                   <div className="flex items-center gap-2 text-[11px] text-neutral-500">
                     <span className="inline-flex items-center gap-1">
                       <Calendar className="h-3 w-3 text-amber-500" />
-                      <span>{event.timeDisplay || "Sat, 27 Sep 2025"}</span>
-                    </span>
-                    <span>•</span>
-                    <span className="inline-flex items-center gap-1">
-                      <MapPin className="h-3 w-3 text-primary-500" />
-                      <span>{event.distance || "0.6 km"}</span>
+                      <span>{eventDate(event.startsAt)} · {eventTime(event.startsAt)}</span>
                     </span>
                     <span className="px-1.5 py-0.2 rounded bg-rose-50 text-rose-600 font-semibold text-[10px]">
                       Event
@@ -182,9 +173,7 @@ export default function ExplorePage() {
                 href={`/events/${event.id}`}
                 className="w-full sm:w-auto text-center px-4 py-1.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold shadow-xs transition-colors"
               >
-                {event.ticketPrice && event.ticketPrice > 0
-                  ? `Get Ticket (₦${event.ticketPrice.toLocaleString()})`
-                  : "Get Ticket"}
+                {event.minPrice > 0 ? `Get Ticket (${priceLabel(event)})` : "Register"}
               </Link>
             </div>
           ))}

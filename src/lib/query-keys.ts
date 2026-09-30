@@ -823,3 +823,33 @@ export const addressKeys = {
   all: ["addresses"] as const,
   list: (userId: string) => ["addresses", userId] as const,
 };
+
+/**
+ * Event ticketing. Everything is scoped by user where the data is personal
+ * (tickets, organizer status) so caches never leak across accounts.
+ */
+export const eventKeys = {
+  all: ["events"] as const,
+  list: (filters: Record<string, string | undefined>) =>
+    ["events", "list", filters] as const,
+  detail: (id: string) => ["events", "detail", id] as const,
+};
+
+export const ticketKeys = {
+  all: ["tickets"] as const,
+  mine: (userId: string) => ["tickets", "mine", userId] as const,
+  detail: (userId: string, id: string) => ["tickets", "detail", userId, id] as const,
+};
+
+export const organizerKeys = {
+  all: ["organizer"] as const,
+  status: (userId: string) => ["organizer", "status", userId] as const,
+  events: (userId: string) => ["organizer", "events", userId] as const,
+  event: (id: string) => ["organizer", "event", id] as const,
+  dashboard: (id: string) => ["organizer", "dashboard", id] as const,
+  attendees: (id: string, q: string, page: number) =>
+    ["organizer", "attendees", id, q, page] as const,
+  attendance: (id: string) => ["organizer", "attendance", id] as const,
+  adminApplications: (filters: Record<string, string | number | undefined>) =>
+    ["organizer", "admin", "applications", filters] as const,
+};

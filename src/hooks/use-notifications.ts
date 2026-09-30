@@ -19,6 +19,8 @@ import {
   NotificationCategorySummary,
 } from "@/services/notifications";
 import { Notification } from "@/types";
+import { persistNotificationRead } from "@/services/event-notification-sync";
+import { markAllServerNotificationsReadApi } from "@/services/event-tickets";
 
 /**
  * Simulates network latency for the sync, in-memory store so the UI
@@ -255,6 +257,8 @@ export function useMarkNotificationAsRead() {
     mutationFn: async (notificationId: string) => {
       await delay();
       markAsRead(notificationId);
+      // Mirrored backend notifications also persist their read state.
+      void persistNotificationRead(notificationId).catch(() => undefined);
       return notificationId;
     },
     onMutate: async (notificationId: string) => {
@@ -296,6 +300,7 @@ export function useMarkAllNotificationsAsRead() {
     mutationFn: async () => {
       await delay();
       if (userId) markAllAsRead(userId);
+      void markAllServerNotificationsReadApi().catch(() => undefined);
     },
     onMutate: async () => {
       if (!userId) return undefined;

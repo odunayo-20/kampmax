@@ -59,13 +59,6 @@ export {
   hasUserReportedReview,
 } from "./reviews";
 export {
-  getEvents,
-  getEventById,
-  getUpcomingEvents,
-  attendEvent,
-  unattendEvent,
-} from "./events";
-export {
   getWallet,
   getWalletTransactions,
   getWalletBalance,
