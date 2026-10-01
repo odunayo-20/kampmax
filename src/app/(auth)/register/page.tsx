@@ -15,6 +15,8 @@ import {
   PasswordStrengthMeter,
   NigerianPhoneInput,
   CampusSafetyAgreement,
+  ResidenceHallSelector,
+  ReferralCodeInput,
 } from "@/components/auth";
 import { cn } from "@/lib/utils";
 import { Campus, UserRole } from "@/types";
@@ -108,6 +110,7 @@ function RegisterForm() {
     (campus: Campus) => {
       setChosenCampus(campus);
       setSelectedCampus(campus);
+      setResidenceHall("");
       setErrors((prev) => {
         if (!prev.campus) return prev;
         const copy = { ...prev };
@@ -135,6 +138,8 @@ function RegisterForm() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [residenceHall, setResidenceHall] = useState("");
+  const [referralCode, setReferralCode] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -222,6 +227,16 @@ function RegisterForm() {
       if (result.success) {
         // Sync selected campus across the app
         setSelectedCampus(chosenCampus);
+
+        // Store student residence hall & referral preferences in localStorage
+        if (typeof window !== "undefined") {
+          if (residenceHall.trim()) {
+            localStorage.setItem("kampmax_user_residence", residenceHall.trim());
+          }
+          if (referralCode.trim()) {
+            localStorage.setItem("kampmax_referral_code", referralCode.trim());
+          }
+        }
 
         // Resiliently register campus membership in backend
         try {
@@ -374,6 +389,14 @@ function RegisterForm() {
           error={errors.campus}
         />
 
+        {/* Hall of Residence / Delivery Hub (Optional) */}
+        <ResidenceHallSelector
+          campusId={chosenCampus?.id}
+          campusName={chosenCampus?.name}
+          value={residenceHall}
+          onChange={(val) => setResidenceHall(val)}
+        />
+
         <div className="grid grid-cols-2 gap-3">
           <Input
             label="First name"
@@ -457,6 +480,12 @@ function RegisterForm() {
           onChange={(e) => setConfirmPassword(e.target.value)}
           error={errors.confirmPassword}
           autoComplete="new-password"
+        />
+
+        {/* Optional Referral / Ambassador Code Accordion */}
+        <ReferralCodeInput
+          value={referralCode}
+          onChange={(code) => setReferralCode(code)}
         />
 
         {/* Terms of Service & Campus Safety Charter Agreement */}

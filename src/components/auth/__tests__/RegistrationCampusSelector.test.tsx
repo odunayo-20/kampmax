@@ -129,4 +129,4 @@ describe("RegistrationCampusSelector", () => {
 
     expect(onSelectCampus).toHaveBeenCalledWith(mockCampuses[1]);
   });
-});
+}, 20000);

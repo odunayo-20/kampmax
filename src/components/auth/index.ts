@@ -9,3 +9,9 @@ export {
 } from "./NigerianPhoneInput";
 export { CampusSafetyModal } from "./CampusSafetyModal";
 export { CampusSafetyAgreement } from "./CampusSafetyAgreement";
+export { ResidenceHallSelector } from "./ResidenceHallSelector";
+export {
+  ReferralCodeInput,
+  validateReferralCode,
+  type ReferralValidationResult,
+} from "./ReferralCodeInput";
