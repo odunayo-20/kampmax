@@ -93,6 +93,13 @@ export default function StoreManagementPage() {
         </div>
         <button
           type="button"
+          onClick={() => router.push("/vendor/store/location")}
+          className="inline-flex items-center gap-1.5 rounded-md border border-kampmax-border bg-white px-3 py-2 text-sm font-medium text-kampmax-text hover:bg-neutral-50"
+        >
+          Location
+        </button>
+        <button
+          type="button"
           onClick={() => router.push(`/store/${storeSlug ?? "adebayo-gadgets"}`)}
           className="inline-flex items-center gap-1.5 rounded-md border border-kampmax-border bg-white px-3 py-2 text-sm font-medium text-kampmax-text hover:bg-neutral-50"
         >

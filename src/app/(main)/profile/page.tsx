@@ -292,6 +292,13 @@ export default function ProfilePage() {
           onClick={() => router.push("/profile/addresses")}
         />
         <SettingsRow
+          icon={<MapPin className="h-5 w-5" />}
+          label="My Location"
+          description="Set where you are based"
+          action={<ChevronRight className="h-4 w-4 text-kampmax-text-secondary" />}
+          onClick={() => router.push("/profile/location")}
+        />
+        <SettingsRow
           icon={<CreditCard className="h-5 w-5" />}
           label="Payment Methods"
           description={`${savedPaymentMethodsCount} saved method${savedPaymentMethodsCount === 1 ? "" : "s"}`}

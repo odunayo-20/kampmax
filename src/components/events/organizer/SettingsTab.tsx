@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { useCancelEvent, useUpdateEvent } from "@/hooks/use-events";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import { EntityLocationSettings } from "@/components/maps/EntityLocationSettings";
 import type { EventItem } from "@/types/event-ticketing";
 
 const inputClass =
@@ -97,6 +98,14 @@ export function SettingsTab({ event, canEdit }: { event: EventItem; canEdit: boo
           </>
         )}
       </form>
+
+      <div className="rounded-2xl bg-white p-4 shadow-sm">
+        <p className="mb-1 text-sm font-bold text-neutral-900">Nearby</p>
+        <p className="mb-4 text-xs text-neutral-500">
+          Put this event on the map so people nearby can discover it. This is separate from the venue text above.
+        </p>
+        <EntityLocationSettings entityType="EVENT" entityId={event.id} noun="this event" />
+      </div>
 
       {canEdit && (
         <div className="rounded-2xl border border-error-100 bg-white p-4">

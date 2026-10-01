@@ -824,6 +824,30 @@ export const addressKeys = {
   list: (userId: string) => ["addresses", userId] as const,
 };
 
+export const nearbyKeys = {
+  all: ["nearby"] as const,
+  types: ["nearby", "types"] as const,
+  search: (p: {
+    lat: number;
+    lng: number;
+    radius: number;
+    bounds?: string;
+    type: string;
+    category: string;
+    campus: string;
+    date: string;
+    sort: string;
+    q: string;
+  }) =>
+    ["nearby", "search", p.lat, p.lng, p.radius, p.bounds ?? "", p.type, p.category, p.campus, p.date, p.sort, p.q] as const,
+};
+
+export const locationKeys = {
+  all: ["location"] as const,
+  profile: (userId: string) => ["location", "profile", userId] as const,
+  entity: (userId: string, type: string, id: string) => ["location", "entity", userId, type, id] as const,
+};
+
 /**
  * Event ticketing. Everything is scoped by user where the data is personal
  * (tickets, organizer status) so caches never leak across accounts.
