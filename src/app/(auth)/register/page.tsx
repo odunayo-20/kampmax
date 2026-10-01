@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, FormEvent, useEffect, useCallback } from "react";
+import { Suspense, useState, FormEvent, useEffect, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Mail, UserRound, AtSign, ArrowRight, Sparkles } from "lucide-react";
@@ -17,7 +17,12 @@ import {
   CampusSafetyAgreement,
   ResidenceHallSelector,
   ReferralCodeInput,
+  VerifiedStudentBadgeNotice,
+  AcademicInfoStep,
+  PostRegistrationWelcomeModal,
+  detectCampusFromEmail,
 } from "@/components/auth";
+import { updateMyProfile } from "@/services/profile";
 import { cn } from "@/lib/utils";
 import { Campus, UserRole } from "@/types";
 import { KAMPMAX_ROLE_PATHS, type KampmaxRoleId } from "@/components/layout/footer/role-paths";
@@ -110,6 +115,7 @@ function RegisterForm() {
     (campus: Campus) => {
       setChosenCampus(campus);
       setSelectedCampus(campus);
+      setCampusAutoDetected(false);
       setResidenceHall("");
       setErrors((prev) => {
         if (!prev.campus) return prev;
@@ -135,12 +141,39 @@ function RegisterForm() {
   const [lastName, setLastName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
+  const [campusAutoDetected, setCampusAutoDetected] = useState(false);
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [residenceHall, setResidenceHall] = useState("");
   const [referralCode, setReferralCode] = useState("");
+  const [faculty, setFaculty] = useState("");
+  const [department, setDepartment] = useState("");
+  const [level, setLevel] = useState("");
+  const [matricNumber, setMatricNumber] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+
+  // Institutional email detection: auto-picks campus and queues Verified Student badge
+  const emailDetection = useMemo(() => {
+    return detectCampusFromEmail(email, campuses);
+  }, [email, campuses]);
+
+  useEffect(() => {
+    if (emailDetection.matchedCampus) {
+      if (!chosenCampus || chosenCampus.id !== emailDetection.matchedCampus.id) {
+        setChosenCampus(emailDetection.matchedCampus);
+        setSelectedCampus(emailDetection.matchedCampus);
+        setCampusAutoDetected(true);
+        setErrors((prev) => {
+          if (!prev.campus) return prev;
+          const copy = { ...prev };
+          delete copy.campus;
+          return copy;
+        });
+      }
+    }
+  }, [emailDetection.matchedCampus, chosenCampus, setSelectedCampus]);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -228,13 +261,28 @@ function RegisterForm() {
         // Sync selected campus across the app
         setSelectedCampus(chosenCampus);
 
-        // Store student residence hall & referral preferences in localStorage
+        // Store student residence hall, referral preferences, queued verified student badge, and academic info in localStorage
         if (typeof window !== "undefined") {
           if (residenceHall.trim()) {
             localStorage.setItem("kampmax_user_residence", residenceHall.trim());
           }
           if (referralCode.trim()) {
             localStorage.setItem("kampmax_referral_code", referralCode.trim());
+          }
+          if (emailDetection.badgeQueued) {
+            localStorage.setItem("kampmax_verified_student_queued", "true");
+            localStorage.setItem("kampmax_institutional_email", email.trim().toLowerCase());
+          }
+          if (faculty || department || level || matricNumber) {
+            localStorage.setItem(
+              "kampmax_academic_info",
+              JSON.stringify({
+                faculty: faculty.trim(),
+                department: department.trim(),
+                level: level.trim(),
+                matricNumber: matricNumber.trim(),
+              })
+            );
           }
         }
 
@@ -245,7 +293,22 @@ function RegisterForm() {
           // If offline or mock backend, local selection remains persisted
         }
 
-        router.push(choice.next ?? "/home");
+        // Persist academic info directly to real backend profile
+        if (faculty.trim() || department.trim() || level.trim() || matricNumber.trim()) {
+          try {
+            await updateMyProfile({
+              ...(faculty.trim() ? { faculty: faculty.trim() } : {}),
+              ...(department.trim() ? { department: department.trim() } : {}),
+              ...(level.trim() ? { level: level.trim() } : {}),
+              ...(matricNumber.trim() ? { matricNumber: matricNumber.trim() } : {}),
+            });
+          } catch {
+            // Non-blocking fallback
+          }
+        }
+
+        // Trigger lightweight 10-second post-registration welcome & feed customizer
+        setShowWelcomeModal(true);
       } else {
         setErrors({ general: result.message ?? "Registration failed." });
       }
@@ -254,6 +317,11 @@ function RegisterForm() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleWelcomeComplete() {
+    setShowWelcomeModal(false);
+    router.push(choice.next ?? "/home");
   }
 
   // Avoid flashing before auth state is loaded
@@ -387,6 +455,7 @@ function RegisterForm() {
           selectedCampus={chosenCampus}
           onSelectCampus={handleSelectCampus}
           error={errors.campus}
+          autoDetectedFromEmail={campusAutoDetected}
         />
 
         {/* Hall of Residence / Delivery Hub (Optional) */}
@@ -395,6 +464,19 @@ function RegisterForm() {
           campusName={chosenCampus?.name}
           value={residenceHall}
           onChange={(val) => setResidenceHall(val)}
+        />
+
+        {/* Academic Details (Optional) — Faculty, Department, Level, Matric */}
+        <AcademicInfoStep
+          selectedCampus={chosenCampus}
+          faculty={faculty}
+          department={department}
+          level={level}
+          matricNumber={matricNumber}
+          onChangeFaculty={setFaculty}
+          onChangeDepartment={setDepartment}
+          onChangeLevel={setLevel}
+          onChangeMatricNumber={setMatricNumber}
         />
 
         <div className="grid grid-cols-2 gap-3">
@@ -440,6 +522,9 @@ function RegisterForm() {
           leftIcon={<Mail className="h-4 w-4" />}
           autoComplete="email"
         />
+
+        {/* Verified Student Badge Notice upon institutional email detection */}
+        <VerifiedStudentBadgeNotice detection={emailDetection} />
 
         {/* Nigerian Phone Number with Telco Detection */}
         <NigerianPhoneInput
@@ -531,6 +616,13 @@ function RegisterForm() {
           Sign in
         </Link>
       </p>
+
+      {/* 10-Second Post-Registration Welcome & Feed Customizer */}
+      <PostRegistrationWelcomeModal
+        isOpen={showWelcomeModal}
+        firstName={firstName}
+        onComplete={handleWelcomeComplete}
+      />
     </div>
   );
 }

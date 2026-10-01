@@ -11,15 +11,22 @@ import {
   School,
   AlertCircle,
   Loader2,
+  Sparkles,
+  Navigation,
 } from "lucide-react";
 import type { Campus } from "@/types";
 import { useApp } from "@/lib/app-context";
+import {
+  detectCampusFromGeolocation,
+  type GeolocationDetectionResult,
+} from "@/lib/campus-geolocation";
 import { cn } from "@/lib/utils";
 
 interface RegistrationCampusSelectorProps {
   selectedCampus: Campus | null;
   onSelectCampus: (campus: Campus) => void;
   error?: string;
+  autoDetectedFromEmail?: boolean;
   className?: string;
 }
 
@@ -27,12 +34,28 @@ export function RegistrationCampusSelector({
   selectedCampus,
   onSelectCampus,
   error,
+  autoDetectedFromEmail,
   className,
 }: RegistrationCampusSelectorProps) {
   const { campuses, isLoadingCampuses } = useApp();
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+  const [geoResult, setGeoResult] = useState<GeolocationDetectionResult | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleDetectLocation() {
+    setIsDetectingLocation(true);
+    try {
+      const res = await detectCampusFromGeolocation(campuses);
+      setGeoResult(res);
+      if (res.status === "success" && res.detectedCampus) {
+        // If not already open, we keep it visible for one-tap selection
+      }
+    } finally {
+      setIsDetectingLocation(false);
+    }
+  }
 
   const filteredCampuses = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -87,10 +110,49 @@ export function RegistrationCampusSelector({
             *
           </span>
         </label>
-        <span className="text-xs text-kampmax-text-secondary">
-          Required for campus services
-        </span>
+        <button
+          type="button"
+          onClick={handleDetectLocation}
+          disabled={isDetectingLocation}
+          className="text-xs font-semibold text-kampmax-blue hover:text-kampmax-blue-dark flex items-center gap-1 hover:underline transition-colors disabled:opacity-50"
+        >
+          {isDetectingLocation ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <Navigation className="h-3 w-3" />
+          )}
+          Detect My Campus
+        </button>
       </div>
+
+      {/* Geolocation Quick-Pick Banner (Prompt) */}
+      {geoResult?.status === "success" && geoResult.detectedCampus && (
+        <div className="rounded-lg border border-sky-200 bg-sky-50/90 p-3 flex items-center justify-between gap-3 animate-in fade-in duration-200 shadow-xs">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-full bg-sky-500/15 text-sky-700 flex items-center justify-center shrink-0">
+              <Navigation className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-sky-950 truncate">
+                Are you currently at {geoResult.detectedCampus.name}?
+              </p>
+              <p className="text-[11px] text-sky-700">
+                GPS detected • {geoResult.formattedDistance}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              handleSelect(geoResult.detectedCampus!);
+              setGeoResult(null);
+            }}
+            className="px-3 py-1.5 rounded-md bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shrink-0 shadow-xs transition-colors"
+          >
+            Tap to select
+          </button>
+        </div>
+      )}
 
       {/* Selector Trigger Button */}
       {hasSelection && selectedCampus ? (
@@ -115,6 +177,12 @@ export function RegistrationCampusSelector({
                 <span className="text-[10px] font-bold uppercase tracking-wider bg-kampmax-blue/10 text-kampmax-blue px-2 py-0.5 rounded-full shrink-0">
                   {selectedCampus.abbreviation}
                 </span>
+                {autoDetectedFromEmail && (
+                  <span className="text-[10px] font-medium bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 animate-in fade-in duration-150">
+                    <Sparkles className="h-2.5 w-2.5 text-emerald-600" />
+                    Auto-detected from email
+                  </span>
+                )}
               </div>
               <p className="text-xs text-kampmax-text-secondary flex items-center gap-1 mt-0.5 truncate">
                 <MapPin className="h-3 w-3 shrink-0 text-kampmax-text-muted" />
@@ -254,6 +322,64 @@ export function RegistrationCampusSelector({
                 )}
               </div>
             </div>
+
+            {/* Detect My Campus Action Inside Modal */}
+            <div className="px-4 py-2 bg-neutral-50/80 border-b border-kampmax-border flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={handleDetectLocation}
+                disabled={isDetectingLocation}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-kampmax-blue hover:text-kampmax-blue-dark transition-colors disabled:opacity-50"
+              >
+                {isDetectingLocation ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Navigation className="h-3.5 w-3.5" />
+                )}
+                <span>
+                  {isDetectingLocation
+                    ? "Detecting nearest campus..."
+                    : "Detect My Campus (GPS Quick-Pick)"}
+                </span>
+              </button>
+              {geoResult?.errorMessage && (
+                <span
+                  className="text-[11px] text-amber-700 truncate max-w-[210px]"
+                  title={geoResult.errorMessage}
+                >
+                  {geoResult.errorMessage}
+                </span>
+              )}
+            </div>
+
+            {/* Modal Quick-Pick Banner */}
+            {geoResult?.status === "success" && geoResult.detectedCampus && (
+              <div className="mx-4 mt-3 rounded-lg border border-sky-200 bg-sky-50/90 p-3 flex items-center justify-between gap-3 animate-in fade-in duration-150 shadow-xs">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-sky-500/15 text-sky-700 flex items-center justify-center shrink-0">
+                    <Navigation className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-sky-950 truncate">
+                      Are you currently at {geoResult.detectedCampus.name}?
+                    </p>
+                    <p className="text-[11px] text-sky-700">
+                      GPS detected • {geoResult.formattedDistance}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleSelect(geoResult.detectedCampus!);
+                    setGeoResult(null);
+                  }}
+                  className="px-3 py-1.5 rounded-md bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shrink-0 shadow-xs transition-colors"
+                >
+                  Tap to select
+                </button>
+              </div>
+            )}
 
             {/* Campus List */}
             <div className="flex-1 overflow-y-auto p-4 space-y-2 no-scrollbar">

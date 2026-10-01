@@ -4,29 +4,31 @@ import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { RegistrationCampusSelector } from "../RegistrationCampusSelector";
 import type { Campus } from "@/types";
 
-const mockCampuses: Campus[] = [
-  {
-    id: "unilag",
-    name: "University of Lagos",
-    abbreviation: "UNILAG",
-    location: "Akoka, Lagos",
-    departments: ["Computer Science", "Economics"],
-  },
-  {
-    id: "futa",
-    name: "Federal University of Technology, Akure",
-    abbreviation: "FUTA",
-    location: "Akure, Ondo State",
-    departments: ["Software Engineering", "Architecture"],
-  },
-  {
-    id: "oau",
-    name: "Obafemi Awolowo University",
-    abbreviation: "OAU",
-    location: "Ile-Ife, Osun State",
-    departments: ["Medicine", "Law"],
-  },
-];
+const { mockCampuses } = vi.hoisted(() => ({
+  mockCampuses: [
+    {
+      id: "unilag",
+      name: "University of Lagos",
+      abbreviation: "UNILAG",
+      location: "Akoka, Lagos",
+      departments: ["Computer Science", "Economics"],
+    },
+    {
+      id: "futa",
+      name: "Federal University of Technology, Akure",
+      abbreviation: "FUTA",
+      location: "Akure, Ondo State",
+      departments: ["Software Engineering", "Architecture"],
+    },
+    {
+      id: "oau",
+      name: "Obafemi Awolowo University",
+      abbreviation: "OAU",
+      location: "Ile-Ife, Osun State",
+      departments: ["Medicine", "Law"],
+    },
+  ] as Campus[],
+}));
 
 vi.mock("@/lib/app-context", () => ({
   useApp: () => ({
@@ -34,6 +36,18 @@ vi.mock("@/lib/app-context", () => ({
     isLoadingCampuses: false,
     selectedCampus: { id: "", name: "", abbreviation: "", location: "", departments: [] },
     setSelectedCampus: vi.fn(),
+  }),
+}));
+
+vi.mock("@/lib/campus-geolocation", () => ({
+  detectCampusFromGeolocation: vi.fn().mockResolvedValue({
+    status: "success",
+    userCoords: { latitude: 6.517, longitude: 3.398 },
+    detectedCampus: mockCampuses[0],
+    distanceKm: 0.5,
+    formattedDistance: "500m away",
+    promptMessage: "Are you currently at University of Lagos? Tap to select.",
+    errorMessage: null,
   }),
 }));
 
@@ -57,6 +71,7 @@ describe("RegistrationCampusSelector", () => {
     );
 
     expect(screen.getByText(/Campus \/ Institution/i)).toBeTruthy();
+    expect(screen.getByText(/Detect My Campus/i)).toBeTruthy();
     expect(
       screen.getByText(/Choose your university or polytechnic/i)
     ).toBeTruthy();
@@ -128,5 +143,26 @@ describe("RegistrationCampusSelector", () => {
     fireEvent.click(screen.getByText("Federal University of Technology, Akure"));
 
     expect(onSelectCampus).toHaveBeenCalledWith(mockCampuses[1]);
+  });
+
+  it("detects campus via GPS and selects from quick-pick prompt", async () => {
+    render(
+      <RegistrationCampusSelector
+        selectedCampus={null}
+        onSelectCampus={onSelectCampus}
+      />
+    );
+
+    const detectBtn = screen.getByText(/Detect My Campus/i);
+    fireEvent.click(detectBtn);
+
+    const tapBtn = await screen.findByText(/Tap to select/i);
+    expect(tapBtn).toBeTruthy();
+    expect(
+      screen.getByText(/Are you currently at University of Lagos\?/i)
+    ).toBeTruthy();
+
+    fireEvent.click(tapBtn);
+    expect(onSelectCampus).toHaveBeenCalledWith(mockCampuses[0]);
   });
 }, 20000);

@@ -77,6 +77,10 @@ export function mapBackendCampusToFrontend(
     location,
     departments: [],
     imageUrl: raw.coverImage || raw.logo || undefined,
+    coordinates:
+      typeof raw.latitude === "number" && typeof raw.longitude === "number"
+        ? { latitude: raw.latitude, longitude: raw.longitude }
+        : undefined,
   };
 }
 

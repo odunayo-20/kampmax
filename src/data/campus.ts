@@ -6,6 +6,8 @@ export const campuses: Campus[] = [
     name: "Rufus Giwa Polytechnic",
     abbreviation: "RUGIPO",
     location: "Owo, Ondo State",
+    coordinates: { latitude: 7.1966, longitude: 5.5867 },
+    emailDomains: ["rugipo.edu.ng"],
     departments: [
       "Computer Science",
       "Business Administration",
@@ -22,6 +24,8 @@ export const campuses: Campus[] = [
     name: "Obafemi Awolowo University",
     abbreviation: "OAU",
     location: "Ile-Ife, Osun State",
+    coordinates: { latitude: 7.5199, longitude: 4.523 },
+    emailDomains: ["oauife.edu.ng", "student.oauife.edu.ng", "oau.edu.ng"],
     departments: ["Computer Science", "Law", "Medicine", "Engineering"],
   },
   {
@@ -29,6 +33,8 @@ export const campuses: Campus[] = [
     name: "University of Ibadan",
     abbreviation: "UI",
     location: "Ibadan, Oyo State",
+    coordinates: { latitude: 7.4443, longitude: 3.9003 },
+    emailDomains: ["ui.edu.ng", "stu.ui.edu.ng"],
     departments: ["Computer Science", "Medicine", "Engineering", "Arts"],
   },
   {
@@ -36,6 +42,8 @@ export const campuses: Campus[] = [
     name: "University of Lagos",
     abbreviation: "UNILAG",
     location: "Akoka, Lagos State",
+    coordinates: { latitude: 6.5173, longitude: 3.3986 },
+    emailDomains: ["unilag.edu.ng", "live.unilag.edu.ng"],
     departments: ["Computer Science", "Engineering", "Law", "Business Admin"],
   },
   {
@@ -43,6 +51,8 @@ export const campuses: Campus[] = [
     name: "University of Nigeria",
     abbreviation: "UNN",
     location: "Nsukka, Enugu State",
+    coordinates: { latitude: 6.8645, longitude: 7.4083 },
+    emailDomains: ["unn.edu.ng", "students.unn.edu.ng"],
     departments: ["Computer Science", "Engineering", "Medicine", "Law"],
   },
   {
@@ -50,6 +60,8 @@ export const campuses: Campus[] = [
     name: "Ahmadu Bello University",
     abbreviation: "ABU",
     location: "Zaria, Kaduna State",
+    coordinates: { latitude: 11.1523, longitude: 7.6496 },
+    emailDomains: ["abu.edu.ng"],
     departments: ["Computer Science", "Engineering", "Agriculture", "Law"],
   },
   {
@@ -57,6 +69,8 @@ export const campuses: Campus[] = [
     name: "University of Abuja",
     abbreviation: "UNIABUJA",
     location: "Gwagwalada, FCT",
+    coordinates: { latitude: 8.9833, longitude: 7.1833 },
+    emailDomains: ["uniabuja.edu.ng"],
     departments: ["Computer Science", "Law", "Medicine", "Engineering"],
   },
   {
@@ -64,6 +78,8 @@ export const campuses: Campus[] = [
     name: "Federal University of Technology",
     abbreviation: "FUTO",
     location: "Owerri, Imo State",
+    coordinates: { latitude: 5.385, longitude: 7.045 },
+    emailDomains: ["futo.edu.ng"],
     departments: ["Computer Science", "Engineering", "Biotechnology"],
   },
 ];

@@ -178,6 +178,11 @@ export interface Campus {
   location: string;
   departments: string[];
   imageUrl?: string;
+  emailDomains?: string[];
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
 // ============================================================

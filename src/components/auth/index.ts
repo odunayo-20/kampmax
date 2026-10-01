@@ -15,3 +15,28 @@ export {
   validateReferralCode,
   type ReferralValidationResult,
 } from "./ReferralCodeInput";
+export { VerifiedStudentBadgeNotice } from "./VerifiedStudentBadgeNotice";
+export {
+  AcademicInfoStep,
+  NIGERIAN_FACULTIES,
+  ACADEMIC_LEVELS,
+} from "./AcademicInfoStep";
+export {
+  PostRegistrationWelcomeModal,
+  FEED_INTEREST_OPTIONS,
+  AVATAR_PRESETS,
+  type FeedInterestOption,
+} from "./PostRegistrationWelcomeModal";
+export {
+  detectCampusFromEmail,
+  isInstitutionalEmail,
+  type CampusEmailDetectionResult,
+} from "@/lib/campus-email";
+export {
+  detectCampusFromGeolocation,
+  calculateHaversineDistanceKm,
+  formatCampusDistance,
+  findNearestCampus,
+  type GeolocationDetectionResult,
+  type CampusDistanceResult,
+} from "@/lib/campus-geolocation";
