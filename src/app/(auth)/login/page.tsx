@@ -13,26 +13,18 @@ import { useAuth } from "@/lib/auth-context";
  * Returns a safe destination after login. Only allows local, non-external
  * paths (prevents open-redirect). Unknown params fall back to /home.
  */
-function safeReturnTo(raw: string | null): string {
-  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/home";
-  // Only permit known customer-facing paths (storefronts & the service
-  // marketplace are public).
-  if (raw.startsWith("/store/")) return raw;
-  if (raw.startsWith("/services/")) return raw;
+export function safeReturnTo(raw: string | null): string {
   if (
-    [
-      "/home",
-      "/marketplace",
-      "/cart",
-      "/orders",
-      "/notifications",
-      "/services",
-      "/support",
-    ].some((p) => raw === p || raw.startsWith(`${p}/`))
+    !raw ||
+    !raw.startsWith("/") ||
+    raw.startsWith("//") ||
+    raw.includes("://") ||
+    raw.includes("\\") ||
+    raw.startsWith("/api")
   ) {
-    return raw;
+    return "/home";
   }
-  return "/home";
+  return raw;
 }
 
 export default function LoginPage() {
@@ -46,7 +38,8 @@ export default function LoginPage() {
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const returnTo = safeReturnTo(searchParams.get("returnTo"));
+  const rawTarget = searchParams.get("returnTo") || searchParams.get("redirect");
+  const returnTo = safeReturnTo(rawTarget);
   const { login } = useAuth();
 
   const [email, setEmail] = useState("");
@@ -181,6 +174,15 @@ function LoginForm() {
         </Link>
       </p>
 
+      <div className="pt-2 text-center">
+        <Link
+          href="/home"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-500 hover:text-neutral-900 transition-colors py-1.5 px-3 rounded-full hover:bg-neutral-100"
+        >
+          <span>Explore as Guest</span>
+          <span aria-hidden>→</span>
+        </Link>
+      </div>
     </div>
   );
 }

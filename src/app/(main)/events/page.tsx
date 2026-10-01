@@ -7,6 +7,7 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { useApp } from "@/lib/app-context";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useEvents, useOrganizerStatus } from "@/hooks/use-events";
+import { clearAuthTokens } from "@/lib/auth-storage";
 import { cn } from "@/lib/utils";
 import {
   eventDate,
@@ -110,8 +111,13 @@ export default function EventsPage() {
           <p className="text-sm font-semibold text-error-700">Couldn&apos;t load events</p>
           <p className="mt-1 text-xs text-error-700/80">{events.error.message}</p>
           <button
-            onClick={() => events.refetch()}
-            className="mt-3 rounded-lg bg-white px-4 py-2 text-xs font-semibold text-error-700 shadow-sm"
+            onClick={() => {
+              if (events.error?.message?.toLowerCase().includes("token")) {
+                clearAuthTokens();
+              }
+              events.refetch();
+            }}
+            className="mt-3 rounded-lg bg-white px-4 py-2 text-xs font-semibold text-error-700 shadow-sm hover:bg-error-50 transition-colors"
           >
             Try again
           </button>

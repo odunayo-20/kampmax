@@ -39,11 +39,6 @@ export function MobileHeader() {
             <span className="font-semibold text-neutral-900">{selectedCampus.abbreviation}</span>
           </div>
 
-          <NotificationBell
-            variant="link"
-            className="text-neutral-500"
-          />
-
           <Link
             href="/cart"
             aria-label="Cart"
@@ -61,17 +56,33 @@ export function MobileHeader() {
             )}
           </Link>
 
-          <Link
-            href="/profile"
-            aria-label="Profile"
-            className="ml-1 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-1"
-          >
-            <Avatar
-              name={user?.name || "User"}
-              size="sm"
-              className="h-8 w-8 text-[11px] ring-1 ring-neutral-200"
-            />
-          </Link>
+          {user ? (
+            <>
+              <NotificationBell
+                variant="link"
+                className="text-neutral-500"
+              />
+
+              <Link
+                href="/profile"
+                aria-label="Profile"
+                className="ml-1 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-1"
+              >
+                <Avatar
+                  name={user.name}
+                  size="sm"
+                  className="h-8 w-8 text-[11px] ring-1 ring-neutral-200"
+                />
+              </Link>
+            </>
+          ) : (
+            <Link
+              href="/login"
+              className="ml-1 text-xs font-bold text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-200/80 px-2.5 py-1.5 rounded-lg transition-colors"
+            >
+              Sign In
+            </Link>
+          )}
         </div>
       </div>
     </header>

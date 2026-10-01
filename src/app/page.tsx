@@ -3,20 +3,22 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { useApp } from "@/lib/app-context";
 
 export default function RootPage() {
   const router = useRouter();
   const { status } = useAuth();
+  const { hasCompletedOnboarding } = useApp();
 
   useEffect(() => {
     if (status === "loading") return;
 
-    if (status === "authenticated") {
+    if (status === "authenticated" || hasCompletedOnboarding) {
       router.replace("/home");
     } else {
       router.replace("/onboarding");
     }
-  }, [status, router]);
+  }, [status, hasCompletedOnboarding, router]);
 
   // Show nothing while determining auth state
   return (

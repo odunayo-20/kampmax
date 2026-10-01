@@ -51,15 +51,18 @@ export function useNotifications(
   options?: { pageSize?: number }
 ) {
   const { user } = useAuth();
-  const userId = user?.id || "u1";
+  const userId = user?.id;
   const enabled = Boolean(userId);
   const pageSize = options?.pageSize ?? NOTIFICATION_PAGE_SIZE;
 
   return useInfiniteQuery({
-    queryKey: notificationKeys.list(userId, filters),
+    queryKey: notificationKeys.list(userId || "guest", filters),
     enabled,
     initialPageParam: 0,
     queryFn: async ({ pageParam }): Promise<NotificationPagePayload> => {
+      if (!userId) {
+        return { items: [], nextCursor: null, hasMore: false };
+      }
       await delay();
       const all = getNotifications(userId);
       const visible =
@@ -86,13 +89,15 @@ export function useNotifications(
  */
 export function useUnreadNotificationCount() {
   const { user } = useAuth();
-  const userId = user?.id || "u1";
+  const userId = user?.id;
   const enabled = Boolean(userId);
 
   return useQuery({
-    queryKey: notificationKeys.unreadCount(userId),
+    queryKey: notificationKeys.unreadCount(userId || "guest"),
     enabled,
+    initialData: 0,
     queryFn: async () => {
+      if (!userId) return 0;
       await delay(0);
       return getUnreadNotificationCount(userId);
     },
@@ -104,13 +109,15 @@ export function useUnreadNotificationCount() {
  */
 export function useNotificationCategorySummaries() {
   const { user } = useAuth();
-  const userId = user?.id || "u1";
+  const userId = user?.id;
   const enabled = Boolean(userId);
 
   return useQuery({
-    queryKey: notificationKeys.categorySummaries(userId),
+    queryKey: notificationKeys.categorySummaries(userId || "guest"),
     enabled,
+    initialData: [],
     queryFn: async () => {
+      if (!userId) return [];
       await delay(0);
       return getNotificationCategorySummaries(userId);
     },

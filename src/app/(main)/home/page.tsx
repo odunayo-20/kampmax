@@ -65,7 +65,7 @@ export default function HomePage() {
     .slice(0, 4);
 
   const greeting = getGreeting();
-  const firstName = user?.name?.split(" ")[0] || "Daniel";
+  const firstName = user?.name ? user.name.split(" ")[0] : null;
   const upcomingEvents = eventsQuery.data ?? [];
   const featuredEvent = upcomingEvents.find((e) => e.isFeatured) ?? upcomingEvents[0];
   const opportunities = getAllOpportunities().slice(0, 4);
@@ -77,10 +77,12 @@ export default function HomePage() {
         <div className="flex items-start justify-between">
           <div className="space-y-0.5">
             <h1 className="text-xl sm:text-2xl font-black tracking-tight text-neutral-900 leading-tight">
-              {greeting}, {firstName} <span aria-hidden>👋</span>
+              {firstName ? `${greeting}, ${firstName}` : `${greeting}!`} <span aria-hidden>👋</span>
             </h1>
             <p className="text-xs sm:text-sm text-neutral-500 font-medium">
-              Discover what&apos;s happening around you
+              {user
+                ? "Discover what's happening around you"
+                : `Explore ${selectedCampus.abbreviation} marketplace, events & gigs`}
             </p>
           </div>
 
@@ -108,6 +110,45 @@ export default function HomePage() {
             </span>
           </Link>
         </div>
+
+        {/* Guest Exploration Showcase Card */}
+        {!user && (
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary-600 via-primary-700 to-indigo-700 text-white p-4 sm:p-5 shadow-sm mt-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1 max-w-xl">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 font-bold bg-white/20 px-2 py-0.5 rounded-full text-[10px] tracking-wide uppercase">
+                    <Sparkles className="h-3 w-3" /> Campus Ecosystem
+                  </span>
+                  <span className="text-xs text-blue-100 font-semibold">
+                    Guest Explorer
+                  </span>
+                </div>
+                <h2 className="text-base sm:text-lg font-black tracking-tight text-white">
+                  Buy, sell, hire &amp; connect on {selectedCampus.name}
+                </h2>
+                <p className="text-xs text-blue-100/90 leading-relaxed">
+                  You can freely browse listings, events, and services as a guest. Create an account whenever you&apos;re ready to order or post.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2.5 shrink-0">
+                <Link
+                  href="/login"
+                  className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold transition-colors text-center"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  href="/register"
+                  className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-100 text-primary-700 text-xs font-bold shadow-xs transition-colors text-center"
+                >
+                  Create Free Account
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* 2. Hero Event Banner: Kampmax Fest 2025 */}

@@ -26,7 +26,9 @@ function store(): Storage {
 function readKey(key: string): string | null {
   try {
     const s = store();
-    return typeof s.getItem === "function" ? s.getItem(key) : null;
+    const val = typeof s.getItem === "function" ? s.getItem(key) : null;
+    if (!val || val === "null" || val === "undefined" || val.trim() === "") return null;
+    return val;
   } catch {
     return null;
   }

@@ -109,68 +109,109 @@ export function DesktopNavigation() {
             <ChevronDown className="h-3 w-3 text-neutral-500" />
           </div>
 
-          {/* Chat / Messages with unread badge */}
-          <Link
-            href="/chat"
-            aria-label="Messages"
-            className={cn(
-              "relative h-9 w-9 flex items-center justify-center rounded-xl transition-colors",
-              "hover:bg-neutral-100 text-neutral-600",
-              isActive("/chat") && "bg-primary-50 text-primary-600"
-            )}
-          >
-            <MessageCircle className="h-[18px] w-[18px]" />
-            <UnreadMessageBadge
-              count={unreadMessages}
-              className="absolute -top-1 -right-1 min-w-[16px] h-4 text-[9px]"
-            />
-          </Link>
+          {user ? (
+            <>
+              {/* Chat / Messages with unread badge */}
+              <Link
+                href="/chat"
+                aria-label="Messages"
+                className={cn(
+                  "relative h-9 w-9 flex items-center justify-center rounded-xl transition-colors",
+                  "hover:bg-neutral-100 text-neutral-600",
+                  isActive("/chat") && "bg-primary-50 text-primary-600"
+                )}
+              >
+                <MessageCircle className="h-[18px] w-[18px]" />
+                <UnreadMessageBadge
+                  count={unreadMessages}
+                  className="absolute -top-1 -right-1 min-w-[16px] h-4 text-[9px]"
+                />
+              </Link>
 
-          {/* Notifications Dropdown Bell */}
-          <NotificationBell
-            variant="dropdown"
-            active={isActive("/notifications")}
-          />
+              {/* Notifications Dropdown Bell */}
+              <NotificationBell
+                variant="dropdown"
+                active={isActive("/notifications")}
+              />
 
-          {/* Shopping Cart */}
-          <Link
-            href="/cart"
-            aria-label="Cart"
-            className={cn(
-              "relative h-9 w-9 flex items-center justify-center rounded-xl transition-colors",
-              "hover:bg-neutral-100 text-neutral-600",
-              isActive("/cart") && "bg-primary-50 text-primary-600"
-            )}
-          >
-            <ShoppingCart className="h-[18px] w-[18px]" />
-            {itemCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center bg-primary-600 text-white text-[9px] font-bold rounded-full px-1">
-                {itemCount > 9 ? "9+" : itemCount}
-              </span>
-            )}
-          </Link>
+              {/* Shopping Cart */}
+              <Link
+                href="/cart"
+                aria-label="Cart"
+                className={cn(
+                  "relative h-9 w-9 flex items-center justify-center rounded-xl transition-colors",
+                  "hover:bg-neutral-100 text-neutral-600",
+                  isActive("/cart") && "bg-primary-50 text-primary-600"
+                )}
+              >
+                <ShoppingCart className="h-[18px] w-[18px]" />
+                {itemCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center bg-primary-600 text-white text-[9px] font-bold rounded-full px-1">
+                    {itemCount > 9 ? "9+" : itemCount}
+                  </span>
+                )}
+              </Link>
 
-          <div className="w-px h-6 bg-neutral-200 mx-1" />
+              <div className="w-px h-6 bg-neutral-200 mx-1" />
 
-          {/* User Profile */}
-          <Link
-            href="/profile"
-            aria-label="User Profile"
-            className={cn(
-              "flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-xl transition-colors",
-              "hover:bg-neutral-100",
-              isActive("/profile") && "bg-primary-50"
-            )}
-          >
-            <Avatar
-              name={user?.name || "Daniel"}
-              size="sm"
-              className="h-7 w-7 text-[11px]"
-            />
-            <span className="text-xs font-semibold text-neutral-900 max-w-[110px] truncate">
-              {user?.name || "Profile"}
-            </span>
-          </Link>
+              {/* User Profile */}
+              <Link
+                href="/profile"
+                aria-label="User Profile"
+                className={cn(
+                  "flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-xl transition-colors",
+                  "hover:bg-neutral-100",
+                  isActive("/profile") && "bg-primary-50"
+                )}
+              >
+                <Avatar
+                  name={user.name}
+                  size="sm"
+                  className="h-7 w-7 text-[11px]"
+                />
+                <span className="text-xs font-semibold text-neutral-900 max-w-[110px] truncate">
+                  {user.name}
+                </span>
+              </Link>
+            </>
+          ) : (
+            <>
+              {/* Shopping Cart for Guest */}
+              <Link
+                href="/cart"
+                aria-label="Cart"
+                className={cn(
+                  "relative h-9 w-9 flex items-center justify-center rounded-xl transition-colors",
+                  "hover:bg-neutral-100 text-neutral-600",
+                  isActive("/cart") && "bg-primary-50 text-primary-600"
+                )}
+              >
+                <ShoppingCart className="h-[18px] w-[18px]" />
+                {itemCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center bg-primary-600 text-white text-[9px] font-bold rounded-full px-1">
+                    {itemCount > 9 ? "9+" : itemCount}
+                  </span>
+                )}
+              </Link>
+
+              <div className="w-px h-6 bg-neutral-200 mx-1" />
+
+              <div className="flex items-center gap-2 pl-1">
+                <Link
+                  href="/login"
+                  className="text-xs font-semibold text-neutral-700 hover:text-neutral-900 px-3 py-1.5 rounded-lg hover:bg-neutral-100 transition-colors"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  href="/register"
+                  className="text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 px-3.5 py-1.5 rounded-lg shadow-xs transition-colors"
+                >
+                  Join
+                </Link>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </header>

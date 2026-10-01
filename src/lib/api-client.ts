@@ -215,12 +215,7 @@ interface ParsedError {
 // -- Token helper --
 
 function getAuthToken(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return localStorage.getItem("kampmax_auth_token");
-  } catch {
-    return null;
-  }
+  return getAccessToken();
 }
 
 // -- Core fetch wrapper --
@@ -235,11 +230,12 @@ async function fetchApi(
   const fullPath = `/api/v1${normalized}`;
   const url = new URL(fullPath, baseUrl).toString();
 
+  const token = getAuthToken();
   const reqOptions: RequestInit = {
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      ...(getAuthToken() ? { Authorization: `Bearer ${getAuthToken()}` } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {}),
     },
     ...options,
@@ -268,7 +264,32 @@ async function fetchApi(
       });
       return retryResponse;
     }
-    // Refresh failed — fall through to return the original 401 response
+
+    // Refresh failed or no refresh token was present.
+    // If an Authorization header was sent on a GET request, retry once WITHOUT the
+    // Authorization header in case the endpoint allows public/guest access.
+    const headersObj = (reqOptions.headers || {}) as Record<string, string>;
+    const hasAuthHeader = Boolean(headersObj.Authorization || headersObj.authorization);
+    const isGet = !reqOptions.method || reqOptions.method.toUpperCase() === "GET";
+
+    if (hasAuthHeader && isGet) {
+      const cleanHeaders = { ...headersObj };
+      delete cleanHeaders.Authorization;
+      delete cleanHeaders.authorization;
+      try {
+        const guestResponse = await fetch(url, {
+          ...reqOptions,
+          headers: cleanHeaders,
+        });
+        if (guestResponse.ok) {
+          return guestResponse;
+        }
+      } catch {
+        // network error during retry; fall through to original response
+      }
+    }
+
+    // Refresh failed and unauthenticated retry failed — fall through to return original 401 response
   }
 
   return response;
