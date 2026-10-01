@@ -72,12 +72,20 @@ export function EntityLocationSettings({ entityType, entityId, noun = "this list
     );
   }
 
-  const initial: PickedLocation | null = saved
+  const isSavedValid = Boolean(
+    saved &&
+      typeof saved.latitude === "number" &&
+      typeof saved.longitude === "number" &&
+      !isNaN(saved.latitude) &&
+      !isNaN(saved.longitude),
+  );
+
+  const initial: PickedLocation | null = isSavedValid && saved
     ? {
         latitude: saved.latitude,
         longitude: saved.longitude,
         source: saved.source === "DEVICE" ? "DEVICE" : "MANUAL",
-        accuracyMeters: saved.accuracyMeters,
+        accuracyMeters: typeof saved.accuracyMeters === "number" ? saved.accuracyMeters : null,
         country: null,
         state: null,
         city: null,

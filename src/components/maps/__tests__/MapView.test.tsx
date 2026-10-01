@@ -43,6 +43,7 @@ vi.mock("maplibre-gl", () => ({
   Map: h.Map,
   Marker: h.Marker,
   NavigationControl: vi.fn(),
+  setWorkerUrl: vi.fn(),
   LngLatBounds: vi.fn(function () {
     return { extend: vi.fn(), getCenter: () => ({ lng: 0, lat: 0 }) };
   }),

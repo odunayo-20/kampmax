@@ -51,12 +51,20 @@ export default function MyLocationPage() {
     }
   }
 
-  const initial: PickedLocation | null = saved
+  const isSavedValid = Boolean(
+    saved &&
+      typeof saved.latitude === "number" &&
+      typeof saved.longitude === "number" &&
+      !isNaN(saved.latitude) &&
+      !isNaN(saved.longitude),
+  );
+
+  const initial: PickedLocation | null = isSavedValid && saved
     ? {
         latitude: saved.latitude,
         longitude: saved.longitude,
         source: saved.source === "DEVICE" ? "DEVICE" : "MANUAL",
-        accuracyMeters: saved.accuracyMeters,
+        accuracyMeters: typeof saved.accuracyMeters === "number" ? saved.accuracyMeters : null,
         country: saved.country,
         state: saved.state,
         city: saved.city,
@@ -114,12 +122,12 @@ export default function MyLocationPage() {
           )}
 
           <LocationPicker
-            key={saved?.updatedAt ?? "empty"}
+            key={isSavedValid ? (saved?.updatedAt ?? "saved") : "empty"}
             initial={initial}
             onConfirm={handleConfirm}
             saving={saveMutation.isPending}
             saveError={saveError}
-            confirmLabel={saved ? "Update location" : "Confirm location"}
+            confirmLabel={isSavedValid ? "Update location" : "Confirm location"}
           />
 
           {justSaved && (
@@ -128,7 +136,7 @@ export default function MyLocationPage() {
             </p>
           )}
 
-          {saved && (
+          {isSavedValid && (
             <div className="border-t border-neutral-200 pt-4">
               <Button type="button" variant="outline" onClick={handleRemove} disabled={deleteMutation.isPending}>
                 {deleteMutation.isPending ? "Removing…" : "Remove saved location"}

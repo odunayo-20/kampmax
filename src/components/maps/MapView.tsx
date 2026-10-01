@@ -107,12 +107,19 @@ export function MapView({
       .then((lib) => {
         if (cancelled || !containerRef.current) return;
         libRef.current = lib;
+        if (typeof lib.setWorkerUrl === "function") {
+          lib.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
+        }
         const start = markerPropRef.current;
+        const validStart =
+          start && typeof start.latitude === "number" && typeof start.longitude === "number" && !isNaN(start.latitude) && !isNaN(start.longitude)
+            ? start
+            : null;
         const map = new lib.Map({
           container: containerRef.current,
           style: getMapStyleUrl(),
-          center: [(start ?? DEFAULT_MAP_CENTER).longitude, (start ?? DEFAULT_MAP_CENTER).latitude],
-          zoom: start ? SELECTED_LOCATION_ZOOM : DEFAULT_MAP_ZOOM,
+          center: [(validStart ?? DEFAULT_MAP_CENTER).longitude, (validStart ?? DEFAULT_MAP_CENTER).latitude],
+          zoom: validStart ? SELECTED_LOCATION_ZOOM : DEFAULT_MAP_ZOOM,
           attributionControl: { compact: true },
         });
         mapRef.current = map;

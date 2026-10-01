@@ -316,7 +316,7 @@ async function parseResponse<T>(response: Response): Promise<{
     ) {
       // Unpack envelope
       const backendData = (rawBody as BackendSuccessResponse).data;
-      if (backendData !== null && typeof backendData !== "undefined") {
+      if (typeof backendData !== "undefined") {
         data = backendData as T;
       }
     } else if (rawBody !== null && typeof rawBody !== "undefined") {

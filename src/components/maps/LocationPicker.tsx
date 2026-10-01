@@ -55,12 +55,27 @@ function describe(loc: PickedLocation): string {
   return loc.formattedAddress ?? [loc.area, loc.city, loc.state, loc.country].filter(Boolean).join(", ");
 }
 
+function hasValidCoordinates(
+  loc: unknown,
+): loc is PickedLocation & { latitude: number; longitude: number } {
+  if (!loc || typeof loc !== "object") return false;
+  const l = loc as Partial<PickedLocation>;
+  return (
+    typeof l.latitude === "number" &&
+    typeof l.longitude === "number" &&
+    !isNaN(l.latitude) &&
+    !isNaN(l.longitude)
+  );
+}
+
 /**
  * Reusable location picker: device location, place search, or click/drag on the
  * map. It only reports a selection via `onConfirm`; persistence is the caller's job.
  */
 export function LocationPicker({ initial = null, onConfirm, saving = false, saveError = null, confirmLabel = "Confirm location" }: LocationPickerProps) {
-  const [selected, setSelected] = useState<PickedLocation | null>(initial);
+  const [selected, setSelected] = useState<PickedLocation | null>(
+    hasValidCoordinates(initial) ? initial : null,
+  );
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<GeocodeResult[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -228,13 +243,15 @@ export function LocationPicker({ initial = null, onConfirm, saving = false, save
       <p className="text-xs text-neutral-500">Click the map or drag the marker to fine-tune the spot.</p>
 
       <div aria-live="polite" className="min-h-[2.5rem]">
-        {selected ? (
+        {hasValidCoordinates(selected) ? (
           <>
             <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Selected location</p>
             <p className="mt-0.5 text-sm text-neutral-900">
-              {resolving ? "Looking up address…" : describe(selected) || `${selected.latitude.toFixed(5)}, ${selected.longitude.toFixed(5)}`}
+              {resolving
+                ? "Looking up address…"
+                : describe(selected) || `${selected.latitude.toFixed(5)}, ${selected.longitude.toFixed(5)}`}
             </p>
-            {selected.accuracyMeters !== null && (
+            {selected.accuracyMeters !== null && selected.accuracyMeters !== undefined && !isNaN(selected.accuracyMeters) && (
               <p className="text-xs text-neutral-500">Accurate to about {Math.round(selected.accuracyMeters)} m</p>
             )}
           </>
@@ -254,7 +271,11 @@ export function LocationPicker({ initial = null, onConfirm, saving = false, save
         </p>
       )}
 
-      <Button type="button" onClick={() => selected && void onConfirm(selected)} disabled={!selected || busy || saving}>
+      <Button
+        type="button"
+        onClick={() => hasValidCoordinates(selected) && void onConfirm(selected)}
+        disabled={!hasValidCoordinates(selected) || busy || saving}
+      >
         {saving ? "Saving…" : confirmLabel}
       </Button>
     </div>
