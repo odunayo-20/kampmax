@@ -3,14 +3,19 @@
 import { Suspense, useState, FormEvent, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Mail, Phone, UserRound, AtSign, ArrowRight, Sparkles } from "lucide-react";
+import { ArrowLeft, Mail, UserRound, AtSign, ArrowRight, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui";
 import { Input } from "@/components/ui/Input";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { useAuth } from "@/lib/auth-context";
 import { useApp } from "@/lib/app-context";
 import { joinCampus } from "@/services/campus";
-import { RegistrationCampusSelector } from "@/components/auth";
+import {
+  RegistrationCampusSelector,
+  PasswordStrengthMeter,
+  NigerianPhoneInput,
+  CampusSafetyAgreement,
+} from "@/components/auth";
 import { cn } from "@/lib/utils";
 import { Campus, UserRole } from "@/types";
 import { KAMPMAX_ROLE_PATHS, type KampmaxRoleId } from "@/components/layout/footer/role-paths";
@@ -130,6 +135,7 @@ function RegisterForm() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -158,9 +164,10 @@ function RegisterForm() {
     }
 
     if (phone.trim()) {
-      // Optional — validate format only if provided
-      if (!/^\+?[1-9]\d{1,14}$/.test(phone.replace(/\s/g, ""))) {
-        newErrors.phone = "Enter a valid phone number (e.g. +2348012345678)";
+      // Validate Nigerian E.164 phone: e.g. +2348012345678 (14 chars)
+      const digits = phone.replace(/\D/g, "");
+      if (digits.length < 10 || digits.length > 14) {
+        newErrors.phone = "Enter a valid 11-digit phone number";
       }
     }
 
@@ -173,6 +180,10 @@ function RegisterForm() {
 
     if (password !== confirmPassword) {
       newErrors.confirmPassword = "Passwords do not match";
+    }
+
+    if (!agreedToTerms) {
+      newErrors.terms = "You must agree to the Terms and Campus Safety Charter";
     }
 
     setErrors(newErrors);
@@ -204,7 +215,7 @@ function RegisterForm() {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         password,
-        // Only send phone if the user filled it in
+        // Only send phone if provided
         ...(phone.trim() ? { phone: phone.trim() } : {}),
       });
 
@@ -321,7 +332,7 @@ function RegisterForm() {
     );
   }
 
-  // Step 2: Registration form with embedded campus selection
+  // Step 2: Registration form with embedded campus, password meter, and phone formatter
   return (
     <div className="space-y-6">
       <div>
@@ -407,25 +418,37 @@ function RegisterForm() {
           autoComplete="email"
         />
 
-        <Input
-          label="Phone number (optional)"
-          type="tel"
-          placeholder="+2348012345678"
+        {/* Nigerian Phone Number with Telco Detection */}
+        <NigerianPhoneInput
           value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+          onChange={(normalized) => {
+            setPhone(normalized);
+            if (errors.phone) {
+              setErrors((prev) => {
+                const copy = { ...prev };
+                delete copy.phone;
+                return copy;
+              });
+            }
+          }}
           error={errors.phone}
-          leftIcon={<Phone className="h-4 w-4" />}
-          autoComplete="tel"
         />
 
-        <PasswordInput
-          label="Password"
-          placeholder="At least 8 characters"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          error={errors.password}
-          autoComplete="new-password"
-        />
+        {/* Password Input with Live Strength Meter */}
+        <div className="space-y-1">
+          <PasswordInput
+            label="Password"
+            placeholder="Create a strong password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            error={errors.password}
+            autoComplete="new-password"
+          />
+          <PasswordStrengthMeter
+            password={password}
+            confirmPassword={confirmPassword}
+          />
+        </div>
 
         <PasswordInput
           label="Confirm password"
@@ -436,9 +459,21 @@ function RegisterForm() {
           autoComplete="new-password"
         />
 
-        <p className="text-xs text-kampmax-text-secondary">
-          Password must be 8+ characters with uppercase, lowercase, a number, and a special character.
-        </p>
+        {/* Terms of Service & Campus Safety Charter Agreement */}
+        <CampusSafetyAgreement
+          agreed={agreedToTerms}
+          onChange={(val) => {
+            setAgreedToTerms(val);
+            if (errors.terms) {
+              setErrors((prev) => {
+                const copy = { ...prev };
+                delete copy.terms;
+                return copy;
+              });
+            }
+          }}
+          error={errors.terms}
+        />
 
         <Button
           type="submit"
