@@ -1,15 +1,18 @@
 "use client";
 
-import { Suspense, useState, FormEvent } from "react";
+import { Suspense, useState, FormEvent, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Mail, Phone, UserRound, AtSign, ArrowRight } from "lucide-react";
+import { ArrowLeft, Mail, Phone, UserRound, AtSign, ArrowRight, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui";
 import { Input } from "@/components/ui/Input";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { useAuth } from "@/lib/auth-context";
+import { useApp } from "@/lib/app-context";
+import { joinCampus } from "@/services/campus";
+import { RegistrationCampusSelector } from "@/components/auth";
 import { cn } from "@/lib/utils";
-import { UserRole } from "@/types";
+import { Campus, UserRole } from "@/types";
 import { KAMPMAX_ROLE_PATHS, type KampmaxRoleId } from "@/components/layout/footer/role-paths";
 
 interface RoleChoice {
@@ -50,19 +53,73 @@ function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { register, status: authStatus } = useAuth();
+  const { campuses, selectedCampus, setSelectedCampus } = useApp();
   const campusParam = searchParams.get("campus");
 
   const [step, setStep] = useState<"role" | "form">("role");
   const [choiceId, setChoiceId] = useState<KampmaxRoleId>("customer");
   const choice = choiceById(choiceId);
 
+  // Campus selection state — pre-populated from query param or app state
+  const [chosenCampus, setChosenCampus] = useState<Campus | null>(() => {
+    if (campusParam && campuses.length > 0) {
+      const match = campuses.find(
+        (c) =>
+          c.id === campusParam ||
+          c.abbreviation.toLowerCase() === campusParam.toLowerCase()
+      );
+      if (match) return match;
+    }
+    if (selectedCampus && selectedCampus.id) {
+      return selectedCampus;
+    }
+    return null;
+  });
+
+  // Sync campus state once campuses load
+  useEffect(() => {
+    if (!chosenCampus && campuses.length > 0) {
+      if (campusParam) {
+        const match = campuses.find(
+          (c) =>
+            c.id === campusParam ||
+            c.abbreviation.toLowerCase() === campusParam.toLowerCase()
+        );
+        if (match) {
+          setChosenCampus(match);
+          return;
+        }
+      }
+      if (selectedCampus && selectedCampus.id) {
+        const match = campuses.find((c) => c.id === selectedCampus.id);
+        if (match) {
+          setChosenCampus(match);
+        }
+      }
+    }
+  }, [campuses, campusParam, selectedCampus, chosenCampus]);
+
+  const handleSelectCampus = useCallback(
+    (campus: Campus) => {
+      setChosenCampus(campus);
+      setSelectedCampus(campus);
+      setErrors((prev) => {
+        if (!prev.campus) return prev;
+        const copy = { ...prev };
+        delete copy.campus;
+        return copy;
+      });
+    },
+    [setSelectedCampus]
+  );
+
   /** Where a role choice should land once we already have a session for
    * this person — the onboarding route for that capability (customer has
-   * none, since they already are one), carrying the campus pick forward
-   * so they don't have to make it twice. */
+   * none, since they already are one), carrying the campus pick forward. */
   function destinationForExistingAccount(c: RoleChoice): string {
     if (!c.next) return "/home";
-    return campusParam ? `${c.next}?campus=${encodeURIComponent(campusParam)}` : c.next;
+    const cid = chosenCampus?.id || campusParam;
+    return cid ? `${c.next}?campus=${encodeURIComponent(cid)}` : c.next;
   }
 
   // Form fields — mapped 1-to-1 with backend RegisterDto
@@ -79,6 +136,11 @@ function RegisterForm() {
 
   function validateForm(): boolean {
     const newErrors: Record<string, string> = {};
+
+    // Mandatory campus selection
+    if (!chosenCampus || !chosenCampus.id) {
+      newErrors.campus = "Please select your campus or institution";
+    }
 
     if (!firstName.trim()) newErrors.firstName = "First name is required";
     if (!lastName.trim()) newErrors.lastName = "Last name is required";
@@ -120,8 +182,6 @@ function RegisterForm() {
   function choose(id: KampmaxRoleId) {
     const c = choiceById(id);
     if (authStatus === "authenticated") {
-      // Already signed in — activate the chosen capability on the existing
-      // account instead of walking them through creating a second one.
       router.push(destinationForExistingAccount(c));
       return;
     }
@@ -132,6 +192,7 @@ function RegisterForm() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!validateForm()) return;
+    if (!chosenCampus) return;
 
     setLoading(true);
     setErrors({});
@@ -146,7 +207,18 @@ function RegisterForm() {
         // Only send phone if the user filled it in
         ...(phone.trim() ? { phone: phone.trim() } : {}),
       });
+
       if (result.success) {
+        // Sync selected campus across the app
+        setSelectedCampus(chosenCampus);
+
+        // Resiliently register campus membership in backend
+        try {
+          await joinCampus(chosenCampus.id);
+        } catch {
+          // If offline or mock backend, local selection remains persisted
+        }
+
         router.push(choice.next ?? "/home");
       } else {
         setErrors({ general: result.message ?? "Registration failed." });
@@ -158,9 +230,7 @@ function RegisterForm() {
     }
   }
 
-  // Avoid flashing the "create account" choices before we know whether a
-  // session already exists — an authenticated visitor gets a different
-  // set of destinations (see choose()/destinationForExistingAccount()).
+  // Avoid flashing before auth state is loaded
   if (authStatus === "loading") {
     return (
       <div className="flex items-center justify-center py-20">
@@ -180,7 +250,7 @@ function RegisterForm() {
             className="inline-flex items-center gap-1 text-sm text-kampmax-text-secondary hover:text-kampmax-text transition-colors mb-6"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back
+            Back to intro
           </Link>
           <h1 className="text-2xl font-bold text-kampmax-text">
             {alreadySignedIn ? "You're already signed in" : "Create your Kampmax account"}
@@ -251,24 +321,31 @@ function RegisterForm() {
     );
   }
 
-  // Step 2: Registration form
+  // Step 2: Registration form with embedded campus selection
   return (
     <div className="space-y-6">
       <div>
-        <button
-          onClick={() => setStep("role")}
-          className="inline-flex items-center gap-1 text-sm text-kampmax-text-secondary hover:text-kampmax-text transition-colors mb-6"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back
-        </button>
+        <div className="flex items-center justify-between mb-4">
+          <button
+            onClick={() => setStep("role")}
+            className="inline-flex items-center gap-1 text-sm text-kampmax-text-secondary hover:text-kampmax-text transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Change role
+          </button>
+          <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-kampmax-blue/10 text-kampmax-blue">
+            <Sparkles className="h-3.5 w-3.5" />
+            {KAMPMAX_ROLE_PATHS[choiceId].title}
+          </span>
+        </div>
+
         <h1 className="text-2xl font-bold text-kampmax-text">
-          Create your account{choice.next ? ` as a ${KAMPMAX_ROLE_PATHS[choiceId].title}` : ""}
+          Create your account
         </h1>
         <p className="text-sm text-kampmax-text-secondary mt-1">
           {choice.next
-            ? "We'll create your Kampmax account first, then start your onboarding in a moment."
-            : "Fill in your details to start using Kampmax."}
+            ? "We'll set up your campus account first, then begin your role onboarding."
+            : "Fill in your details and select your school to start using Kampmax."}
         </p>
       </div>
 
@@ -278,6 +355,13 @@ function RegisterForm() {
             <p className="text-sm text-kampmax-error">{errors.general}</p>
           </div>
         )}
+
+        {/* Embedded, Required Campus Selection */}
+        <RegistrationCampusSelector
+          selectedCampus={chosenCampus}
+          onSelectCampus={handleSelectCampus}
+          error={errors.campus}
+        />
 
         <div className="grid grid-cols-2 gap-3">
           <Input
