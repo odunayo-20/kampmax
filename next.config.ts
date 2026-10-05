@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },
       { protocol: "https", hostname: "res.cloudinary.com" },
+      // Locally stored uploads in development (backend STORAGE_PROVIDER=local).
+      { protocol: "http", hostname: "localhost" },
     ],
   },
   async headers() {

@@ -13,6 +13,7 @@ import type {
   SupportCustomerReplyInput,
   SupportCustomerService,
   SupportTicket,
+  SupportTicketCategory,
   SupportTicketDetail,
 } from "@/types/admin";
 
@@ -147,7 +148,7 @@ export const supportService: SupportCustomerService = {
     // Trigger in-app notification for customer bell
     pushUserNotification({
       userId: effectiveUserId,
-      type: "messages",
+      type: "message",
       category: "messages",
       title: "Support Message Sent",
       message: `Your message was sent on ticket #${id}.`,
@@ -157,7 +158,7 @@ export const supportService: SupportCustomerService = {
     if (effectiveUserId !== "u1") {
       pushUserNotification({
         userId: "u1",
-        type: "messages",
+        type: "message",
         category: "messages",
         title: "Support Message Sent",
         message: `Your message was sent on ticket #${id}.`,
@@ -168,7 +169,7 @@ export const supportService: SupportCustomerService = {
     // Trigger in-app notification for admin bell
     pushUserNotification({
       userId: "admin",
-      type: "messages",
+      type: "message",
       category: "messages",
       title: `Customer Message on Ticket #${id}`,
       message: `New message on ticket #${id}: "${snippet}"`,

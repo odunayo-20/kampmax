@@ -40,7 +40,8 @@ export type AdminNavItemKey =
   | "verifications"
   | "security"
   | "support"
-  | "eventOrganizers";
+  | "eventOrganizers"
+  | "blog";
 
 /**
  * Which sections each role can see. CAMPUS_ADMIN is scoped to their
@@ -86,11 +87,24 @@ export function canSeeSection(
 const ACTION_ROLES: Record<string, AdminRole[]> = {
   // backend permission `taxonomy.manage` (SUPER_ADMIN, ADMIN)
   "categories:manage": ["SUPER_ADMIN", "ADMIN"],
+  // backend blog.* permissions (see common/rbac/permissions.ts)
+  "blog:create": ["SUPER_ADMIN", "ADMIN"],
+  "blog:update": ["SUPER_ADMIN", "ADMIN"],
+  "blog:publish": ["SUPER_ADMIN", "ADMIN"],
+  "blog:delete": ["SUPER_ADMIN", "ADMIN"],
+  "blog:manageCategories": ["SUPER_ADMIN", "ADMIN"],
+  "blog:manageTags": ["SUPER_ADMIN", "ADMIN"],
 };
 
 /** UI action -> backend permission slug (see backend common/rbac/permissions.ts). */
 const ACTION_SLUGS: Record<string, string> = {
   "categories:manage": "taxonomy.manage",
+  "blog:create": "blog.create",
+  "blog:update": "blog.update",
+  "blog:publish": "blog.publish",
+  "blog:delete": "blog.delete",
+  "blog:manageCategories": "blog.manage_categories",
+  "blog:manageTags": "blog.manage_tags",
 };
 
 /**

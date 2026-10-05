@@ -285,7 +285,7 @@ export function createMockSupportManagementService(): AdminSupportManagementServ
       // Real in-app notification to the requester (Module 26A store).
       pushNotificationRecord({
         userId: ticket.customer.id,
-        type: "messages",
+        type: "message",
         category: "messages",
         title: "Kampmax support replied to your ticket",
         message: `"${ticket.subject}" — ${ctx.actor.name}: "${input.body.slice(0, 60)}"`,
@@ -294,7 +294,7 @@ export function createMockSupportManagementService(): AdminSupportManagementServ
       if (ticket.customer.id !== "u1") {
         pushNotificationRecord({
           userId: "u1",
-          type: "messages",
+          type: "message",
           category: "messages",
           title: "Kampmax support replied to your ticket",
           message: `"${ticket.subject}" — ${ctx.actor.name}: "${input.body.slice(0, 60)}"`,
@@ -305,7 +305,7 @@ export function createMockSupportManagementService(): AdminSupportManagementServ
       // Real in-app notification to the admin console bell
       pushNotificationRecord({
         userId: "admin",
-        type: "messages",
+        type: "message",
         category: "messages",
         title: "Support Response Dispatched",
         message: `Replied to ${ticket.customer.name} on #${ticket.id}`,
@@ -872,7 +872,7 @@ export function createMockSupportManagementService(): AdminSupportManagementServ
       const targetAdmin = ticket.assigneeId || "admin";
       pushNotificationRecord({
         userId: targetAdmin,
-        type: "messages",
+        type: "message",
         category: "messages",
         title: "Customer replied to support ticket",
         message: `${ticket.customer.name} replied on #${ticket.id}: "${input.body.slice(0, 80)}"`,
@@ -882,7 +882,7 @@ export function createMockSupportManagementService(): AdminSupportManagementServ
       // Notify customer confirmation
       pushNotificationRecord({
         userId,
-        type: "messages",
+        type: "message",
         category: "messages",
         title: "Support reply sent",
         message: `Your message was sent to Support on #${ticket.id}.`,

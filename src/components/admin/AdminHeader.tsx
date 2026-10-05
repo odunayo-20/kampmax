@@ -215,7 +215,7 @@ export function AdminHeader() {
                   return (
                     <li key={n.id}>
                       <Link
-                        href={n.actionUrl || `/admin/notifications/${n.id}`}
+                        href={(typeof n.data?.actionUrl === "string" ? n.data.actionUrl : null) || `/admin/notifications/${n.id}`}
                         onClick={() => {
                           markNotificationRead(n.id);
                           setNotifOpen(false);
@@ -243,7 +243,7 @@ export function AdminHeader() {
                           </span>
                         </span>
                         <span className={cn("line-clamp-1 pl-4 text-xs", !n.read ? "text-kampmax-text/90 font-medium" : "text-kampmax-text-secondary")}>
-                          {n.message}
+                          {n.body}
                         </span>
                         <span className="flex items-center gap-1.5 pl-4 text-[10px] text-kampmax-text-secondary/70">
                           <TypeIcon className="h-3 w-3" />

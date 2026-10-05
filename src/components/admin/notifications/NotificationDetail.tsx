@@ -84,7 +84,7 @@ function DetailContent({
           Message
         </h2>
         <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-kampmax-text">
-          {row.message || row.body}
+          {row.body}
         </p>
       </div>
 

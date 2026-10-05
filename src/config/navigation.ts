@@ -1,6 +1,7 @@
 import {
   Home,
   Compass,
+  Newspaper,
   Ticket,
   Users,
   Menu,
@@ -130,6 +131,13 @@ export const MORE_MENU_SECTIONS: NavSectionConfig[] = [
         href: "/nearby",
         icon: MapPin,
         description: "Interactive campus map, food & verified spots",
+      },
+      {
+        id: "blog",
+        label: "Blog",
+        href: "/blog",
+        icon: Newspaper,
+        description: "Guides, opportunities & stories for students and vendors",
       },
     ],
   },

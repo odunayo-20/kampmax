@@ -31,6 +31,7 @@ import {
   Fingerprint,
   Headphones,
   Wrench,
+  Newspaper,
 } from "lucide-react";
 import { AdminNavItemKey, canSeeSection } from "./permissions";
 import { AdminRole } from "@/types/admin";
@@ -84,6 +85,13 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       { key: "products", href: "/admin/products", label: "Products", icon: Package },
       { key: "marketplace", href: "/admin/marketplace", label: "Marketplace", icon: Boxes },
       { key: "categories", href: "/admin/categories", label: "Categories", icon: Tags },
+    ],
+  },
+  {
+    id: "content",
+    label: "Content",
+    items: [
+      { key: "blog", href: "/admin/blog", label: "Blog", icon: Newspaper },
     ],
   },
   {

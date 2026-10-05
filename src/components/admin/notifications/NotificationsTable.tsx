@@ -113,8 +113,8 @@ export function NotificationsTable(props: NotificationsTableProps) {
                         {r.title}
                       </p>
                     </div>
-                    <p className="mt-0.5 truncate text-xs text-kampmax-text-secondary" title={r.message || r.body}>
-                      {previewText(r.message || r.body, 64)}
+                    <p className="mt-0.5 truncate text-xs text-kampmax-text-secondary" title={r.body}>
+                      {previewText(r.body, 64)}
                     </p>
                   </td>
 
@@ -201,7 +201,7 @@ export function NotificationsTable(props: NotificationsTableProps) {
             </div>
 
             <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-kampmax-text-secondary">
-              {previewText(r.message || r.body, 110)}
+              {previewText(r.body, 110)}
             </p>
 
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-dashed border-kampmax-border pt-2 text-[11px] text-kampmax-text-secondary">
