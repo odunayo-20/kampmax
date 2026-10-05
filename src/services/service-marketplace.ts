@@ -66,6 +66,25 @@ const DEFAULT_PAGE_SIZE = 12;
 
 // ── Lookups ───────────────────────────────────────────────────
 
+/**
+ * Live catalogue only (GET /service-provider/services): unlike
+ * getMarketplaceServicesApi it never falls back to the bundled demo data, so
+ * an outage surfaces as an error instead of fake rows.
+ */
+export async function listPublicServices(
+  query: { q?: string; limit?: number } = {}
+): Promise<MarketplaceService[]> {
+  const params = new URLSearchParams();
+  if (query.q) params.set("q", query.q);
+  if (query.limit) params.set("limit", String(query.limit));
+  const qs = params.toString();
+  const { data, error } = await apiClient.get<MarketplaceServicePage>(
+    `/service-provider/services${qs ? `?${qs}` : ""}`
+  );
+  if (error) throw error;
+  return data?.items ?? [];
+}
+
 export function getProviderById(providerId: string): MarketplaceProvider | undefined {
   return marketplaceServiceProviders.find((p) => p.id === providerId);
 }

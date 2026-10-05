@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import {
   Search,
@@ -21,13 +22,12 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { useEvents } from "@/hooks/use-events";
 import { useDebounce } from "@/hooks/use-debounce";
 import { eventDate, eventTime, priceLabel } from "@/components/events/event-format";
-import { products } from "@/data/products";
-import { marketplaceServices } from "@/data/service-marketplace";
-import { getAllOpportunities } from "@/data/opportunity";
-import { campusCourses } from "@/data/courses";
+import { fetchProducts } from "@/services/products";
+import { listPublicJobs } from "@/services/jobs";
+import { listPublicServices } from "@/services/service-marketplace";
 import { cn } from "@/lib/utils";
 
-type ExploreCategory = "all" | "events" | "products" | "services" | "jobs" | "courses";
+type ExploreCategory = "all" | "events" | "products" | "services" | "jobs";
 
 const CATEGORIES: { id: ExploreCategory; label: string }[] = [
   { id: "all", label: "All" },
@@ -35,56 +35,55 @@ const CATEGORIES: { id: ExploreCategory; label: string }[] = [
   { id: "products", label: "Products" },
   { id: "services", label: "Services" },
   { id: "jobs", label: "Jobs" },
-  { id: "courses", label: "Courses" },
 ];
 
 export default function ExplorePage() {
   const [selectedCategory, setSelectedCategory] = useState<ExploreCategory>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const q = searchQuery.toLowerCase().trim();
+  const debouncedQ = useDebounce(searchQuery.trim(), 300);
+  const search = debouncedQ || undefined;
 
-  const allOpportunities = useMemo(() => getAllOpportunities(), []);
-
-  const debouncedQ = useDebounce(q, 300);
-  const eventsQuery = useEvents({ q: debouncedQ || undefined, limit: 20 });
+  const eventsQuery = useEvents({ q: search, limit: 20 });
   const filteredEvents = eventsQuery.data ?? [];
 
-  const filteredProducts = useMemo(() => {
-    return products.filter(
-      (p) => !q || p.title.toLowerCase().includes(q) || p.description.toLowerCase().includes(q)
-    );
-  }, [q]);
+  const productsQuery = useQuery({
+    queryKey: ["explore", "products", search],
+    queryFn: async () => {
+      const res = await fetchProducts({ search, status: "ACTIVE", limit: 4 });
+      if (res.error) throw res.error;
+      return res.data;
+    },
+  });
+  const servicesQuery = useQuery({
+    queryKey: ["explore", "services", search],
+    queryFn: () => listPublicServices({ q: search, limit: 3 }),
+  });
+  const jobsQuery = useQuery({
+    queryKey: ["explore", "jobs", search],
+    queryFn: async () => {
+      const res = await listPublicJobs({ search, limit: 3 });
+      if (res.error) throw res.error;
+      return res.jobs;
+    },
+  });
 
-  const filteredServices = useMemo(() => {
-    return marketplaceServices.filter(
-      (s) =>
-        !q ||
-        s.name.toLowerCase().includes(q) ||
-        s.description.toLowerCase().includes(q) ||
-        s.tags?.some((t) => t.toLowerCase().includes(q))
-    );
-  }, [q]);
+  const filteredProducts = productsQuery.data ?? [];
+  const filteredServices = servicesQuery.data ?? [];
+  const filteredJobs = jobsQuery.data ?? [];
 
-  const filteredJobs = useMemo(() => {
-    return allOpportunities.filter(
-      (j) =>
-        !q ||
-        j.title.toLowerCase().includes(q) ||
-        j.employer.name.toLowerCase().includes(q) ||
-        j.skills.some((s) => s.toLowerCase().includes(q))
-    );
-  }, [allOpportunities, q]);
-
-  const filteredCourses = useMemo(() => {
-    return campusCourses.filter(
-      (c) =>
-        !q ||
-        c.title.toLowerCase().includes(q) ||
-        c.provider.toLowerCase().includes(q) ||
-        c.category.toLowerCase().includes(q)
-    );
-  }, [q]);
+  const failed = [eventsQuery, productsQuery, servicesQuery, jobsQuery].some((q) => q.isError);
+  const loading = [eventsQuery, productsQuery, servicesQuery, jobsQuery].some((q) => q.isLoading);
+  const showEvents = selectedCategory === "all" || selectedCategory === "events";
+  const showProducts = selectedCategory === "all" || selectedCategory === "products";
+  const showServices = selectedCategory === "all" || selectedCategory === "services";
+  const showJobs = selectedCategory === "all" || selectedCategory === "jobs";
+  const empty =
+    !loading &&
+    (!showEvents || !filteredEvents.length) &&
+    (!showProducts || !filteredProducts.length) &&
+    (!showServices || !filteredServices.length) &&
+    (!showJobs || !filteredJobs.length);
 
   return (
     <PageContainer className="space-y-4 pb-12">
@@ -132,8 +131,20 @@ export default function ExplorePage() {
 
       {/* Mixed Multi-Vertical Results Stream */}
       <div className="space-y-3.5">
+        {failed && (
+          <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Some results could not be loaded. Please try again.
+          </p>
+        )}
+        {loading && <p className="text-xs text-neutral-500">Loading…</p>}
+        {empty && !failed && (
+          <p className="py-8 text-center text-sm text-neutral-500">
+            Nothing found{debouncedQ ? ` for "${debouncedQ}"` : ""}.
+          </p>
+        )}
+
         {/* Events Vertical */}
-        {(selectedCategory === "all" || selectedCategory === "events") &&
+        {showEvents &&
           filteredEvents.map((event) => (
             <div
               key={`event-${event.id}`}
@@ -179,11 +190,11 @@ export default function ExplorePage() {
           ))}
 
         {/* Products Vertical */}
-        {(selectedCategory === "all" || selectedCategory === "products") &&
-          filteredProducts.slice(0, 4).map((product) => (
+        {showProducts &&
+          filteredProducts.map((product) => (
             <Link
               key={`product-${product.id}`}
-              href={`/marketplace/product/${product.id}`}
+              href={`/marketplace/${product.id}`}
               className="group flex items-center justify-between p-3.5 bg-white border border-neutral-200/90 rounded-2xl shadow-xs hover:shadow-md transition-all gap-3"
             >
               <div className="flex items-center gap-3">
@@ -198,7 +209,10 @@ export default function ExplorePage() {
                   <h3 className="text-sm font-bold text-neutral-900 line-clamp-1 group-hover:text-primary-600">
                     {product.title}
                   </h3>
-                  <p className="text-xs text-neutral-500">Gadgets & Accessories</p>
+                  <p className="text-xs text-neutral-500 capitalize">
+                    {product.condition}
+                    {product.location ? ` · ${product.location}` : ""}
+                  </p>
                   <p className="text-xs font-extrabold text-neutral-900">
                     ₦{product.price.toLocaleString()}
                   </p>
@@ -209,14 +223,13 @@ export default function ExplorePage() {
                 <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-semibold text-[10px]">
                   Product
                 </span>
-                <span className="text-[11px] text-neutral-400">0.5 km</span>
               </div>
             </Link>
           ))}
 
         {/* Services Vertical */}
-        {(selectedCategory === "all" || selectedCategory === "services") &&
-          filteredServices.slice(0, 3).map((service) => (
+        {showServices &&
+          filteredServices.map((service) => (
             <Link
               key={`service-${service.id}`}
               href={`/services/${service.id}`}
@@ -238,7 +251,7 @@ export default function ExplorePage() {
                     {service.name}
                   </h3>
                   <p className="text-xs text-neutral-500">
-                    {service.tags?.[0] || "Campus Service"} • Verified Pro
+                    {service.durationMinutes ? `${service.durationMinutes} min` : "Campus service"}
                   </p>
                   <p className="text-xs font-extrabold text-neutral-900">
                     ₦{service.price.toLocaleString()}
@@ -250,14 +263,13 @@ export default function ExplorePage() {
                 <span className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-600 font-semibold text-[10px]">
                   Service
                 </span>
-                <span className="text-[11px] text-neutral-400">1.1 km</span>
               </div>
             </Link>
           ))}
 
         {/* Jobs Vertical */}
-        {(selectedCategory === "all" || selectedCategory === "jobs") &&
-          filteredJobs.slice(0, 3).map((job) => (
+        {showJobs &&
+          filteredJobs.map((job) => (
             <Link
               key={`job-${job.id}`}
               href={`/jobs/${job.id}`}
@@ -265,7 +277,7 @@ export default function ExplorePage() {
             >
               <div className="flex items-center gap-3">
                 <div className="w-14 h-14 rounded-xl bg-teal-50 border border-teal-100 flex items-center justify-center text-teal-600 font-black text-lg shrink-0">
-                  {job.employer.name.charAt(0)}
+                  {(job.employer.displayName).charAt(0)}
                 </div>
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-1.5">
@@ -273,9 +285,13 @@ export default function ExplorePage() {
                       {job.title}
                     </h3>
                   </div>
-                  <p className="text-xs text-neutral-500">{job.employer.name}</p>
+                  <p className="text-xs text-neutral-500">
+                    {job.employer.displayName}
+                  </p>
                   <p className="text-xs font-bold text-teal-700">
-                    ₦{(job.budget.max || job.budget.min || 50000).toLocaleString()}/month
+                    {job.budgetMax || job.budgetMin
+                      ? `₦${Number(job.budgetMax ?? job.budgetMin).toLocaleString()}`
+                      : "Budget negotiable"}
                   </p>
                 </div>
               </div>
@@ -284,44 +300,8 @@ export default function ExplorePage() {
                 <span className="px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 font-semibold text-[10px]">
                   Job
                 </span>
-                <span className="text-[11px] text-neutral-400">1.5 km</span>
               </div>
             </Link>
-          ))}
-
-        {/* Courses Vertical */}
-        {(selectedCategory === "all" || selectedCategory === "courses") &&
-          filteredCourses.map((course) => (
-            <div
-              key={`course-${course.id}`}
-              className="group flex items-center justify-between p-3.5 bg-white border border-neutral-200/90 rounded-2xl shadow-xs hover:shadow-md transition-all gap-3"
-            >
-              <div className="flex items-center gap-3">
-                <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-indigo-50 shrink-0 border border-indigo-100">
-                  <img
-                    src={course.imageUrl}
-                    alt={course.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                  />
-                </div>
-                <div className="space-y-0.5">
-                  <h3 className="text-sm font-bold text-neutral-900 line-clamp-1">
-                    {course.title}
-                  </h3>
-                  <p className="text-xs text-neutral-500">{course.provider} • {course.duration}</p>
-                  <p className="text-xs font-extrabold text-neutral-900">
-                    ₦{course.price.toLocaleString()}
-                  </p>
-                </div>
-              </div>
-
-              <div className="text-right flex flex-col items-end gap-1">
-                <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 font-semibold text-[10px]">
-                  Course
-                </span>
-                <span className="text-[11px] text-neutral-400">{course.distance || "2.0 km"}</span>
-              </div>
-            </div>
           ))}
       </div>
     </PageContainer>
