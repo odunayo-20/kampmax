@@ -77,7 +77,12 @@ export function mapBackendTxTypeToFrontend(type: string): WalletTransactionType 
   const upper = type.toUpperCase();
   switch (upper) {
     case "DEPOSIT":
+    case "CREDIT": // top-ups and other inbound credits
       return "deposit";
+    case "DEBIT":
+      return "purchase";
+    case "SETTLEMENT":
+      return "vendor_payout";
     case "WITHDRAWAL":
     case "PAYOUT":
       return "withdrawal";
@@ -93,6 +98,7 @@ export function mapBackendTxTypeToFrontend(type: string): WalletTransactionType 
       return "transfer";
     case "FEE":
     case "PLATFORM_FEE":
+    case "COMMISSION":
       return "payment";
     default:
       return "payment";
@@ -106,8 +112,9 @@ export function mapBackendWalletTransactionToFrontend(
   raw: BackendWalletTransactionResponse
 ): WalletTransaction {
   const statusLower = raw.status.toLowerCase();
+  // The ledger's states are PENDING / SUCCESS / FAILED / REVERSED.
   const status: WalletTransactionStatus =
-    statusLower === "completed"
+    statusLower === "success" || statusLower === "completed"
       ? "completed"
       : statusLower === "pending"
       ? "pending"
@@ -417,6 +424,33 @@ export interface WalletTopup {
 
 function toFailure(error: ApiError | null, fallback: string): Error {
   return new Error(error?.message || fallback);
+}
+
+/**
+ * The signed-in user's real wallet (the backend creates it on first access).
+ * Unlike fetchWallet it never falls back to bundled demo data: failures throw.
+ */
+export async function fetchMyWallet(): Promise<Wallet> {
+  const { data, error } = await apiClient.get<BackendWalletResponse>("/wallet");
+  if (error || !data || !data.id) throw toFailure(error, "Could not load your wallet.");
+  return mapBackendWalletToFrontend(data);
+}
+
+/** The signed-in user's real wallet transactions, newest first; throws on failure. */
+export async function fetchMyWalletTransactions(
+  params: { page?: number; limit?: number } = {},
+): Promise<WalletTransaction[]> {
+  const searchParams = new URLSearchParams();
+  if (params.page) searchParams.set("page", String(params.page));
+  if (params.limit) searchParams.set("limit", String(params.limit));
+  const qs = searchParams.toString();
+  const { data, error } = await apiClient.get<BackendPaginatedWalletTransactions>(
+    `/wallet/transactions${qs ? `?${qs}` : ""}`,
+  );
+  if (error || !data || !Array.isArray(data.data)) {
+    throw toFailure(error, "Could not load your transactions.");
+  }
+  return data.data.map(mapBackendWalletTransactionToFrontend);
 }
 
 /** The signed-in user's real wallet balance; throws instead of showing a fake one. */

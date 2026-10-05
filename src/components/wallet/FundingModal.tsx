@@ -1,59 +1,45 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { cn, formatNaira } from "@/lib/utils";
-import { X, CreditCard, Building2, Smartphone, Check } from "lucide-react";
+import { X } from "lucide-react";
 
 interface FundingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onFund: (amount: number, method: string) => void;
+  /** Starts the payment. Resolves when it was handed off (the page usually navigates away); rejects with a user-facing message. */
+  onFund: (amount: number) => Promise<void>;
   balance: number;
 }
 
 const quickAmounts = [1000, 2000, 5000, 10000, 20000, 50000];
 
-const fundingMethods = [
-  { id: "card", label: "Debit Card", icon: CreditCard, description: "Visa, Mastercard" },
-  { id: "bank_transfer", label: "Bank Transfer", icon: Building2, description: "All banks" },
-  { id: "ussd", label: "USSD", icon: Smartphone, description: "Dial *737#" },
-];
 
 export function FundingModal({ isOpen, onClose, onFund, balance }: FundingModalProps) {
   const [amount, setAmount] = useState("");
-  const [method, setMethod] = useState("card");
-  const [step, setStep] = useState<"form" | "processing" | "success">("form");
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, []);
+  const [error, setError] = useState<string | null>(null);
+  const [step, setStep] = useState<"form" | "processing">("form");
 
   function handleClose() {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = null;
     setStep("form");
+    setError(null);
     onClose();
   }
 
   if (!isOpen) return null;
 
-  function handleFund() {
+  async function handleFund() {
     const amt = Number(amount);
-    if (amt < 100) return;
+    if (!Number.isFinite(amt) || amt < 100) return;
+    setError(null);
     setStep("processing");
-    // Simulate processing
-    timerRef.current = setTimeout(() => {
-      onFund(amt, method);
-      setStep("success");
-      timerRef.current = setTimeout(() => {
-        setStep("form");
-        setAmount("");
-        onClose();
-      }, 2000);
-    }, 1500);
+    try {
+      await onFund(amt);
+      // Paystack takes over the page; if we are still here, show the hand-off.
+    } catch (e) {
+      setStep("form");
+      setError(e instanceof Error ? e.message : "Could not start the payment.");
+    }
   }
 
   return (
@@ -70,21 +56,9 @@ export function FundingModal({ isOpen, onClose, onFund, balance }: FundingModalP
         {step === "processing" && (
           <div className="p-8 text-center">
             <div className="w-12 h-12 rounded-full border-4 border-kampmax-blue border-t-transparent animate-spin mx-auto mb-4" />
-            <p className="text-sm font-semibold text-kampmax-text">Processing...</p>
+            <p className="text-sm font-semibold text-kampmax-text">Opening secure payment…</p>
             <p className="text-xs text-kampmax-text-secondary mt-1">
               Redirecting to payment gateway
-            </p>
-          </div>
-        )}
-
-        {step === "success" && (
-          <div className="p-8 text-center">
-            <div className="w-12 h-12 rounded-full bg-kampmax-success/10 flex items-center justify-center mx-auto mb-4">
-              <Check className="h-6 w-6 text-kampmax-success" />
-            </div>
-            <p className="text-sm font-semibold text-kampmax-text">Wallet Funded!</p>
-            <p className="text-xs text-kampmax-text-secondary mt-1">
-              Your balance has been updated
             </p>
           </div>
         )}
@@ -134,50 +108,17 @@ export function FundingModal({ isOpen, onClose, onFund, balance }: FundingModalP
                 </div>
               </div>
 
-              {/* Method */}
-              <div>
-                <p className="text-xs text-kampmax-text-secondary mb-2">Payment Method</p>
-                <div className="space-y-2">
-                  {fundingMethods.map((m) => {
-                    const Icon = m.icon;
-                    return (
-                      <button
-                        key={m.id}
-                        onClick={() => setMethod(m.id)}
-                        className={cn(
-                          "w-full flex items-center gap-3 p-3 rounded-xl border transition-colors",
-                          method === m.id
-                            ? "border-kampmax-blue bg-kampmax-blue/5"
-                            : "border-kampmax-border"
-                        )}
-                      >
-                        <div
-                          className={cn(
-                            "w-10 h-10 rounded-xl flex items-center justify-center",
-                            method === m.id
-                              ? "bg-kampmax-blue text-white"
-                              : "bg-kampmax-muted text-kampmax-text-secondary"
-                          )}
-                        >
-                          <Icon className="h-5 w-5" />
-                        </div>
-                        <div className="text-left">
-                          <p className="text-sm font-medium text-kampmax-text">{m.label}</p>
-                          <p className="text-[10px] text-kampmax-text-secondary">
-                            {m.description}
-                          </p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              {error && (
+                <p role="alert" className="rounded-lg bg-red-50 p-3 text-xs text-red-700">
+                  {error}
+                </p>
+              )}
 
               {/* Note */}
               <div className="bg-kampmax-muted/50 rounded-lg p-3">
                 <p className="text-[11px] text-kampmax-text-secondary leading-relaxed">
-                  Minimum top-up: {formatNaira(100)}. Funds are added instantly after
-                  payment confirmation. Paystack integration coming soon.
+                  Minimum top-up: {formatNaira(100)}. You will pay securely with Paystack, and
+                  funds are added once the payment is confirmed.
                 </p>
               </div>
             </div>

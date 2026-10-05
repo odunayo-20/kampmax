@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -10,10 +11,16 @@ import { WalletStats } from "@/components/wallet/WalletStats";
 import { TransactionItem } from "@/components/wallet/TransactionItem";
 import { TransactionDetail } from "@/components/wallet/TransactionDetail";
 import { FundingModal } from "@/components/wallet/FundingModal";
-import { WithdrawModal } from "@/components/wallet/WithdrawModal";
 import { FinancialIdentityCard } from "@/components/wallet/FinancialIdentityCard";
 import { useAuth } from "@/lib/auth-context";
-import { getWallet, getWalletTransactions, depositToWallet, withdrawFromWallet } from "@/services/wallet";
+import {
+  fetchMyWallet,
+  fetchMyWalletTransactions,
+  startWalletTopup,
+  verifyWalletTopup,
+} from "@/services/wallet";
+import { getFriendlyErrorMessage } from "@/lib/error-messages";
+import { formatNaira } from "@/lib/utils";
 import { WalletTransaction, WalletTransactionType } from "@/types";
 import { Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -28,51 +35,99 @@ const filterTabs: { id: "all" | WalletTransactionType; label: string }[] = [
   { id: "transfer", label: "Transfers" },
 ];
 
+const WALLET_KEY = ["wallet", "profile"] as const;
+
 export default function WalletPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const [, setTick] = useState(0);
+  const queryClient = useQueryClient();
 
   const [filter, setFilter] = useState<"all" | WalletTransactionType>("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "completed" | "pending" | "processing" | "failed" | "cancelled">("all");
   const [selectedTx, setSelectedTx] = useState<WalletTransaction | null>(null);
   const [showFunding, setShowFunding] = useState(false);
-  const [showWithdraw, setShowWithdraw] = useState(false);
+  const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  const handledReturn = useRef(false);
+
+  const walletQuery = useQuery({
+    queryKey: [...WALLET_KEY, "wallet", user?.id],
+    queryFn: fetchMyWallet,
+    enabled: !!user,
+  });
+  const txQuery = useQuery({
+    queryKey: [...WALLET_KEY, "transactions", user?.id],
+    queryFn: () => fetchMyWalletTransactions({ limit: 50 }),
+    enabled: !!user,
+  });
+
+  const topup = useMutation({
+    mutationFn: async (amount: number) => {
+      const result = await startWalletTopup(amount, `${window.location.origin}${window.location.pathname}`);
+      if (!result.authorizationUrl) throw new Error("The payment page could not be opened.");
+      window.location.assign(result.authorizationUrl);
+    },
+  });
+
+  // Paystack sends the user back with ?reference=…; confirm it once, then tidy the URL.
+  useEffect(() => {
+    if (handledReturn.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const reference = params.get("reference") ?? params.get("trxref");
+    if (!reference?.startsWith("KMPX-TOP-")) return;
+    handledReturn.current = true;
+    window.history.replaceState(null, "", window.location.pathname);
+    verifyWalletTopup(reference)
+      .then((result) => {
+        setNotice(
+          result.status === "SUCCESS"
+            ? { tone: "ok", text: `${formatNaira(result.amount)} added to your wallet.` }
+            : { tone: "error", text: "That payment was not completed, so nothing was charged." }
+        );
+        void queryClient.invalidateQueries({ queryKey: WALLET_KEY });
+      })
+      .catch((error) => setNotice({ tone: "error", text: getFriendlyErrorMessage(error) }));
+  }, [queryClient]);
 
   if (!user) return null;
 
-  const wallet = getWallet(user.id);
-  if (!wallet) {
+  if (walletQuery.isPending) {
     return (
-    <PageContainer className="space-y-4">
+      <PageContainer className="space-y-4">
+        <Breadcrumbs items={[{ label: "Profile", href: "/profile" }, { label: "Wallet" }]} />
+        <p className="py-10 text-center text-sm text-kampmax-text-secondary">Loading your wallet…</p>
+      </PageContainer>
+    );
+  }
+
+  const wallet = walletQuery.data;
+  if (walletQuery.isError || !wallet) {
+    return (
+      <PageContainer className="space-y-4">
         <Breadcrumbs items={[{ label: "Profile", href: "/profile" }, { label: "Wallet" }]} />
         <div className="bg-white rounded-xl border border-kampmax-border p-8 text-center">
-          <p className="text-sm font-medium text-kampmax-text">No wallet found</p>
+          <p className="text-sm font-medium text-kampmax-text">We could not load your wallet</p>
           <p className="text-xs text-kampmax-text-secondary mt-1">
-            Contact support to set up your wallet
+            {getFriendlyErrorMessage(walletQuery.error)}
           </p>
+          <button
+            type="button"
+            onClick={() => void walletQuery.refetch()}
+            className="mt-3 text-xs font-semibold text-kampmax-blue hover:underline"
+          >
+            Try again
+          </button>
         </div>
         <FinancialIdentityCard />
       </PageContainer>
     );
   }
 
-  const txs = getWalletTransactions(wallet.id);
+  const txs = txQuery.data ?? [];
   const filtered = txs.filter((tx) => {
     const matchType = filter === "all" || tx.type === filter;
     const matchStatus = statusFilter === "all" || tx.status === statusFilter;
     return matchType && matchStatus;
   });
-
-  function handleFund(amt: number, method: string) {
-    depositToWallet(user!.id, amt, `Top-up via ${method}`);
-    setTick((t) => t + 1);
-  }
-
-  function handleWithdraw(amt: number, bank: string, account: string) {
-    withdrawFromWallet(user!.id, amt, bank, account);
-    setTick((t) => t + 1);
-  }
 
   return (
     <PageContainer className="space-y-4">
@@ -95,8 +150,19 @@ export default function WalletPage() {
       <BalanceCard
         wallet={wallet}
         onTopUp={() => setShowFunding(true)}
-        onWithdraw={() => setShowWithdraw(true)}
       />
+
+      {notice && (
+        <p
+          role="status"
+          className={cn(
+            "rounded-xl px-3 py-2 text-xs",
+            notice.tone === "ok" ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"
+          )}
+        >
+          {notice.text}
+        </p>
+      )}
 
       <FinancialIdentityCard />
 
@@ -141,7 +207,18 @@ export default function WalletPage() {
 
       {/* Transactions */}
       <div className="bg-white rounded-xl border border-kampmax-border overflow-hidden">
-        {filtered.length === 0 ? (
+        {txQuery.isError ? (
+          <div className="p-8 text-center">
+            <p className="text-sm text-kampmax-text-secondary">Could not load transactions.</p>
+            <button
+              type="button"
+              onClick={() => void txQuery.refetch()}
+              className="mt-2 text-xs font-semibold text-kampmax-blue hover:underline"
+            >
+              Try again
+            </button>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="p-8 text-center">
             <Clock className="h-8 w-8 text-kampmax-text-secondary/30 mx-auto mb-2" />
             <p className="text-sm text-kampmax-text-secondary">No transactions found</p>
@@ -183,15 +260,7 @@ export default function WalletPage() {
       <FundingModal
         isOpen={showFunding}
         onClose={() => setShowFunding(false)}
-        onFund={handleFund}
-        balance={wallet.balance}
-      />
-
-      {/* Withdraw Modal */}
-      <WithdrawModal
-        isOpen={showWithdraw}
-        onClose={() => setShowWithdraw(false)}
-        onWithdraw={handleWithdraw}
+        onFund={(amount) => topup.mutateAsync(amount).catch((e) => { throw new Error(getFriendlyErrorMessage(e)); })}
         balance={wallet.balance}
       />
     </PageContainer>
