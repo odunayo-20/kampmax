@@ -92,17 +92,22 @@ describe("datetime-local helpers", () => {
   });
 });
 
-describe("image alt text", () => {
+describe("publish checks on rich content", () => {
   const ready = { ...EMPTY_FORM, title: "Ready", categoryId: "c" };
 
-  it("counts images with empty or placeholder alt", async () => {
-    const { countImagesMissingAlt } = await import("../markdown-actions");
-    expect(countImagesMissingAlt("![](a.png) ![Describe the image](b.png) ![A real description](c.png)")).toBe(2);
-    expect(countImagesMissingAlt("no images, [a link](x)")).toBe(0);
+  it("blocks publishing until every image has alt text", () => {
+    expect(publishBlockers({ ...ready, content: '<figure><img src="https://x/a.png" alt=""></figure>' })).toEqual(["alt text for 1 image"]);
+    expect(publishBlockers({ ...ready, content: '<figure><img src="https://x/a.png" alt="Students at OAU"></figure>' })).toEqual([]);
   });
 
-  it("blocks publishing until every image has alt text", () => {
-    expect(publishBlockers({ ...ready, content: "![](https://x/a.png)" })).toEqual(["alt text for 1 image"]);
-    expect(publishBlockers({ ...ready, content: "![Students at OAU](https://x/a.png)" })).toEqual([]);
+  it("blocks publishing while the heading order is broken", () => {
+    const blockers = publishBlockers({ ...ready, content: "<h2>A</h2><h4>B</h4>" });
+    expect(blockers).toHaveLength(1);
+    expect(blockers[0]).toMatch(/heading order/);
+    expect(publishBlockers({ ...ready, content: "<h2>A</h2><h3>B</h3><p>x</p>" })).toEqual([]);
+  });
+
+  it("treats an empty editor document as missing content", () => {
+    expect(publishBlockers({ ...EMPTY_FORM, title: "Ready", categoryId: "c", content: "" })).toEqual(["article content"]);
   });
 });

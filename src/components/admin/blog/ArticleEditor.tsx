@@ -1,27 +1,36 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertCircle, ArrowLeft, ExternalLink, Loader2, Star } from "lucide-react";
+import { AlertCircle, ArrowLeft, ExternalLink, Info, Loader2, Star } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { ErrorState } from "@/components/admin/ErrorState";
 import { LoadingSkeleton } from "@/components/admin/LoadingSkeleton";
+import { EditorSkeleton } from "@/components/editor/EditorSkeleton";
 import { useAdminSession } from "@/lib/admin/admin-auth-context";
 import { canAdminPerform } from "@/lib/admin/permissions";
-import { useAdminArticle, useBlogCategories, useBlogMutations } from "@/hooks/admin/use-admin-blog";
-import { BlogApiValidationError } from "@/services/admin/blog-management.api";
+import { useAdminArticle, useBlogCategories, useBlogMutations, useBlogTags } from "@/hooks/admin/use-admin-blog";
+import { BlogApiValidationError, blogAdminApi } from "@/services/admin/blog-management.api";
 import { cn } from "@/lib/utils";
 import type { AdminArticle } from "@/types/blog";
+import { ArticlePreview } from "./ArticlePreview";
 import { ArticleStatusBadge } from "./ArticleStatusBadge";
 import { EMPTY_FORM, formFromArticle, isDirty, publishBlockers, toInput, validateForm, withTitle, type ArticleFormState } from "./article-form";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS, formatDateTime, fromLocalInputValue, toLocalInputValue } from "./blog-meta";
+import { clearDraft, draftKey, isRecoverable, readDraft, useDebouncedAutosave, useLocalDraftWriter, type StoredDraft } from "./draft-protection";
 import { ImageField } from "./ImageField";
-import { MarkdownEditor } from "./MarkdownEditor";
 import { SeoSection } from "./SeoSection";
 import { TagPicker } from "./TagPicker";
 import { ToastStack, useToasts } from "./useToasts";
+
+// The editor (ProseMirror) is only loaded on the pages that need it.
+const RichTextEditor = dynamic(() => import("@/components/editor/RichTextEditor"), {
+  ssr: false,
+  loading: () => <EditorSkeleton />,
+});
 
 function Card({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
   return (
@@ -31,6 +40,10 @@ function Card({ title, children, className }: { title: string; children: React.R
     </section>
   );
 }
+
+type AutosaveState = { state: "idle" } | { state: "saving" } | { state: "saved"; at: number } | { state: "failed"; message: string };
+
+const timeLabel = (ms: number) => new Date(ms).toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" });
 
 export function ArticleEditor({ articleId }: { articleId?: string }) {
   const router = useRouter();
@@ -46,6 +59,7 @@ export function ArticleEditor({ articleId }: { articleId?: string }) {
 
   const articleQuery = useAdminArticle(articleId ?? null);
   const categories = useBlogCategories();
+  const allTags = useBlogTags();
   const mutations = useBlogMutations();
   const toasts = useToasts();
 
@@ -59,6 +73,14 @@ export function ArticleEditor({ articleId }: { articleId?: string }) {
   const [publishAt, setPublishAt] = useState("");
   const [busy, setBusy] = useState<null | "save" | "publish" | "other">(null);
   const [confirm, setConfirm] = useState<null | "unpublish" | "archive" | "delete">(null);
+  const [view, setView] = useState<"write" | "preview">("write");
+  const [autosave, setAutosave] = useState<AutosaveState>({ state: "idle" });
+  const [failedForm, setFailedForm] = useState<ArticleFormState | null>(null);
+  const [recoverable, setRecoverable] = useState<StoredDraft | null>(null);
+  const saving = useRef(false);
+
+  const key = draftKey(articleId);
+  const ready = isNew || loadedFor !== null;
 
   // Populate once per loaded article (never clobber in-progress edits on refetch).
   useEffect(() => {
@@ -74,10 +96,21 @@ export function ArticleEditor({ articleId }: { articleId?: string }) {
     }
   }, [articleQuery.data, loadedFor]);
 
+  // Offer to recover unsaved edits from a previous visit (once, when ready).
+  useEffect(() => {
+    if (!ready) return;
+    const stored = readDraft(key);
+    setRecoverable(isRecoverable(stored, baseline, article?.updatedAt ?? null) ? stored : null);
+    // Only on first ready: later saves must not re-offer their own draft.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, key]);
+
   const dirty = isDirty(form, baseline);
   useEffect(() => {
     if (!dirty) return;
-    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
@@ -88,6 +121,8 @@ export function ArticleEditor({ articleId }: { articleId?: string }) {
   const readOnly = isNew ? !can.create : !can.update;
   const status = article?.status;
   const locked = status === "ARCHIVED";
+
+  useLocalDraftWriter({ key, form, dirty, baseUpdatedAt: article?.updatedAt ?? null, enabled: ready && !readOnly && !locked });
 
   const patch = useCallback((p: Partial<ArticleFormState>) => setForm((f) => ({ ...f, ...p })), []);
 
@@ -102,6 +137,7 @@ export function ArticleEditor({ articleId }: { articleId?: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /** Loads a server version into the form (initial load and recovery only; it replaces the document). */
   const adopt = useCallback((saved: AdminArticle) => {
     const next = formFromArticle(saved);
     setArticle(saved);
@@ -109,6 +145,17 @@ export function ArticleEditor({ articleId }: { articleId?: string }) {
     setBaseline(next);
     setLoadedFor(saved.id);
   }, []);
+
+  /** Records a successful save without touching what the author is currently typing. */
+  const markSaved = useCallback(
+    (saved: AdminArticle, sent: ArticleFormState) => {
+      setArticle(saved);
+      setBaseline({ ...sent, slug: saved.slug, slugTouched: true });
+      setForm((f) => (f.slug === sent.slug ? { ...f, slug: saved.slug, slugTouched: true } : f));
+      clearDraft(key);
+    },
+    [key]
+  );
 
   /** Saves edits. Returns the saved article, or null if blocked/failed. */
   const save = useCallback(async (): Promise<AdminArticle | null> => {
@@ -118,29 +165,65 @@ export function ArticleEditor({ articleId }: { articleId?: string }) {
       return null;
     }
     setServerErrors([]);
+    const sent = form;
     try {
       if (isNew) {
-        const created = await mutations.create.mutateAsync(toInput(form, { isNew: true }));
-        adopt(created);
+        const created = await mutations.create.mutateAsync(toInput(sent, { isNew: true }));
+        clearDraft(key);
         router.replace(`/admin/blog/${created.id}`);
         return created;
       }
       if (!article) return null;
-      const saved = await mutations.update.mutateAsync({ id: article.id, input: { ...toInput(form, { isNew: false, originalSlug: article.slug }), expectedUpdatedAt: article.updatedAt } });
-      adopt(saved);
+      const saved = await mutations.update.mutateAsync({
+        id: article.id,
+        input: { ...toInput(sent, { isNew: false, originalSlug: article.slug }), expectedUpdatedAt: article.updatedAt },
+      });
+      markSaved(saved, sent);
       return saved;
     } catch (error) {
       reportError(error);
       return null;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form, hasErrors, isNew, article]);
+  }, [form, hasErrors, isNew, article, key]);
+
+  /** Background save for drafts: no toasts, never blocks typing, never replaces the document. */
+  const saveQuietly = useCallback(async () => {
+    if (!article || saving.current) return;
+    saving.current = true;
+    setAutosave({ state: "saving" });
+    const sent = form;
+    try {
+      const saved = await mutations.update.mutateAsync({
+        id: article.id,
+        input: { ...toInput(sent, { isNew: false, originalSlug: article.slug }), expectedUpdatedAt: article.updatedAt },
+      });
+      markSaved(saved, sent);
+      setAutosave({ state: "saved", at: Date.now() });
+    } catch (error) {
+      setFailedForm(sent);
+      setAutosave({ state: "failed", message: error instanceof Error ? error.message : "Couldn't autosave." });
+    } finally {
+      saving.current = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, article]);
+
+  // Autosave applies to unpublished drafts only: a live article is never changed behind the author's back.
+  useDebouncedAutosave({
+    enabled: !isNew && status === "DRAFT" && !readOnly && dirty && !hasErrors && busy === null && failedForm !== form,
+    signal: form,
+    save: () => void saveQuietly(),
+  });
 
   async function onSaveDraft() {
     setBusy("save");
     const saved = await save();
     setBusy(null);
-    if (saved) toasts.success(isNew ? "Draft created." : "Changes saved.");
+    if (saved) {
+      setAutosave({ state: "idle" });
+      toasts.success(isNew ? "Draft created." : "Changes saved.");
+    }
   }
 
   async function onPublish() {
@@ -159,7 +242,7 @@ export function ArticleEditor({ articleId }: { articleId?: string }) {
     if (saved) {
       try {
         const published = await mutations.publish.mutateAsync({ id: saved.id, publishAt: when ?? undefined });
-        adopt(published);
+        setArticle(published);
         toasts.success(published.status === "SCHEDULED" ? `Scheduled for ${formatDateTime(published.publishedAt)}.` : "Article published.");
       } catch (error) {
         reportError(error);
@@ -174,6 +257,7 @@ export function ArticleEditor({ articleId }: { articleId?: string }) {
     try {
       if (kind === "delete") {
         await mutations.remove.mutateAsync(article.id);
+        clearDraft(key);
         toasts.success("Article deleted.");
         router.replace("/admin/blog");
         return;
@@ -195,14 +279,25 @@ export function ArticleEditor({ articleId }: { articleId?: string }) {
     }
   }
 
+  const uploadImage = useCallback((file: File) => blogAdminApi.uploadImage(file), []);
+
   if (!isNew && articleQuery.isLoading) return <LoadingSkeleton variant="cards" rows={4} />;
   if (!isNew && articleQuery.isError) {
     return <ErrorState title="Couldn't load this article" message={articleQuery.error instanceof Error ? articleQuery.error.message : undefined} onRetry={() => void articleQuery.refetch()} />;
   }
 
-  const fieldError = (key: keyof typeof errors) => (showErrors || form.title || form.slug ? errors[key] : undefined);
+  const fieldError = (k: keyof typeof errors) => (showErrors || form.title || form.slug ? errors[k] : undefined);
   const disabled = readOnly || locked || busy !== null;
   const activeCategories = categories.data?.filter((c) => c.isActive || c.id === form.categoryId) ?? [];
+  const categoryName = categories.data?.find((c) => c.id === form.categoryId)?.name ?? null;
+  const tagNames = form.tagIds.map((id) => allTags.data?.items.find((t) => t.id === id)?.name).filter((n): n is string => !!n);
+
+  const saveStatus =
+    autosave.state === "saving" ? "Autosaving…"
+    : autosave.state === "failed" ? "Autosave failed — your changes are kept on this device"
+    : dirty ? "Unsaved changes"
+    : autosave.state === "saved" ? `Autosaved ${timeLabel(autosave.at)}`
+    : null;
 
   return (
     <>
@@ -215,7 +310,11 @@ export function ArticleEditor({ articleId }: { articleId?: string }) {
         actions={
           <>
             {status && <ArticleStatusBadge status={status} />}
-            {dirty && <span className="text-xs text-warning-700" role="status">Unsaved changes</span>}
+            {saveStatus && (
+              <span role="status" aria-live="polite" className={cn("text-xs", autosave.state === "failed" || (dirty && autosave.state !== "saving") ? "text-warning-700" : "text-kampmax-text-muted")}>
+                {saveStatus}
+              </span>
+            )}
             {status === "PUBLISHED" && article && (
               <a href={`/blog/${article.slug}`} target="_blank" rel="noopener noreferrer" className={BUTTON_SECONDARY}>
                 <ExternalLink aria-hidden className="h-4 w-4" /> View live
@@ -231,6 +330,21 @@ export function ArticleEditor({ articleId }: { articleId?: string }) {
         }
       />
 
+      {recoverable && (
+        <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary-100 bg-primary-50 px-3 py-2.5 text-sm text-kampmax-text">
+          <span>
+            You have unsaved changes from {new Date(recoverable.savedAt).toLocaleString("en-NG", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}. Restore them?
+          </span>
+          <span className="flex gap-2">
+            <button type="button" className={BUTTON_PRIMARY} onClick={() => { setForm(recoverable.form); setRecoverable(null); }}>
+              Restore
+            </button>
+            <button type="button" className={BUTTON_SECONDARY} onClick={() => { clearDraft(key); setRecoverable(null); }}>
+              Discard
+            </button>
+          </span>
+        </div>
+      )}
       {readOnly && (
         <p role="status" className="mb-4 rounded-lg border border-kampmax-border bg-kampmax-muted px-3 py-2 text-sm text-kampmax-text-secondary">
           You have read-only access to the blog, so editing is disabled.
@@ -239,6 +353,17 @@ export function ArticleEditor({ articleId }: { articleId?: string }) {
       {locked && (
         <p role="status" className="mb-4 rounded-lg border border-warning-100 bg-warning-50 px-3 py-2 text-sm text-warning-700">
           This article is archived. Restore it as a draft to edit it.
+        </p>
+      )}
+      {article?.contentFormat === "markdown" && (
+        <p role="status" className="mb-4 flex gap-2 rounded-lg border border-primary-100 bg-primary-50 px-3 py-2 text-sm text-kampmax-text">
+          <Info aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-primary-600" />
+          This article was written in an earlier format. It has been converted for editing, and saving updates it to the new editor.
+        </p>
+      )}
+      {autosave.state === "failed" && (
+        <p role="alert" className="mb-4 rounded-lg border border-warning-100 bg-warning-50 px-3 py-2 text-sm text-warning-700">
+          {autosave.message} Your changes are safe on this device. Use “Save changes” to try again.
         </p>
       )}
       {serverErrors.length > 0 && (
@@ -250,7 +375,7 @@ export function ArticleEditor({ articleId }: { articleId?: string }) {
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         {/* Main column */}
-        <div className="space-y-5">
+        <div className="min-w-0 space-y-5">
           <Card title="Content">
             <div>
               <label htmlFor="article-title" className="mb-1 block text-xs font-medium text-kampmax-text">Title</label>
@@ -279,8 +404,46 @@ export function ArticleEditor({ articleId }: { articleId?: string }) {
             </div>
 
             <div>
-              <p className="mb-1 text-xs font-medium text-kampmax-text">Article body</p>
-              <MarkdownEditor value={form.content} onChange={(content) => patch({ content })} disabled={disabled} />
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p id="article-body-label" className="text-xs font-medium text-kampmax-text">Article body</p>
+                <div role="tablist" aria-label="Editor view" className="inline-flex rounded-md bg-kampmax-muted p-0.5 text-xs font-medium">
+                  {(["write", "preview"] as const).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      role="tab"
+                      aria-selected={view === v}
+                      onClick={() => setView(v)}
+                      className={cn("rounded px-3 py-1.5 capitalize focus-visible:outline focus-visible:outline-2 focus-visible:outline-kampmax-blue", view === v ? "bg-white text-kampmax-text shadow-sm" : "text-kampmax-text-secondary")}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Kept mounted while previewing so undo history and cursor survive. */}
+              <div className={view === "write" ? "" : "hidden"}>
+                <RichTextEditor
+                  value={form.content}
+                  onChange={(content) => patch({ content })}
+                  onUploadImage={uploadImage}
+                  onError={toasts.error}
+                  disabled={disabled}
+                  label="Article body"
+                />
+              </div>
+              {view === "preview" && (
+                <ArticlePreview
+                  title={form.title}
+                  excerpt={form.excerpt}
+                  content={form.content}
+                  coverImage={form.coverImage}
+                  categoryName={categoryName}
+                  tagNames={tagNames}
+                  authorName={article?.author.name ?? admin?.name ?? "Kampmax"}
+                  publishedAt={article?.publishedAt ?? null}
+                />
+              )}
             </div>
           </Card>
 
@@ -350,7 +513,7 @@ export function ArticleEditor({ articleId }: { articleId?: string }) {
               </button>
             )}
 
-            {article && (can.delete) && (
+            {article && can.delete && (
               <div className="flex gap-3 border-t border-kampmax-border pt-3 text-sm">
                 {!locked && <button type="button" onClick={() => setConfirm("archive")} disabled={busy !== null} className="text-kampmax-text-secondary hover:text-kampmax-text hover:underline">Archive</button>}
                 <button type="button" onClick={() => setConfirm("delete")} disabled={busy !== null} className="text-kampmax-error hover:underline">Delete</button>
@@ -386,36 +549,9 @@ export function ArticleEditor({ articleId }: { articleId?: string }) {
         </aside>
       </div>
 
-      <ConfirmDialog
-        open={confirm === "unpublish"}
-        tone="warning"
-        title="Unpublish this article?"
-        message="It will disappear from the public blog and return to draft."
-        confirmLabel="Unpublish"
-        loading={busy === "other"}
-        onConfirm={() => void lifecycle("unpublish")}
-        onCancel={() => setConfirm(null)}
-      />
-      <ConfirmDialog
-        open={confirm === "archive"}
-        tone="warning"
-        title="Archive this article?"
-        message="It will be hidden from the public blog but kept on file. You can restore it later."
-        confirmLabel="Archive"
-        loading={busy === "other"}
-        onConfirm={() => void lifecycle("archive")}
-        onCancel={() => setConfirm(null)}
-      />
-      <ConfirmDialog
-        open={confirm === "delete"}
-        tone="danger"
-        title="Delete this article?"
-        message="It is removed from the console and the public blog. This cannot be undone from here."
-        confirmLabel="Delete article"
-        loading={busy === "other"}
-        onConfirm={() => void lifecycle("delete")}
-        onCancel={() => setConfirm(null)}
-      />
+      <ConfirmDialog open={confirm === "unpublish"} tone="warning" title="Unpublish this article?" message="It will disappear from the public blog and return to draft." confirmLabel="Unpublish" loading={busy === "other"} onConfirm={() => void lifecycle("unpublish")} onCancel={() => setConfirm(null)} />
+      <ConfirmDialog open={confirm === "archive"} tone="warning" title="Archive this article?" message="It will be hidden from the public blog but kept on file. You can restore it later." confirmLabel="Archive" loading={busy === "other"} onConfirm={() => void lifecycle("archive")} onCancel={() => setConfirm(null)} />
+      <ConfirmDialog open={confirm === "delete"} tone="danger" title="Delete this article?" message="It is removed from the console and the public blog. This cannot be undone from here." confirmLabel="Delete article" loading={busy === "other"} onConfirm={() => void lifecycle("delete")} onCancel={() => setConfirm(null)} />
       <ToastStack toasts={toasts.toasts} />
     </>
   );

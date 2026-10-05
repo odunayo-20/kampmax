@@ -48,7 +48,10 @@ export interface ArticleDetail extends ArticleListItem {
 }
 
 export interface AdminArticle extends ArticleListItem {
+  /** Editor HTML. Earlier Markdown articles arrive already rendered. */
   content: string | null;
+  /** Stored format; "markdown" converts to HTML on the next save. */
+  contentFormat: "markdown" | "html";
   contentHtml: string;
   coverImageMediaId: string | null;
   ogImage: string | null;

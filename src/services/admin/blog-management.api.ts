@@ -108,6 +108,11 @@ export const blogAdminApi = {
     return (json.data ?? json) as { id: string; url: string };
   },
 
+  /** Inline article images use the same validated upload as the cover image. */
+  uploadImage(file: File): Promise<{ id: string; url: string }> {
+    return blogAdminApi.uploadCover(file);
+  },
+
   // Categories
   listCategories: () => call(() => apiClient.get<BlogCategoryItem[]>(`${BASE}/categories`)),
   createCategory: (input: { name: string; slug?: string; description?: string; isActive?: boolean; sortOrder?: number }) =>

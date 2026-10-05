@@ -1,6 +1,6 @@
 import type { AdminArticle, ArticleInput } from "@/types/blog";
 import { SLUG_PATTERN, slugifyTitle } from "./blog-meta";
-import { countImagesMissingAlt } from "./markdown-actions";
+import { countImagesMissingAlt, findHeadingIssues } from "@/components/editor/content-utils";
 
 export interface ArticleFormState {
   title: string;
@@ -117,6 +117,8 @@ export function publishBlockers(form: ArticleFormState): string[] {
   if (!form.categoryId) missing.push("a category");
   const noAlt = countImagesMissingAlt(form.content);
   if (noAlt > 0) missing.push(`alt text for ${noAlt} image${noAlt === 1 ? "" : "s"}`);
+  const headingIssues = findHeadingIssues(form.content);
+  if (headingIssues.length > 0) missing.push(`a fix to the heading order (${headingIssues[0]})`);
   return missing;
 }
 
