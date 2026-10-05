@@ -110,7 +110,11 @@ export default function RichTextEditor({
   useEffect(() => {
     if (!editor || value === lastEmitted.current) return;
     lastEmitted.current = value;
-    editor.commands.setContent(value || "", { emitUpdate: false });
+    // Deferred: node views render through React, which cannot flush while it is already rendering.
+    const next = value || "";
+    queueMicrotask(() => {
+      if (!editor.isDestroyed) editor.commands.setContent(next, { emitUpdate: false });
+    });
   }, [editor, value]);
 
   const uploadFiles = useCallback(
