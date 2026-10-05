@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import {
@@ -25,6 +25,9 @@ import { eventDate, eventTime, priceLabel } from "@/components/events/event-form
 import { fetchProducts } from "@/services/products";
 import { listPublicJobs } from "@/services/jobs";
 import { listPublicServices } from "@/services/service-marketplace";
+import { useAuth } from "@/lib/auth-context";
+import { useMyLocation } from "@/hooks/use-location";
+import { fetchNearby, formatDistance, roundCoordinate } from "@/services/nearby-api";
 import { cn } from "@/lib/utils";
 
 type ExploreCategory = "all" | "events" | "products" | "services" | "jobs";
@@ -36,6 +39,12 @@ const CATEGORIES: { id: ExploreCategory; label: string }[] = [
   { id: "services", label: "Services" },
   { id: "jobs", label: "Jobs" },
 ];
+
+type Origin = { latitude: number; longitude: number };
+
+/** Nearby caps the radius at 25 km and a page at 50 results. */
+const NEARBY_RADIUS_M = 25_000;
+const NEARBY_LIMIT = 50;
 
 export default function ExplorePage() {
   const [selectedCategory, setSelectedCategory] = useState<ExploreCategory>("all");
@@ -71,6 +80,70 @@ export default function ExplorePage() {
   const filteredProducts = productsQuery.data ?? [];
   const filteredServices = servicesQuery.data ?? [];
   const filteredJobs = jobsQuery.data ?? [];
+
+  // Distances come from the backend's /nearby (privacy-aware, reduced-precision
+  // public locations). Origin: saved profile location, else the device. Never fabricated.
+  const { status: authStatus } = useAuth();
+  const profileLocation = useMyLocation();
+  const [deviceOrigin, setDeviceOrigin] = useState<Origin | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [locationDenied, setLocationDenied] = useState(false);
+
+  const profile = profileLocation.data;
+  const origin: Origin | null =
+    deviceOrigin ?? (profile ? { latitude: profile.latitude, longitude: profile.longitude } : null);
+
+  const nearbyQuery = useQuery({
+    queryKey: [
+      "explore",
+      "nearby",
+      origin ? roundCoordinate(origin.latitude) : null,
+      origin ? roundCoordinate(origin.longitude) : null,
+    ],
+    enabled: authStatus === "authenticated" && origin !== null,
+    staleTime: 60_000,
+    queryFn: () =>
+      fetchNearby({
+        latitude: origin!.latitude,
+        longitude: origin!.longitude,
+        radiusMeters: NEARBY_RADIUS_M,
+        limit: NEARBY_LIMIT,
+      }),
+  });
+
+  // "TYPE:id" -> meters. Products inherit their vendor's distance and services
+  // their provider's. Jobs have no location of their own, so they show none.
+  const distances = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const item of nearbyQuery.data?.items ?? []) {
+      map.set(`${item.entityType}:${item.entityId}`, item.distanceMeters);
+    }
+    return map;
+  }, [nearbyQuery.data]);
+  const distanceLabel = (type: string, id: string) => {
+    const m = distances.get(`${type}:${id}`);
+    return m === undefined ? "" : formatDistance(m);
+  };
+
+  const useDeviceLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationDenied(true);
+      return;
+    }
+    setLocating(true);
+    setLocationDenied(false);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setDeviceOrigin({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+        setLocating(false);
+      },
+      () => {
+        setLocationDenied(true);
+        setLocating(false);
+      },
+      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 5 * 60_000 }
+    );
+  };
 
   const failed = [eventsQuery, productsQuery, servicesQuery, jobsQuery].some((q) => q.isError);
   const loading = [eventsQuery, productsQuery, servicesQuery, jobsQuery].some((q) => q.isLoading);
@@ -129,6 +202,30 @@ export default function ExplorePage() {
         </div>
       </div>
 
+      {/* Distance origin */}
+      <div className="flex items-center justify-between gap-2 text-xs text-neutral-500">
+        <span className="inline-flex items-center gap-1">
+          <MapPin className="h-3.5 w-3.5 text-neutral-400" />
+          {origin
+            ? deviceOrigin
+              ? "Distances from your current location"
+              : "Distances from your saved location"
+            : locationDenied
+              ? "Location unavailable. Allow location access to see distances."
+              : "Turn on location to see how far things are"}
+        </span>
+        {(!origin || deviceOrigin) && (
+          <button
+            type="button"
+            onClick={useDeviceLocation}
+            disabled={locating}
+            className="font-semibold text-primary-600 hover:text-primary-700 disabled:opacity-50"
+          >
+            {locating ? "Locating…" : deviceOrigin ? "Refresh" : "Use my location"}
+          </button>
+        )}
+      </div>
+
       {/* Mixed Multi-Vertical Results Stream */}
       <div className="space-y-3.5">
         {failed && (
@@ -173,6 +270,9 @@ export default function ExplorePage() {
                       <Calendar className="h-3 w-3 text-amber-500" />
                       <span>{eventDate(event.startsAt)} · {eventTime(event.startsAt)}</span>
                     </span>
+                    {distanceLabel("EVENT", event.id) && (
+                      <span>{distanceLabel("EVENT", event.id)}</span>
+                    )}
                     <span className="px-1.5 py-0.2 rounded bg-rose-50 text-rose-600 font-semibold text-[10px]">
                       Event
                     </span>
@@ -223,6 +323,11 @@ export default function ExplorePage() {
                 <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-semibold text-[10px]">
                   Product
                 </span>
+                {distanceLabel("VENDOR", product.vendorId) && (
+                  <span className="text-[11px] text-neutral-400">
+                    {distanceLabel("VENDOR", product.vendorId)}
+                  </span>
+                )}
               </div>
             </Link>
           ))}
@@ -263,6 +368,11 @@ export default function ExplorePage() {
                 <span className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-600 font-semibold text-[10px]">
                   Service
                 </span>
+                {distanceLabel("SERVICE_PROVIDER", service.providerId) && (
+                  <span className="text-[11px] text-neutral-400">
+                    {distanceLabel("SERVICE_PROVIDER", service.providerId)}
+                  </span>
+                )}
               </div>
             </Link>
           ))}

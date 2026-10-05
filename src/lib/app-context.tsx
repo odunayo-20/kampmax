@@ -59,14 +59,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setIsLoadingCampuses(true);
     try {
       const res = await fetchCampuses({ limit: 50 });
-      if (res.data && res.data.length > 0) {
+      // On failure fetchCampuses hands back its cached/mock list: never let
+      // that replace the user's selection or the list we already have.
+      if (!res.error && res.data && res.data.length > 0) {
         setCampuses(res.data);
 
-        // If currently selected campus matches one in the fresh list, keep it synchronized
         setSelectedCampusState((prev) => {
-          const matched = res.data.find((c) => c.id === prev.id || c.abbreviation === prev.abbreviation);
+          const matched =
+            res.data.find((c) => c.id === prev.id) ??
+            (prev.abbreviation
+              ? res.data.find((c) => c.abbreviation === prev.abbreviation)
+              : undefined);
           // A stale/mock selection (e.g. a seed id) falls back to a real campus.
-          return matched || res.data[0];
+          const next = matched ?? res.data[0];
+          // Persist the resolution so a stale stored campus does not reappear
+          // (and flicker) on every load.
+          if (next.id !== prev.id || next.name !== prev.name) {
+            try {
+              localStorage.setItem(SELECTED_CAMPUS_KEY, JSON.stringify(next));
+            } catch {
+              // quota/private browsing
+            }
+          }
+          return next;
         });
       }
     } catch {

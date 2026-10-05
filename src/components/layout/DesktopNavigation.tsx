@@ -105,7 +105,7 @@ export function DesktopNavigation() {
           {/* Campus Selector */}
           <div className="flex items-center gap-1.5 text-xs text-neutral-600 px-2.5 py-1.5 rounded-xl bg-neutral-50 border border-neutral-200">
             <MapPin className="h-3.5 w-3.5 text-primary-600" />
-            <span className="font-semibold text-neutral-900">{selectedCampus.abbreviation}</span>
+            <span className="font-semibold text-neutral-900">{selectedCampus.abbreviation || "Campus"}</span>
             <ChevronDown className="h-3 w-3 text-neutral-500" />
           </div>
 

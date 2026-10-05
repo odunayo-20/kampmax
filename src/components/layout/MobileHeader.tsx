@@ -36,7 +36,7 @@ export function MobileHeader() {
 
           <div className="flex items-center gap-1 text-xs text-neutral-600 mr-1 ml-0.5 px-1.5 py-1 rounded-md bg-neutral-50 border border-neutral-200">
             <MapPin className="h-3.5 w-3.5 text-primary-600 shrink-0" />
-            <span className="font-semibold text-neutral-900">{selectedCampus.abbreviation}</span>
+            <span className="font-semibold text-neutral-900">{selectedCampus.abbreviation || "Campus"}</span>
           </div>
 
           <Link

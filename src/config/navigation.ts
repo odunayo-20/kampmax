@@ -262,11 +262,12 @@ export const MORE_MENU_SECTIONS: NavSectionConfig[] = [
 ];
 
 /**
- * Desktop Header Navigation Links (4 core primary destinations)
+ * Desktop Header Navigation Links (core destinations, plus More for the full menu)
  */
 export const DESKTOP_NAV_LINKS: NavItemConfig[] = [
   { id: "home", href: "/home", icon: Home, label: "Home" },
   { id: "explore", href: "/explore", icon: Compass, label: "Explore" },
   { id: "events", href: "/events", icon: Ticket, label: "Events" },
   { id: "community", href: "/community", icon: Users, label: "Community" },
+  { id: "more", href: "/more", icon: Menu, label: "More" },
 ];
