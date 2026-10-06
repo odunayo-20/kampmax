@@ -8,7 +8,7 @@ import type {
 } from "@/types/storefront";
 import { getVendorBySlug, getVendorById, getCurrentUser, fetchVendorBySlug } from "@/services/users";
 import { getProductsByVendor, fetchProducts } from "@/services/products";
-import { getCampusById } from "@/services/campus";
+import { fetchCampuses, getCampusById } from "@/services/campus";
 import { getCategoryById } from "@/services/categories";
 import {
   getReviewsByVendor,
@@ -77,9 +77,22 @@ export async function fetchStorefrontBySlug(slug: string): Promise<Storefront | 
   return buildStorefrontAsync(vendor);
 }
 
+/** Never show a raw campus id to customers. */
+function campusLabel(campus?: { name: string }): string {
+  return campus?.name || "Campus";
+}
+
+/** The campus from the local cache, loading the campus list first if it is empty. */
+async function resolveCampus(campusId: string) {
+  const cached = getCampusById(campusId);
+  if (cached) return cached;
+  await fetchCampuses({ limit: 100 });
+  return getCampusById(campusId);
+}
+
 async function buildStorefrontAsync(vendor: Vendor): Promise<Storefront> {
   const meta = storefrontMeta[vendor.id];
-  const campus = getCampusById(vendor.campusId);
+  const campus = await resolveCampus(vendor.campusId);
 
   const [productsRes, ratingRes] = await Promise.all([
     fetchProducts({ vendorId: vendor.id, status: "ACTIVE", limit: 1 }),
@@ -108,14 +121,14 @@ async function buildStorefrontAsync(vendor: Vendor): Promise<Storefront> {
     attestation: { followers: meta?.followers ?? 0 },
     productsCount,
     campusId: vendor.campusId,
-    campusName: campus?.name || vendor.campusId,
-    campuses: [{ id: vendor.campusId, name: campus?.name || vendor.campusId }],
+    campusName: campusLabel(campus),
+    campuses: [{ id: vendor.campusId, name: campusLabel(campus) }],
     specialties: vendor.specialties,
     responseTime: meta?.responseTime || vendor.responseTime,
     established: meta?.established || vendor.joinDate,
     about: meta?.about || {
       description: vendor.description,
-      campus: campus?.name || vendor.campusId,
+      campus: campusLabel(campus),
     },
     policies: meta?.policies || [],
     delivery: meta?.delivery || {
@@ -150,14 +163,14 @@ function buildStorefront(vendor: NonNullable<ReturnType<typeof getVendorById>>):
     attestation: { followers: meta?.followers ?? 0 },
     productsCount: publishableProducts.length,
     campusId: vendor.campusId,
-    campusName: campus?.name || vendor.campusId,
-    campuses: [{ id: vendor.campusId, name: campus?.name || vendor.campusId }],
+    campusName: campusLabel(campus),
+    campuses: [{ id: vendor.campusId, name: campusLabel(campus) }],
     specialties: vendor.specialties,
     responseTime: meta?.responseTime || vendor.responseTime,
     established: meta?.established || vendor.joinDate,
     about: meta?.about || {
       description: vendor.description,
-      campus: campus?.name || vendor.campusId,
+      campus: campusLabel(campus),
     },
     policies: meta?.policies || [],
     delivery: meta?.delivery || {
