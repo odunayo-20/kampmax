@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { Storefront } from "@/types/storefront";
 import { getStoreNavigationSections } from "@/services/storefront";
@@ -11,68 +10,66 @@ interface StoreNavigationProps {
   onNavigate: (id: string) => void;
 }
 
-const SECTION_IDS = ["products", "reviews", "about", "delivery", "policies"] as const;
+/** Height of the sticky site header plus this bar, so targets land below both. */
+const SCROLL_OFFSET = 56 + 56 + 12;
 
 /**
- * Storefront section navigation (tabs). Only shows sections the vendor
- * actually supports — never empty placeholders. Scrolls to the target section
- * and highlights the active one (works with the page-level scroll-spy).
+ * Sticky section navigation. Only lists sections the store actually has — never
+ * empty placeholders — and sits below the 56px site header so it stays visible
+ * while scrolling.
  */
 export function StoreNavigation({ store, activeSection, onNavigate }: StoreNavigationProps) {
   const sections = getStoreNavigationSections(store);
-  const ref = useRef<HTMLDivElement>(null);
 
   function scrollTo(id: string) {
     const el = document.getElementById(id);
     if (!el) return;
-    const headerOffset = 90;
-    const y = el.getBoundingClientRect().top + window.scrollY - headerOffset;
+    const y = el.getBoundingClientRect().top + window.scrollY - SCROLL_OFFSET;
     window.scrollTo({ top: y, behavior: "smooth" });
     onNavigate(id);
   }
 
-  const tabs: { id: string; label: string; enabled: boolean }[] = [
+  // "Contact" is an action in the header, not a section on the page.
+  const tabs = [
     { id: "products", label: "Products", enabled: sections.products },
     { id: "services", label: "Services", enabled: sections.services },
     { id: "reviews", label: "Reviews", enabled: sections.reviews },
     { id: "about", label: "About", enabled: sections.about },
     { id: "delivery", label: "Delivery", enabled: sections.delivery },
     { id: "policies", label: "Policies", enabled: sections.policies },
-    { id: "contact", label: "Contact", enabled: sections.contact },
   ].filter((t) => t.enabled);
 
+  if (tabs.length === 0) return null;
+
   return (
-    <div
-      ref={ref}
-      className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-kampmax-border"
-      role="tablist"
+    <nav
       aria-label="Store sections"
+      className="sticky top-14 z-30 -mx-4 mt-4 border-y border-kampmax-border bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/80"
     >
-      <div className="max-w-[1280px] mx-auto px-4 overflow-x-auto">
-        <div className="flex gap-1 whitespace-nowrap">
+      <div className="mx-auto max-w-[1280px] overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <ul className="flex gap-1.5 whitespace-nowrap py-2">
           {tabs.map((tab) => {
             const active = activeSection === tab.id;
             return (
-              <button
-                key={tab.id}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => scrollTo(tab.id)}
-                // additional focus ring for keyboard users
-                className={cn(
-                  "px-4 py-3 text-sm font-semibold border-b-2 -mb-px transition-colors rounded-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2",
-                  active
-                    ? "border-kampmax-blue text-kampmax-blue"
-                    : "border-transparent text-kampmax-text-secondary hover:text-kampmax-text"
-                )}
-              >
-                {tab.label}
-              </button>
+              <li key={tab.id}>
+                <button
+                  type="button"
+                  aria-current={active ? "true" : undefined}
+                  onClick={() => scrollTo(tab.id)}
+                  className={cn(
+                    "rounded-full px-4 py-1.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-1",
+                    active
+                      ? "bg-kampmax-navy text-white"
+                      : "text-kampmax-text-secondary hover:bg-kampmax-muted hover:text-kampmax-text"
+                  )}
+                >
+                  {tab.label}
+                </button>
+              </li>
             );
           })}
-        </div>
+        </ul>
       </div>
-    </div>
+    </nav>
   );
 }

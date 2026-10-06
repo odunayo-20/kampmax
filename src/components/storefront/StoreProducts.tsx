@@ -131,35 +131,40 @@ export function StoreProducts({ store }: StoreProductsProps) {
       )}
 
       {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-        <div className="relative flex-1">
-          <label htmlFor="store-search" className="sr-only">
-            Search this store
-          </label>
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-kampmax-text-secondary" />
-          <input
-            id="store-search"
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={`Search ${store.storeName}...`}
-            className="w-full pl-9 pr-3 py-2 rounded-lg border border-kampmax-border text-sm focus:outline-none focus:border-kampmax-blue"
-          />
+      <div className="space-y-3 rounded-2xl border border-kampmax-border bg-white p-3 sm:p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative flex-1">
+            <label htmlFor="store-search" className="sr-only">
+              Search this store
+            </label>
+            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-kampmax-text-secondary" aria-hidden />
+            <input
+              id="store-search"
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={`Search ${store.storeName}…`}
+              className="w-full rounded-lg border border-kampmax-border bg-kampmax-bg py-2.5 pl-10 pr-3 text-sm transition-colors focus:border-kampmax-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-100"
+            />
+          </div>
+          <div className="flex items-center justify-between gap-3 sm:justify-end">
+            <span className="whitespace-nowrap text-xs text-kampmax-text-secondary" aria-live="polite">
+              {result.total} product{result.total !== 1 ? "s" : ""}
+            </span>
+            <StoreSortDropdown value={sort} onChange={setSort} />
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <StoreSortDropdown value={sort} onChange={setSort} />
-          <span className="text-xs text-kampmax-text-secondary whitespace-nowrap">
-            {result.total} product{result.total !== 1 ? "s" : ""}
-          </span>
-        </div>
-      </div>
 
-      {/* Categories */}
-      <StoreCategories
-        categories={categories}
-        activeCategoryId={categoryId}
-        onCategoryChange={(id) => setCategoryId(id)}
-      />
+        {categories.length > 0 && (
+          <div className="border-t border-kampmax-border pt-3">
+            <StoreCategories
+              categories={categories}
+              activeCategoryId={categoryId}
+              onCategoryChange={(id) => setCategoryId(id)}
+            />
+          </div>
+        )}
+      </div>
 
       {/* Grid / empty */}
       {result.items.length === 0 ? (

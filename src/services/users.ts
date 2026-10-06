@@ -64,6 +64,7 @@ export function mapBackendVendorToFrontend(raw: BackendVendorPublicProfile): Ven
     verified: raw.verificationStatus === "VERIFIED",
     campusId: raw.campusId,
     specialties: [],
+    logo: raw.logo || undefined,
     coverImage: raw.banner || undefined,
     responseTime: undefined,
     joinDate: raw.createdAt,

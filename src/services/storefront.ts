@@ -97,7 +97,7 @@ async function buildStorefrontAsync(vendor: Vendor): Promise<Storefront> {
     vendorId: vendor.id,
     slug: vendor.slug || vendor.id,
     storeName: vendor.storeName,
-    logo: meta?.logo,
+    logo: meta?.logo ?? vendor.logo,
     coverImage: vendor.coverImage,
     tagline: meta?.tagline || vendor.description,
     description: vendor.description,

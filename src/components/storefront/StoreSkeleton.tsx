@@ -11,10 +11,10 @@ function Skeleton({ className }: { className?: string }) {
 /** Skeleton for the storefront header (cover + identity). */
 export function StoreHeaderSkeleton() {
   return (
-    <div className="bg-white rounded-2xl border border-kampmax-border overflow-hidden">
-      <Skeleton className="h-40 sm:h-56 w-full rounded-none" />
-      <div className="px-4 sm:px-6 pb-6 -mt-8">
-        <Skeleton className="h-20 w-20 rounded-2xl ring-4 ring-white" />
+    <div className="overflow-hidden rounded-2xl border border-kampmax-border bg-white">
+      <Skeleton className="h-40 w-full rounded-none sm:h-56 lg:h-64" />
+      <div className="-mt-12 px-4 pb-6 sm:-mt-14 sm:px-8">
+        <Skeleton className="h-24 w-24 rounded-2xl ring-4 ring-white sm:h-28 sm:w-28" />
         <div className="mt-4 space-y-2">
           <Skeleton className="h-6 w-48" />
           <Skeleton className="h-4 w-72 max-w-full" />

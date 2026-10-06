@@ -25,10 +25,15 @@ export function StoreDelivery({ store }: StoreDeliveryProps) {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-kampmax-border p-5 sm:p-6 space-y-4">
-      <h2 className="text-base font-bold text-kampmax-text">Delivery & Pickup</h2>
+    <div className="space-y-5 rounded-2xl border border-kampmax-border bg-white p-5 sm:p-6">
+      <div>
+        <h2 id="delivery-heading" className="text-lg font-bold tracking-tight text-kampmax-text">
+          Delivery &amp; pickup
+        </h2>
+        <p className="mt-1 text-sm text-kampmax-text-secondary">How you can get your order.</p>
+      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3">
         <DeliveryOption
           icon={<Bike className="h-5 w-5" />}
           title="Campus delivery"

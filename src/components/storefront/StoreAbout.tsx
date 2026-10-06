@@ -16,7 +16,7 @@ interface InfoItemProps {
 function InfoItem({ icon, label, value }: InfoItemProps) {
   return (
     <div className="flex items-start gap-3">
-      <div className="w-8 h-8 rounded-lg bg-kampmax-muted flex items-center justify-center text-kampmax-text-secondary shrink-0">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-kampmax-blue">
         {icon}
       </div>
       <div className="min-w-0">
@@ -36,15 +36,15 @@ export function StoreAbout({ store }: StoreAboutProps) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-xl border border-kampmax-border p-5 sm:p-6">
-        <h2 className="text-base font-bold text-kampmax-text mb-2">
+      <div className="rounded-2xl border border-kampmax-border bg-white p-5 sm:p-7">
+        <h2 id="about-heading" className="mb-3 text-xl font-bold tracking-tight text-kampmax-text">
           About {store.storeName}
         </h2>
-        <p className="text-sm text-kampmax-text-secondary leading-relaxed">
+        <p className="max-w-3xl text-[15px] leading-relaxed text-kampmax-text-secondary">
           {a?.description || store.description}
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5">
+        <div className="mt-6 grid grid-cols-1 gap-4 border-t border-kampmax-border pt-6 sm:grid-cols-2 lg:grid-cols-3">
           <InfoItem
             icon={<MapPin className="h-4 w-4" />}
             label="Campus"
@@ -66,13 +66,13 @@ export function StoreAbout({ store }: StoreAboutProps) {
       </div>
 
       {store.specialties.length > 0 && (
-        <div className="bg-white rounded-xl border border-kampmax-border p-5 sm:p-6">
-          <h2 className="text-base font-bold text-kampmax-text mb-3">Specialties</h2>
+        <div className="rounded-2xl border border-kampmax-border bg-white p-5 sm:p-7">
+          <h2 className="mb-3 text-base font-bold text-kampmax-text">Specialties</h2>
           <div className="flex flex-wrap gap-2">
             {store.specialties.map((s) => (
               <span
                 key={s}
-                className="px-3 py-1 bg-kampmax-muted text-kampmax-text-secondary rounded-full text-xs font-medium"
+                className="rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700"
               >
                 {s}
               </span>

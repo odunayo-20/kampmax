@@ -216,6 +216,7 @@ export interface Vendor {
   verified: boolean;
   campusId: string;
   specialties: string[];
+  logo?: string;
   coverImage?: string;
   responseTime?: string;
   joinDate?: string;

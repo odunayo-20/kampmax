@@ -22,7 +22,7 @@ export function StoreEmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center text-center py-12 px-4",
+        "flex flex-col items-center justify-center rounded-2xl border border-dashed border-kampmax-border bg-white px-4 py-12 text-center",
         className
       )}
     >
