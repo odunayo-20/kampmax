@@ -37,7 +37,7 @@ export function SearchEmptyState({
       .slice(0, 4)
       .map((c) => ({
         label: `${c.name} products`,
-        href: `/marketplace/category/${c.id}`,
+        href: `/marketplace?category=${c.id}`,
       })),
     ...serviceCategories.slice(0, 4).map((c) => ({
       label: `${c.name} services`,

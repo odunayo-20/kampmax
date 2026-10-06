@@ -31,7 +31,7 @@ export function SearchCategoryBrowse({ className }: { className?: string }) {
           {marketplaceCategories.map((c) => (
             <Link
               key={c.id}
-              href={`/marketplace/category/${c.id}`}
+              href={`/marketplace?category=${c.id}`}
               className="group flex items-center gap-3 p-3 bg-white border border-neutral-200 rounded-xl hover:border-primary-300 hover:shadow-sm transition-all"
             >
               <span className="text-xl">{c.icon}</span>

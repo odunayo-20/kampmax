@@ -21,6 +21,8 @@ export interface BackendSelectedVariation {
   option: string;
   price?: number;
   sku?: string;
+  /** The exact pick per group when the product has several variant groups. */
+  choices?: Array<{ name: string; option: string }>;
 }
 
 export interface BackendCartItemResponse {
@@ -29,6 +31,8 @@ export interface BackendCartItemResponse {
   productName: string;
   productSlug: string;
   productImage: string | null;
+  categoryId?: string | null;
+  campusId?: string;
   quantity: number;
   unitPrice: number;
   subtotal: number;
@@ -57,7 +61,8 @@ export interface BackendCartResponse {
 export interface AddCartItemPayload {
   productId: string;
   quantity: number;
-  selectedVariation?: BackendSelectedVariation;
+  /** One chosen option per variant group; the server prices and checks stock from these. */
+  selectedVariations?: Array<{ name: string; option: string }>;
 }
 
 export interface UpdateCartItemPayload {
@@ -150,9 +155,9 @@ export function mapBackendCartToFrontend(cart: BackendCartResponse): CartLineIte
         title: item.productName,
         description: "",
         price: Number(item.unitPrice),
-        categoryId: "c1",
+        categoryId: item.categoryId ?? "",
         vendorId: group.vendorId,
-        campusId: "unilag",
+        campusId: item.campusId ?? "",
         images: item.productImage ? [item.productImage] : ["/placeholder-product.svg"],
         condition: "New",
         status: item.isActive ? (item.inStock ? "available" : "sold") : "removed",
@@ -160,12 +165,17 @@ export function mapBackendCartToFrontend(cart: BackendCartResponse): CartLineIte
         stock: item.availableStock,
       };
 
-      const selectedVariants = item.selectedVariation
-        ? { [item.selectedVariation.name]: item.selectedVariation.option }
+      const picks = item.selectedVariation
+        ? item.selectedVariation.choices?.length
+          ? item.selectedVariation.choices
+          : [{ name: item.selectedVariation.name, option: item.selectedVariation.option }]
+        : [];
+      const selectedVariants = picks.length
+        ? Object.fromEntries(picks.map((p) => [p.name, p.option]))
         : undefined;
 
-      const variantLabel = item.selectedVariation
-        ? `${item.selectedVariation.name}: ${item.selectedVariation.option}`
+      const variantLabel = picks.length
+        ? picks.map((p) => `${p.name}: ${p.option}`).join(" · ")
         : undefined;
 
       const availabilityStatus: AvailabilityStatus =

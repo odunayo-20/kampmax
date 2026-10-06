@@ -15,6 +15,7 @@ import { useEnsureVendors } from "@/hooks/use-vendor-cache";
 import { useApp } from "@/lib/app-context";
 import { isWishlisted, toggleWishlist } from "@/services/wishlist";
 import { addRecentlyViewed } from "@/services/recently-viewed";
+import { fetchReviewEligibility } from "@/services/reviews";
 import { ProductReviewsSection } from "@/components/reviews";
 import { formatNaira, calculateDiscountPercentage } from "@/lib/utils";
 import { EMPTY_CAMPUS } from "@/services/campus";
@@ -97,6 +98,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     },
   });
   const similar = relatedQuery.data ?? [];
+
+  // Only a buyer who received this product can review it; the server decides.
+  const eligibilityQuery = useQuery({
+    queryKey: ["reviews", "eligibility", "PRODUCT", id, user?.id],
+    enabled: !!user?.id,
+    staleTime: 60_000,
+    queryFn: () => fetchReviewEligibility("PRODUCT", id),
+  });
 
   useEffect(() => {
     if (product) {
@@ -220,12 +229,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     return parts.length ? parts.join(" · ") : undefined;
   }
 
-  /** The server cart records one option per line; it prices and checks stock against it. */
-  function serverVariation(): { name: string; option: string } | undefined {
-    if (variantGroups.length !== 1) return undefined;
-    const group = variantGroups[0];
-    const option = group.options.find((o) => o.id === selectedVariants[group.id]);
-    return option ? { name: group.name, option: option.id } : undefined;
+  /** Every chosen option; the server prices the line and checks stock from these. */
+  function serverVariations(): Array<{ name: string; option: string }> | undefined {
+    const picks = variantGroups.flatMap((group) => {
+      const option = group.options.find((o) => o.id === selectedVariants[group.id]);
+      return option ? [{ name: group.name, option: option.id }] : [];
+    });
+    return picks.length ? picks : undefined;
   }
 
   function handleAddToCart() {
@@ -234,7 +244,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     addItem(cartProduct, quantity, {
       variantLabel: buildVariantLabel(),
       selectedVariants,
-      serverVariation: serverVariation(),
+      serverVariations: serverVariations(),
       unitPrice: effectivePrice,
       openDrawer: true,
     });
@@ -249,7 +259,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     addItem(cartProduct, quantity, {
       variantLabel: buildVariantLabel(),
       selectedVariants,
-      serverVariation: serverVariation(),
+      serverVariations: serverVariations(),
       unitPrice: effectivePrice,
       openDrawer: false,
     });
@@ -351,13 +361,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             productId={product.id}
             vendorId={product.vendorId}
             userId={user?.id ?? null}
-            isVerifiedBuyer={false} // TODO: derive from orders when backend is connected
+            isVerifiedBuyer={eligibilityQuery.data?.eligible ?? false}
             productTitle={product.title}
           />
 
           <RelatedProducts products={similar} currentCategoryId={product.categoryId} />
 
-          <RecentlyViewedBar />
+          <RecentlyViewedBar excludeId={product.id} />
         </div>
       </PageContainer>
 

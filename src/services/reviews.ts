@@ -212,6 +212,29 @@ export async function deleteMyReview(id: string): Promise<{
   return { success: true, error: null };
 }
 
+export interface ReviewEligibility {
+  eligible: boolean;
+  alreadyReviewed: boolean;
+  /** Why the user can't review, in plain words. */
+  reason?: string;
+}
+
+/**
+ * Whether the signed-in user may review a target (they must have received the
+ * product, and not have reviewed it already).
+ * Endpoint: GET /reviews/eligibility/:targetType/:targetId
+ */
+export async function fetchReviewEligibility(
+  targetType: BackendReviewTargetType,
+  targetId: string
+): Promise<ReviewEligibility> {
+  const { data, error } = await apiClient.get<ReviewEligibility>(
+    `/reviews/eligibility/${targetType}/${targetId}`
+  );
+  if (error || !data) throw error ?? new Error("Could not check review eligibility");
+  return data;
+}
+
 /**
  * List public approved reviews for a target entity.
  * Endpoint: GET /reviews/target/:targetType/:targetId

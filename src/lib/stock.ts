@@ -5,7 +5,11 @@ import type { Product } from "@/types";
  * flagged it OUT_OF_STOCK (mapped to status "sold"), or its stock count is 0.
  * A stock of -1 means unlimited.
  */
-export function isOutOfStock(product: Pick<Product, "status" | "stock">): boolean {
+export function isOutOfStock(
+  product: Pick<Product, "status" | "stock"> & { hasVariants?: boolean }
+): boolean {
   if (product.status === "sold") return true;
+  // Stock is kept per option for variant products; the product page checks it.
+  if (product.hasVariants) return false;
   return typeof product.stock === "number" && product.stock === 0;
 }

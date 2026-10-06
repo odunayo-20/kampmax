@@ -59,6 +59,8 @@ export function ProductCard({
   }
 
   function handleAddToCart(e: React.MouseEvent) {
+    // A product with options can't be added blind: let the click open its page.
+    if (product.hasVariants) return;
     e.preventDefault();
     e.stopPropagation();
     if (outOfStock) return;
@@ -182,7 +184,10 @@ export function ProductCard({
             <button
               onClick={handleAddToCart}
               disabled={outOfStock}
-              aria-label={outOfStock ? "Out of stock" : "Add to cart"}
+              aria-label={
+                outOfStock ? "Out of stock" : product.hasVariants ? "Choose options" : "Add to cart"
+              }
+              title={product.hasVariants ? "Choose options" : undefined}
               className={cn(
                 "p-1.5 rounded-xl border transition-all shrink-0 flex items-center justify-center text-xs font-semibold",
                 outOfStock && "opacity-40 cursor-not-allowed hover:bg-neutral-50",

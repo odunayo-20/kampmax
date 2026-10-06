@@ -79,6 +79,11 @@ export function QuickViewModal({ product, onClose }: QuickViewModalProps) {
   }
 
   function handleAddToCart() {
+    // Options (size, colour…) are chosen on the product page.
+    if (product!.hasVariants) {
+      router.push(`/marketplace/${product!.id}`);
+      return;
+    }
     addItem(product!, quantity);
     setAddedToast(true);
     setTimeout(() => setAddedToast(false), 3000);

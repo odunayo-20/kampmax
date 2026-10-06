@@ -35,6 +35,18 @@ export function addRecentlyViewed(product: Product): Product[] {
 }
 
 /**
+ * Replace the stored list (used after re-checking items against the live catalogue).
+ */
+export function saveRecentlyViewed(products: Product[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(RECENTLY_VIEWED_KEY, JSON.stringify(products.slice(0, MAX_RECENT_ITEMS)));
+  } catch (err) {
+    console.error("Failed to save recently viewed products:", err);
+  }
+}
+
+/**
  * Clear all recently viewed products.
  */
 export function clearRecentlyViewed(): void {

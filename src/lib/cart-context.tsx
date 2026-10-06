@@ -75,7 +75,7 @@ interface CartContextType {
       variantLabel?: string;
       selectedVariants?: Record<string, string>;
       /** The option to record on the server cart (it prices and checks stock against it). */
-      serverVariation?: { name: string; option: string };
+      serverVariations?: Array<{ name: string; option: string }>;
       unitPrice?: number;
       openDrawer?: boolean;
     }
@@ -281,7 +281,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         variantLabel?: string;
         selectedVariants?: Record<string, string>;
         /** The option to record on the server cart (it prices and checks stock against it). */
-        serverVariation?: { name: string; option: string };
+        serverVariations?: Array<{ name: string; option: string }>;
         unitPrice?: number;
         openDrawer?: boolean;
       }
@@ -331,7 +331,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         addToServerCart({
           productId: product.id,
           quantity,
-          selectedVariation: options?.serverVariation,
+          selectedVariations: options?.serverVariations,
         }).then(async (res) => {
           if (res.error) {
             setFeedback({

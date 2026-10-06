@@ -406,7 +406,7 @@ export function search(query: string, filters: SearchFiltersInput = {}): SearchP
           type: "category",
           title: c.name,
           subtitle: "Category",
-          url: `/marketplace/category/${c.id}`,
+          url: `/marketplace?category=${c.id}`,
         },
         score,
         date: 0,

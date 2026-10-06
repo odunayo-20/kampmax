@@ -82,6 +82,10 @@ export function useMarketplace(initialCampusId?: string) {
     categoryId: searchParams.get("category") ?? "",
     vendorId: searchParams.get("vendor") ?? "",
     search: searchParams.get("q") ?? searchParams.get("search") ?? "",
+    minPrice: searchParams.get("minPrice") ?? "",
+    maxPrice: searchParams.get("maxPrice") ?? "",
+    condition: (["New", "Used"] as const).find((c) => c.toLowerCase() === searchParams.get("condition")?.toLowerCase()) ?? "",
+    sort: (["recent", "price_low", "price_high"] as const).find((o) => o === searchParams.get("sort")) ?? "recent",
   }));
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 

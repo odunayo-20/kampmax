@@ -44,6 +44,8 @@ export interface BackendProductListItem {
   allowDelivery?: boolean;
   allowPickup?: boolean;
   deliveryFee?: number | string;
+  /** True when a buyer must choose options before it can be bought. */
+  hasVariants?: boolean;
   createdAt: string | Date;
   /** Shown first in a search because an admin boosted it. */
   sponsored?: boolean;
