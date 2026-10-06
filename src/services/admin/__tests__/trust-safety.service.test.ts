@@ -188,6 +188,8 @@ describe("trustSafetyService (live stores)", () => {
     expect(counts.bySource).toEqual({
       review: 0,
       campus_post: 0,
+      store: 0,
+      service: 0,
     });
 
     const list = await trustSafetyService.list();
@@ -289,6 +291,8 @@ describe("computeTrustSafetyCounts", () => {
     expect(counts.bySource).toEqual({
       review: 4,
       campus_post: 3,
+      store: 0,
+      service: 0,
     });
     expect(counts.byTargetType).toEqual({
       product: 2,

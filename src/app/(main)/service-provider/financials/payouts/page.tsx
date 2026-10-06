@@ -1,174 +1,83 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { SpFinancialsSubnav } from "@/components/service-provider/financials/SpFinancialsSubnav";
-import { SpPayoutAccountCard } from "@/components/service-provider/financials/SpPayoutAccountCard";
-import { SpPayoutsTable } from "@/components/service-provider/financials/SpPayoutsTable";
-import { SpPayoutRequestModal } from "@/components/service-provider/financials/SpPayoutRequestModal";
-import { SpPagination } from "@/components/service-provider/financials/SpPagination";
-import { SpFinancialsSkeleton } from "@/components/service-provider/financials/SpFinancialsSkeleton";
-import {
-  getPayouts,
-  getPayoutsLive,
-  getPayoutAccount,
-  getPayoutAccountLive,
-  requestPayout,
-  requestPayoutLive,
-  computeAvailable,
-  computeAvailableLive,
-} from "@/services/service-provider-financials";
-import type { SpPayout, SpPayoutStatus, SpPayoutAccount, SpPayoutRequestInput, SpPayoutRequestResult, SpFinancialPage } from "@/types/service-provider-financials";
+import { TransactionItem } from "@/components/wallet/TransactionItem";
+import { WithdrawModal } from "@/components/wallet/WithdrawModal";
+import { Button } from "@/components/ui";
+import { formatNaira } from "@/lib/utils";
+import { getFriendlyErrorMessage } from "@/lib/error-messages";
+import { fetchMyWallet, fetchMyWalletTransactions, submitWithdrawal, type WithdrawPayload } from "@/services/wallet";
 
-const DEFAULT_PAGE_SIZE = 10;
+const KEY = ["sp-payouts"] as const;
 
 export default function PayoutsPage() {
-  const router = useRouter();
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(DEFAULT_PAGE_SIZE);
-  const [statusFilter, setStatusFilter] = useState<SpPayoutStatus | "all">("all");
-  const [data, setData] = useState<SpFinancialPage<SpPayout> | null>(null);
-  const [account, setAccount] = useState<SpPayoutAccount | null>(null);
-  const [available, setAvailable] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const payoutsRes = await getPayoutsLive({ page, pageSize, status: statusFilter });
-      setData(payoutsRes);
-    } catch {
-      try {
-        const payoutsRes = getPayouts({ page, pageSize, status: statusFilter });
-        setData(payoutsRes);
-      } catch {
-        setData(null);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [page, pageSize, statusFilter]);
+  const wallet = useQuery({ queryKey: [...KEY, "wallet"], queryFn: fetchMyWallet, retry: false });
+  const history = useQuery({
+    queryKey: [...KEY, "withdrawals"],
+    queryFn: async () => (await fetchMyWalletTransactions({ limit: 100 })).filter((t) => t.type === "withdrawal"),
+    retry: false,
+  });
 
-  const fetchMeta = useCallback(async () => {
-    try {
-      const [acct, avail] = await Promise.all([
-        getPayoutAccountLive(),
-        computeAvailableLive(),
-      ]);
-      setAccount(acct);
-      setAvailable(avail);
-    } catch {
-      try {
-        const [acct, avail] = [getPayoutAccount(), computeAvailable()];
-        setAccount(acct);
-        setAvailable(avail);
-      } catch {
-        setAccount(null);
-        setAvailable(0);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-    fetchMeta();
-  }, [fetchData, fetchMeta]);
-
-  const handlePageChange = (newPage: number) => {
-    setPage(newPage);
-  };
-
-  const handleStatusChange = (newStatus: SpPayoutStatus | "all") => {
-    setStatusFilter(newStatus);
-    setPage(1);
-  };
-
-  const handleRequestPayout = () => {
-    setModalOpen(true);
-  };
-
-  const handleModalSubmit = async (input: SpPayoutRequestInput): Promise<SpPayoutRequestResult> => {
-    try {
-      const res = await requestPayoutLive(input);
-      if (res.ok) {
-        fetchData();
-        fetchMeta();
-      }
-      return res;
-    } catch {
-      const res = requestPayout(input);
-      if (res.ok) {
-        fetchData();
-        fetchMeta();
-      }
-      return res;
-    }
-  };
-
-  const handleModalClose = () => {
-    setModalOpen(false);
-  };
-
-  if (loading) return <SpFinancialsSkeleton />;
-  if (!data) return <div className="text-center py-12 text-kampmax-text-secondary">No access</div>;
+  async function withdraw(payload: WithdrawPayload) {
+    await submitWithdrawal(payload);
+    await queryClient.invalidateQueries({ queryKey: KEY });
+  }
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-kampmax-text">Payouts</h1>
-          <p className="mt-1 text-sm text-kampmax-text-secondary">
-            Request payouts and view payout history
-          </p>
-        </div>
+      <header>
+        <h1 className="text-2xl font-bold text-kampmax-text">Payouts</h1>
+        <p className="mt-1 text-sm text-kampmax-text-secondary">
+          Withdraw your wallet balance to a bank account and track each withdrawal.
+        </p>
       </header>
 
       <SpFinancialsSubnav />
 
-      <SpPayoutAccountCard
-        account={account ?? { bankName: "", bankCode: "", accountName: "", maskedAccountNumber: "••••••••••", status: "missing", currency: "NGN", restrictions: [] }}
-        onRequestPayout={handleRequestPayout}
-        canRequest={account?.status === "verified"}
-      />
-
-      <div className="rounded-xl border border-kampmax-border bg-white p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="text-sm text-kampmax-text-secondary">Filter:</label>
-          <select
-            value={statusFilter}
-            onChange={(e) => handleStatusChange(e.target.value as SpPayoutStatus | "all")}
-            className="h-10 px-3 text-sm bg-white border border-neutral-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-600/20"
-          >
-            <option value="all">All statuses</option>
-            <option value="processing">Processing</option>
-            <option value="successful">Successful</option>
-            <option value="failed">Failed</option>
-          </select>
+      {wallet.isError ? (
+        <div role="alert" className="rounded-xl border border-kampmax-border bg-white p-6 text-center">
+          <p className="text-sm text-kampmax-text-secondary">{getFriendlyErrorMessage(wallet.error)}</p>
+          <Button variant="outline" size="sm" className="mt-3" onClick={() => void wallet.refetch()}>Try again</Button>
         </div>
-      </div>
+      ) : (
+        <div className="flex flex-col gap-3 rounded-xl border border-kampmax-border bg-white p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs text-kampmax-text-secondary">Available to withdraw</p>
+            <p className="text-2xl font-bold text-kampmax-text">
+              {wallet.data ? formatNaira(wallet.data.balance) : "…"}
+            </p>
+          </div>
+          <Button onClick={() => setOpen(true)} disabled={!wallet.data || wallet.data.balance < 100}>
+            Withdraw
+          </Button>
+        </div>
+      )}
 
-      <SpPayoutsTable
-        items={data.items}
-        onRowClick={(p) => router.push(`/service-provider/financials/payouts/${p.id}`)}
-      />
+      <section className="rounded-xl border border-kampmax-border bg-white">
+        <h2 className="border-b border-kampmax-border px-4 py-3 text-sm font-bold text-kampmax-text">Withdrawals</h2>
+        {history.isPending ? (
+          <p className="p-6 text-center text-sm text-kampmax-text-secondary">Loading…</p>
+        ) : history.isError ? (
+          <p role="alert" className="p-6 text-center text-sm text-kampmax-text-secondary">
+            {getFriendlyErrorMessage(history.error)}
+          </p>
+        ) : history.data.length === 0 ? (
+          <p className="p-6 text-center text-sm text-kampmax-text-secondary">You haven&apos;t withdrawn anything yet.</p>
+        ) : (
+          <div className="divide-y divide-kampmax-border">
+            {history.data.map((tx) => (
+              <TransactionItem key={tx.id} transaction={tx} />
+            ))}
+          </div>
+        )}
+      </section>
 
-      <SpPagination
-        page={data.page}
-        totalPages={data.totalPages}
-        total={data.total}
-        pageSize={data.pageSize}
-        itemLabel="payouts"
-        onPageChange={handlePageChange}
-      />
-
-      <SpPayoutRequestModal
-        isOpen={modalOpen}
-        onClose={handleModalClose}
-        onSubmit={handleModalSubmit}
-        account={account ?? { bankName: "", bankCode: "", accountName: "", maskedAccountNumber: "••••••••••", status: "missing", currency: "NGN", restrictions: [] }}
-        available={available}
-      />
+      <WithdrawModal isOpen={open} onClose={() => setOpen(false)} onWithdraw={withdraw} balance={wallet.data?.balance ?? 0} />
     </div>
   );
 }

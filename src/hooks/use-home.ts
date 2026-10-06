@@ -53,7 +53,7 @@ export function useHomeServices(campusId?: string) {
   return useQuery({
     queryKey: homeKeys.services(apiCampusId),
     // Live catalogue only: an outage is an error, never demo services.
-    queryFn: () => listPublicServices({ limit: 8 }),
+    queryFn: () => listPublicServices({ campusId: apiCampusId, limit: 8 }),
   });
 }
 

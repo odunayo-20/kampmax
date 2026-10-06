@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -11,9 +11,10 @@ import { WalletStats } from "@/components/wallet/WalletStats";
 import { TransactionItem } from "@/components/wallet/TransactionItem";
 import { TransactionDetail } from "@/components/wallet/TransactionDetail";
 import { FundingModal } from "@/components/wallet/FundingModal";
+import { WithdrawModal } from "@/components/wallet/WithdrawModal";
 import { FinancialIdentityCard } from "@/components/wallet/FinancialIdentityCard";
 import { useAuth } from "@/lib/auth-context";
-import { fetchMyWallet, fetchMyWalletTransactions } from "@/services/wallet";
+import { fetchMyWallet, fetchMyWalletTransactions, submitWithdrawal, type WithdrawPayload } from "@/services/wallet";
 import { useWalletTopup } from "@/hooks/use-wallet-topup";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
 import { WalletTransaction, WalletTransactionType } from "@/types";
@@ -40,6 +41,8 @@ export default function WalletPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | "completed" | "pending" | "processing" | "failed" | "cancelled">("all");
   const [selectedTx, setSelectedTx] = useState<WalletTransaction | null>(null);
   const [showFunding, setShowFunding] = useState(false);
+  const [showWithdraw, setShowWithdraw] = useState(false);
+  const queryClient = useQueryClient();
   const { notice, startTopup } = useWalletTopup();
 
   const walletQuery = useQuery({
@@ -52,6 +55,11 @@ export default function WalletPage() {
     queryFn: () => fetchMyWalletTransactions({ limit: 50 }),
     enabled: !!user,
   });
+
+  async function withdraw(payload: WithdrawPayload) {
+    await submitWithdrawal(payload);
+    await queryClient.invalidateQueries({ queryKey: WALLET_KEY });
+  }
 
   if (!user) return null;
 
@@ -115,6 +123,7 @@ export default function WalletPage() {
       <BalanceCard
         wallet={wallet}
         onTopUp={() => setShowFunding(true)}
+        onWithdraw={() => setShowWithdraw(true)}
       />
 
       {notice && (
@@ -222,6 +231,13 @@ export default function WalletPage() {
       )}
 
       {/* Funding Modal */}
+      <WithdrawModal
+        isOpen={showWithdraw}
+        onClose={() => setShowWithdraw(false)}
+        onWithdraw={withdraw}
+        balance={wallet.balance}
+      />
+
       <FundingModal
         isOpen={showFunding}
         onClose={() => setShowFunding(false)}

@@ -895,16 +895,6 @@ export interface StoreProfile {
   createdAt: string;
 }
 
-export interface StoreSettings {
-  acceptOrders: boolean;
-  autoConfirm: boolean;
-  notifyOnOrder: boolean;
-  notifyOnMessage: boolean;
-  showSoldItems: boolean;
-  allowPreOrder: boolean;
-  minOrderAmount: number;
-}
-
 // ============================================================
 // GLOBAL SEARCH
 // ============================================================
@@ -977,6 +967,8 @@ export interface SearchPage {
   pageSize: number;
   totalPages: number;
   suggestions: SearchSuggestion[];
+  /** Result types that could not be searched this time (their service was unreachable). */
+  unavailable?: SearchEntityType[];
 }
 
 export interface TrendingSearch {

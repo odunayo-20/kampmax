@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { BadgeCheck, Clock, MapPin, Wrench, Star } from "lucide-react";
-import type { MarketplaceProvider, MarketplaceService } from "@/types/service-marketplace";
+import type { MarketplaceProvider, MarketplaceService, ServiceProviderSummary } from "@/types/service-marketplace";
 import {
   getServicePriceDisplay,
   getServiceDurationLabel,
@@ -17,7 +17,10 @@ interface ServiceCardProps {
   className?: string;
 }
 
-export function ServiceCard({ service, provider, className }: ServiceCardProps) {
+export function ServiceCard({ service, provider: providerProp, className }: ServiceCardProps) {
+  // The listing says who offers each service; a fuller profile can still be passed in.
+  const provider: (ServiceProviderSummary & Partial<MarketplaceProvider>) | undefined =
+    providerProp ?? service.provider ?? undefined;
   const price = getServicePriceDisplay(service.pricingModel, service.price, service.priceMax);
 
   return (

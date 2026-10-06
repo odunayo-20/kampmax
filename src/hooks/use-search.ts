@@ -3,10 +3,7 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { searchKeys } from "@/lib/query-keys";
-import { getSuggestions, search, SearchFiltersInput } from "@/services/search";
-import { fetchProducts } from "@/services/products";
-import { fetchVendors } from "@/services/users";
-import { fetchCategories } from "@/services/categories";
+import { getSuggestions, search } from "@/services/search";
 import type { GlobalSearchQuery, SearchPage, SearchSuggestion } from "@/types";
 import {
   SEARCH_PAGE_SIZE,
@@ -31,14 +28,8 @@ export function useGlobalSearch(query: GlobalSearchQuery) {
     enabled,
     placeholderData: keepPreviousData,
     staleTime: 30_000,
-    queryFn: async (): Promise<SearchPage> => {
-      // Refresh the live caches the sync search reads from.
-      await Promise.all([
-        fetchProducts({ search: trimmedQuery, campusId: query.campusId, status: "ACTIVE", limit: 50 }),
-        fetchVendors({ search: trimmedQuery, campusId: query.campusId, limit: 20 }),
-        fetchCategories({ limit: 50 }),
-      ]);
-      const filters: SearchFiltersInput = {
+    queryFn: (): Promise<SearchPage> =>
+      search(trimmedQuery, {
         type: query.type,
         sort: query.sort,
         campusId: query.campusId,
@@ -46,17 +37,15 @@ export function useGlobalSearch(query: GlobalSearchQuery) {
         priceMax: query.priceMax,
         page: query.page ?? 1,
         pageSize: query.pageSize ?? SEARCH_PAGE_SIZE,
-      };
-      return search(trimmedQuery, filters);
-    },
+      }),
   });
 }
 
 /**
  * Type-ahead suggestions for the global search box. Only fires once the
- * query is ≥2 characters. The current backend has no suggestion endpoint —
- * this runs over the same in-memory stores the mock services read, and the
- * hook boundary is where a real `GET /search/suggestions` will plug in.
+ * query is ≥2 characters. The backend has no suggestion endpoint, so these are
+ * the top live matches from a few verticals; this hook is where a real
+ * `GET /search/suggestions` will plug in.
  */
 export function useSearchSuggestions(q: string) {
   const { status } = useAuth();
@@ -68,13 +57,7 @@ export function useSearchSuggestions(q: string) {
   return useQuery({
     queryKey: searchKeys.suggestions(trimmed),
     enabled,
-    queryFn: async (): Promise<SearchSuggestion[]> => {
-      await Promise.all([
-        fetchProducts({ search: trimmed, status: "ACTIVE", limit: 10 }),
-        fetchVendors({ search: trimmed, limit: 5 }),
-        fetchCategories({ limit: 50 }),
-      ]);
-      return getSuggestions(trimmed);
-    },
+    staleTime: 30_000,
+    queryFn: (): Promise<SearchSuggestion[]> => getSuggestions(trimmed),
   });
 }

@@ -31,7 +31,7 @@ export function VerificationStatusBanner({
               Verified {role === "vendor" ? "Vendor Account" : "Freelancer Pro"}
             </p>
             <p className="text-xs text-emerald-700">
-              Your identity (NIN/BVN) and documents are verified. All privileges are active.
+              Your verification is complete. All privileges are active.
             </p>
           </div>
         </div>
@@ -56,7 +56,7 @@ export function VerificationStatusBanner({
               Verification in Progress
             </p>
             <p className="text-xs text-amber-700">
-              Your NIN, BVN, and uploaded documents are currently under review by our compliance team (typically takes 12-24h).
+              Our team is reviewing your verification. You&apos;ll be notified as soon as there&apos;s a decision.
             </p>
           </div>
         </div>
@@ -98,6 +98,32 @@ export function VerificationStatusBanner({
     );
   }
 
+  if (status === "suspended") {
+    return (
+      <div
+        className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-900 ${className}`}
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-700">
+            <XCircle className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-red-950">Account Suspended</p>
+            <p className="text-xs text-red-700">
+              This account has been suspended by Kampmax. Contact support to find out why and how to resolve it.
+            </p>
+          </div>
+        </div>
+        <Link
+          href="/support"
+          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-red-700 shrink-0"
+        >
+          Contact support <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
+      </div>
+    );
+  }
+
   // Unverified (Default state)
   return (
     <div
@@ -112,12 +138,11 @@ export function VerificationStatusBanner({
             <p className="text-sm font-bold text-kampmax-navy">
               Account Verification Required
             </p>
-            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800 uppercase tracking-wider">
-              Required for Payouts
-            </span>
           </div>
           <p className="text-xs text-kampmax-text-secondary mt-0.5">
-            Complete your NIN/BVN and document verification in your dashboard to activate your profile and start receiving payouts.
+            {role === "vendor"
+              ? "Upload your verification documents so Kampmax can verify your store."
+              : "Ask for a review of your freelancer profile to earn the verified badge."}
           </p>
         </div>
       </div>
@@ -125,7 +150,7 @@ export function VerificationStatusBanner({
         href={verificationHref}
         className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-kampmax-blue px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-kampmax-blue/90 transition-colors shrink-0"
       >
-        Verify Identity Now <ArrowRight className="h-3.5 w-3.5" />
+        Start verification <ArrowRight className="h-3.5 w-3.5" />
       </Link>
     </div>
   );

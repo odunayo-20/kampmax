@@ -80,9 +80,19 @@ export interface MarketplaceProvider {
 
 // ── Public service projection ─────────────────────────────────
 
+/** The public face of whoever offers a service (verified, active providers only). */
+export interface ServiceProviderSummary {
+  id: string;
+  slug: string;
+  displayName: string;
+  verified: boolean;
+}
+
 export interface MarketplaceService {
   id: string;
   providerId: string;
+  /** Who offers it; null when the provider can't be shown. */
+  provider?: ServiceProviderSummary | null;
   name: string;
   description: string;
   categoryId: string;
@@ -188,10 +198,4 @@ export interface RequestQuoteInput {
   preferredDate?: string;
   location?: string;
   message?: string;
-}
-
-export interface RequestQuoteResult {
-  success: boolean;
-  id?: string;
-  message: string;
 }

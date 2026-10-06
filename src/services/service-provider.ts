@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/api-client";
+import { addSpDashboardServiceLive, updateSpAvailabilityLive } from "@/services/service-provider-dashboard.api";
 import type {
   ServiceProviderOnboardingDraft,
   ServiceProviderOnboardingDocument,
@@ -392,54 +393,88 @@ export async function createSpProfileApi(
   return { created: true, error: null };
 }
 
-// ── Submit for review ────────────────────────────────────────
+// ── Completing onboarding ────────────────────────────────────
+// Onboarding is only complete once what the person entered is saved on the
+// server: the profile, each service they listed, and their weekly schedule.
+// Approval ("verified") is Kampmax's decision, made by an admin afterwards.
 
-export function submitSpApplication(): {
-  success: boolean;
-  result: ServiceProviderSubmitResult;
-  message: string;
-} {
+export interface SpOnboardingResult {
+  ok: boolean;
+  /** What did not get saved, in plain words. Empty when ok. */
+  problems: string[];
+}
+
+/** The minimum a provider needs before they can go live; null when the draft is ready. */
+export function validateSpDraft(draft: ServiceProviderOnboardingDraft): string | null {
+  if (!(draft.profile?.displayName || draft.provider?.displayName)?.trim()) {
+    return "Add a display name.";
+  }
+  if (!draft.category?.primaryCategoryId) return "Choose a primary service category.";
+  if (!draft.services || draft.services.length === 0) return "Add at least one service.";
+  return null;
+}
+
+/**
+ * Saves the onboarding draft on the server. Safe to run again after a partial
+ * failure: an existing profile is kept and services already saved are skipped.
+ */
+export async function completeSpOnboarding(
+  draft: ServiceProviderOnboardingDraft
+): Promise<SpOnboardingResult> {
+  const invalid = validateSpDraft(draft);
+  if (invalid) return { ok: false, problems: [invalid] };
+
+  const problems: string[] = [];
+
+  const profile = await createSpProfileApi(draft);
+  // 409 = the profile already exists (an earlier attempt got this far).
+  if (profile.error && profile.error.status !== 409) {
+    return {
+      ok: false,
+      problems: [profile.error.message || "We couldn't create your provider profile."],
+    };
+  }
+
+  const existing = await apiClient.get<Array<{ title: string }>>("/service-provider/services/me");
+  if (existing.error || !existing.data) {
+    problems.push("We couldn't check which services you already have, so none were added. Try again.");
+  } else {
+    const saved = new Set(existing.data.map((svc) => svc.title.trim().toLowerCase()));
+    for (const svc of draft.services) {
+      if (saved.has(svc.name.trim().toLowerCase())) continue;
+      const res = await addSpDashboardServiceLive({
+        name: svc.name,
+        description: svc.description,
+        categoryId: svc.categoryId || draft.category.primaryCategoryId || "",
+        pricingModel: svc.pricingModel,
+        price: svc.price,
+        priceMax: svc.priceMax,
+        durationMinutes: svc.durationMinutes,
+        locationType: svc.locationType,
+        images: svc.images,
+      });
+      if (!res.ok) problems.push(`"${svc.name}" wasn't saved: ${res.error ?? "unknown error"}`);
+    }
+  }
+
+  const days = draft.availability?.days;
+  if (days && days.some((d) => d.isAvailable)) {
+    const res = await updateSpAvailabilityLive(days);
+    if (!res.ok) problems.push(`Your weekly schedule wasn't saved: ${res.error ?? "unknown error"}`);
+  }
+
+  return { ok: problems.length === 0, problems };
+}
+
+/** Remembers on this device that onboarding was finished, so it isn't offered again. */
+export function markSpApplicationSubmitted(): void {
   const app = store[ownerId()];
-  if (!app) return { success: false, result: SERVICE_PROVIDER_SUBMIT_RESULT.MISSING_INFORMATION, message: "You have not started an application." };
-
-  if (
-    app.status === SERVICE_PROVIDER_ONBOARDING_STATUS.PENDING_REVIEW ||
-    app.status === SERVICE_PROVIDER_ONBOARDING_STATUS.APPROVED
-  ) {
-    return { success: false, result: SERVICE_PROVIDER_SUBMIT_RESULT.ALREADY_SUBMITTED, message: "This application has already been submitted." };
-  }
-
-  // Backend validation — mirrors real checks; UI can't bypass these.
-  if (!app.provider.displayName) {
-    return { success: false, result: SERVICE_PROVIDER_SUBMIT_RESULT.MISSING_INFORMATION, message: "Provider display name is required." };
-  }
-  if (!app.profile.displayName) {
-    return { success: false, result: SERVICE_PROVIDER_SUBMIT_RESULT.MISSING_INFORMATION, message: "Profile display name is required." };
-  }
-  if (!app.category.primaryCategoryId) {
-    return { success: false, result: SERVICE_PROVIDER_SUBMIT_RESULT.MISSING_INFORMATION, message: "Choose a primary service category." };
-  }
-  if (app.services.length === 0) {
-    return { success: false, result: SERVICE_PROVIDER_SUBMIT_RESULT.MISSING_INFORMATION, message: "Add at least one service." };
-  }
-  if (!app.location.primaryCampusId) {
-    return { success: false, result: SERVICE_PROVIDER_SUBMIT_RESULT.MISSING_INFORMATION, message: "Primary campus is required." };
-  }
-  if (app.verification.status === SERVICE_PROVIDER_VERIFICATION_STATUS.PENDING ||
-      app.verification.status === SERVICE_PROVIDER_VERIFICATION_STATUS.ACTION_REQUIRED) {
-    return { success: false, result: SERVICE_PROVIDER_SUBMIT_RESULT.VERIFICATION_REQUIRED, message: "Verification is still required before submitting." };
-  }
-  const requiredDoc = app.documents.find((d) => d.required && d.status !== "uploaded" && d.status !== "approved");
-  if (requiredDoc) {
-    return { success: false, result: SERVICE_PROVIDER_SUBMIT_RESULT.DOCUMENT_REQUIRED, message: `Required document missing: ${requiredDoc.label}.` };
-  }
-
+  if (!app) return;
   app.status = SERVICE_PROVIDER_ONBOARDING_STATUS.PENDING_REVIEW;
   app.submittedAt = new Date().toISOString();
   app.currentStep = SERVICE_PROVIDER_ONBOARDING_STEPS;
   app.adminMessage = undefined;
   scramble(app);
-  return { success: true, result: SERVICE_PROVIDER_SUBMIT_RESULT.SUBMITTED, message: "Submitted. Kampmax will review your application." };
 }
 
 // ── Public profile access ────────────────────────────────────

@@ -14,6 +14,11 @@ interface ReportStoreModalProps {
   storeName: string;
 }
 
+const messageFor = (error: unknown) =>
+  (error as { status?: number } | null)?.status === 409
+    ? "You've already reported this store. Our team is reviewing it."
+    : "Something went wrong submitting your report. Please try again.";
+
 const reportReasons: { value: ReportStoreReason; label: string }[] = [
   { value: "fraud", label: "Fraud / scam" },
   { value: "counterfeit", label: "Counterfeit product" },
@@ -37,7 +42,8 @@ export function ReportStoreModal({
   const [reason, setReason] = useState<ReportStoreReason | null>(null);
   const [details, setDetails] = useState("");
   const [submitted, setSubmitted] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -50,11 +56,12 @@ export function ReportStoreModal({
 
   if (!isOpen) return null;
 
-  function handleSubmit() {
-    if (!reason) return;
-    setError(false);
+  async function handleSubmit() {
+    if (!reason || sending) return;
+    setError(null);
+    setSending(true);
     try {
-      reportStore({ vendorId, userId, reason, details });
+      await reportStore({ vendorId, reason, details });
       setSubmitted(true);
       setTimeout(() => {
         setSubmitted(false);
@@ -62,8 +69,10 @@ export function ReportStoreModal({
         setDetails("");
         onClose();
       }, 1800);
-    } catch {
-      setError(true);
+    } catch (err) {
+      setError(messageFor(err));
+    } finally {
+      setSending(false);
     }
   }
 
@@ -109,7 +118,7 @@ export function ReportStoreModal({
 
             {error && (
               <p className="text-xs text-kampmax-error bg-kampmax-error/5 border border-kampmax-error/20 rounded-lg p-2.5">
-                Something went wrong submitting your report. Please try again.
+                {error}
               </p>
             )}
 
@@ -150,11 +159,11 @@ export function ReportStoreModal({
             </div>
 
             <button
-              onClick={handleSubmit}
-              disabled={!reason}
+              onClick={() => void handleSubmit()}
+              disabled={!reason || sending}
               className="w-full py-2.5 rounded-xl bg-kampmax-error text-white text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Submit Report
+              {sending ? "Sending…" : "Submit Report"}
             </button>
           </div>
         )}

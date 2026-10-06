@@ -1,199 +1,172 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { cn, formatNaira, formatNairaCompact } from "@/lib/utils";
-import { X, Building2, Check } from "lucide-react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Loader2, X } from "lucide-react";
+import { formatNaira } from "@/lib/utils";
+import { fetchBanks, resolveBankAccount } from "@/services/financial-api";
+import type { WithdrawPayload } from "@/services/wallet";
+
+const MIN_WITHDRAWAL = 100;
 
 interface WithdrawModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onWithdraw: (amount: number, bankName: string, bankAccount: string) => void;
+  /** Sends the request. Rejects with a user-facing message. */
+  onWithdraw: (payload: WithdrawPayload) => Promise<void>;
   balance: number;
 }
 
-const savedBanks = [
-  { name: "GTBank", account: "•••• 4567", type: "Savings" },
-  { name: "Access Bank", account: "•••• 8901", type: "Current" },
-];
-
 export function WithdrawModal({ isOpen, onClose, onWithdraw, balance }: WithdrawModalProps) {
+  const [bankCode, setBankCode] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
   const [amount, setAmount] = useState("");
-  const [selectedBank, setSelectedBank] = useState(0);
-  const [step, setStep] = useState<"form" | "processing" | "success">("form");
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, []);
+  const banks = useQuery({ queryKey: ["financial", "banks"], queryFn: fetchBanks, enabled: isOpen, staleTime: 60 * 60_000 });
 
-  function handleClose() {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = null;
-    setStep("form");
-    onClose();
-  }
+  const accountReady = /^\d{10}$/.test(accountNumber) && bankCode.length > 0;
+  const holder = useQuery({
+    queryKey: ["financial", "resolve", accountNumber, bankCode],
+    queryFn: () => resolveBankAccount(accountNumber, bankCode),
+    enabled: isOpen && accountReady,
+    retry: false,
+    staleTime: 10 * 60_000,
+  });
 
   if (!isOpen) return null;
 
-  function handleWithdraw() {
-    const amt = Number(amount);
-    if (amt < 100 || amt > balance) return;
-    setStep("processing");
-    timerRef.current = setTimeout(() => {
-      onWithdraw(amt, savedBanks[selectedBank].name, savedBanks[selectedBank].account);
-      setStep("success");
-      timerRef.current = setTimeout(() => {
-        setStep("form");
-        setAmount("");
-        onClose();
-      }, 2000);
-    }, 1500);
+  const value = Number(amount);
+  const amountError =
+    amount === "" ? null
+    : !Number.isFinite(value) || value < MIN_WITHDRAWAL ? `The minimum is ${formatNaira(MIN_WITHDRAWAL)}.`
+    : value > balance ? "That is more than your balance."
+    : null;
+  const canSubmit = !!holder.data?.accountName && amount !== "" && !amountError && !submitting;
+
+  function reset() {
+    setBankCode("");
+    setAccountNumber("");
+    setAmount("");
+    setError(null);
+    setSubmitting(false);
   }
+
+  function handleClose() {
+    reset();
+    onClose();
+  }
+
+  async function submit() {
+    if (!canSubmit || !holder.data) return;
+    setError(null);
+    setSubmitting(true);
+    try {
+      await onWithdraw({
+        amount: value,
+        destination: { bankCode, accountNumber, accountName: holder.data.accountName },
+      });
+      reset();
+      onClose();
+    } catch (e) {
+      setSubmitting(false);
+      setError(e instanceof Error ? e.message : "Could not request your withdrawal.");
+    }
+  }
+
+  const field =
+    "w-full px-3 py-2.5 rounded-lg border border-kampmax-border text-sm text-kampmax-text focus:outline-none focus:border-kampmax-blue focus:ring-1 focus:ring-kampmax-blue/20";
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-md rounded-xl flex flex-col max-h-[85vh]">
-        {/* Header */}
         <div className="shrink-0 border-b border-kampmax-border px-4 py-3 flex items-center justify-between">
-          <h2 className="text-sm font-bold text-kampmax-text">Withdraw Funds</h2>
-          <button onClick={handleClose} className="w-8 h-8 rounded-lg flex items-center justify-center text-kampmax-text-secondary">
+          <h2 className="text-sm font-bold text-kampmax-text">Withdraw to bank</h2>
+          <button
+            onClick={handleClose}
+            aria-label="Close"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-kampmax-text-secondary"
+          >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {step === "processing" && (
-          <div className="p-8 text-center">
-            <div className="w-12 h-12 rounded-full border-4 border-kampmax-blue border-t-transparent animate-spin mx-auto mb-4" />
-            <p className="text-sm font-semibold text-kampmax-text">Processing withdrawal...</p>
-            <p className="text-xs text-kampmax-text-secondary mt-1">
-              This may take a few minutes
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="bg-kampmax-muted/50 rounded-xl p-3 flex items-center justify-between">
+            <span className="text-xs text-kampmax-text-secondary">Available</span>
+            <span className="text-sm font-bold text-kampmax-text">{formatNaira(balance)}</span>
+          </div>
+
+          <div>
+            <label htmlFor="wd-bank" className="block text-xs font-medium text-kampmax-text-secondary mb-1.5">Bank</label>
+            <select id="wd-bank" value={bankCode} onChange={(e) => setBankCode(e.target.value)} className={field} disabled={banks.isPending}>
+              <option value="">{banks.isPending ? "Loading banks…" : "Select a bank"}</option>
+              {(banks.data ?? []).map((b) => (
+                <option key={b.code} value={b.code}>{b.name}</option>
+              ))}
+            </select>
+            {banks.isError && <p className="mt-1 text-[11px] text-red-600">Could not load banks. Close this and try again.</p>}
+          </div>
+
+          <div>
+            <label htmlFor="wd-account" className="block text-xs font-medium text-kampmax-text-secondary mb-1.5">Account number</label>
+            <input
+              id="wd-account"
+              inputMode="numeric"
+              maxLength={10}
+              value={accountNumber}
+              onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ""))}
+              placeholder="10-digit account number"
+              className={field}
+            />
+            {accountReady && holder.isFetching && (
+              <p className="mt-1 flex items-center gap-1 text-[11px] text-kampmax-text-secondary">
+                <Loader2 className="h-3 w-3 animate-spin" aria-hidden /> Checking account…
+              </p>
+            )}
+            {holder.data && <p className="mt-1 text-xs font-semibold text-emerald-700">{holder.data.accountName}</p>}
+            {accountReady && holder.isError && (
+              <p className="mt-1 text-[11px] text-red-600">We couldn&apos;t find that account. Check the bank and number.</p>
+            )}
+          </div>
+
+          <div>
+            <label htmlFor="wd-amount" className="block text-xs font-medium text-kampmax-text-secondary mb-1.5">Amount (₦)</label>
+            <input
+              id="wd-amount"
+              type="number"
+              min={MIN_WITHDRAWAL}
+              max={balance}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="Enter amount"
+              className={field}
+            />
+            {amountError && <p className="mt-1 text-[11px] text-red-600">{amountError}</p>}
+          </div>
+
+          {error && (
+            <p role="alert" className="rounded-lg bg-red-50 p-3 text-xs text-red-700">{error}</p>
+          )}
+
+          <div className="bg-kampmax-muted/50 rounded-lg p-3">
+            <p className="text-[11px] text-kampmax-text-secondary leading-relaxed">
+              The amount leaves your wallet now and is paid to this account by Kampmax. It shows as pending until the
+              transfer is made.
             </p>
           </div>
-        )}
+        </div>
 
-        {step === "success" && (
-          <div className="p-8 text-center">
-            <div className="w-12 h-12 rounded-full bg-kampmax-success/10 flex items-center justify-center mx-auto mb-4">
-              <Check className="h-6 w-6 text-kampmax-success" />
-            </div>
-            <p className="text-sm font-semibold text-kampmax-text">Withdrawal Initiated!</p>
-            <p className="text-xs text-kampmax-text-secondary mt-1">
-              Funds will arrive within 24 hours
-            </p>
-          </div>
-        )}
-
-        {step === "form" && (
-          <>
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {/* Available */}
-              <div className="bg-kampmax-muted/50 rounded-xl p-3">
-                <p className="text-xs text-kampmax-text-secondary">
-                  Available for withdrawal
-                </p>
-                <p className="text-lg font-bold text-kampmax-text">{formatNaira(balance)}</p>
-              </div>
-
-              {/* Amount */}
-              <div>
-                <label className="block text-xs font-medium text-kampmax-text-secondary mb-1.5">
-                  Amount (₦)
-                </label>
-                <input
-                  type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="Enter amount"
-                  min={100}
-                  max={balance}
-                  className="w-full px-3 py-2.5 rounded-lg border border-kampmax-border text-sm focus:outline-none focus:border-kampmax-blue"
-                />
-                {Number(amount) > balance && (
-                  <p className="text-[10px] text-kampmax-error mt-1">Amount exceeds balance</p>
-                )}
-              </div>
-
-              {/* Quick amounts */}
-              <div className="grid grid-cols-4 gap-2">
-                {[...new Set([1000, 5000, 10000, balance])].map((amt) => (
-                  <button
-                    key={amt}
-                    onClick={() => setAmount(String(amt))}
-                    className={cn(
-                      "py-2 rounded-lg text-xs font-medium border transition-colors truncate px-1",
-                      amount === String(amt)
-                        ? "bg-kampmax-blue text-white border-kampmax-blue"
-                        : "bg-white text-kampmax-text border-kampmax-border"
-                    )}
-                    title={formatNaira(amt)}
-                  >
-                    {amt === balance ? "All" : formatNairaCompact(amt)}
-                  </button>
-                ))}
-              </div>
-
-              {/* Bank selection */}
-              <div>
-                <p className="text-xs text-kampmax-text-secondary mb-2">Send to</p>
-                <div className="space-y-2">
-                  {savedBanks.map((bank, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setSelectedBank(i)}
-                      className={cn(
-                        "w-full flex items-center gap-3 p-3 rounded-xl border transition-colors",
-                        selectedBank === i
-                          ? "border-kampmax-blue bg-kampmax-blue/5"
-                          : "border-kampmax-border"
-                      )}
-                    >
-                      <div
-                        className={cn(
-                          "w-10 h-10 rounded-xl flex items-center justify-center",
-                          selectedBank === i
-                            ? "bg-kampmax-blue text-white"
-                            : "bg-kampmax-muted text-kampmax-text-secondary"
-                        )}
-                      >
-                        <Building2 className="h-5 w-5" />
-                      </div>
-                      <div className="flex-1 text-left">
-                        <p className="text-sm font-medium text-kampmax-text">{bank.name}</p>
-                        <p className="text-[10px] text-kampmax-text-secondary">
-                          {bank.type} {bank.account}
-                        </p>
-                      </div>
-                      {selectedBank === i && (
-                        <Check className="h-5 w-5 text-kampmax-blue" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Note */}
-              <div className="bg-kampmax-muted/50 rounded-lg p-3">
-                <p className="text-[11px] text-kampmax-text-secondary leading-relaxed">
-                  Withdrawals are processed within 24 hours to your linked bank account.
-                  Minimum withdrawal: {formatNaira(100)}. No withdrawal fees.
-                </p>
-              </div>
-            </div>
-
-            {/* Footer - static, outside scroll area */}
-            <div className="shrink-0 border-t border-kampmax-border px-4 py-3">
-              <button
-                onClick={handleWithdraw}
-                disabled={!amount || Number(amount) < 100 || Number(amount) > balance}
-                className="w-full py-3 rounded-xl bg-kampmax-navy text-white text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Withdraw {amount ? formatNaira(Number(amount)) : ""}
-              </button>
-            </div>
-          </>
-        )}
+        <div className="shrink-0 border-t border-kampmax-border px-4 py-3">
+          <button
+            onClick={() => void submit()}
+            disabled={!canSubmit}
+            className="w-full rounded-lg bg-kampmax-blue py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {submitting ? "Requesting…" : "Request withdrawal"}
+          </button>
+        </div>
       </div>
     </div>
   );

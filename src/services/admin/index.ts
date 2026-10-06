@@ -1,23 +1,10 @@
 // ============================================================
 // ADMIN SERVICE CONTAINER
 //
-// SINGLE SWAP POINT for the future NestJS backend.
-//
-// Every admin page/component consumes services through this
-// module. When the real API lands:
-//   1. Implement each `Admin*Service` interface in
-//      `<resource>.http.ts` files (fetch/axios against NestJS).
-//   2. Replace the factory calls below with the HTTP variants.
-//   3. Delete `src/data/admin/*` mock modules.
-// No component or page code changes required.
+// Every admin page/component consumes services through this module,
+// and every service here talks to the live NestJS API.
 // ============================================================
 
-import { mockSettings } from "@/data/admin/system";
-import { mockUsers, mockVendors } from "@/data/admin/people";
-import { mockCategories, mockProducts } from "@/data/admin/catalog";
-import { mockOrders, mockPayments, mockWithdrawals } from "@/data/admin/commerce";
-import { mockPromotions } from "@/data/admin/growth";
-import { mockDisputes, mockPosts, mockReports, mockReviews } from "@/data/admin/content";
 import { DashboardService } from "./dashboard.service";
 import { createApiDashboardService } from "./dashboard.api";
 
@@ -33,54 +20,24 @@ export type {
 
 /** Live operator auth: POST /admin/auth/login, GET /admin/auth/session. */
 export const adminAuthService: AdminAuthService = createApiAdminAuthService();
-import { AdminUserService, createMockUserService } from "./users.service";
 import type { AdminUserManagementService } from "./user-management.service";
 import { createApiUserManagementService } from "./user-management.api";
 import type { AdminCampusManagementService } from "./campus-management.service";
 import { createApiCampusManagementService } from "./campus-management.api";
 import { AdminCampusService } from "./campuses.service";
 import { createApiCampusService } from "./campuses.api";
-import { AdminVendorService, createMockVendorService } from "./vendors.service";
 import type { AdminVendorManagementService } from "./vendor-management.service";
 import { createApiVendorManagementService } from "./vendor-management.api";
 import type { AdminProductManagementService } from "./product-management.service";
 import { createApiProductManagementService } from "./product-management.api";
 import {
-  AdminCategoryService,
-  AdminProductService,
-  createMockCategoryService,
-  createMockProductService,
-} from "./catalog.service";
-import { AdminOrderService, createMockOrderService } from "./orders.service";
-import { AdminPaymentService, createMockPaymentService } from "./payments.service";
-import {
-  AdminWithdrawalService,
-  createMockWithdrawalService,
-} from "./withdrawals.service";
-import {
-  AdminPromotionService,
-  createMockPromotionService,
-} from "./promotions.service";
-import {
-  AdminContentService,
-  AdminDisputeService,
-  AdminReportService,
-  AdminReviewService,
-  createMockDisputeService,
-  createMockPostService,
-  createMockReportService,
-  createMockReviewService,
-} from "./content.service";
-import {
   AdminNotificationService,
 } from "./notifications.service";
 import { createApiNotificationService } from "./notifications.api";
-import { AdminSettingService, createMockSettingService } from "./settings.service";
 
 // Live API dashboard service — calls NestJS backend analytics + admin endpoints.
 export const dashboardService: DashboardService = createApiDashboardService();
 
-export const userService: AdminUserService = createMockUserService(mockUsers);
 
 /** /admin/users console: live directory API (staff, vendors, customers). */
 export const userManagementService: AdminUserManagementService =
@@ -112,8 +69,6 @@ export type { ManagedCampusSortField } from "./campus-management.service";
 export const campusService: AdminCampusService =
   createApiCampusService();
 
-export const vendorService: AdminVendorService =
-  createMockVendorService(mockVendors);
 
 /** /admin/vendors console: live store directory + lifecycle API. */
 export const vendorManagementService: AdminVendorManagementService =
@@ -192,28 +147,12 @@ import { createApiFreelancerManagementService } from "./freelancer-management.ap
 export const promotionManagementService: AdminPromotionManagementService =
   createApiPromotionManagementService();
 
-export const productService: AdminProductService =
-  createMockProductService(mockProducts);
 
-export const categoryService: AdminCategoryService =
-  createMockCategoryService(mockCategories);
 
-export const orderService: AdminOrderService = createMockOrderService(mockOrders);
 
-export const paymentService: AdminPaymentService =
-  createMockPaymentService(mockPayments);
 
-export const withdrawalService: AdminWithdrawalService =
-  createMockWithdrawalService(mockWithdrawals);
 
-export const promotionService: AdminPromotionService =
-  createMockPromotionService(mockPromotions);
 
-export const postService: AdminContentService = createMockPostService(mockPosts);
-export const reportService: AdminReportService = createMockReportService(mockReports);
-export const reviewService: AdminReviewService = createMockReviewService(mockReviews);
-export const disputeService: AdminDisputeService =
-  createMockDisputeService(mockDisputes);
 
 import type { AdminCommunityService } from "./community.service";
 import { createApiCommunityService } from "./community.api";
@@ -379,8 +318,6 @@ export const adminAuditTrailService: AdminAuditLogService = createApiAuditLogSer
 export const notificationService: AdminNotificationService =
   createApiNotificationService();
 
-export const settingService: AdminSettingService =
-  createMockSettingService(mockSettings);
 
 import type { AdminSupportManagementService } from "./support-management.service";
 import { createApiSupportManagementService } from "./support-management.api";

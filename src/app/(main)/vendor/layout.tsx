@@ -14,7 +14,7 @@ import { VendorSidebar } from "@/components/vendor-dashboard/VendorSidebar";
 import { VendorTopbar } from "@/components/vendor-dashboard/VendorTopbar";
 
 import { VerificationStatusBanner } from "@/components/verification/VerificationStatusBanner";
-import { getVendorKycState } from "@/services/verification";
+import { useVendorVerification } from "@/hooks/use-verification";
 
 export default function VendorLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -23,7 +23,7 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
   const [access, setAccess] = useState<VendorAccess | null>(null);
   const [loadError, setLoadError] = useState(false);
   const permissions = getVendorPermissions();
-  const kycState = getVendorKycState();
+  const verification = useVendorVerification();
 
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -124,9 +124,9 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
       <div className="lg:pl-64">
         <VendorTopbar storeName={storeName} storeSlug={storeSlug} />
         <main className="mx-auto max-w-6xl px-4 py-6 lg:px-8 space-y-5">
-          {pathname !== "/vendor/verification" && (
+          {pathname !== "/vendor/verification" && verification.data && (
             <VerificationStatusBanner
-              status={kycState.status}
+              status={verification.data.status}
               role="vendor"
               verificationHref="/vendor/verification"
             />

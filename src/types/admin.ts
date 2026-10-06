@@ -2091,7 +2091,7 @@ export interface ManagedReviewListQuery extends ListQuery {
  * service-provider — one real `reviews` table, not the separate storefront vs
  * profile split the old mock stores implied). "campus_post" is post_reports.
  */
-export const TRUST_SAFETY_SOURCES = ["review", "campus_post"] as const;
+export const TRUST_SAFETY_SOURCES = ["review", "campus_post", "store", "service"] as const;
 export type TrustSafetySource = (typeof TRUST_SAFETY_SOURCES)[number];
 
 export const TRUST_SAFETY_STATUSES = [

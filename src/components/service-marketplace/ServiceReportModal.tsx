@@ -29,7 +29,8 @@ export function ServiceReportModal({ isOpen, onClose, serviceId, serviceName }: 
   const [reason, setReason] = useState<ServiceReportReason | null>(null);
   const [details, setDetails] = useState("");
   const [submitted, setSubmitted] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -42,11 +43,12 @@ export function ServiceReportModal({ isOpen, onClose, serviceId, serviceName }: 
 
   if (!isOpen) return null;
 
-  function handleSubmit() {
-    if (!reason) return;
-    setError(false);
+  async function handleSubmit() {
+    if (!reason || sending) return;
+    setError(null);
+    setSending(true);
     try {
-      reportService({ serviceId, reason, details });
+      await reportService({ serviceId, reason, details });
       setSubmitted(true);
       setTimeout(() => {
         setSubmitted(false);
@@ -54,8 +56,14 @@ export function ServiceReportModal({ isOpen, onClose, serviceId, serviceName }: 
         setDetails("");
         onClose();
       }, 1800);
-    } catch {
-      setError(true);
+    } catch (err) {
+      setError(
+        (err as { status?: number } | null)?.status === 409
+          ? "You've already reported this service. Our team is reviewing it."
+          : "Something went wrong submitting your report. Please try again."
+      );
+    } finally {
+      setSending(false);
     }
   }
 
@@ -101,7 +109,7 @@ export function ServiceReportModal({ isOpen, onClose, serviceId, serviceName }: 
 
             {error && (
               <p className="text-xs text-error-600 bg-error-50 border border-error-200 rounded-lg p-2.5">
-                Something went wrong submitting your report. Please try again.
+                {error}
               </p>
             )}
 
@@ -142,11 +150,11 @@ export function ServiceReportModal({ isOpen, onClose, serviceId, serviceName }: 
             </div>
 
             <button
-              onClick={handleSubmit}
-              disabled={!reason}
+              onClick={() => void handleSubmit()}
+              disabled={!reason || sending}
               className="w-full py-2.5 rounded-xl bg-error-600 text-white text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-error-700"
             >
-              Submit report
+              {sending ? "Sending…" : "Submit report"}
             </button>
           </div>
         )}

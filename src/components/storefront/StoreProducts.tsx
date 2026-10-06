@@ -1,15 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 import { Search, PackageOpen } from "lucide-react";
 import type { StoreSortOption, Storefront } from "@/types/storefront";
-import {
-  getStoreCategories,
-  getStoreProducts,
-  isUnavailable,
-} from "@/services/storefront";
-import { fetchProducts } from "@/services/products";
-import type { Product } from "@/types";
+import { isUnavailable } from "@/services/storefront";
+import { fetchProducts, type ProductQueryParams } from "@/services/products";
 import { ProductCard, ProductGrid } from "@/components/marketplace";
 import { Button } from "@/components/atoms/Button";
 import { StoreCategories } from "./StoreCategories";
@@ -22,103 +18,75 @@ interface StoreProductsProps {
 }
 
 const PAGE_SIZE = 12;
+const SEARCH_DEBOUNCE_MS = 300;
 
-/** Client-side sort + paginate over an already vendor/status/search-filtered live product list. */
-function paginateAndSort(
-  products: Product[],
-  sort: StoreSortOption,
-  page: number,
-  pageSize: number
-): { items: Product[]; total: number; page: number; pageSize: number; totalPages: number; unavailableCount: number } {
-  const sorted = [...products];
-  switch (sort) {
-    case "price_asc":
-      sorted.sort((a, b) => a.price - b.price);
-      break;
-    case "price_desc":
-      sorted.sort((a, b) => b.price - a.price);
-      break;
-    case "rating":
-      sorted.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-      break;
-    case "newest":
-      sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      break;
-    case "featured":
-    default:
-      sorted.sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0));
-      break;
-  }
+/** The backend orders by newest or by price. */
+const SERVER_SORT: Record<StoreSortOption, NonNullable<ProductQueryParams["sort"]>> = {
+  featured: "recent",
+  newest: "recent",
+  rating: "recent",
+  price_asc: "price_low",
+  price_desc: "price_high",
+};
 
-  const total = sorted.length;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const start = (page - 1) * pageSize;
-  const items = sorted.slice(start, start + pageSize);
-
-  return { items, total, page, pageSize, totalPages, unavailableCount: 0 };
+function useDebounced<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(timer);
+  }, [value, delayMs]);
+  return debounced;
 }
 
-/** Store product catalog: search, categories, sort, availability, pagination. */
+/** Store product catalog: search, categories, sort and paging all done by the server. */
 export function StoreProducts({ store }: StoreProductsProps) {
-  const categories = useMemo(() => getStoreCategories(store), [store]);
-
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [sort, setSort] = useState<StoreSortOption>("featured");
-  const [page, setPage] = useState(1);
-  const [shopUnavailable] = useState(isUnavailable(store));
-  const [liveProducts, setLiveProducts] = useState<Product[] | null>(null);
-  const [isFetching, setIsFetching] = useState(true);
+  const [sort, setSort] = useState<StoreSortOption>("newest");
+  const shopUnavailable = isUnavailable(store);
+  const debouncedSearch = useDebounced(search.trim(), SEARCH_DEBOUNCE_MS);
 
-  // Reset pagination whenever the filters change.
-  useEffect(() => {
-    setPage(1);
-  }, [search, categoryId, sort]);
+  const query: ProductQueryParams = {
+    vendorId: store.vendorId,
+    status: "ACTIVE",
+    search: debouncedSearch || undefined,
+    categoryId: categoryId || undefined,
+    sort: SERVER_SORT[sort],
+    limit: PAGE_SIZE,
+  };
 
-  // Fetch this vendor's live catalog from the backend (debounced on search).
-  useEffect(() => {
-    let mounted = true;
-    setIsFetching(true);
-    const timeout = setTimeout(
-      () => {
-        fetchProducts({
-          vendorId: store.vendorId,
-          status: "ACTIVE",
-          search: search || undefined,
-          categoryId: categoryId || undefined,
-          limit: 100,
-        })
-          .then((res) => {
-            if (mounted) setLiveProducts(res.data);
-          })
-          .finally(() => {
-            if (mounted) setIsFetching(false);
-          });
-      },
-      search ? 300 : 0
-    );
-    return () => {
-      mounted = false;
-      clearTimeout(timeout);
-    };
-  }, [store.vendorId, search, categoryId]);
+  const productsQuery = useInfiniteQuery({
+    queryKey: ["storefront", "products", store.vendorId, query],
+    initialPageParam: 1,
+    placeholderData: keepPreviousData,
+    queryFn: async ({ pageParam }) => {
+      const res = await fetchProducts({ ...query, page: pageParam });
+      if (res.error) throw res.error;
+      return res;
+    },
+    getNextPageParam: (last) => (last.page < last.totalPages ? last.page + 1 : undefined),
+  });
 
-  const result = liveProducts
-    ? paginateAndSort(liveProducts, sort, page, PAGE_SIZE)
-    : getStoreProducts(store, {
-        search,
-        categoryId,
-        sort,
-        availability: "available",
-        page,
-        pageSize: PAGE_SIZE,
-      });
+  const products = (productsQuery.data?.pages ?? [])
+    .flatMap((page) => page.data)
+    .filter((p) => p.status === "available");
+  const total = productsQuery.data?.pages[0]?.total ?? 0;
+  const hasFilters = search !== "" || categoryId !== "" || sort !== "newest";
 
-  const hasFilters = search !== "" || categoryId !== "" || sort !== "featured";
-  const remaining = result.total - (page * PAGE_SIZE > result.total ? result.total : page * PAGE_SIZE);
-
-  if (isFetching && liveProducts === null) {
+  if (productsQuery.isPending) {
     return <StoreProductsSkeleton count={8} />;
+  }
+
+  if (productsQuery.isError) {
+    return (
+      <div role="alert" className="rounded-2xl border border-kampmax-border bg-white px-4 py-12 text-center">
+        <p className="text-sm font-semibold text-kampmax-text">We couldn&apos;t load this store&apos;s products</p>
+        <p className="mt-1 text-xs text-kampmax-text-secondary">Check your connection and try again.</p>
+        <Button variant="outline" size="sm" className="mt-4" onClick={() => void productsQuery.refetch()}>
+          Try again
+        </Button>
+      </div>
+    );
   }
 
   return (
@@ -149,16 +117,16 @@ export function StoreProducts({ store }: StoreProductsProps) {
           </div>
           <div className="flex items-center justify-between gap-3 sm:justify-end">
             <span className="whitespace-nowrap text-xs text-kampmax-text-secondary" aria-live="polite">
-              {result.total} product{result.total !== 1 ? "s" : ""}
+              {total.toLocaleString()} product{total !== 1 ? "s" : ""}
             </span>
             <StoreSortDropdown value={sort} onChange={setSort} />
           </div>
         </div>
 
-        {categories.length > 0 && (
+        {store.categories.length > 0 && (
           <div className="border-t border-kampmax-border pt-3">
             <StoreCategories
-              categories={categories}
+              categories={store.categories}
               activeCategoryId={categoryId}
               onCategoryChange={(id) => setCategoryId(id)}
             />
@@ -167,16 +135,16 @@ export function StoreProducts({ store }: StoreProductsProps) {
       </div>
 
       {/* Grid / empty */}
-      {result.items.length === 0 ? (
+      {products.length === 0 ? (
         <StoreEmptyState
           icon={<PackageOpen />}
           title={
-            result.total === 0 && !hasFilters
+            total === 0 && !hasFilters
               ? "This store hasn't listed any products yet"
               : "No products match your filters"
           }
           description={
-            result.total === 0 && !hasFilters
+            total === 0 && !hasFilters
               ? `Check back soon — ${store.storeName} will list products here.`
               : "Try a different search or category."
           }
@@ -188,7 +156,7 @@ export function StoreProducts({ store }: StoreProductsProps) {
                 onClick={() => {
                   setSearch("");
                   setCategoryId("");
-                  setSort("featured");
+                  setSort("newest");
                 }}
               >
                 Clear filters
@@ -199,19 +167,22 @@ export function StoreProducts({ store }: StoreProductsProps) {
       ) : (
         <>
           <ProductGrid>
-            {result.items.map((product) => (
+            {products.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
           </ProductGrid>
 
-          {result.totalPages > 1 && page < result.totalPages && (
+          {productsQuery.hasNextPage && (
             <div className="flex justify-center pt-4">
               <Button
                 variant="outline"
-                onClick={() => setPage((p) => p + 1)}
+                disabled={productsQuery.isFetchingNextPage}
+                onClick={() => void productsQuery.fetchNextPage()}
                 className="border-kampmax-border"
               >
-                Load more ({Math.max(remaining, 0)} remaining)
+                {productsQuery.isFetchingNextPage
+                  ? "Loading…"
+                  : `Load more (${Math.max(total - products.length, 0)} remaining)`}
               </Button>
             </div>
           )}
@@ -225,4 +196,3 @@ export function StoreProducts({ store }: StoreProductsProps) {
 export function StoreProductsLoading() {
   return <StoreProductsSkeleton count={8} />;
 }
-

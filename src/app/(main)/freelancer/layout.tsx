@@ -15,7 +15,7 @@ import { FreelancerSidebar } from "@/components/freelancer/dashboard/FreelancerS
 import { FreelancerTopbar } from "@/components/freelancer/dashboard/FreelancerTopbar";
 import { FREELANCER_ONBOARDING_STATUS } from "@/types/freelancer";
 import { VerificationStatusBanner } from "@/components/verification/VerificationStatusBanner";
-import { getFreelancerKycState } from "@/services/verification";
+import { useFreelancerVerification } from "@/hooks/use-verification";
 
 /**
  * Freelancer module shell.
@@ -30,6 +30,7 @@ import { getFreelancerKycState } from "@/services/verification";
 export default function FreelancerLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { status } = useAuth();
+  const verification = useFreelancerVerification();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [access, setAccess] = useState<FreelancerAccess | null>(null);
   const [loadError, setLoadError] = useState(false);
@@ -132,9 +133,9 @@ export default function FreelancerLayout({ children }: { children: React.ReactNo
       <div className="lg:pl-64">
         <FreelancerTopbar displayName={displayName} status={statusLabel} />
         <main className="mx-auto max-w-6xl px-4 py-6 lg:px-8 space-y-5">
-          {pathname !== "/freelancer/verification" && (
+          {pathname !== "/freelancer/verification" && verification.data && (
             <VerificationStatusBanner
-              status={getFreelancerKycState().status}
+              status={verification.data.status}
               role="freelancer"
               verificationHref="/freelancer/verification"
             />

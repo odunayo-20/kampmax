@@ -249,7 +249,7 @@ function SearchPageInner() {
       {!hasQuery && !isPending ? (
         <div className="space-y-6">
           <p className="text-sm text-neutral-500 -mt-2">
-            Search across products, services, jobs, providers, vendors and more.
+            Search across products, services, providers, jobs, events, vendors and more.
           </p>
           <RecentSearches
             searches={recentSearches}
@@ -294,6 +294,14 @@ function SearchPageInner() {
                 <SearchResultsSkeleton />
               ) : data && data.total > 0 ? (
                 <>
+                  {data.unavailable && data.unavailable.length > 0 && (
+                    <p
+                      role="status"
+                      className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+                    >
+                      Some results couldn&apos;t be loaded ({data.unavailable.join(", ")}). Try again in a moment.
+                    </p>
+                  )}
                   <SearchResults
                     items={data.items}
                     query={data.query}

@@ -14,11 +14,15 @@ export const SAFETY_SOURCE_TABS: (TrustSafetySource | "all")[] = [
   "all",
   "review",
   "campus_post",
+  "store",
+  "service",
 ];
 
 export const SAFETY_SOURCE_LABELS: Record<TrustSafetySource, string> = {
   review: "Review",
   campus_post: "Campus post",
+  store: "Store",
+  service: "Service",
 };
 
 export function safetySourceLabel(source: TrustSafetySource): string {
@@ -31,6 +35,10 @@ export function safetySourceVariant(source: TrustSafetySource): BadgeVariant {
       return "blue";
     case "campus_post":
       return "gold";
+    case "store":
+      return "info";
+    case "service":
+      return "success";
   }
 }
 

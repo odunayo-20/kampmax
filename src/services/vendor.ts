@@ -5,7 +5,6 @@ import {
   VendorDailyEarning,
   VendorCustomer,
   StoreProfile,
-  StoreSettings,
 } from "@/types";
 import {
   vendorProducts as mockProducts,
@@ -14,13 +13,11 @@ import {
   vendorDailyEarnings,
   vendorCustomers,
   storeProfile as mockStoreProfile,
-  storeSettings as mockStoreSettings,
 } from "@/data/vendor";
 
 let products = [...mockProducts];
 let orders = [...mockOrders];
 let store = { ...mockStoreProfile };
-let settings = { ...mockStoreSettings };
 
 // ── Products ──
 
@@ -153,52 +150,5 @@ export async function updateStoreProfileLive(data: Partial<StoreProfile>): Promi
 export function updateStoreProfile(data: Partial<StoreProfile>): StoreProfile {
   store = { ...store, ...data };
   return store;
-}
-
-// ── Store Settings (Live & Fallback) ──
-
-export function getStoreSettings(): StoreSettings {
-  return settings;
-}
-
-export async function getStoreSettingsLive(): Promise<StoreSettings> {
-  try {
-    const { data } = await apiClient.get<any>("/vendors/me/settings");
-    if (data) {
-      return {
-        acceptOrders: data.orderAcceptance === "AUTO" || data.orderAcceptance === undefined ? settings.acceptOrders : false,
-        autoConfirm: data.orderAcceptance === "AUTO",
-        allowPreOrder: settings.allowPreOrder,
-        showSoldItems: data.storefrontVisible ?? settings.showSoldItems,
-        minOrderAmount: settings.minOrderAmount,
-        notifyOnOrder: (data.notificationPrefs?.order as boolean) ?? settings.notifyOnOrder,
-        notifyOnMessage: (data.notificationPrefs?.message as boolean) ?? settings.notifyOnMessage,
-      };
-    }
-  } catch {}
-  return getStoreSettings();
-}
-
-export async function updateStoreSettingsLive(data: Partial<StoreSettings>): Promise<StoreSettings> {
-  try {
-    const payload: Record<string, unknown> = {};
-    if (data.showSoldItems !== undefined) payload.storefrontVisible = data.showSoldItems;
-    if (data.acceptOrders !== undefined || data.autoConfirm !== undefined) {
-      payload.orderAcceptance = data.autoConfirm ? "AUTO" : data.acceptOrders ? "MANUAL" : "MANUAL";
-    }
-    if (data.notifyOnOrder !== undefined || data.notifyOnMessage !== undefined) {
-      payload.notificationPrefs = {
-        order: data.notifyOnOrder ?? settings.notifyOnOrder,
-        message: data.notifyOnMessage ?? settings.notifyOnMessage,
-      };
-    }
-    await apiClient.patch("/vendors/me/settings", payload);
-  } catch {}
-  return updateStoreSettings(data);
-}
-
-export function updateStoreSettings(data: Partial<StoreSettings>): StoreSettings {
-  settings = { ...settings, ...data };
-  return settings;
 }
 

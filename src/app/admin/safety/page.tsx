@@ -38,7 +38,7 @@ function parseInitialFilters(params: URLSearchParams): SafetyFilterState {
   const rawTarget = params.get("target");
   const rawReason = params.get("reason");
   const validStatus = SAFETY_STATUS_TABS as (TrustSafetyReportStatus | "all")[];
-  const validSource = ["all", "review", "campus_post"] as (
+  const validSource = ["all", "review", "campus_post", "store", "service"] as (
     | TrustSafetySource
     | "all"
   )[];

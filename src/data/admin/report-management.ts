@@ -445,7 +445,7 @@ export function sortTrustSafetyReports(
 // ------------------------------------------------------------
 
 const STATUSES: TrustSafetyReportStatus[] = ["open", "reviewing", "resolved", "dismissed"];
-const SOURCES: TrustSafetySource[] = ["review", "campus_post"];
+const SOURCES: TrustSafetySource[] = ["review", "campus_post", "store", "service"];
 const TARGET_TYPES: TrustSafetyTargetType[] = [
   "product",
   "vendor",
@@ -467,6 +467,8 @@ export function computeTrustSafetyCounts(
   const bySource: Record<TrustSafetySource, number> = {
     review: 0,
     campus_post: 0,
+    store: 0,
+    service: 0,
   };
   const byReason = new Map<string, number>();
   const byTargetType: Record<TrustSafetyTargetType, number> = {

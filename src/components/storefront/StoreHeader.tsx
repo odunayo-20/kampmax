@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { MapPin, MessageCircle, Flag, Zap } from "lucide-react";
 import { Storefront } from "@/types/storefront";
 import { useAuth } from "@/lib/auth-context";
+import { useStoreFollow } from "@/hooks/use-store-follow";
 import { Avatar } from "@/components/atoms/Avatar";
 import { StarRatingDisplay } from "@/components/reviews/StarRating";
 import { StoreVerificationBadge, StoreAvailabilityBadge } from "./StoreBadges";
@@ -26,7 +27,9 @@ export function StoreHeader({ store }: StoreHeaderProps) {
   const [reportOpen, setReportOpen] = useState(false);
 
   const hasRating = store.rating > 0;
-  const followers = store.attestation.followers;
+  // Live count once known (it moves when you follow); the rendered one until then.
+  const { followers: liveFollowers } = useStoreFollow(store.slug, store.vendorId);
+  const followers = liveFollowers ?? store.attestation.followers;
 
   function requireAuth(action: () => void) {
     if (status !== "authenticated") {

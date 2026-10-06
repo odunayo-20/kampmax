@@ -33,7 +33,6 @@ import type {
   MarketplaceServiceQuery,
   MarketplaceServiceReview,
   RequestQuoteInput,
-  RequestQuoteResult,
   ServiceMarketplaceCategory,
   ServiceReportInput,
   ServiceSortOption,
@@ -72,14 +71,38 @@ const DEFAULT_PAGE_SIZE = 12;
  * an outage surfaces as an error instead of fake rows.
  */
 export async function listPublicServices(
-  query: { q?: string; limit?: number } = {}
+  query: { q?: string; campusId?: string; limit?: number } = {}
 ): Promise<MarketplaceService[]> {
   const params = new URLSearchParams();
   if (query.q) params.set("q", query.q);
+  if (query.campusId) params.set("campusId", query.campusId);
   if (query.limit) params.set("limit", String(query.limit));
   const qs = params.toString();
   const { data, error } = await apiClient.get<MarketplaceServicePage>(
     `/service-provider/services${qs ? `?${qs}` : ""}`
+  );
+  if (error) throw error;
+  return data?.items ?? [];
+}
+
+export interface ProviderSearchHit {
+  id: string;
+  slug: string;
+  displayName: string;
+  bio: string | null;
+  verified: boolean;
+}
+
+/** Verified providers with a live service, by name or bio. Live only: failures throw. */
+export async function searchProviders(
+  query: { q?: string; limit?: number } = {}
+): Promise<ProviderSearchHit[]> {
+  const params = new URLSearchParams();
+  if (query.q) params.set("q", query.q);
+  if (query.limit) params.set("limit", String(query.limit));
+  const qs = params.toString();
+  const { data, error } = await apiClient.get<{ items: ProviderSearchHit[] }>(
+    `/service-provider/providers${qs ? `?${qs}` : ""}`
   );
   if (error) throw error;
   return data?.items ?? [];
@@ -431,26 +454,48 @@ export function toggleServiceFavorite(serviceId: string, userId: string): boolea
 
 // ── Report (moderation via backend; no deletion here) ─────────
 
-export function reportService(input: ServiceReportInput): { success: boolean; id: string } {
-  // In production this POSTs to the backend for moderation review.
-  void input;
-  const id = `svc-report-${Date.now()}`;
-  return { success: true, id };
+/** Sends a report to moderators. Resolves only once it has really been received. */
+export async function reportService(input: ServiceReportInput): Promise<{ id: string }> {
+  const { data, error } = await apiClient.post<
+    { reason: ServiceReportInput["reason"]; details?: string },
+    { id: string }
+  >(`/service-provider/services/${input.serviceId}/report`, {
+    reason: input.reason,
+    details: input.details?.trim() || undefined,
+  });
+  if (error || !data) throw error ?? new Error("Could not send the report.");
+  return data;
 }
 
-// ── Request a quote (prepare-only; no negotiation) ────────────
+// ── Request a quote ───────────────────────────────────────────
+// A quote request is a real message to the provider: the backend opens (or
+// reuses) the customer's chat with them and posts what is needed. The provider
+// answers with a quote in that conversation. No negotiation, payment or booking.
 
-export function submitRequestQuote(input: RequestQuoteInput): RequestQuoteResult {
-  if (!input.serviceId || !input.providerId) {
-    return { success: false, message: "Service information is incomplete." };
-  }
-  if (!input.requirements.trim()) {
-    return { success: false, message: "Tell the provider a little about your requirements." };
-  }
-  const id = `quote-${Date.now()}`;
-  return {
-    success: true,
-    id,
-    message: "Your request was sent. The provider will respond with a quote.",
-  };
+export interface QuoteRequestResult {
+  /** The chat with the provider, where the quote will arrive. */
+  conversationId: string;
+}
+
+/** Sends the request; resolves only once the provider's chat has the message. */
+export async function requestQuote(input: RequestQuoteInput): Promise<QuoteRequestResult> {
+  const requirements = input.requirements.trim();
+  if (!input.serviceId) throw new Error("Service information is incomplete.");
+  if (requirements.length < 5) throw new Error("Tell the provider a little about your requirements.");
+
+  const { data, error } = await apiClient.post<
+    { requirements: string; neededBy?: string },
+    QuoteRequestResult
+  >(`/service-provider/services/${input.serviceId}/quote-request`, {
+    requirements: [
+      requirements,
+      input.location ? `Where: ${input.location}` : "",
+      input.message?.trim() ? `More details: ${input.message.trim()}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    neededBy: input.preferredDate || undefined,
+  });
+  if (error || !data) throw error ?? new Error("Could not send your request. Please try again.");
+  return data;
 }

@@ -41,7 +41,7 @@ export function FinancialIdentityCard() {
   });
 
   // Show who owns the account before the user submits, to catch typos.
-  const accountReady = /^d{10}$/.test(form.accountNumber) && form.bankCode.length > 0;
+  const accountReady = /^\d{10}$/.test(form.accountNumber) && form.bankCode.length > 0;
   const holder = useQuery({
     queryKey: ["financial", "resolve", form.accountNumber, form.bankCode],
     queryFn: () => resolveBankAccount(form.accountNumber, form.bankCode),

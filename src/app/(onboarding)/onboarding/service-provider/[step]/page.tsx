@@ -13,7 +13,7 @@ import { StepPricing } from "@/components/service-provider/StepPricing";
 import { StepPortfolio } from "@/components/service-provider/StepPortfolio";
 import { StepVerification } from "@/components/service-provider/StepVerification";
 import { StepReview } from "@/components/service-provider/StepReview";
-import { createSpApplication, createSpProfileApi, getSpOnboardingDraft, getSpOnboardingStatus, saveSpDraft, submitSpApplication } from "@/services/service-provider";
+import { completeSpOnboarding, createSpApplication, getSpOnboardingDraft, getSpOnboardingStatus, markSpApplicationSubmitted, saveSpDraft } from "@/services/service-provider";
 import { SERVICE_PROVIDER_ONBOARDING_STATUS, SERVICE_PROVIDER_ONBOARDING_STEPS, SERVICE_PROVIDER_ONBOARDING_STEP, isSpBlockingStatus } from "@/types/service-provider";
 import type { ServiceProviderOnboardingDraft, ServiceProviderOnboardingStepId } from "@/types/service-provider";
 
@@ -223,24 +223,20 @@ export default function ServiceProviderOnboardingStepPage() {
     setSubmitting(true);
     setError(null);
     try {
-      // Activate the Service Provider capability on the backend — this is
-      // the real onboarding completion step.
-      const { error: apiError } = await createSpProfileApi(draft);
-      if (apiError) {
-        setError(apiError.message || "We couldn't activate your service provider profile. Please try again.");
+      // Saves the profile, the services and the schedule on the server; it can
+      // be run again if something fails, and says exactly what didn't save.
+      const result = await completeSpOnboarding(draft);
+      if (!result.ok) {
+        setError(result.problems.join(" "));
         return;
       }
 
-      const res = submitSpApplication();
-      if (res.success) {
-        const allSteps: ServiceProviderOnboardingStepId[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-        setCompletedSteps(allSteps);
-        persistProgress(allSteps);
-        persistDraft(draft);
-        router.push("/service-provider");
-      } else {
-        setError(res.message);
-      }
+      markSpApplicationSubmitted();
+      const allSteps: ServiceProviderOnboardingStepId[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+      setCompletedSteps(allSteps);
+      persistProgress(allSteps);
+      persistDraft(draft);
+      router.push("/service-provider");
     } catch (e) {
       setError("Submission failed. Please try again.");
     } finally {

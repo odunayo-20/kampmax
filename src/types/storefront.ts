@@ -116,6 +116,8 @@ export interface Storefront {
   reviewCount: number;
   attestation: { followers: number };
   productsCount: number;
+  /** Categories of the store's live products, with exact counts. */
+  categories: StoreCategory[];
   campusId: string;
   campusName: string;
   campuses: { id: string; name: string }[];

@@ -11,14 +11,12 @@ interface StoreSortDropdownProps {
 }
 
 const sortOptions: { value: StoreSortOption; label: string }[] = [
-  { value: "featured", label: "Featured" },
   { value: "newest", label: "Newest" },
   { value: "price_asc", label: "Price: Low to High" },
   { value: "price_desc", label: "Price: High to Low" },
-  { value: "rating", label: "Highest Rated" },
 ];
 
-/** Store-scoped product sort control. Ranking stays backend-controllable. */
+/** Store-scoped product sort control: the backend orders by newest or by price. */
 export function StoreSortDropdown({ value, onChange, className }: StoreSortDropdownProps) {
   return (
     <div className={cn("relative", className)}>

@@ -5,7 +5,6 @@ import {
   VendorDailyEarning,
   VendorCustomer,
   StoreProfile,
-  StoreSettings,
 } from "@/types";
 
 export const vendorProducts: VendorProduct[] = [
@@ -442,14 +441,4 @@ export const storeProfile: StoreProfile = {
   campusId: "rugipo",
   isActive: true,
   createdAt: "2024-03-10T09:00:00Z",
-};
-
-export const storeSettings: StoreSettings = {
-  acceptOrders: true,
-  autoConfirm: false,
-  notifyOnOrder: true,
-  notifyOnMessage: true,
-  showSoldItems: true,
-  allowPreOrder: false,
-  minOrderAmount: 500,
 };

@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { X, Check, Send, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { submitRequestQuote } from "@/services/service-marketplace";
+import { useAuth } from "@/lib/auth-context";
+import { requestQuote } from "@/services/service-marketplace";
+import { getFriendlyErrorMessage } from "@/lib/error-messages";
 import {
   LOCATION_OPTIONS,
   type ServiceMarketplaceFilters,
@@ -19,8 +22,8 @@ interface RequestQuoteModalProps {
 }
 
 /**
- * Request-quote flow (prepare-only): the customer describes requirements + a
- * preferred date, then the request is submitted for the provider to quote on.
+ * Request-quote flow: the customer describes what they need, and the request is
+ * sent to the provider as a message in their chat, where they reply with a quote.
  * There is NO negotiation, payment, or booking here.
  */
 export function RequestQuoteModal({
@@ -36,7 +39,9 @@ export function RequestQuoteModal({
   const [location, setLocation] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ id: string; message: string } | null>(null);
+  const [sending, setSending] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const { status } = useAuth();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -49,21 +54,25 @@ export function RequestQuoteModal({
 
   if (!isOpen) return null;
 
-  function handleSubmit() {
+  async function handleSubmit() {
+    if (sending) return;
     setError(null);
-    const res = submitRequestQuote({
-      serviceId,
-      providerId,
-      requirements: requirements.trim(),
-      preferredDate: preferredDate || undefined,
-      location: location || undefined,
-      message: message.trim() || undefined,
-    });
-    if (!res.success || !res.id) {
-      setError(res.message || "Could not submit your request. Please try again.");
-      return;
+    setSending(true);
+    try {
+      const res = await requestQuote({
+        serviceId,
+        providerId,
+        requirements: requirements.trim(),
+        preferredDate: preferredDate || undefined,
+        location: LOCATION_OPTIONS.find((o) => o.value === location)?.label || undefined,
+        message: message.trim() || undefined,
+      });
+      setConversationId(res.conversationId);
+    } catch (err) {
+      setError(getFriendlyErrorMessage(err));
+    } finally {
+      setSending(false);
     }
-    setResult({ id: res.id, message: res.message });
   }
 
   return (
@@ -90,14 +99,21 @@ export function RequestQuoteModal({
           </button>
         </div>
 
-        {result ? (
+        {conversationId ? (
           <div className="p-8 text-center">
             <div className="w-12 h-12 rounded-full bg-success-50 flex items-center justify-center mx-auto mb-3">
               <Check className="h-6 w-6 text-success-600" />
             </div>
             <p className="text-sm font-semibold text-neutral-900">Request sent</p>
-            <p className="text-xs text-neutral-500 mt-1">{result.message}</p>
-            <p className="text-[11px] text-neutral-400 mt-2 font-mono">Ref: {result.id}</p>
+            <p className="text-xs text-neutral-500 mt-1">
+              {providerDisplayName} will reply with a quote in your conversation.
+            </p>
+            <Link
+              href={`/chat/${conversationId}`}
+              className="mt-4 inline-flex rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700"
+            >
+              Open conversation
+            </Link>
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -188,19 +204,28 @@ export function RequestQuoteModal({
             </div>
 
             <button
-              onClick={handleSubmit}
-              disabled={!requirements.trim()}
+              onClick={() => void handleSubmit()}
+              disabled={!requirements.trim() || sending}
               className={cn(
                 "w-full py-2.5 rounded-xl text-white text-sm font-semibold transition-colors",
-                requirements.trim()
+                requirements.trim() && !sending
                   ? "bg-primary-600 hover:bg-primary-700"
                   : "bg-neutral-300 cursor-not-allowed"
               )}
             >
-              Send request
+              {sending ? "Sending…" : "Send request"}
             </button>
+            {status !== "authenticated" && (
+              <p className="text-[11px] text-neutral-500 text-center">
+                You need to{" "}
+                <Link href="/login" className="font-semibold text-primary-600 hover:underline">
+                  sign in
+                </Link>{" "}
+                to send a request.
+              </p>
+            )}
             <p className="text-[11px] text-neutral-400 text-center">
-              You&apos;ll be contacted with a quote. No payment is taken here.
+              The provider replies with a quote in your chat. No payment is taken here.
             </p>
           </div>
         )}

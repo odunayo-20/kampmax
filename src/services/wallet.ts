@@ -233,34 +233,6 @@ export async function fetchWalletTransactions(params: {
 }
 
 /**
- * Request a withdrawal from wallet to bank account.
- * POST /api/v1/wallet/withdraw
- */
-export async function withdrawFromWalletApi(
-  payload: WithdrawPayload
-): Promise<{ data: WalletTransaction | null; error: ApiError | null }> {
-  const { data, error } = await apiClient.post<WithdrawPayload, BackendWalletTransactionResponse>(
-    "/wallet/withdraw",
-    payload
-  );
-
-  if (error || !data || !data.id) {
-    return { data: null, error };
-  }
-
-  const mapped = mapBackendWalletTransactionToFrontend(data);
-  cachedTransactions.unshift(mapped);
-  if (cachedWallet) {
-    cachedWallet.balance = Math.max(0, cachedWallet.balance - mapped.amount);
-    cachedWallet.pendingAmount += mapped.amount;
-  }
-
-  return { data: mapped, error: null };
-}
-
-export const requestWalletWithdrawal = withdrawFromWalletApi;
-
-/**
  * Synchronous mock deposit helper for UI components.
  */
 export function depositToWallet(
@@ -489,4 +461,18 @@ export async function devCreditWallet(amount: number): Promise<void> {
     { amount },
   );
   if (error) throw toFailure(error, "Development credit is not available.");
+}
+
+/**
+ * Asks to withdraw to a bank account. The amount leaves the wallet at once and
+ * is paid out by Kampmax; the returned entry is PENDING until then. Throws a
+ * user-facing message on failure.
+ */
+export async function submitWithdrawal(payload: WithdrawPayload): Promise<WalletTransaction> {
+  const { data, error } = await apiClient.post<WithdrawPayload, BackendWalletTransactionResponse>(
+    "/wallet/withdraw",
+    payload,
+  );
+  if (error || !data || !data.id) throw toFailure(error, "Could not request your withdrawal.");
+  return mapBackendWalletTransactionToFrontend(data);
 }
