@@ -464,6 +464,15 @@ export async function cancelOrderApi(
   return { data: mapped, error: null };
 }
 
+/**
+ * Cancel orders whose payment did not go through, so a failed payment never
+ * leaves an order behind. Best-effort: the backend only cancels PENDING
+ * orders (a paid one is refused) and also expires stragglers on its own.
+ */
+export async function cancelUnpaidOrders(ids: string[]): Promise<void> {
+  await Promise.allSettled(ids.map((id) => cancelOrderApi(id)));
+}
+
 // ============================================================
 // SYNCHRONOUS FALLBACK GETTERS (for non-async components)
 // ============================================================

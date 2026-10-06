@@ -63,6 +63,7 @@ export default function CheckoutPage() {
     loyalty,
     paymentMethod,
     setPayment,
+    walletBalance,
     placeOrder,
     isBusy,
     summaryItemCount,
@@ -207,6 +208,8 @@ export default function CheckoutPage() {
               paystackEnabled={flags.paystackEnabled}
               finalTotal={session.pricing.finalTotal}
               onChange={setPayment}
+              walletEnabled={isCustomer}
+              walletBalance={walletBalance}
             />
           </div>
 

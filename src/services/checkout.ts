@@ -36,6 +36,8 @@ export interface InitializePaymentPayload {
 export interface BackendPaymentResponse {
   id: string;
   orderId: string;
+  /** Every order the payment covers (multi-vendor checkout), incl. `orderId`. */
+  orderIds?: string[];
   userId: string;
   reference: string;
   amount: number;
@@ -424,6 +426,43 @@ export async function initializePaystackPayment(
     error: {
       code: error?.status ? String(error.status) : "payment_init_failed",
       message: error?.message || "Failed to initialize payment gateway with backend.",
+    },
+  };
+}
+
+/**
+ * Pay the given orders from the customer's Kampmax Pay wallet. The backend
+ * debits the wallet and confirms the orders in one step; a low balance comes
+ * back as an error and nothing is charged.
+ */
+export async function payOrdersWithWallet(
+  orderIds: string[]
+): Promise<CheckoutActionResult<{ reference: string; orderId: string }>> {
+  const [orderId] = orderIds;
+  if (!orderId) {
+    return {
+      ok: false,
+      error: {
+        code: "missing_order_id",
+        message: "An active order ID is required to pay.",
+      },
+    };
+  }
+
+  const { data, error } = await apiClient.post<
+    { orderId: string; orderIds: string[] },
+    BackendPaymentResponse
+  >("/payments/wallet", { orderId, orderIds });
+
+  if (data && data.reference && data.status === "SUCCESS") {
+    return { ok: true, data: { reference: data.reference, orderId: data.orderId } };
+  }
+
+  return {
+    ok: false,
+    error: {
+      code: error?.status ? String(error.status) : "wallet_payment_failed",
+      message: error?.message || "We couldn't complete the wallet payment.",
     },
   };
 }

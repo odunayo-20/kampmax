@@ -2,6 +2,8 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchMyWalletBalance } from "@/services/wallet";
 import { useAddresses, useCreateAddress, useDeleteAddress, useUpdateAddress } from "@/hooks/use-addresses";
 import { useEnsureVendors } from "@/hooks/use-vendor-cache";
 import { useCart } from "@/lib/cart-context";
@@ -19,12 +21,13 @@ import {
   selectDelivery,
   getDefaultSelectedDelivery,
   initializePaystackPayment,
+  payOrdersWithWallet,
   getPaymentStatus,
   getCustomerInfo,
   checkoutFeatureFlags,
   estimateLoyaltyPointsEarned,
 } from "@/services/checkout";
-import { checkoutOrdersApi } from "@/services/orders";
+import { checkoutOrdersApi, cancelUnpaidOrders } from "@/services/orders";
 import type { AddressFormValues } from "@/components/checkout/AddressForm";
 import {
   CHECKOUT_STATES,
@@ -105,6 +108,16 @@ export function useCheckout() {
   );
 
   const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod>("paystack");
+
+  // Kampmax Pay wallet: only signed-in customers have one. The server remains
+  // the authority on whether the balance covers the order.
+  const queryClient = useQueryClient();
+  const walletQuery = useQuery({
+    queryKey: ["wallet", "balance", user?.id ?? ""],
+    queryFn: fetchMyWalletBalance,
+    enabled: status === "authenticated",
+  });
+  const walletBalance = walletQuery.data?.balance;
 
   // ── Guard against duplicate submits ──
   const busyRef = useRef(false);
@@ -422,6 +435,18 @@ export function useCheckout() {
       return false;
     }
 
+    // Catch a short wallet before any order is created.
+    if (
+      paymentMethod === "wallet" &&
+      (walletBalance === undefined || walletBalance < session.pricing.finalTotal)
+    ) {
+      setErrorInfo({
+        code: "insufficient_wallet_balance",
+        message: "Your wallet balance is too low for this order. Top up or choose another payment method.",
+      });
+      return false;
+    }
+
     // Duplicate-submit guard
     if (busyRef.current) return false;
     busyRef.current = true;
@@ -470,35 +495,70 @@ export function useCheckout() {
       }
     }
 
-    // 3. Initialise payment through the service (Paystack)
-    transitionTo(CHECKOUT_STATES.PAYMENT_INITIALIZING);
-    const initResult = await initializePaystackPayment(
-      session,
-      createdOrderIds,
-      typeof window !== "undefined" ? `${window.location.origin}/checkout/callback` : undefined
-    );
-
-    if (!initResult.ok) {
+    // An order only goes through if its payment does: any failure from here
+    // on cancels the orders just created (the backend also expires any that
+    // slip through, e.g. a closed tab). A paid order cannot be cancelled.
+    const failPayment = async (error: CheckoutErrorInfo) => {
+      await cancelUnpaidOrders(createdOrderIds);
       busyRef.current = false;
       transitionTo(CHECKOUT_STATES.PAYMENT_FAILED);
-      setErrorInfo(initResult.error || { message: "Payment could not be initialized." });
+      setErrorInfo({
+        ...error,
+        message: createdOrderIds.length
+          ? `${error.message} Your order was not placed and you have not been charged.`
+          : error.message,
+      });
       return false;
-    }
+    };
 
-    // Paystack hosted checkout: the customer pays there and returns to
-    // /checkout/callback, which verifies the payment with the backend. The cart
-    // is only cleared and the order only confirmed after that verification.
-    const initData = initResult.data as { reference?: string; authorizationUrl?: string } | undefined;
-    if (!initData?.authorizationUrl) {
-      busyRef.current = false;
-      transitionTo(CHECKOUT_STATES.PAYMENT_FAILED);
-      setErrorInfo({ code: "no_authorization_url", message: "Payment could not be started. Please try again." });
-      return false;
-    }
+    try {
+      // 3a. Wallet: the backend debits the wallet and confirms the orders in
+      // one step, so there is no redirect — confirm and head to the order.
+      if (paymentMethod === "wallet") {
+        transitionTo(CHECKOUT_STATES.PAYMENT_INITIALIZING);
+        const walletResult = await payOrdersWithWallet(createdOrderIds);
+        void queryClient.invalidateQueries({ queryKey: ["wallet"] });
+        if (!walletResult.ok || !walletResult.data) {
+          return await failPayment(
+            walletResult.error || { message: "We couldn't complete the wallet payment." }
+          );
+        }
+        transitionTo(CHECKOUT_STATES.PAYMENT_PENDING);
+        transitionTo(CHECKOUT_STATES.PAYMENT_SUCCESS);
+        transitionTo(CHECKOUT_STATES.ORDER_CONFIRMATION);
+        clearCart();
+        router.replace(`/orders/${walletResult.data.orderId}`);
+        return true;
+      }
 
-    transitionTo(CHECKOUT_STATES.PAYMENT_PENDING);
-    window.location.assign(initData.authorizationUrl);
-    return true;
+      // 3b. Initialise payment through the service (Paystack)
+      transitionTo(CHECKOUT_STATES.PAYMENT_INITIALIZING);
+      const initResult = await initializePaystackPayment(
+        session,
+        createdOrderIds,
+        typeof window !== "undefined" ? `${window.location.origin}/checkout/callback` : undefined
+      );
+
+      if (!initResult.ok) {
+        return await failPayment(initResult.error || { message: "Payment could not be initialized." });
+      }
+
+      // Paystack hosted checkout: the customer pays there and returns to
+      // /checkout/callback, which verifies the payment with the backend. The cart
+      // is only cleared and the order only confirmed after that verification.
+      const initData = initResult.data as { reference?: string; authorizationUrl?: string } | undefined;
+      if (!initData?.authorizationUrl) {
+        return await failPayment({ code: "no_authorization_url", message: "Payment could not be started." });
+      }
+
+      transitionTo(CHECKOUT_STATES.PAYMENT_PENDING);
+      window.location.assign(initData.authorizationUrl);
+      return true;
+    } catch (err) {
+      return await failPayment({
+        message: err instanceof Error && err.message ? err.message : "Payment failed.",
+      });
+    }
   }, [
     session,
     coupon,
@@ -506,6 +566,9 @@ export function useCheckout() {
     customer,
     selectedCampus,
     status,
+    paymentMethod,
+    walletBalance,
+    queryClient,
     validateCustomer,
     transitionTo,
     clearCart,
@@ -581,6 +644,7 @@ export function useCheckout() {
     loyalty,
     paymentMethod,
     setPayment,
+    walletBalance,
 
     // actions
     placeOrder,

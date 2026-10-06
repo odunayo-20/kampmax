@@ -120,7 +120,7 @@ export interface LoyaltySectionState {
 // PAYMENT
 // ============================================================
 
-export type CheckoutPaymentMethod = "paystack";
+export type CheckoutPaymentMethod = "paystack" | "wallet";
 
 export type PaymentInitiationState =
   | "idle"

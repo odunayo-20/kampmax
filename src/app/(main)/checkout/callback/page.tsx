@@ -6,6 +6,7 @@ import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { useCart } from "@/lib/cart-context";
 import { verifyPaymentApi } from "@/services/checkout";
+import { cancelUnpaidOrders } from "@/services/orders";
 
 type Phase =
   | { kind: "verifying" }
@@ -48,7 +49,9 @@ function CheckoutCallback() {
       } else if (data.status === "PENDING") {
         setPhase({ kind: "pending", orderId: data.orderId });
       } else {
-        setPhase({ kind: "failed", message: "Payment was not completed. You have not been charged." });
+        // The payment did not go through, so neither does the order.
+        void cancelUnpaidOrders(data.orderIds?.length ? data.orderIds : [data.orderId]);
+        setPhase({ kind: "failed", message: "Payment was not completed. Your order was not placed and you have not been charged." });
       }
     });
   }, [reference, clearCart, router]);
