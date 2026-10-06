@@ -19,12 +19,15 @@ function live<T>(res: { data: T; error: unknown }): T {
   return res.data;
 }
 
-import { getMarketplaceServicesApi } from "@/services/service-marketplace";
+import { listPublicServices } from "@/services/service-marketplace";
+import { listPublicJobs } from "@/services/jobs";
+import { jobToOpportunity } from "@/lib/job-api-mapping";
 
 export const homeKeys = {
   all: ["home"] as const,
   products: (campusId?: string) => ["home", "products", campusId ?? "all"] as const,
   services: (campusId?: string) => ["home", "services", campusId ?? "all"] as const,
+  gigs: (campusId?: string) => ["home", "gigs", campusId ?? "all"] as const,
   categories: ["home", "categories"] as const,
   vendors: (campusId?: string) => ["home", "vendors", campusId ?? "all"] as const,
   featured: (placement: string, campusId?: string, categoryId?: string) =>
@@ -49,9 +52,24 @@ export function useHomeServices(campusId?: string) {
   const apiCampusId = toApiCampusId(campusId);
   return useQuery({
     queryKey: homeKeys.services(apiCampusId),
+    // Live catalogue only: an outage is an error, never demo services.
+    queryFn: () => listPublicServices({ limit: 8 }),
+  });
+}
+
+/** Newest published gigs (public, no sign-in needed). */
+export function useHomeGigs(campusId?: string) {
+  const apiCampusId = toApiCampusId(campusId);
+  return useQuery({
+    queryKey: homeKeys.gigs(apiCampusId),
     queryFn: async () => {
-      const page = await getMarketplaceServicesApi({ campusId: apiCampusId });
-      return page.items;
+      const { jobs, error } = await listPublicJobs({
+        campusId: apiCampusId,
+        sort: "newest",
+        limit: 4,
+      });
+      if (error) throw error;
+      return jobs.map(jobToOpportunity);
     },
   });
 }

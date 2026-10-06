@@ -28,13 +28,12 @@ import {
   HomeGigCard,
 } from "@/components/home";
 import { ServiceCard } from "@/components/service-marketplace/ServiceCard";
-import { getProviderById } from "@/services/service-marketplace";
 import { useEvents } from "@/hooks/use-events";
-import { getAllOpportunities } from "@/data/opportunity";
 import { useApp } from "@/lib/app-context";
 import { useAuth } from "@/lib/auth-context";
 import {
   useHomeCategories,
+  useHomeGigs,
   useHomeProducts,
   useHomeServices,
   useHomeVendors,
@@ -49,6 +48,7 @@ export default function HomePage() {
   const servicesQuery = useHomeServices(campusId);
   const categoriesQuery = useHomeCategories();
   const vendorsQuery = useHomeVendors(campusId);
+  const gigsQuery = useHomeGigs(campusId);
   const eventsQuery = useEvents({ campusId: campusId || undefined, limit: 10 });
 
   const products = productsQuery.data ?? [];
@@ -68,7 +68,7 @@ export default function HomePage() {
   const firstName = user?.name ? user.name.split(" ")[0] : null;
   const upcomingEvents = eventsQuery.data ?? [];
   const featuredEvent = upcomingEvents.find((e) => e.isFeatured) ?? upcomingEvents[0];
-  const opportunities = getAllOpportunities().slice(0, 4);
+  const opportunities = gigsQuery.data ?? [];
 
   return (
     <PageContainer className="space-y-5 lg:space-y-7 pb-12">
@@ -86,12 +86,16 @@ export default function HomePage() {
             </p>
           </div>
 
-          {/* Campus selector pill */}
+          {/* Campus selector pill (shown once the live campus has loaded) */}
+          {selectedCampus.id && (
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary-50/80 border border-primary-200/70 text-xs font-bold text-primary-700 shadow-2xs">
             <MapPin className="h-3.5 w-3.5 text-primary-600 shrink-0" />
-            <span className="truncate max-w-[120px] sm:max-w-none">{selectedCampus.abbreviation}, {selectedCampus.location.split(",")[0]}</span>
+            <span className="truncate max-w-[120px] sm:max-w-none">
+              {[selectedCampus.abbreviation, selectedCampus.location.split(",")[0]].filter(Boolean).join(", ")}
+            </span>
             <ChevronDown className="h-3 w-3 text-primary-500 shrink-0" />
           </div>
+          )}
         </div>
 
         {/* Universal Search Bar */}
@@ -157,8 +161,8 @@ export default function HomePage() {
       {/* 3. 8-Icon Quick Access Grid (Marketplace, Services, Jobs, Events, Courses, Communities, Nearby, Pay) */}
       <QuickAccessGrid />
 
-      {/* 4. Nearby & Trending Story Reel */}
-      <NearbyStoryReel />
+      {/* 4. Popular stores reel (live vendors) */}
+      <NearbyStoryReel vendors={vendors} campusAbbreviation={selectedCampus.abbreviation} />
 
       {/* 5. Campus Services & Gigs — High Prominence */}
       <section aria-label="Campus Services" className="space-y-3">
@@ -171,11 +175,7 @@ export default function HomePage() {
         {services.length > 0 ? (
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
             {services.slice(0, 4).map((service) => (
-              <ServiceCard
-                key={service.id}
-                service={service}
-                provider={getProviderById(service.providerId)}
-              />
+              <ServiceCard key={service.id} service={service} />
             ))}
           </div>
         ) : (

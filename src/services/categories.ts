@@ -17,6 +17,8 @@ export interface BackendCategoryTreeItem {
   isActive: boolean;
   sortOrder: number;
   createdAt: string;
+  /** Active products in the category and its subcategories. */
+  productCount?: number;
   children?: BackendCategoryTreeItem[];
 }
 
@@ -86,7 +88,7 @@ export function mapBackendCategoryToFrontend(raw: BackendCategoryTreeItem): Cate
     id: raw.id,
     name: raw.name,
     icon: getIconForCategory(raw.name, raw.icon || null),
-    productCount: 0,
+    productCount: Number(raw.productCount) || 0,
   };
 }
 
