@@ -1,13 +1,10 @@
 import {
-  VendorStore,
   VendorNotifications,
   ActionRequiredItem,
   StoreHealth,
   DashboardOverview,
-  STORE_STATUS,
   VENDOR_ORDER_STATUS,
 } from "@/types/vendor-dashboard";
-import { STORE_STATUS as _S } from "@/types/vendor-dashboard";
 
 // ============================================================
 // VENDOR DASHBOARD MOCK DATA  (Module 10)
@@ -28,67 +25,6 @@ import { STORE_STATUS as _S } from "@/types/vendor-dashboard";
 const DAY_LABELS = [
   "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
 ];
-
-// Seed store model for the authenticated demo vendor (v8 / u1).
-export const initialStore: VendorStore = {
-  vendorId: "v8",
-  identity: {
-    storeName: "Adebayo's Gadgets",
-    tagline: "Gadgets & essentials for campus life.",
-    description:
-      "Gadgets, electronics and campus essentials from a fellow student. Affordable, tested, and delivered with a smile.",
-    categoryId: "cat2", // Electronics
-  },
-  branding: {
-    logoRef: null,
-    coverRef: null,
-    logoPreviewColor: "#1769E0",
-  },
-  contact: {
-    businessEmail: "adebayo@rugipo.edu.ng",
-    businessPhone: "+234 812 345 6789",
-    messagingAvailable: true,
-  },
-  location: {
-    primaryCampusId: "rugipo",
-    supportedCampusIds: ["rugipo"],
-    pickupLocation: "Engineering Block, RUGIPO",
-    deliveryArea: "RUGIPO campus and surrounding hostels",
-  },
-  hours: [
-    { dayIndex: 0, label: "Monday", mode: "custom", openTime: "08:00", closeTime: "20:00" },
-    { dayIndex: 1, label: "Tuesday", mode: "custom", openTime: "08:00", closeTime: "20:00" },
-    { dayIndex: 2, label: "Wednesday", mode: "custom", openTime: "08:00", closeTime: "20:00" },
-    { dayIndex: 3, label: "Thursday", mode: "custom", openTime: "08:00", closeTime: "20:00" },
-    { dayIndex: 4, label: "Friday", mode: "custom", openTime: "08:00", closeTime: "20:00" },
-    { dayIndex: 5, label: "Saturday", mode: "open_24", openTime: "00:00", closeTime: "23:59" },
-    { dayIndex: 6, label: "Sunday", mode: "closed", openTime: "00:00", closeTime: "00:00" },
-  ],
-  delivery: {
-    deliveryAvailable: true,
-    pickupAvailable: true,
-    prepTimeMinutes: 30,
-    supportedCampusIds: ["rugipo"],
-    deliveryFee: 500,
-  },
-  policies: {
-    returnPolicy:
-      "Items may be returned within 7 days if defective or not as described. Must be in original packaging.",
-    cancellationPolicy:
-      "Orders may be cancelled before preparation begins. Contact support if you need to cancel after that.",
-    deliveryPolicy:
-      "We deliver on-campus within the RUGIPO area. A delivery fee applies to off-body locations.",
-    pickupPolicy:
-      "Free pickup at the Engineering Block. Please wait for the READY notification before coming.",
-  },
-  status: STORE_STATUS.OPEN,
-  platformSuspended: false,
-  updatedAt: "2026-08-27T10:00:00.000Z",
-};
-
-void _S;
-
-export const storeMock = { store: { ...initialStore } };
 
 // ── Dashboard overview (non-financial; backend-provided) ─────
 

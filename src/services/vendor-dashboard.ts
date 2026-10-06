@@ -9,7 +9,7 @@ import type {
   VendorRecentOrder,
   VendorPermissions,
   StoreStatus,
-  StoreBranding,
+  StoreHoursDay,
 } from "@/types/vendor-dashboard";
 import {
   VENDOR_DASHBOARD_GATE,
@@ -18,7 +18,6 @@ import {
 import { VENDOR_ONBOARDING_STATUS } from "@/types/onboarding";
 import { getCurrentUser, getVendorByUserId } from "@/services/users";
 import {
-  storeMock,
   dashboardOverview,
   notificationsMock,
   initialActionRequired,
@@ -27,6 +26,7 @@ import {
 } from "@/data/vendor-dashboard";
 
 import { apiClient, type ApiError } from "@/lib/api-client";
+import { uploadFileDirect } from "@/services/media";
 
 // ============================================================
 // VENDOR DASHBOARD SERVICE LAYER  (Module 10)
@@ -341,122 +341,67 @@ export function getStoreHealth(): StoreHealth {
   return initialStoreHealth;
 }
 
-// ── Store management ─────────────────────────────────────────
+// ── Store management (live: GET/PATCH /vendors/me/store) ─────
 
-export async function fetchMyStoreApi(): Promise<VendorStore | null> {
-  const { data, error } = await apiClient.get<VendorStore>("/vendors/me");
-  if (!error && data && data.vendorId) {
-    storeMock.store = data;
-    return data;
-  }
-  return getStore();
+/** What the store page edits; the backend validates every section. */
+export interface StorePatch {
+  identity?: Partial<VendorStore["identity"]>;
+  branding?: {
+    /** Uploaded media id; null removes the image. */
+    logoMediaId?: string | null;
+    coverMediaId?: string | null;
+    logoPreviewColor?: string;
+  };
+  contact?: Partial<VendorStore["contact"]>;
+  location?: Partial<VendorStore["location"]>;
+  hours?: Array<Pick<StoreHoursDay, "dayIndex" | "mode" | "openTime" | "closeTime">>;
+  delivery?: Partial<VendorStore["delivery"]>;
+  policies?: Partial<VendorStore["policies"]>;
+  status?: Exclude<StoreStatus, "unavailable">;
 }
 
-export function getStore(): VendorStore | null {
-  const access = getVendorAccess();
-  if (access.kind !== VENDOR_DASHBOARD_GATE.APPROVED) return null;
-  return clone(storeMock.store);
-}
-
-export interface StoreUpdateResult {
-  ok: boolean;
+export interface StoreResult {
   store: VendorStore | null;
-  error?: string;
+  error: ApiError | null;
 }
 
-export async function updateStoreApi(patch: Partial<VendorStore>): Promise<StoreUpdateResult> {
-  const { data, error } = await apiClient.patch<Partial<VendorStore>, VendorStore>("/vendors/me", patch);
-  if (!error && data) {
-    storeMock.store = data;
-    return { ok: true, store: data };
-  }
-  return updateStore(patch);
+/** The signed-in vendor's real store. Never falls back to demo data. */
+export async function fetchMyStoreApi(): Promise<StoreResult> {
+  const { data, error } = await apiClient.get<VendorStore>("/vendors/me/store");
+  if (error || !data?.vendorId) return { store: null, error };
+  return { store: data, error: null };
+}
+
+/** Saves part of the store; the response is the saved state. */
+export async function updateStoreApi(patch: StorePatch): Promise<StoreResult> {
+  const { data, error } = await apiClient.patch<StorePatch, VendorStore>(
+    "/vendors/me/store",
+    patch
+  );
+  if (error || !data?.vendorId) return { store: null, error };
+  return { store: data, error: null };
 }
 
 /**
- * Update store fields. The backend validates every change and decides whether
- * a store-status (open/closed) change is permitted — a vendor must never be
- * able to override a platform-level suspension.
+ * Uploads a logo or cover image and attaches it to the store. The backend
+ * checks the file type and size and that the upload is the caller's own.
  */
-export function updateStore(patch: Partial<VendorStore>): StoreUpdateResult {
-  const access = getVendorAccess();
-  if (access.kind !== VENDOR_DASHBOARD_GATE.APPROVED) {
-    return { ok: false, store: null, error: "You don't have permission to edit this store." };
-  }
-  const current = storeMock.store;
-  const next = mergeStore(current, patch);
-
-  // Platform suspension overrides any vendor-chosen status.
-  if (current.platformSuspended) {
-    next.status = "unavailable";
-  }
-  next.updatedAt = new Date().toISOString();
-  storeMock.store = next;
-  return { ok: true, store: clone(next) };
+export async function uploadStoreImageApi(
+  field: "logo" | "cover",
+  file: File
+): Promise<StoreResult> {
+  const { data: media, error } = await uploadFileDirect(
+    file,
+    field === "logo" ? "logo" : "banner"
+  );
+  if (error || !media) return { store: null, error };
+  return updateStoreApi({
+    branding: field === "logo" ? { logoMediaId: media.id } : { coverMediaId: media.id },
+  });
 }
 
-export function setStoreStatus(status: StoreStatus): StoreUpdateResult {
-  // Frontend submits the desired state; backend decides permission.
-  return updateStore({ status });
-}
-
-function mergeStore(current: VendorStore, patch: Partial<VendorStore>): VendorStore {
-  return {
-    ...current,
-    ...patch,
-    identity: { ...current.identity, ...(patch.identity ?? {}) },
-    branding: { ...current.branding, ...(patch.branding ?? {}) },
-    contact: { ...current.contact, ...(patch.contact ?? {}) },
-    location: { ...current.location, ...(patch.location ?? {}) },
-    delivery: { ...current.delivery, ...(patch.delivery ?? {}) },
-    policies: { ...current.policies, ...(patch.policies ?? {}) },
-    hours: patch.hours ?? current.hours,
-  };
-}
-
-// ── Branding uploads (authenticated; private refs only) ──────
-
-export interface BrandingUploadResult {
-  ok: boolean;
-  branding: StoreBranding;
-  error?: string;
-}
-
-export function uploadBranding(
-  field: "logoRef" | "coverRef",
-  fileName: string,
-  fileSizeBytes: number,
-  fileType: string,
-  previewColor: string
-): BrandingUploadResult {
-  const access = getVendorAccess();
-  if (access.kind !== VENDOR_DASHBOARD_GATE.APPROVED) {
-    return { ok: false, branding: storeMock.store.branding, error: "Not authorized." };
-  }
-  // Client-side validation is a UX aid, NOT a security boundary. The backend
-  // re-validates. Only private/authenticated refs are produced — never public URLs.
-  void fileType;
-  if (fileSizeBytes <= 0 || fileSizeBytes > 8 * 1024 * 1024) {
-    return { ok: false, branding: storeMock.store.branding, error: "File must be 8MB or smaller." };
-  }
-  const existing = storeMock.store.branding[field];
-  const next: StoreBranding = {
-    ...storeMock.store.branding,
-    [field]: existing ?? `private://vstore/${storeMock.store.vendorId}/${field}-${Date.now()}`,
-    logoPreviewColor: previewColor || storeMock.store.branding.logoPreviewColor,
-  };
-  storeMock.store.branding = next;
-  storeMock.store.updatedAt = new Date().toISOString();
-  return { ok: true, branding: clone(next) };
-}
-
-export function removeBranding(field: "logoRef" | "coverRef"): StoreBranding {
-  const next: StoreBranding = { ...storeMock.store.branding, [field]: null };
-  storeMock.store.branding = next;
-  storeMock.store.updatedAt = new Date().toISOString();
-  return clone(next);
-}
-
-function clone<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
+export function removeStoreImageApi(field: "logo" | "cover"): Promise<StoreResult> {
+  return updateStoreApi({
+    branding: field === "logo" ? { logoMediaId: null } : { coverMediaId: null },
+  });
 }

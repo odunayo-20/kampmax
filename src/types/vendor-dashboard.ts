@@ -248,13 +248,16 @@ export interface StorePolicies {
 }
 
 export interface StoreBranding {
-  logoRef?: string | null; // private/authenticated ref — never public URL
+  /** Public URL of the uploaded logo, or null when none is set. */
+  logoRef?: string | null;
   coverRef?: string | null;
   logoPreviewColor?: string;
 }
 
 export interface VendorStore {
   vendorId: string;
+  /** Public storefront path segment (/store/<slug>). */
+  slug: string;
   identity: {
     storeName: string;
     tagline: string;
