@@ -39,7 +39,11 @@ export function getFriendlyErrorMessage(error: unknown): string {
     return FRIENDLY_ERROR_MESSAGES.CONFLICT;
   if (normalized.includes("validation") || normalized.includes("422"))
     return FRIENDLY_ERROR_MESSAGES.VALIDATION;
-  if (normalized.includes("rate limit") || normalized.includes("429"))
+  if (
+    normalized.includes("rate limit") ||
+    normalized.includes("too many requests") ||
+    normalized.includes("429")
+  )
     return FRIENDLY_ERROR_MESSAGES.RATE_LIMITED;
   if (normalized.includes("offline") || normalized.includes("network"))
     return FRIENDLY_ERROR_MESSAGES.NETWORK;

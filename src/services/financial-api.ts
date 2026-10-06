@@ -42,6 +42,22 @@ async function unwrap<T>(request: Promise<{ data: T; error: ApiError | null }>):
   return data;
 }
 
+export interface Bank {
+  name: string;
+  code: string;
+}
+
+/** Banks supported for verification (live from the payment provider). */
+export const fetchBanks = () => unwrap(apiClient.get<Bank[]>("/financial/banks"));
+
+/** The registered holder name for an account; rejects when it does not resolve. */
+export const resolveBankAccount = (accountNumber: string, bankCode: string) =>
+  unwrap(
+    apiClient.get<{ accountName: string }>(
+      `/financial/resolve-account?accountNumber=${encodeURIComponent(accountNumber)}&bankCode=${encodeURIComponent(bankCode)}`
+    )
+  );
+
 export const fetchFinancialStatus = () => unwrap(apiClient.get<FinancialStatus>("/financial/status"));
 
 export const startFinancialOnboarding = (input: FinancialOnboardingInput) =>

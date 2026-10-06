@@ -3,8 +3,11 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Clock, ShieldCheck, XCircle } from "lucide-react";
+import { getFriendlyErrorMessage } from "@/lib/error-messages";
 import {
+  fetchBanks,
   fetchFinancialStatus,
+  resolveBankAccount,
   retryVirtualAccount,
   startFinancialOnboarding,
   type FinancialStatus,
@@ -21,6 +24,12 @@ export function FinancialIdentityCard() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState({ bvn: "", accountNumber: "", bankCode: "" });
 
+  const banks = useQuery({
+    queryKey: ["financial", "banks"],
+    queryFn: fetchBanks,
+    staleTime: 60 * 60_000,
+  });
+
   const { data: status } = useQuery({
     queryKey: QUERY_KEY,
     queryFn: fetchFinancialStatus,
@@ -29,6 +38,16 @@ export function FinancialIdentityCard() {
       const s = q.state.data;
       return s && (s.kyc === "KYC_PENDING" || s.virtualAccount === "VIRTUAL_ACCOUNT_PENDING") ? 5000 : false;
     },
+  });
+
+  // Show who owns the account before the user submits, to catch typos.
+  const accountReady = /^d{10}$/.test(form.accountNumber) && form.bankCode.length > 0;
+  const holder = useQuery({
+    queryKey: ["financial", "resolve", form.accountNumber, form.bankCode],
+    queryFn: () => resolveBankAccount(form.accountNumber, form.bankCode),
+    enabled: accountReady,
+    retry: false,
+    staleTime: 10 * 60_000,
   });
 
   const onDone = (next: FinancialStatus) => queryClient.setQueryData(QUERY_KEY, next);
@@ -72,7 +91,10 @@ export function FinancialIdentityCard() {
       </ol>
 
       {status.kyc === "KYC_PENDING" && (
-        <Row icon={<Clock className="h-4 w-4 text-amber-500" />} text="Verification in progress…" />
+        <Row
+          icon={<Clock className="h-4 w-4 text-amber-500" />}
+          text="Verification in progress. This usually takes a few minutes; you can leave this page."
+        />
       )}
 
       {status.kyc === "KYC_VERIFIED" && (
@@ -97,23 +119,67 @@ export function FinancialIdentityCard() {
             if (valid) submit.mutate(form);
           }}
         >
-          {(
-            [
-              ["bvn", "BVN (11 digits)"],
-              ["accountNumber", "Account number (10 digits)"],
-              ["bankCode", "Bank code"],
-            ] as const
-          ).map(([key, label]) => (
-            <input
-              key={key}
-              value={form[key]}
-              onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-              placeholder={label}
-              inputMode="numeric"
-              autoComplete="off"
-              className="w-full rounded-lg border border-kampmax-border px-3 py-2 text-sm"
-            />
-          ))}
+          <input
+            type="password"
+            value={form.bvn}
+            onChange={(e) => setForm({ ...form, bvn: e.target.value.replace(/D/g, "").slice(0, 11) })}
+            placeholder="BVN (11 digits)"
+            inputMode="numeric"
+            autoComplete="off"
+            aria-label="BVN"
+            className="w-full rounded-lg border border-kampmax-border px-3 py-2 text-sm"
+          />
+          <select
+            value={form.bankCode}
+            onChange={(e) => setForm({ ...form, bankCode: e.target.value })}
+            aria-label="Bank"
+            disabled={banks.isPending || banks.isError}
+            className="w-full rounded-lg border border-kampmax-border bg-white px-3 py-2 text-sm"
+          >
+            <option value="">
+              {banks.isPending ? "Loading banks…" : banks.isError ? "Banks unavailable" : "Select your bank"}
+            </option>
+            {(banks.data ?? []).map((bank) => (
+              <option key={`${bank.code}-${bank.name}`} value={bank.code}>
+                {bank.name}
+              </option>
+            ))}
+          </select>
+          {banks.isError && (
+            <button
+              type="button"
+              onClick={() => void banks.refetch()}
+              className="text-xs font-semibold text-kampmax-blue hover:underline"
+            >
+              Reload banks
+            </button>
+          )}
+          <input
+            value={form.accountNumber}
+            onChange={(e) => setForm({ ...form, accountNumber: e.target.value.replace(/D/g, "").slice(0, 10) })}
+            placeholder="Account number (10 digits)"
+            inputMode="numeric"
+            autoComplete="off"
+            aria-label="Account number"
+            className="w-full rounded-lg border border-kampmax-border px-3 py-2 text-sm"
+          />
+          {accountReady && (
+            <p
+              className={
+                holder.isError ? "text-xs text-red-500" : "text-xs text-kampmax-text-secondary"
+              }
+            >
+              {holder.isPending
+                ? "Checking account…"
+                : holder.isError
+                  ? "We could not find that account. Check the bank and number."
+                  : `Account name: ${holder.data.accountName}`}
+            </p>
+          )}
+          <p className="text-[11px] text-kampmax-text-secondary">
+            The BVN and account must belong to the name on your Kampmax profile. Your BVN is sent for
+            verification only and is never stored.
+          </p>
           <button
             type="submit"
             disabled={!valid || submit.isPending}
@@ -121,7 +187,7 @@ export function FinancialIdentityCard() {
           >
             {submit.isPending ? "Submitting…" : "Verify identity"}
           </button>
-          {submit.isError && <p className="text-xs text-red-500">Could not start verification. Try again.</p>}
+          {submit.isError && <p className="text-xs text-red-500">{submitErrorMessage(submit.error)}</p>}
         </form>
       )}
 
@@ -162,6 +228,16 @@ export function FinancialIdentityCard() {
       )}
     </div>
   );
+}
+
+/**
+ * Verification rejections (400) carry a reason written for the user by our own
+ * backend, so show it; anything else gets the generic friendly message.
+ */
+function submitErrorMessage(error: unknown): string {
+  const e = error as { status?: number; message?: string } | null;
+  if (e?.status === 400 && e.message && !/^bad request/i.test(e.message)) return e.message;
+  return getFriendlyErrorMessage(error);
 }
 
 function Row({ icon, text }: { icon: React.ReactNode; text: string }) {

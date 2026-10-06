@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -13,14 +13,9 @@ import { TransactionDetail } from "@/components/wallet/TransactionDetail";
 import { FundingModal } from "@/components/wallet/FundingModal";
 import { FinancialIdentityCard } from "@/components/wallet/FinancialIdentityCard";
 import { useAuth } from "@/lib/auth-context";
-import {
-  fetchMyWallet,
-  fetchMyWalletTransactions,
-  startWalletTopup,
-  verifyWalletTopup,
-} from "@/services/wallet";
+import { fetchMyWallet, fetchMyWalletTransactions } from "@/services/wallet";
+import { useWalletTopup } from "@/hooks/use-wallet-topup";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
-import { formatNaira } from "@/lib/utils";
 import { WalletTransaction, WalletTransactionType } from "@/types";
 import { Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -40,14 +35,12 @@ const WALLET_KEY = ["wallet", "profile"] as const;
 export default function WalletPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const queryClient = useQueryClient();
 
   const [filter, setFilter] = useState<"all" | WalletTransactionType>("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "completed" | "pending" | "processing" | "failed" | "cancelled">("all");
   const [selectedTx, setSelectedTx] = useState<WalletTransaction | null>(null);
   const [showFunding, setShowFunding] = useState(false);
-  const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
-  const handledReturn = useRef(false);
+  const { notice, startTopup } = useWalletTopup();
 
   const walletQuery = useQuery({
     queryKey: [...WALLET_KEY, "wallet", user?.id],
@@ -59,34 +52,6 @@ export default function WalletPage() {
     queryFn: () => fetchMyWalletTransactions({ limit: 50 }),
     enabled: !!user,
   });
-
-  const topup = useMutation({
-    mutationFn: async (amount: number) => {
-      const result = await startWalletTopup(amount, `${window.location.origin}${window.location.pathname}`);
-      if (!result.authorizationUrl) throw new Error("The payment page could not be opened.");
-      window.location.assign(result.authorizationUrl);
-    },
-  });
-
-  // Paystack sends the user back with ?reference=…; confirm it once, then tidy the URL.
-  useEffect(() => {
-    if (handledReturn.current) return;
-    const params = new URLSearchParams(window.location.search);
-    const reference = params.get("reference") ?? params.get("trxref");
-    if (!reference?.startsWith("KMPX-TOP-")) return;
-    handledReturn.current = true;
-    window.history.replaceState(null, "", window.location.pathname);
-    verifyWalletTopup(reference)
-      .then((result) => {
-        setNotice(
-          result.status === "SUCCESS"
-            ? { tone: "ok", text: `${formatNaira(result.amount)} added to your wallet.` }
-            : { tone: "error", text: "That payment was not completed, so nothing was charged." }
-        );
-        void queryClient.invalidateQueries({ queryKey: WALLET_KEY });
-      })
-      .catch((error) => setNotice({ tone: "error", text: getFriendlyErrorMessage(error) }));
-  }, [queryClient]);
 
   if (!user) return null;
 
@@ -260,7 +225,7 @@ export default function WalletPage() {
       <FundingModal
         isOpen={showFunding}
         onClose={() => setShowFunding(false)}
-        onFund={(amount) => topup.mutateAsync(amount).catch((e) => { throw new Error(getFriendlyErrorMessage(e)); })}
+        onFund={startTopup}
         balance={wallet.balance}
       />
     </PageContainer>

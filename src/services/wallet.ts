@@ -35,7 +35,7 @@ export interface BackendWalletTransactionResponse {
   walletId: string;
   type: string;
   direction: "CREDIT" | "DEBIT";
-  status: "PENDING" | "COMPLETED" | "FAILED" | "REVERSED";
+  status: "PENDING" | "SUCCESS" | "FAILED" | "REVERSED";
   amount: number;
   balanceBefore: number;
   balanceAfter: number;
@@ -49,12 +49,15 @@ export interface BackendWalletTransactionResponse {
   createdAt: string | Date;
 }
 
+/** GET /wallet/transactions: the backend's standard { items, meta } page. */
 export interface BackendPaginatedWalletTransactions {
-  data: BackendWalletTransactionResponse[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
+  items: BackendWalletTransactionResponse[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
 }
 
 export interface WithdrawPayload {
@@ -202,7 +205,7 @@ export async function fetchWalletTransactions(params: {
 
   const { data, error } = await apiClient.get<BackendPaginatedWalletTransactions>(path);
 
-  if (error || !data || !Array.isArray(data.data)) {
+  if (error || !data || !Array.isArray(data.items)) {
     return {
       data: cachedTransactions,
       total: cachedTransactions.length,
@@ -213,7 +216,7 @@ export async function fetchWalletTransactions(params: {
     };
   }
 
-  const mapped = data.data.map(mapBackendWalletTransactionToFrontend);
+  const mapped = data.items.map(mapBackendWalletTransactionToFrontend);
   cachedTransactions = mapped;
   if (cachedWallet) {
     cachedWallet.transactions = mapped;
@@ -221,10 +224,10 @@ export async function fetchWalletTransactions(params: {
 
   return {
     data: mapped,
-    total: data.total,
-    page: data.page,
-    limit: data.limit,
-    totalPages: data.totalPages,
+    total: data.meta.total,
+    page: data.meta.page,
+    limit: data.meta.limit,
+    totalPages: data.meta.totalPages,
     error: null,
   };
 }
@@ -447,10 +450,10 @@ export async function fetchMyWalletTransactions(
   const { data, error } = await apiClient.get<BackendPaginatedWalletTransactions>(
     `/wallet/transactions${qs ? `?${qs}` : ""}`,
   );
-  if (error || !data || !Array.isArray(data.data)) {
+  if (error || !data || !Array.isArray(data.items)) {
     throw toFailure(error, "Could not load your transactions.");
   }
-  return data.data.map(mapBackendWalletTransactionToFrontend);
+  return data.items.map(mapBackendWalletTransactionToFrontend);
 }
 
 /** The signed-in user's real wallet balance; throws instead of showing a fake one. */
