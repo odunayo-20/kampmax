@@ -85,6 +85,9 @@ export interface ProductQueryParams {
   status?: BackendProductStatus;
   minPrice?: number;
   maxPrice?: number;
+  /** Comma-separated backend conditions, e.g. "USED,REFURBISHED". */
+  condition?: string;
+  sort?: "recent" | "price_low" | "price_high";
   page?: number;
   limit?: number;
 }
@@ -156,6 +159,33 @@ const PUBLISHED_STATUS_FROM_BACKEND: Record<BackendProductStatus, ProductPublish
 };
 
 /**
+ * The public product carries `variations` (what the cart prices against):
+ * each option has an absolute price and its own stock. Group id = name and
+ * option id = label, matching how the cart records a selection.
+ */
+function variationsToGroups(
+  variations: BackendProductDetail["variations"],
+  basePrice: number
+): ProductVariantGroup[] | undefined {
+  if (!variations?.length) return undefined;
+  return variations
+    .filter((g) => g.options?.length)
+    .map((g) => ({
+      id: g.name,
+      name: g.name,
+      required: true,
+      options: g.options.map((o) => ({
+        id: o.label,
+        value: o.label,
+        priceModifier: o.price !== undefined ? Number(o.price) - basePrice : undefined,
+        stock: o.stockQuantity,
+        // A negative stock means unlimited.
+        available: o.stockQuantity === undefined || o.stockQuantity < 0 || o.stockQuantity > 0,
+      })),
+    }));
+}
+
+/**
  * Maps a backend product entity into the frontend Product model.
  */
 export function mapBackendProductToFrontend(
@@ -213,7 +243,10 @@ export function mapBackendProductToFrontend(
     costPrice:
       "costPrice" in raw && raw.costPrice != null ? Number(raw.costPrice) : undefined,
     hasVariants: "hasVariants" in raw ? raw.hasVariants : undefined,
-    variantGroups: "variantConfig" in raw ? raw.variantConfig?.variantGroups : undefined,
+    variantGroups:
+      ("variantConfig" in raw ? raw.variantConfig?.variantGroups : undefined) ??
+      ("variations" in raw ? variationsToGroups(raw.variations, Number(raw.price)) : undefined),
+    attributes: "attributes" in raw && raw.attributes ? raw.attributes : undefined,
     variants: "variantConfig" in raw ? raw.variantConfig?.variants : undefined,
     allowDelivery: raw.allowDelivery ?? true,
     allowPickup: raw.allowPickup ?? true,
@@ -247,6 +280,8 @@ export async function fetchProducts(
   if (params.status) searchParams.append("status", params.status);
   if (params.minPrice !== undefined) searchParams.append("minPrice", String(params.minPrice));
   if (params.maxPrice !== undefined) searchParams.append("maxPrice", String(params.maxPrice));
+  if (params.condition) searchParams.append("condition", params.condition);
+  if (params.sort) searchParams.append("sort", params.sort);
   if (params.page) searchParams.append("page", String(params.page));
   if (params.limit) searchParams.append("limit", String(params.limit));
 
@@ -312,6 +347,10 @@ export async function fetchProductById(
   const { data, error } = await apiClient.get<BackendProductDetail>(`/products/${id}`);
 
   if (error || !data) {
+    if (error?.status === 404) {
+      cachedProducts = cachedProducts.filter((p) => p.id !== id);
+      return { data: null, error };
+    }
     const fallback = cachedProducts.find((p) => p.id === id) || null;
     return { data: fallback, error };
   }

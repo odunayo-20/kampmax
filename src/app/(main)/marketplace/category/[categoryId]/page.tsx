@@ -125,8 +125,8 @@ function CategoryPageContent({ params }: CategoryPageProps) {
       }
     });
 
-    fetchProductsByCategory(categoryId).then((res) => {
-      if (mounted && res.data && res.data.length > 0) {
+    fetchProductsByCategory(categoryId, undefined, { status: "ACTIVE", limit: 100 }).then((res) => {
+      if (mounted && !res.error) {
         setAllProducts(res.data.filter((p) => p.status === "available"));
       }
     });

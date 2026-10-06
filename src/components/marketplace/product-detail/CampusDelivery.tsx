@@ -1,6 +1,7 @@
 "use client";
 
-import { MapPin, Store, Truck, Clock, Shield } from "lucide-react";
+import { MapPin, Store, Truck } from "lucide-react";
+import { formatNaira } from "@/lib/utils";
 
 interface CampusDeliveryProps {
   campus: {
@@ -10,65 +11,65 @@ interface CampusDeliveryProps {
     location: string;
   };
   productLocation?: string;
-  onPickupLocationChange?: (location: string) => void;
+  /** What this listing's seller offers; undefined is treated as offered. */
+  allowPickup?: boolean;
+  allowDelivery?: boolean;
+  deliveryFee?: number;
 }
 
-const deliveryOptions = [
-  { label: "Campus Pickup", price: 0, eta: "Today", icon: Store },
-  { label: "Standard Delivery", price: 1000, eta: "Tomorrow", icon: Truck },
-  { label: "Express Delivery", price: 2000, eta: "2 hours", icon: Clock },
-];
-
-export function CampusDelivery({ campus, productLocation }: CampusDeliveryProps) {
+/** How the buyer can receive this item, from the listing's own settings. */
+export function CampusDelivery({
+  campus,
+  productLocation,
+  allowPickup = true,
+  allowDelivery = true,
+  deliveryFee = 0,
+}: CampusDeliveryProps) {
   return (
     <div className="space-y-4">
-      <div className="rounded-[10px] border border-campus-100 bg-campus-50 p-4">
-        <h3 className="text-sm font-semibold text-neutral-900 flex items-center gap-1.5">
-          <MapPin className="h-4 w-4 text-campus-600" /> Available around
-        </h3>
-        <p className="text-sm font-medium text-neutral-900 mt-1">{campus.name}</p>
-        <p className="text-xs text-neutral-600">{campus.location}</p>
-        <div className="mt-3 space-y-1.5 text-xs">
-          <div className="flex justify-between">
-            <span className="text-neutral-600">Pickup location</span>
-            <span className="font-medium text-neutral-900">{productLocation || "Student Union Building"}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-neutral-600">Estimated delivery</span>
-            <span className="font-medium text-success-700">Today, 2–5 PM</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-neutral-600">Distance</span>
-            <span className="font-medium text-neutral-900">On campus · 0.3 km</span>
-          </div>
+      {campus.name && (
+        <div className="rounded-[10px] border border-campus-100 bg-campus-50 p-4">
+          <h3 className="text-sm font-semibold text-neutral-900 flex items-center gap-1.5">
+            <MapPin className="h-4 w-4 text-campus-600" /> Available around
+          </h3>
+          <p className="text-sm font-medium text-neutral-900 mt-1">{campus.name}</p>
+          {campus.location && <p className="text-xs text-neutral-600">{campus.location}</p>}
+          <p className="mt-2 text-[11px] text-neutral-500">Privacy: exact vendor address is not shown.</p>
         </div>
-        <p className="mt-2 text-[11px] text-neutral-500">Privacy: exact vendor address is not shown.</p>
-      </div>
+      )}
 
       <div className="rounded-[10px] border border-neutral-200 bg-white p-4">
         <h3 className="text-sm font-semibold text-neutral-900 flex items-center gap-1.5">
-          <Truck className="h-4 w-4 text-primary-600" /> Delivery
+          <Truck className="h-4 w-4 text-primary-600" /> Getting it
         </h3>
-        <p className="text-xs text-neutral-600 mt-1">
-          Delivering to: <span className="font-medium text-neutral-900">{campus.abbreviation}</span>
-        </p>
-        <div className="mt-3 space-y-2">
-          {deliveryOptions.map((opt) => (
-            <label
-              key={opt.label}
-              className="flex items-center justify-between gap-3 rounded-md border border-neutral-200 bg-white px-3 py-2.5 hover:border-neutral-300 cursor-pointer"
-            >
+        <ul className="mt-3 space-y-2">
+          {allowPickup && (
+            <li className="flex items-center justify-between gap-3 rounded-md border border-neutral-200 px-3 py-2.5">
               <span className="flex items-center gap-2 text-sm">
-                <input type="radio" name="delivery" defaultChecked={opt.price === 0} className="accent-primary-600" />
-                <opt.icon className="h-4 w-4 text-neutral-500" />
-                <span className="font-medium text-neutral-900">{opt.label}</span>
-                <span className="text-xs text-neutral-500">· {opt.eta}</span>
+                <Store className="h-4 w-4 text-neutral-500" aria-hidden />
+                <span className="font-medium text-neutral-900">Pickup</span>
+                {productLocation && <span className="text-xs text-neutral-500">· {productLocation}</span>}
               </span>
-              <span className="text-sm font-semibold text-neutral-900">{opt.price === 0 ? "Free" : `₦${opt.price.toLocaleString()}`}</span>
-            </label>
-          ))}
-        </div>
-        <p className="mt-2 text-[11px] text-neutral-500">Fees shown are estimates; final fee confirmed at checkout.</p>
+              <span className="text-sm font-semibold text-neutral-900">Free</span>
+            </li>
+          )}
+          {allowDelivery && (
+            <li className="flex items-center justify-between gap-3 rounded-md border border-neutral-200 px-3 py-2.5">
+              <span className="flex items-center gap-2 text-sm">
+                <Truck className="h-4 w-4 text-neutral-500" aria-hidden />
+                <span className="font-medium text-neutral-900">Delivery</span>
+                <span className="text-xs text-neutral-500">· to {campus.abbreviation || "your campus"}</span>
+              </span>
+              <span className="text-sm font-semibold text-neutral-900">
+                {deliveryFee > 0 ? formatNaira(deliveryFee) : "Free"}
+              </span>
+            </li>
+          )}
+          {!allowPickup && !allowDelivery && (
+            <li className="text-xs text-neutral-500">The seller hasn&apos;t set up pickup or delivery for this item.</li>
+          )}
+        </ul>
+        <p className="mt-2 text-[11px] text-neutral-500">You choose how to receive it at checkout.</p>
       </div>
     </div>
   );

@@ -211,7 +211,7 @@ export function buildCartLine(
 ): CartLineItem {
   const selectedVariants = options?.selectedVariants;
   const stock = selectedVariants
-    ? getStockForSelection(product.id, selectedVariants)
+    ? getStockForSelection(product, selectedVariants)
     : undefined;
 
   const availabilityStatus: AvailabilityStatus =
@@ -432,7 +432,7 @@ export function validateCartItems(
     }
 
     const stock = item.selectedVariants
-      ? getStockForSelection(product.id, item.selectedVariants)
+      ? getStockForSelection(product, item.selectedVariants)
       : undefined;
     if (stock === 0) {
       return {

@@ -1,12 +1,10 @@
 "use client";
 
 import { Suspense, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { X } from "lucide-react";
 import { Product } from "@/types";
 import { useMarketplace } from "@/hooks/useMarketplace";
 import { useApp } from "@/lib/app-context";
-import { getCampuses } from "@/services/campus";
 import { getVendorById } from "@/services/users";
 import { useEnsureVendors } from "@/hooks/use-vendor-cache";
 import { SearchBar } from "@/components/shared";
@@ -26,7 +24,6 @@ import {
 import { Button } from "@/components/atoms/Button";
 
 function MarketplaceContent() {
-  const searchParams = useSearchParams();
   const { selectedCampus, campuses } = useApp();
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
 
@@ -36,10 +33,13 @@ function MarketplaceContent() {
     clearFilters,
     setCategoryId,
     categories,
-    filteredProducts,
-    displayedProducts,
+    products,
     hasMore,
     loadMore,
+    isLoading,
+    isFetchingMore,
+    isError,
+    retry,
     activeFilterCount,
     mobileFilterOpen,
     setMobileFilterOpen,
@@ -50,21 +50,17 @@ function MarketplaceContent() {
 
   // Load any vendors not yet in the shared cache; the count re-triggers the
   // memo below once their names arrive.
-  const vendorsLoaded = useEnsureVendors(displayedProducts.map((p) => p.vendorId));
+  const vendorsLoaded = useEnsureVendors(products.map((p) => p.vendorId));
 
+  // Only vendors we actually know about; an unknown store shows no name rather than a placeholder.
   const vendorCache = useMemo(() => {
     const cache: Record<string, { name: string; verified: boolean }> = {};
-    filteredProducts.forEach((p) => {
-      if (!cache[p.vendorId]) {
-        const vendor = getVendorById(p.vendorId);
-        cache[p.vendorId] = {
-          name: vendor?.storeName || "Unknown",
-          verified: vendor?.verified || false,
-        };
-      }
+    products.forEach((p) => {
+      const vendor = cache[p.vendorId] ? undefined : getVendorById(p.vendorId);
+      if (vendor) cache[p.vendorId] = { name: vendor.storeName, verified: vendor.verified };
     });
     return cache;
-  }, [filteredProducts, vendorsLoaded]);
+  }, [products, vendorsLoaded]);
 
   return (
     <PageContainer className="space-y-4">
@@ -97,7 +93,7 @@ function MarketplaceContent() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-sm text-kampmax-text-secondary">
-                {totalCount} {totalCount === 1 ? "product" : "products"}
+                {isLoading ? "Loading…" : `${totalCount.toLocaleString()} ${totalCount === 1 ? "product" : "products"}`}
               </span>
               {activeFilterCount > 0 && (
                 <button
@@ -119,13 +115,17 @@ function MarketplaceContent() {
             <div className="flex flex-wrap gap-2">
               {filters.campusId && (
                 <FilterChip
-                  label={campuses.find((c) => c.id === filters.campusId)?.abbreviation || filters.campusId}
+                  label={
+                    campuses.find((c) => c.id === filters.campusId)?.abbreviation ||
+                    campuses.find((c) => c.id === filters.campusId)?.name ||
+                    "Campus"
+                  }
                   onRemove={() => updateFilter("campusId", "")}
                 />
               )}
               {filters.vendorId && (
                 <FilterChip
-                  label={vendorCache[filters.vendorId]?.name || filters.vendorId}
+                  label={vendorCache[filters.vendorId]?.name || "Store"}
                   onRemove={() => updateFilter("vendorId", "")}
                 />
               )}
@@ -150,10 +150,26 @@ function MarketplaceContent() {
             </div>
           )}
 
-          {filteredProducts.length > 0 ? (
+          {isError ? (
+            <div role="alert" className="rounded-2xl border border-kampmax-border bg-white px-4 py-12 text-center">
+              <p className="text-sm font-semibold text-kampmax-text">We couldn&apos;t load products</p>
+              <p className="mt-1 text-xs text-kampmax-text-secondary">
+                Check your connection and try again.
+              </p>
+              <Button onClick={retry} variant="outline" className="mt-4 border-kampmax-border">
+                Try again
+              </Button>
+            </div>
+          ) : isLoading ? (
+            <ProductGrid>
+              {Array.from({ length: 8 }).map((_, i) => (
+                <ProductSkeleton key={i} />
+              ))}
+            </ProductGrid>
+          ) : products.length > 0 ? (
             <>
               <ProductGrid>
-                {displayedProducts.map((product) => {
+                {products.map((product) => {
                   const vendor = vendorCache[product.vendorId];
                   return (
                     <ProductCard
@@ -171,10 +187,13 @@ function MarketplaceContent() {
                 <div className="flex justify-center pt-4">
                   <Button
                     onClick={loadMore}
+                    disabled={isFetchingMore}
                     variant="outline"
                     className="border-kampmax-border"
                   >
-                    Load more ({filteredProducts.length - displayedProducts.length} remaining)
+                    {isFetchingMore
+                      ? "Loading…"
+                      : `Load more (${Math.max(totalCount - products.length, 0)} remaining)`}
                   </Button>
                 </div>
               )}

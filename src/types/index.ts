@@ -269,6 +269,8 @@ export interface Product {
   allowDelivery?: boolean;
   allowPickup?: boolean;
   deliveryFee?: number;
+  /** Vendor-entered details (e.g. Brand, Size) shown as the product's specs. */
+  attributes?: Record<string, string>;
 }
 
 // ============================================================

@@ -29,7 +29,6 @@ export { Pagination } from "./listing/Pagination";
 export * from "./product-detail/types";
 export { ProductGallery } from "./product-detail/ProductGallery";
 export { VariantSelector } from "./product-detail/VariantSelector";
-export { PersonalizationForm } from "./product-detail/PersonalizationForm";
 export { QuantitySelector } from "./product-detail/QuantitySelector";
 export { PurchaseActions } from "./product-detail/PurchaseActions";
 export { VendorCard } from "./product-detail/VendorCard";

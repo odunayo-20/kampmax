@@ -74,6 +74,8 @@ interface CartContextType {
     options?: {
       variantLabel?: string;
       selectedVariants?: Record<string, string>;
+      /** The option to record on the server cart (it prices and checks stock against it). */
+      serverVariation?: { name: string; option: string };
       unitPrice?: number;
       openDrawer?: boolean;
     }
@@ -278,6 +280,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       options?: {
         variantLabel?: string;
         selectedVariants?: Record<string, string>;
+        /** The option to record on the server cart (it prices and checks stock against it). */
+        serverVariation?: { name: string; option: string };
         unitPrice?: number;
         openDrawer?: boolean;
       }
@@ -324,11 +328,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
       // Send to backend if authenticated
       if (status === "authenticated") {
-        // Variants in the UI are generated placeholders (ids like "color"/"black"),
-        // not backend variations, so sending them makes the API reject the add.
         addToServerCart({
           productId: product.id,
           quantity,
+          selectedVariation: options?.serverVariation,
         }).then(async (res) => {
           if (res.error) {
             setFeedback({

@@ -8,7 +8,6 @@ interface PurchaseActionsProps {
   isUnavailable: boolean;
   allVariantsSelected: boolean;
   inStock: boolean;
-  personalizationValid: boolean;
   added: boolean;
   buyLoading: boolean;
   onAddToCart: () => void;
@@ -21,7 +20,6 @@ export function PurchaseActions({
   isUnavailable,
   allVariantsSelected,
   inStock,
-  personalizationValid,
   added,
   buyLoading,
   onAddToCart,
@@ -35,8 +33,6 @@ export function PurchaseActions({
     ? "Select all variations before purchasing."
     : !inStock
     ? "This combination is out of stock."
-    : !personalizationValid
-    ? "Please complete required personalization."
     : "";
 
   if (mobile) {

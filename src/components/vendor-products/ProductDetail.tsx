@@ -33,7 +33,6 @@ import {
   VendorCard,
   CampusDelivery,
   getVariantGroups,
-  getPersonalizationFields,
   getSpecs,
 } from "@/components/marketplace";
 import { EMPTY_CAMPUS, getCampuses } from "@/services/campus";
@@ -78,9 +77,8 @@ export function ProductDetail({
     ? product.images
     : ["/placeholder-product.svg"];
 
-  const variantGroups = getVariantGroups(product.id, product.categoryId);
-  const personalizationFields = getPersonalizationFields(product.id, product.categoryId);
-  const specs = getSpecs(product.id, product.categoryId);
+  const variantGroups = getVariantGroups(product);
+  const specs = getSpecs(product, campus?.name);
 
   const { publishStatus, stockStatus, availabilityStatus } = getProductDisplayStatus(product);
   const availability = getProductPublishAvailability(publishStatus);
@@ -198,7 +196,6 @@ export function ProductDetail({
           vendor={vendor}
           campus={campus}
           variantGroups={variantGroups}
-          personalizationFields={personalizationFields}
           specs={specs}
           effectivePrice={effectivePrice}
           hasVariants={hasVariants}
@@ -267,7 +264,6 @@ function ProductPreview({
   vendor,
   campus,
   variantGroups,
-  personalizationFields,
   specs,
   effectivePrice,
   hasVariants,
@@ -280,7 +276,6 @@ function ProductPreview({
   vendor: any;
   campus: any;
   variantGroups: any[];
-  personalizationFields: any;
   specs: any[];
   effectivePrice: number;
   hasVariants: boolean;
@@ -343,44 +338,8 @@ function ProductPreview({
             </div>
           )}
 
-          {personalizationFields && (
-            <div className="bg-white rounded-xl border border-kampmax-border p-4">
-              <h3 className="text-sm font-semibold text-kampmax-text mb-3">Personalization (Preview)</h3>
-              <div className="space-y-2">
-                {personalizationFields.map((field: any) => (
-                  <div key={field.id}>
-                    <label className="block text-xs font-medium text-kampmax-text-secondary mb-1">{field.label} {field.required && <span className="text-kampmax-error">*</span>}</label>
-                    {field.type === "text" && (
-                      <input
-                        type="text"
-                        placeholder={field.placeholder}
-                        className="w-full px-3 py-2 rounded-lg border border-kampmax-border text-sm bg-white"
-                        disabled
-                      />
-                    )}
-                    {field.type === "textarea" && (
-                      <textarea
-                        placeholder={field.placeholder}
-                        className="w-full px-3 py-2 rounded-lg border border-kampmax-border text-sm bg-white resize-none"
-                        disabled
-                      />
-                    )}
-                    {field.type === "select" && (
-                      <select className="w-full px-3 py-2 rounded-lg border border-kampmax-border text-sm bg-white" disabled>
-                        <option value="">Select</option>
-                        {field.options?.map((opt: any) => (
-                          <option key={opt.id} value={opt.id}>{opt.label}</option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           <ProductDescription description={product.description} />
-          <ProductSpecs specs={specs} productId={product.id} createdAt={product.createdAt} tags={product.tags} />
+          <ProductSpecs specs={specs} sku={product.sku} createdAt={product.createdAt} tags={product.tags} />
         </div>
 
         <div className="space-y-4">
@@ -399,7 +358,13 @@ function ProductPreview({
           </div>
 
           <VendorCard vendor={vendor} campusName={campus.name} productLocation={product.location} />
-          <CampusDelivery campus={campus} productLocation={product.location} />
+          <CampusDelivery
+            campus={campus}
+            productLocation={product.location}
+            allowPickup={product.allowPickup}
+            allowDelivery={product.allowDelivery}
+            deliveryFee={product.deliveryFee}
+          />
         </div>
       </div>
     </div>

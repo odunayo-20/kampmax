@@ -2,24 +2,26 @@
 
 import { use, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { PageContainer, Breadcrumbs } from "@/components/layout";
 import { Button } from "@/components/ui";
 import { useCart } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
-import { getProductById, fetchProductById, getProductsByCategory } from "@/services/products";
+import { getProductById, fetchProductById, fetchProducts } from "@/services/products";
 import { getVendorById } from "@/services/users";
+import { useEnsureVendors } from "@/hooks/use-vendor-cache";
+import { useApp } from "@/lib/app-context";
 import { isWishlisted, toggleWishlist } from "@/services/wishlist";
 import { addRecentlyViewed } from "@/services/recently-viewed";
 import { ProductReviewsSection } from "@/components/reviews";
 import { formatNaira, calculateDiscountPercentage } from "@/lib/utils";
-import { EMPTY_CAMPUS, getCampuses } from "@/services/campus";
+import { EMPTY_CAMPUS } from "@/services/campus";
 import { Product } from "@/types";
 import {
   ProductGallery,
   VariantSelector,
-  PersonalizationForm,
   QuantitySelector,
   PurchaseActions,
   VendorCard,
@@ -34,12 +36,10 @@ import {
   DesktopActions,
   RecentlyViewedBar,
   getVariantGroups,
-  getPersonalizationFields,
   getSpecs,
   getStockForSelection,
   calculateVariantPriceModifier,
   areAllVariantsSelected,
-  isPersonalizationValid,
   VariantGroup,
 } from "@/components/marketplace";
 
@@ -48,32 +48,55 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const router = useRouter();
   const { addItem } = useCart();
   const { user } = useAuth();
+  const { campuses } = useApp();
 
   const [quantity, setQuantity] = useState(1);
   const [liked, setLiked] = useState(() => isWishlisted(id));
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
-  const [personalization, setPersonalization] = useState<Record<string, string>>({});
   const [added, setAdded] = useState(false);
   const [buyLoading, setBuyLoading] = useState(false);
 
   const [product, setProduct] = useState<Product | null>(() => getProductById(id) || null);
   const [isLoading, setIsLoading] = useState(!product);
+  // A failed load is not the same as a missing product.
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let mounted = true;
+    setLoadFailed(false);
     fetchProductById(id).then((res) => {
-      if (mounted) {
-        if (res.data) {
-          setProduct(res.data);
-          addRecentlyViewed(res.data);
-        }
-        setIsLoading(false);
+      if (!mounted) return;
+      if (res.data) {
+        setProduct(res.data);
+        addRecentlyViewed(res.data);
+      } else if (res.error && res.error.status !== 404) {
+        setLoadFailed(true);
       }
+      setIsLoading(false);
     });
     return () => {
       mounted = false;
     };
-  }, [id]);
+  }, [id, reloadKey]);
+
+  // Seller and related items come from the live API, not whatever happens to be cached.
+  useEnsureVendors(product ? [product.vendorId] : []);
+  const relatedQuery = useQuery({
+    queryKey: ["marketplace", "related", product?.categoryId, product?.id],
+    enabled: !!product?.categoryId,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const res = await fetchProducts({
+        categoryId: product!.categoryId,
+        status: "ACTIVE",
+        limit: 5,
+      });
+      if (res.error) throw res.error;
+      return res.data.filter((p) => p.id !== product!.id).slice(0, 4);
+    },
+  });
+  const similar = relatedQuery.data ?? [];
 
   useEffect(() => {
     if (product) {
@@ -86,12 +109,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     return product.images.length > 0 ? product.images : ["/placeholder-product.svg"];
   }, [product]);
 
-  const variantGroups = useMemo(() => (product ? getVariantGroups(product.id, product.categoryId) : []), [product]);
-  const personalizationFields = useMemo(
-    () => (product ? getPersonalizationFields(product.id, product.categoryId) : null),
-    [product]
-  );
-  const specs = useMemo(() => (product ? getSpecs(product.id, product.categoryId) : []), [product]);
+  const variantGroups = useMemo(() => (product ? getVariantGroups(product) : []), [product]);
 
   useEffect(() => {
     if (!variantGroups.length) return;
@@ -127,6 +145,29 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     );
   }
 
+  if (!product && loadFailed) {
+    return (
+      <PageContainer className="text-center py-16">
+        <div className="max-w-md mx-auto" role="alert">
+          <h1 className="text-lg font-bold text-neutral-900">We couldn&apos;t load this product</h1>
+          <p className="text-sm text-neutral-500 mt-1">Check your connection and try again.</p>
+          <div className="flex gap-2 justify-center mt-6">
+            <Button variant="outline" onClick={() => router.back()}>Go back</Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                setIsLoading(true);
+                setReloadKey((k) => k + 1);
+              }}
+            >
+              Try again
+            </Button>
+          </div>
+        </div>
+      </PageContainer>
+    );
+  }
+
   if (!product) {
     return (
       <PageContainer className="text-center py-16">
@@ -146,9 +187,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   }
 
   const vendor = getVendorById(product.vendorId);
-  const campus = getCampuses().find((c) => c.id === product.campusId) ?? EMPTY_CAMPUS;
-  const similar = getProductsByCategory(product.categoryId).filter((p) => p.id !== product.id).slice(0, 4);
-
+  const campus = campuses.find((c) => c.id === product.campusId) ?? EMPTY_CAMPUS;
+  const specs = getSpecs(product, campus.name || undefined);
 
   const isSold = product.status === "sold";
   const isRemoved = product.status === "removed";
@@ -159,21 +199,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const discountPct = hasDiscount ? calculateDiscountPercentage(product.originalPrice!, effectivePrice) : 0;
 
   const allVariantsSelected = areAllVariantsSelected(variantGroups, selectedVariants);
-  // Real stock from the backend (-1 = unlimited); the hash-based value is only
-  // a fallback for catalog entries that carry no stock figure.
-  const variantStock =
-    typeof product.stock === "number"
-      ? product.stock === -1
-        ? 999
-        : product.stock
-      : getStockForSelection(product.id, selectedVariants);
+  // Real stock from the backend for the chosen options (-1 = unlimited).
+  const variantStock = getStockForSelection(product, selectedVariants);
   const inStock = !isUnavailable && variantStock > 0;
   const lowStock = inStock && variantStock <= 3;
   const maxQty = Math.min(10, variantStock || 10);
 
-  const personalizationValid = isPersonalizationValid(personalizationFields, personalization);
-
-  const canAddToCart = !isUnavailable && inStock && allVariantsSelected && personalizationValid && quantity >= 1 && quantity <= maxQty;
+  const canAddToCart = !isUnavailable && inStock && allVariantsSelected && quantity >= 1 && quantity <= maxQty;
 
   const missingGroups = variantGroups.filter((g) => !selectedVariants[g.id]).map((g) => g.name);
 
@@ -188,12 +220,21 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     return parts.length ? parts.join(" · ") : undefined;
   }
 
+  /** The server cart records one option per line; it prices and checks stock against it. */
+  function serverVariation(): { name: string; option: string } | undefined {
+    if (variantGroups.length !== 1) return undefined;
+    const group = variantGroups[0];
+    const option = group.options.find((o) => o.id === selectedVariants[group.id]);
+    return option ? { name: group.name, option: option.id } : undefined;
+  }
+
   function handleAddToCart() {
     if (!product || !canAddToCart) return;
     const cartProduct = { ...product, price: effectivePrice };
     addItem(cartProduct, quantity, {
       variantLabel: buildVariantLabel(),
       selectedVariants,
+      serverVariation: serverVariation(),
       unitPrice: effectivePrice,
       openDrawer: true,
     });
@@ -208,6 +249,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     addItem(cartProduct, quantity, {
       variantLabel: buildVariantLabel(),
       selectedVariants,
+      serverVariation: serverVariation(),
       unitPrice: effectivePrice,
       openDrawer: false,
     });
@@ -268,8 +310,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               missingGroups={missingGroups}
             />
 
-            <PersonalizationForm fields={personalizationFields} values={personalization} onChange={(id, value) => setPersonalization((p) => ({ ...p, [id]: value }))} />
-
             <QuantitySelector quantity={quantity} maxQty={maxQty} onChange={setQuantity} />
 
             <PurchaseActions
@@ -277,7 +317,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               isUnavailable={isUnavailable}
               allVariantsSelected={allVariantsSelected}
               inStock={inStock}
-              personalizationValid={personalizationValid}
               added={added}
               buyLoading={buyLoading}
               onAddToCart={handleAddToCart}
@@ -294,14 +333,20 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               productImage={gallery[0]}
             />
 
-            <CampusDelivery campus={campus} productLocation={product.location} />
+            <CampusDelivery
+              campus={campus}
+              productLocation={product.location}
+              allowPickup={product.allowPickup}
+              allowDelivery={product.allowDelivery}
+              deliveryFee={product.deliveryFee}
+            />
           </div>
         </div>
 
         <div className="mt-8 space-y-6">
           <ProductDescription description={product.description} />
-          <ProductSpecs specs={specs} productId={product.id} createdAt={product.createdAt} tags={product.tags} />
-          <TrustSignals />
+          <ProductSpecs specs={specs} sku={product.sku} createdAt={product.createdAt} tags={product.tags} />
+          <TrustSignals vendorVerified={vendor?.verified} pickupAvailable={product.allowPickup !== false} />
           <ProductReviewsSection
             productId={product.id}
             vendorId={product.vendorId}

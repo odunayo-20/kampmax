@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Eye, Star, Check, X, Clock, AlertCircle } from "lucide-react";
+import { Star, Check, X, Clock, AlertCircle } from "lucide-react";
 import { ConditionBadge } from "@/components/ui";
 import { formatNaira, calculateDiscountPercentage } from "@/lib/utils";
 
@@ -13,8 +13,7 @@ interface ProductInfoHeaderProps {
     originalPrice?: number;
     rating?: number;
     ratingCount?: number;
-    viewCount?: number;
-    saveCount?: number;
+    sku?: string;
     condition: string;
     status: string;
     images: string[];
@@ -46,7 +45,7 @@ export function ProductInfoHeader({
     <div>
       <h1 className="text-[22px] font-bold tracking-tight text-neutral-900 leading-tight lg:text-2xl">{product.title}</h1>
       <div className="flex flex-wrap items-center gap-2 mt-2">
-        {product.rating && (
+        {product.rating ? (
           <Link href="#reviews" className="flex items-center gap-1.5 group">
             <span className="flex items-center gap-0.5">
               <Star className="h-4 w-4 fill-accent-500 text-accent-500" />
@@ -56,11 +55,7 @@ export function ProductInfoHeader({
               ({product.ratingCount ?? 0} reviews)
             </span>
           </Link>
-        )}
-        <span className="h-1 w-1 rounded-full bg-neutral-300 hidden sm:block" aria-hidden />
-        <span className="inline-flex items-center gap-1 text-xs text-neutral-500">
-          <Eye className="h-3.5 w-3.5" /> {product.viewCount ?? 0} views · {product.saveCount ?? 0} saves
-        </span>
+        ) : null}
       </div>
 
       <div className="mt-4 flex items-baseline gap-3 flex-wrap">
@@ -102,7 +97,10 @@ export function ProductInfoHeader({
         )}
         {!isUnavailable && <span className="text-neutral-400">·</span>}
         {!isUnavailable && (
-          <span className="text-xs text-neutral-500">SKU: {product.id.toUpperCase()} · {product.condition}</span>
+          <span className="text-xs text-neutral-500">
+            {product.sku ? `SKU: ${product.sku} · ` : ""}
+            {product.condition}
+          </span>
         )}
       </div>
     </div>

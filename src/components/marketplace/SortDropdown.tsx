@@ -14,8 +14,6 @@ const sortOptions: { value: SortOption; label: string }[] = [
   { value: "recent", label: "Most Recent" },
   { value: "price_low", label: "Price: Low to High" },
   { value: "price_high", label: "Price: High to Low" },
-  { value: "popular", label: "Most Popular" },
-  { value: "rating", label: "Highest Rated" },
 ];
 
 export function SortDropdown({ value, onChange, className }: SortDropdownProps) {

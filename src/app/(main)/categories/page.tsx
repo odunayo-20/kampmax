@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import {
   BookOpen,
@@ -26,33 +27,30 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { PageContainer } from "@/components/layout";
-import { useHomeCategories, useHomeProducts, useHomeServices } from "@/hooks/use-home";
-import { SP_SERVICE_CATEGORIES } from "@/data/service-categories";
-import { getAllOpportunities } from "@/data/opportunity";
+import { useHomeProducts } from "@/hooks/use-home";
+import { fetchTaxonomyTree, subtreeNodes, type TaxonomyNode } from "@/services/taxonomy";
+import { listPublicServices } from "@/services/service-marketplace";
+import { listPublicJobs } from "@/services/jobs";
+import { jobToOpportunity } from "@/lib/job-api-mapping";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/lib/app-context";
 
-const CATEGORY_ICON_MAP: Record<string, LucideIcon> = {
-  cat1: BookOpen,
-  cat2: Laptop,
-  cat3: Shirt,
-  cat4: Gamepad2,
-  cat5: HomeIcon,
-  cat6: UtensilsCrossed,
-  cat7: Sparkles,
-  cat8: Wrench,
-};
-
-const SERVICE_ICON_MAP: Record<string, LucideIcon> = {
-  cat1: Scissors,
-  cat2: GraduationCap,
-  cat3: Laptop,
-  cat4: Wrench,
-  cat5: Camera,
-  cat6: HomeIcon,
-  cat7: Car,
-  cat8: UtensilsCrossed,
-};
+/** Pick a fitting icon from the category's name; ids are real UUIDs, so they can't be keyed. */
+function iconFor(name: string): LucideIcon {
+  const n = name.toLowerCase();
+  if (/book|textbook|stationer|print|school|study/.test(n)) return BookOpen;
+  if (/electronic|gadget|phone|laptop|tech|computer|\bit\b/.test(n)) return Laptop;
+  if (/fashion|cloth|wear|shoe|apparel|style/.test(n)) return Shirt;
+  if (/game|gaming|entertain/.test(n)) return Gamepad2;
+  if (/home|furniture|hostel|room|house/.test(n)) return HomeIcon;
+  if (/food|snack|cater|drink|restaurant/.test(n)) return UtensilsCrossed;
+  if (/beauty|hair|cosmetic|care|wellness|fitness/.test(n)) return Scissors;
+  if (/photo|video|design|creative|art/.test(n)) return Camera;
+  if (/tutor|lesson|educat|teach|course/.test(n)) return GraduationCap;
+  if (/transport|ride|delivery|logistic|car/.test(n)) return Car;
+  if (/repair|maintenan|fix|plumb|electric/.test(n)) return Wrench;
+  return Tag;
+}
 
 interface ComputedCategoryItem {
   key: string;
@@ -75,84 +73,92 @@ export default function CategoriesPage() {
 
   const campusId = selectedCampus.id;
 
-  // Live queries
-  const categoriesQuery = useHomeCategories();
+  // Live queries: the category trees carry the real structure; counts come from
+  // the backend (products) or from the live listings (services, gigs).
+  const productTree = useQuery({
+    queryKey: ["categories", "tree", "PRODUCT"],
+    queryFn: () => fetchTaxonomyTree("PRODUCT"),
+    staleTime: 5 * 60_000,
+  });
+  const serviceTree = useQuery({
+    queryKey: ["categories", "tree", "SERVICE"],
+    queryFn: () => fetchTaxonomyTree("SERVICE"),
+    staleTime: 5 * 60_000,
+  });
+  const servicesQuery = useQuery({
+    queryKey: ["categories", "services"],
+    queryFn: () => listPublicServices({ limit: 100 }),
+    staleTime: 60_000,
+  });
+  const gigsQuery = useQuery({
+    queryKey: ["categories", "gigs"],
+    queryFn: async () => {
+      const { jobs, error } = await listPublicJobs({ limit: 100, sort: "newest" });
+      if (error) throw error;
+      return jobs.map(jobToOpportunity);
+    },
+    staleTime: 60_000,
+  });
+  // A recent sample of products, used only to suggest tags for each category.
   const productsQuery = useHomeProducts(campusId);
-  const servicesQuery = useHomeServices(campusId);
 
-  const rawCategories = categoriesQuery.data ?? [];
   const rawProducts = productsQuery.data ?? [];
   const rawServices = servicesQuery.data ?? [];
-  const rawOpportunities = useMemo(() => getAllOpportunities(), []);
+  const rawOpportunities = gigsQuery.data ?? [];
+  const isLoading = productTree.isPending || serviceTree.isPending;
 
-  // Compute live categories directly from active data records
   const categoryData = useMemo<ComputedCategoryItem[]>(() => {
-    // 1. Marketplace Categories (From Live Categories & Products)
-    const marketplaceItems: ComputedCategoryItem[] = rawCategories
-      .filter((cat) => cat.id !== "cat8") // cat8 is services, mapped in services section
-      .map((cat) => {
-        const matchingProducts = rawProducts.filter((p) => {
-          const matchesCat = p.categoryId === cat.id;
-          const matchesCampus = !campusId || p.campusId === campusId;
-          return matchesCat && matchesCampus;
-        });
+    const idsOf = (node: TaxonomyNode) => new Set(subtreeNodes(node).map((n) => n.id));
 
-        const tagSet = new Set<string>();
-        matchingProducts.forEach((p) => {
-          p.tags?.forEach((t) => tagSet.add(t));
-        });
-
-        return {
-          key: `mkt-${cat.id}`,
-          id: cat.id,
-          name: cat.name,
-          department: "marketplace",
-          icon: CATEGORY_ICON_MAP[cat.id] ?? Tag,
-          colorClass: "text-primary-600 bg-primary-50 border-primary-200",
-          itemCount: matchingProducts.length,
-          tags: Array.from(tagSet).slice(0, 5),
-          href: `/marketplace?category=${cat.id}`,
-        };
-      });
-
-    // 2. Service Categories (From Service Categories & Active Services)
-    const serviceItems: ComputedCategoryItem[] = SP_SERVICE_CATEGORIES.slice(0, 6).map((scat) => {
-      const matchingServices = rawServices.filter((s) => s.categoryId === scat.id);
-
+    // 1. Marketplace: top-level product categories with the backend's active-product count.
+    const marketplaceItems: ComputedCategoryItem[] = (productTree.data ?? []).map((node) => {
+      const ids = idsOf(node);
       const tagSet = new Set<string>();
-      matchingServices.forEach((s) => {
-        s.tags?.forEach((t) => tagSet.add(t));
-      });
-
+      rawProducts
+        .filter((p) => ids.has(p.categoryId))
+        .forEach((p) => p.tags?.forEach((t) => tagSet.add(t)));
       return {
-        key: `srv-${scat.id}`,
-        id: scat.id,
-        name: scat.name,
-        department: "services",
-        icon: SERVICE_ICON_MAP[scat.id] ?? Wrench,
-        colorClass: "text-purple-600 bg-purple-50 border-purple-200",
-        itemCount: matchingServices.length,
+        key: `mkt-${node.id}`,
+        id: node.id,
+        name: node.name,
+        department: "marketplace",
+        icon: iconFor(node.name),
+        colorClass: "text-primary-600 bg-primary-50 border-primary-200",
+        itemCount: (node as TaxonomyNode & { productCount?: number }).productCount ?? 0,
         tags: Array.from(tagSet).slice(0, 5),
-        href: `/services?category=${scat.id}`,
+        href: `/marketplace?category=${node.id}`,
       };
     });
 
-    // 3. Gig & Opportunity Categories (Extracted from Real Opportunities)
+    // 2. Services: top-level service categories, counting listings anywhere in their subtree.
+    const serviceItems: ComputedCategoryItem[] = (serviceTree.data ?? []).map((node) => {
+      const ids = idsOf(node);
+      const matching = rawServices.filter((svc) => ids.has(svc.categoryId));
+      const tagSet = new Set<string>();
+      matching.forEach((svc) => svc.tags?.forEach((t) => tagSet.add(t)));
+      return {
+        key: `srv-${node.id}`,
+        id: node.id,
+        name: node.name,
+        department: "services",
+        icon: iconFor(node.name),
+        colorClass: "text-purple-600 bg-purple-50 border-purple-200",
+        itemCount: matching.length,
+        tags: Array.from(tagSet).slice(0, 5),
+        href: `/services?category=${node.id}`,
+      };
+    });
+
+    // 3. Gigs: grouped by the category each live job is posted under.
     const oppCategoryMap = new Map<string, typeof rawOpportunities>();
     rawOpportunities.forEach((opp) => {
       const catName = opp.categoryName || "General Gigs";
-      const existing = oppCategoryMap.get(catName) || [];
-      existing.push(opp);
-      oppCategoryMap.set(catName, existing);
+      oppCategoryMap.set(catName, [...(oppCategoryMap.get(catName) ?? []), opp]);
     });
-
     const gigItems: ComputedCategoryItem[] = Array.from(oppCategoryMap.entries()).map(
       ([catName, opps], idx) => {
         const skillSet = new Set<string>();
-        opps.forEach((o) => {
-          o.skills?.forEach((s) => skillSet.add(s));
-        });
-
+        opps.forEach((o) => o.skills?.forEach((sk) => skillSet.add(sk)));
         return {
           key: `gig-${idx}-${catName.toLowerCase().replace(/\s+/g, "-")}`,
           id: `gig-${idx}`,
@@ -168,7 +174,7 @@ export default function CategoriesPage() {
     );
 
     return [...marketplaceItems, ...serviceItems, ...gigItems];
-  }, [rawCategories, rawProducts, rawServices, rawOpportunities, campusId]);
+  }, [productTree.data, serviceTree.data, rawProducts, rawServices, rawOpportunities]);
 
   // Aggregate department counts
   const counts = useMemo(() => {
@@ -371,8 +377,13 @@ export default function CategoriesPage() {
         })}
       </section>
 
-      {/* 3. Empty State */}
-      {filteredCategories.length === 0 && (
+      {/* 3. Loading / Empty State */}
+      {isLoading && categoryData.length === 0 && (
+        <div className="rounded-2xl border border-neutral-200 bg-white p-10 text-center text-sm text-neutral-500" role="status">
+          Loading categories…
+        </div>
+      )}
+      {!isLoading && filteredCategories.length === 0 && (
         <div className="rounded-2xl border border-dashed border-neutral-200 bg-white p-10 text-center space-y-3">
           <div className="h-12 w-12 rounded-full bg-neutral-100 flex items-center justify-center mx-auto text-neutral-400">
             <Search className="h-6 w-6" />
