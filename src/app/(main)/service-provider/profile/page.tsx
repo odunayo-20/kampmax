@@ -2,40 +2,44 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ExternalLink, Image as ImageIcon, MapPin, Wallet, User } from "lucide-react";
+import { ExternalLink, Image as ImageIcon, MapPin, User } from "lucide-react";
 import { ProfessionalDetailsEditor } from "@/components/service-provider/dashboard/ProfessionalDetailsEditor";
 import { ServiceProviderVerificationBadge } from "@/components/service-provider/dashboard/ServiceProviderStatusBadge";
 import {
   fetchSpAvailabilityLive,
   fetchSpProfileRecordLive,
-  getSpAvailability,
-  getSpProfileRecord,
-  getSpSettings,
 } from "@/services/service-provider-dashboard";
-import { formatNaira } from "@/lib/utils";
 import type { ServiceProviderDashboardRecord } from "@/types/service-provider-dashboard";
 
+type Areas = Awaited<ReturnType<typeof fetchSpAvailabilityLive>>;
+
 export default function ProfilePage() {
-  const [record, setRecord] = useState<ServiceProviderDashboardRecord | null>(() => getSpProfileRecord());
-  const [areas, setAreas] = useState<any>(() => getSpAvailability());
-  const [settings] = useState(() => getSpSettings());
-  const [loading, setLoading] = useState(!record);
+  const [record, setRecord] = useState<ServiceProviderDashboardRecord | null>(null);
+  const [areas, setAreas] = useState<Areas | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
-      fetchSpProfileRecordLive().catch(() => null),
-      fetchSpAvailabilityLive().catch(() => null),
-    ]).then(([liveProfile, liveAvailability]) => {
-      if (cancelled) return;
-      if (liveProfile) setRecord(liveProfile);
-      if (liveAvailability) setAreas(liveAvailability);
-      setLoading(false);
-    });
+    setLoading(true);
+    setFailed(false);
+    Promise.all([fetchSpProfileRecordLive(), fetchSpAvailabilityLive()])
+      .then(([liveProfile, liveAvailability]) => {
+        if (cancelled) return;
+        setRecord(liveProfile);
+        setAreas(liveAvailability);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
   if (loading && !record) {
     return (
@@ -47,15 +51,17 @@ export default function ProfilePage() {
 
   if (!record || !areas) {
     return (
-      <div className="rounded-xl border border-kampmax-border bg-white p-10 text-center text-sm text-kampmax-text-secondary">
-        Profile isn&apos;t available right now. Please refresh.
+      <div role="alert" className="rounded-xl border border-kampmax-border bg-white p-10 text-center text-sm text-kampmax-text-secondary">
+        {failed ? "We couldn't load your profile." : "Profile isn't available right now."}{" "}
+        <button type="button" onClick={() => setAttempt((n) => n + 1)} className="font-semibold text-primary-600 hover:underline">
+          Try again
+        </button>
       </div>
     );
   }
 
   const { profile, verification, slug } = record;
-  const campuses = [areas.location.primaryCampusId, ...areas.location.additionalCampusIds].filter(Boolean) as string[];
-
+  
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -104,7 +110,7 @@ export default function ProfilePage() {
       </div>
 
       {/* Service areas + pricing + account */}
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-xl border border-kampmax-border bg-white p-5">
           <div className="flex items-center justify-between">
             <h2 className="flex items-center gap-2 text-sm font-bold text-kampmax-text">
@@ -115,21 +121,7 @@ export default function ProfilePage() {
             </Link>
           </div>
           <p className="mt-2 text-sm text-kampmax-text-secondary">
-            {campuses.length > 0 ? campuses.join(", ") : "No campuses set yet"} · {areas.location.serviceCities.join(", ") || "no cities listed"}
-          </p>
-        </div>
-
-        <div className="rounded-xl border border-kampmax-border bg-white p-5">
-          <div className="flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-sm font-bold text-kampmax-text">
-              <Wallet className="h-4 w-4 text-primary-600" aria-hidden /> Fees
-            </h2>
-            <Link href="/service-provider/availability" className="text-xs font-medium text-primary-600 hover:underline">
-              Manage
-            </Link>
-          </div>
-          <p className="mt-2 text-sm text-kampmax-text-secondary">
-            Travel {formatNaira(areas.pricing.travelFee)} · Emergency {formatNaira(areas.pricing.emergencyFee)} · Min booking {areas.pricing.minimumBookingQuantity}
+            {areas.location.primaryCampusId || "No city set yet"} · within {areas.location.serviceRadiusKm ?? 0} km
           </p>
         </div>
 
@@ -144,9 +136,6 @@ export default function ProfilePage() {
           </div>
           <p className="mt-2 text-sm text-kampmax-text-secondary">
             Global account settings (email, password, security) live in your Kampmax account.
-          </p>
-          <p className="mt-1 text-xs text-kampmax-text-muted">
-            Provider contacts: {settings.contactPreferences.allowEmail ? "email on" : "email off"}
           </p>
         </div>
       </div>

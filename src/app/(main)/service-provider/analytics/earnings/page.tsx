@@ -7,7 +7,7 @@ import { SpAnalyticsPeriodBar } from "@/components/service-provider/analytics/Sp
 import { SpAnalyticsKpiCards } from "@/components/service-provider/analytics/SpAnalyticsKpiCards";
 import { SpAnalyticsTrendChart } from "@/components/service-provider/analytics/SpAnalyticsTrendChart";
 import { SpAnalyticsCategoryChart } from "@/components/service-provider/analytics/SpAnalyticsCategoryChart";
-import { getSpAnalyticsEarnings, getSpAnalyticsEarningsLive } from "@/services/service-provider-analytics";
+import { getSpAnalyticsEarningsLive } from "@/services/service-provider-analytics";
 import { SP_ANALYTICS_PERIOD } from "@/types/service-provider-analytics";
 import type { SpAnalyticsEarnings, SpAnalyticsPeriod } from "@/types/service-provider-analytics";
 
@@ -21,14 +21,9 @@ export default function AnalyticsEarningsPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const liveData = await getSpAnalyticsEarningsLive(period);
-      setData(liveData);
+      setData(await getSpAnalyticsEarningsLive(period));
     } catch {
-      try {
-        setData(getSpAnalyticsEarnings(period));
-      } catch {
-        setData(null);
-      }
+      setData(null);
     } finally {
       setLoading(false);
     }
@@ -39,7 +34,14 @@ export default function AnalyticsEarningsPage() {
   }, [fetchData]);
 
   if (loading && !data) return <SpAnalyticsSkeleton />;
-  if (!data) return <div className="text-center py-12 text-kampmax-text-secondary">You don't have access to analytics</div>;
+  if (!data) return (
+      <div role="alert" className="py-12 text-center text-kampmax-text-secondary">
+        We couldn't load your earnings analytics.{" "}
+        <button type="button" onClick={() => void fetchData()} className="font-semibold text-primary-600 hover:underline">
+          Try again
+        </button>
+      </div>
+    );
 
   return (
     <div className="space-y-6">

@@ -4,9 +4,8 @@ import { BadgeDollarSign, ShieldCheck, Wallet } from "lucide-react";
 import type { ServiceBooking } from "@/types/booking";
 
 /**
- * Payment & escrow readiness panel. Backend projection only — this module
- * never moves money. Renders the payment/escrow state labels and, once an
- * order is confirmed complete, the illustrative settlement breakdown.
+ * Where the money is, and what the provider receives. A backend projection:
+ * this panel only shows it.
  */
 export function SettlementPanel({ booking }: { booking: ServiceBooking }) {
   const f = booking.fulfillment;
@@ -35,7 +34,7 @@ export function SettlementPanel({ booking }: { booking: ServiceBooking }) {
         <div className="rounded-xl border border-neutral-200 bg-white p-3.5">
           <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-neutral-400">
             <BadgeDollarSign className="h-3.5 w-3.5" aria-hidden />
-            Payout preview
+            Payout
           </p>
           <dl className="mt-2 space-y-1.5 text-xs">
             <div className="flex items-center justify-between text-neutral-600">

@@ -9,7 +9,7 @@ import { EvidenceUpload } from "./EvidenceUpload";
 import type { BookingError, BookingEvidence, ServiceBooking, ServiceProblemCategory } from "@/types/booking";
 
 /** Customer: report an issue on a completed booking. Handed to Kampmax support
- * — the dispute engine itself is a later module. */
+ * — Kampmax support reviews it and settles the payment. */
 export function ReportProblemModal({
   booking,
   onClose,
@@ -33,11 +33,11 @@ export function ReportProblemModal({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
-  function submit() {
+  async function submit() {
     if (busy) return;
     setBusy(true);
     setError(null);
-    const result = reportBookingProblem(booking.id, {
+    const result = await reportBookingProblem(booking.id, {
       category,
       description: description.trim(),
       evidence: evidence.length > 0 ? evidence : undefined,

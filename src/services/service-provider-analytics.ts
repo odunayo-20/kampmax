@@ -13,10 +13,6 @@
 // values are pre-formatted (e.g. "₦12,500" / "3") so components stay dumb.
 
 import { apiClient } from "@/lib/api-client";
-import { getBookingsForProvider } from "@/data/booking";
-import { spServiceCategoryName } from "@/data/service-categories";
-import { getProviderActiveServices, getServiceById } from "@/services/service-marketplace";
-import { getSpProfileRecord, getSpReviewsSummary } from "@/services/service-provider-dashboard";
 import { formatNaira } from "@/lib/utils";
 import type { BookingStatus, ServiceBooking } from "@/types/booking";
 import {
@@ -38,17 +34,7 @@ import type {
 
 // ── Ownership / access ──────────────────────────────────────
 
-function ownerProviderId(): string | null {
-  const profile = getSpProfileRecord();
-  if (!profile) return null;
-  return profile.providerId;
-}
 
-function requireOwner(): string {
-  const providerId = ownerProviderId();
-  if (!providerId) throw new Error("UNAUTHORIZED");
-  return providerId;
-}
 
 export { SP_ANALYTICS_SUBTITLE };
 
@@ -120,229 +106,27 @@ function resolveAnalyticsWindow(period: SpAnalyticsPeriod, now: number): Window 
 
 // ── Helpers ─────────────────────────────────────────────────
 
-function bookingsInWindow(providerId: string, w: Window): ServiceBooking[] {
-  return (getBookingsForProvider(providerId, "all") as ServiceBooking[]).filter((b) => {
-    const t = new Date(b.createdAt).getTime();
-    return t >= w.fromMs && t <= w.toMs;
-  });
-}
 
-function grossOf(b: ServiceBooking): number {
-  return b.price?.amount ?? 0;
-}
 
-function kpi(value: string, label: string, key: string, tone: SpAnalyticsKpiTone = "neutral", sublabel?: string): SpAnalyticsKpi {
-  return { key, label, value, tone, sublabel };
-}
 
-/** True when the owner has at least one active marketplace service. */
-function hasServices(providerId: string): boolean {
-  return getProviderActiveServices(providerId).length > 0;
-}
 
 // ── Review-derived KPI (owner-scoped) ────────────────────────
 
-function ratingKpi(providerId: string): SpAnalyticsKpi {
-  const summary = getSpReviewsSummary();
-  if (!hasServices(providerId) || summary.totalCount === 0) {
-    return kpi("—", "Average rating", "avg_rating", "neutral", "No reviews yet");
-  }
-  const tone: SpAnalyticsKpiTone = summary.averageRating >= 4.5 ? "positive" : summary.averageRating >= 3.5 ? "info" : "negative";
-  return kpi(
-    summary.averageRating.toFixed(1),
-    "Average rating",
-    "avg_rating",
-    tone,
-    `${summary.totalCount} review${summary.totalCount === 1 ? "" : "s"}`
-  );
-}
 
 // ── Overview bundle ──────────────────────────────────────────
 
-export function getSpAnalyticsOverview(period: SpAnalyticsPeriod): SpAnalyticsOverview {
-  const providerId = requireOwner();
-  const now = Date.now();
-  const w = resolveAnalyticsWindow(period, now);
-  const bookings = bookingsInWindow(providerId, w);
-
-  const total = bookings.length;
-  const revenue = bookings.reduce((s, b) => s + grossOf(b), 0);
-
-  const completed = bookings.filter((b) => b.status === "completed").length;
-  const cancelled = bookings.filter((b) => b.status === "cancelled").length;
-  const acceptanceBase = bookings.filter((b) => !["pending", "declined"].includes(b.status)).length;
-  const completionBase = bookings.filter((b) => ["in_progress", "completed"].includes(b.status)).length;
-
-  // ── status donut ──
-  const statusCounts = new Map<BookingStatus, number>();
-  for (const s of SP_ANALYTICS_STATUS_ORDER) statusCounts.set(s, 0);
-  for (const b of bookings) statusCounts.set(b.status, (statusCounts.get(b.status) ?? 0) + 1);
-  const slices = SP_ANALYTICS_STATUS_ORDER.filter((s) => (statusCounts.get(s) ?? 0) > 0).map((s) => ({
-    status: s,
-    label: SP_ANALYTICS_STATUS_META[s].label,
-    count: statusCounts.get(s) ?? 0,
-    fraction: total === 0 ? 0 : (statusCounts.get(s) ?? 0) / total,
-    color: SP_ANALYTICS_STATUS_META[s].color,
-  }));
-
-  // ── daily trend ──
-  const trend = dailyTrend(bookings, w);
-
-  // ── category performance ──
-  const categories = categoryMetrics(bookings);
-
-  // ── funnel ──
-  const funnel = SP_ANALYTICS_FUNNEL.map((step, i) => {
-    const count = bookings.filter((b) => step.statuses.includes(b.status)).length;
-    const fromTop = total === 0 ? 0 : count / total;
-    const fromPrevious = i === 0 ? 1 : funnelCount(i - 1) === 0 ? 0 : count / funnelCount(i - 1);
-    return { key: step.key, label: step.label, count, fromTop, fromPrevious };
-  });
-
-  function funnelCount(stepIdx: number): number {
-    const def = SP_ANALYTICS_FUNNEL[stepIdx];
-    return bookings.filter((b) => def.statuses.includes(b.status)).length;
-  }
-
-  // ── peak day (Lagos weekday) ──
-  const peakDay = computePeakDay(bookings);
-
-  const topCategoryId = categories[0]?.categoryId ?? "";
-
-  const kpis: SpAnalyticsKpi[] = [
-    kpi(String(total), "Bookings", "bookings", total > 0 && completionBase > 0 && acceptanceBase > 0 ? "positive" : "neutral", `${completed} completed · ${cancelled} cancelled`),
-    kpi(formatNaira(revenue), "Revenue", "revenue", revenue > 0 ? "positive" : "neutral", "gross, this window"),
-    kpi(ratePct(acceptanceBase, total), "Acceptance rate", "acceptance", toneForRate(acceptanceBase, total), `${acceptanceBase} of ${total} accepted`),
-    kpi(ratePct(completionBase, acceptanceBase), "Completion rate", "completion", toneForRate(completionBase, acceptanceBase), "of accepted bookings"),
-    ratingKpi(providerId),
-  ];
-
-  return {
-    window: { periodLabel: w.periodLabel, from: w.from, to: w.to },
-    kpis,
-    status: { slices, total },
-    trend,
-    categories,
-    funnel,
-    peakDay,
-    topCategoryId,
-  };
-}
 
 // ── Bookings analysis page ──────────────────────────────────
 
-export function getSpAnalyticsBookings(period: SpAnalyticsPeriod): SpAnalyticsBookingsPage {
-  const providerId = requireOwner();
-  const w = resolveAnalyticsWindow(period, Date.now());
-  const bookings = bookingsInWindow(providerId, w);
-
-  const revenue = bookings.reduce((s, b) => s + grossOf(b), 0);
-  const completed = bookings.filter((b) => b.status === "completed").length;
-  const cancelled = bookings.filter((b) => b.status === "cancelled").length;
-
-  const rows: SpAnalyticsBookingsTableRow[] = [...bookings]
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .map((b) => ({
-      id: b.id,
-      reference: b.bookingReference,
-      serviceName: b.serviceName,
-      categoryName: categoryNameOfBooking(b),
-      status: SP_ANALYTICS_STATUS_META[b.status]?.label ?? b.status,
-      amount: formatNaira(grossOf(b)),
-      start: startLabel(b),
-    }));
-
-  return {
-    window: { periodLabel: w.periodLabel, from: w.from, to: w.to },
-    totals: {
-      bookings: bookings.length,
-      revenue: formatNaira(revenue),
-      completed: `${completed} completed`,
-      cancelled: `${cancelled} cancelled`,
-    },
-    rows,
-  };
-}
 
 // ── Earnings analysis page ──────────────────────────────────
 
-export function getSpAnalyticsEarnings(period: SpAnalyticsPeriod): SpAnalyticsEarnings {
-  const providerId = requireOwner();
-  const w = resolveAnalyticsWindow(period, Date.now());
-  const bookings = bookingsInWindow(providerId, w);
-
-  const revenue = bookings.reduce((s, b) => s + grossOf(b), 0);
-  const completedCount = bookings.filter((b) => b.status === "completed").length;
-  const acceptedCount = bookings.filter((b) => !["pending", "declined"].includes(b.status)).length;
-
-  const trend = dailyTrend(bookings, w);
-  const categories = categoryMetrics(bookings);
-
-  // top services by revenue
-  const byService = new Map<string, { name: string; revenue: number; bookings: number }>();
-  for (const b of bookings) {
-    const cur = byService.get(b.serviceId) ?? { name: b.serviceName, revenue: 0, bookings: 0 };
-    cur.revenue += grossOf(b);
-    cur.bookings += 1;
-    byService.set(b.serviceId, cur);
-  }
-  const services = [...byService.entries()]
-    .sort((a, b) => b[1].revenue - a[1].revenue)
-    .slice(0, 6)
-    .map(([serviceId, v]) => ({ serviceId, serviceName: v.name, revenue: formatNaira(v.revenue), bookings: v.bookings }));
-
-  const kpis: SpAnalyticsKpi[] = [
-    kpi(formatNaira(revenue), "Gross revenue", "revenue", revenue > 0 ? "positive" : "neutral", "this window"),
-    kpi(formatNaira(completedCount > 0 ? completedRevenue(bookings) : 0), "Completed revenue", "completed_revenue", "positive", `${completedCount} completed`),
-    kpi(formatNaira(singleBookingHeld(bookings)), "Avg. booking value", "avg_value", "info", `${bookings.length} bookings`),
-    kpi(ratePct(acceptedCount, bookings.length), "Acceptance rate", "acceptance", toneForRate(acceptedCount, bookings.length), `${acceptedCount} of ${bookings.length} accepted`),
-    kpi(String(new Set(bookings.map((b) => b.customerId)).size), "Unique customers", "customers", "neutral", "booked this window"),
-  ];
-
-  return { window: { periodLabel: w.periodLabel, from: w.from, to: w.to }, kpis, trend, categories, services };
-}
 
 // ── Shared computations ─────────────────────────────────────
 
-function categoryNameOfBooking(b: ServiceBooking): string {
-  return spServiceCategoryName(findCategoryForService(b.serviceId));
-}
 
-function findCategoryForService(serviceId: string): string {
-  const svc = getServiceById(serviceId);
-  return svc?.categoryId ?? "uncategorized";
-}
 
-function categoryMetrics(bookings: ServiceBooking[]) {
-  const map = new Map<string, { categoryId: string; categoryName: string; bookings: number; revenue: number }>();
-  for (const b of bookings) {
-    const catId = findCategoryForService(b.serviceId);
-    const name = spServiceCategoryName(catId);
-    const cur = map.get(catId) ?? { categoryId: catId, categoryName: name, bookings: 0, revenue: 0 };
-    cur.bookings += 1;
-    cur.revenue += grossOf(b);
-    map.set(catId, cur);
-  }
-  return [...map.values()].sort((a, b) => b.revenue - a.revenue);
-}
 
-function dailyTrend(bookings: ServiceBooking[], w: Window) {
-  const dayMap = new Map<string, { key: string; label: string; bookings: number; revenue: number }>();
-  const step = 1;
-  for (let t = startOfLagosUtcDay(w.fromMs); t <= w.toMs; t += DAY_MS * step) {
-    const key = new Date(t + LAGOS_OFFSET_MS).toISOString().slice(0, 10);
-    dayMap.set(key, { key, label: dayLabel(t), bookings: 0, revenue: 0 });
-  }
-  for (const b of bookings) {
-    const key = new Date(startOfLagosUtcDay(new Date(b.createdAt).getTime()) + LAGOS_OFFSET_MS).toISOString().slice(0, 10);
-    const cur = dayMap.get(key);
-    if (cur) {
-      cur.bookings += 1;
-      cur.revenue += grossOf(b);
-    }
-  }
-  return [...dayMap.values()];
-}
 
 function dayLabel(dayStartMs: number): string {
   const d = new Date(dayStartMs + LAGOS_OFFSET_MS);
@@ -350,33 +134,8 @@ function dayLabel(dayStartMs: number): string {
   return `${weekdays[d.getUTCDay()]} ${d.getUTCDate()}`;
 }
 
-function computePeakDay(bookings: ServiceBooking[]) {
-  const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const counts = new Array(7).fill(0);
-  const revenue = new Array(7).fill(0);
-  for (const b of bookings) {
-    const idx = new Date(b.startAt).getUTCDay();
-    counts[idx] += 1;
-    revenue[idx] += grossOf(b);
-  }
-  let best = 0;
-  for (let i = 1; i < 7; i++) if (counts[i] > counts[best]) best = i;
-  const max = counts[best] || 1;
-  return {
-    weekday: weekdays[best],
-    bookings: counts[best],
-    revenue: revenue[best],
-    share: max === 0 ? 0 : counts[best] / (counts.reduce((s, c) => s + c, 0) || 1),
-  };
-}
 
-function completedRevenue(bookings: ServiceBooking[]): number {
-  return bookings.filter((b) => b.status === "completed").reduce((s, b) => s + grossOf(b), 0);
-}
 
-function singleBookingHeld(bookings: ServiceBooking[]): number {
-  return bookings.length === 0 ? 0 : Math.round(completedRevenue(bookings) / (bookings.filter((b) => b.status === "completed").length || 1));
-}
 
 function ratePct(numerator: number, denominator: number): string {
   if (denominator === 0) return "—";
@@ -552,7 +311,7 @@ export async function getSpAnalyticsOverviewLive(period: SpAnalyticsPeriod): Pro
   } catch (err) {
     console.warn("Failed live analytics overview fetch:", err);
   }
-  return getSpAnalyticsOverview(period);
+  throw new Error("Could not load your analytics.");
 }
 
 export async function getSpAnalyticsBookingsLive(period: SpAnalyticsPeriod): Promise<SpAnalyticsBookingsPage> {
@@ -608,7 +367,7 @@ export async function getSpAnalyticsBookingsLive(period: SpAnalyticsPeriod): Pro
   } catch (err) {
     console.warn("Failed live analytics bookings fetch:", err);
   }
-  return getSpAnalyticsBookings(period);
+  throw new Error("Could not load your bookings analytics.");
 }
 
 export async function getSpAnalyticsEarningsLive(period: SpAnalyticsPeriod): Promise<SpAnalyticsEarnings> {
@@ -696,5 +455,5 @@ export async function getSpAnalyticsEarningsLive(period: SpAnalyticsPeriod): Pro
   } catch (err) {
     console.warn("Failed live analytics earnings fetch:", err);
   }
-  return getSpAnalyticsEarnings(period);
+  throw new Error("Could not load your earnings analytics.");
 }

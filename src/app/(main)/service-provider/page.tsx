@@ -6,11 +6,8 @@ import { ArrowRight, CalendarDays, ExternalLink, Images, Plus, Sparkles, Wrench,
 import { cn, timeAgo } from "@/lib/utils";
 import {
   computeProfileCompletionFromLive,
-  computeSpProfileCompletion,
   fetchSpDashboardLive,
   fetchSpReviewsSummaryLive,
-  getSpDashboard,
-  getSpReviewsSummary,
 } from "@/services/service-provider-dashboard";
 import { ServiceProviderMetricCard } from "@/components/service-provider/dashboard/ServiceProviderMetricCard";
 import { ServiceProviderVerificationBadge } from "@/components/service-provider/dashboard/ServiceProviderStatusBadge";
@@ -44,14 +41,18 @@ export default function ServiceProviderOverviewPage() {
     record: ServiceProviderDashboardRecord;
     metrics: ServiceProviderDashboardMetric[];
     activity: ServiceProviderActivityEvent[];
-  } | null>(() => getSpDashboard());
-  const [completion, setCompletion] = useState<ServiceProviderProfileCompletion>(() => computeSpProfileCompletion());
-  const [reviews, setReviews] = useState<ServiceProviderReviewsSummary>(() => getSpReviewsSummary());
-  const [loading, setLoading] = useState(!dashboard);
+  } | null>(null);
+  const [completion, setCompletion] = useState<ServiceProviderProfileCompletion | null>(null);
+  const [reviews, setReviews] = useState<ServiceProviderReviewsSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [showWelcome, setShowWelcome] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setFailed(false);
     fetchSpDashboardLive()
       .then((live) => {
         if (cancelled) return;
@@ -59,25 +60,24 @@ export default function ServiceProviderOverviewPage() {
         setCompletion(computeProfileCompletionFromLive(live.record));
         setLoading(false);
       })
-      .catch((err) => {
-        console.warn("Falling back to cached dashboard data:", err);
+      .catch(() => {
         if (cancelled) return;
+        setFailed(true);
         setLoading(false);
       });
 
     fetchSpReviewsSummaryLive()
       .then((revs) => {
-        if (cancelled) return;
-        setReviews(revs);
+        if (!cancelled) setReviews(revs);
       })
-      .catch((err) => {
-        console.warn("Falling back to cached reviews data:", err);
+      .catch(() => {
+        // The rest of the page still works; the ratings card is simply left out.
       });
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
   if (loading && !dashboard) {
     return (
@@ -87,10 +87,13 @@ export default function ServiceProviderOverviewPage() {
     );
   }
 
-  if (!dashboard) {
+  if (!dashboard || !completion) {
     return (
-      <div className="rounded-xl border border-kampmax-border bg-white p-10 text-center text-sm text-kampmax-text-secondary">
-        Dashboard isn&apos;t available right now. Please refresh and try again.
+      <div role="alert" className="rounded-xl border border-kampmax-border bg-white p-10 text-center text-sm text-kampmax-text-secondary">
+        {failed ? "We couldn't load your dashboard." : "Dashboard isn't available right now."}{" "}
+        <button type="button" onClick={() => setAttempt((n) => n + 1)} className="font-semibold text-primary-600 hover:underline">
+          Try again
+        </button>
       </div>
     );
   }
@@ -232,36 +235,38 @@ export default function ServiceProviderOverviewPage() {
 
         {/* Reviews + verification summary */}
         <div className="space-y-4">
-          <div className="rounded-xl border border-kampmax-border bg-white p-5">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold text-kampmax-text">Ratings & reviews</h2>
-              <Link href="/service-provider/reviews" className="text-xs font-medium text-primary-600 hover:underline">
-                View all
-              </Link>
-            </div>
-            <div className="mt-3 flex items-center gap-2">
-              <span className="text-3xl font-bold text-kampmax-text">{reviews.averageRating.toFixed(1)}</span>
-              <span className="text-yellow-500" aria-label={`${reviews.averageRating} out of 5`}>
-                {"★★★★★".slice(0, Math.round(reviews.averageRating))}
-                <span className="text-neutral-300">{"★★★★★".slice(Math.round(reviews.averageRating))}</span>
-              </span>
-              <span className="text-xs text-kampmax-text-muted">({reviews.totalCount} reviews)</span>
-            </div>
-            <div className="mt-3 space-y-1">
-              {reviews.distribution.map((d) => (
-                <div key={d.stars} className="flex items-center gap-2 text-xs text-kampmax-text-secondary">
-                  <span className="w-6 text-right">{d.stars}</span>
-                  <div className="flex-1 h-1.5 rounded-full bg-neutral-200">
-                    <div
-                      className="h-full rounded-full bg-yellow-400"
-                      style={{ width: `${reviews.totalCount ? (d.count / reviews.totalCount) * 100 : 0}%` }}
-                    />
+          {reviews && (
+            <div className="rounded-xl border border-kampmax-border bg-white p-5">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-kampmax-text">Ratings & reviews</h2>
+                <Link href="/service-provider/reviews" className="text-xs font-medium text-primary-600 hover:underline">
+                  View all
+                </Link>
+              </div>
+              <div className="mt-3 flex items-center gap-2">
+                <span className="text-3xl font-bold text-kampmax-text">{reviews.averageRating === null ? "—" : reviews.averageRating.toFixed(1)}</span>
+                <span className="text-yellow-500" aria-label={`${reviews.averageRating ?? 0} out of 5`}>
+                  {"★★★★★".slice(0, Math.round(reviews.averageRating ?? 0))}
+                  <span className="text-neutral-300">{"★★★★★".slice(Math.round(reviews.averageRating ?? 0))}</span>
+                </span>
+                <span className="text-xs text-kampmax-text-muted">({reviews.totalCount} reviews)</span>
+              </div>
+              <div className="mt-3 space-y-1">
+                {reviews.distribution.map((d) => (
+                  <div key={d.stars} className="flex items-center gap-2 text-xs text-kampmax-text-secondary">
+                    <span className="w-6 text-right">{d.stars}</span>
+                    <div className="flex-1 h-1.5 rounded-full bg-neutral-200">
+                      <div
+                        className="h-full rounded-full bg-yellow-400"
+                        style={{ width: `${reviews.totalCount ? (d.count / reviews.totalCount) * 100 : 0}%` }}
+                      />
+                    </div>
+                    <span className="w-6 text-kampmax-text-muted">{d.count}</span>
                   </div>
-                  <span className="w-6 text-kampmax-text-muted">{d.count}</span>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="rounded-xl border border-kampmax-border bg-white p-5">
             <h2 className="text-sm font-bold text-kampmax-text">Verification</h2>

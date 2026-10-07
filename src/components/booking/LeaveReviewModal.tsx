@@ -30,11 +30,11 @@ export function LeaveReviewModal({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
-  function submit() {
+  async function submit() {
     if (busy || rating < 1) return;
     setBusy(true);
     setError(null);
-    const result = submitBookingReview(booking.id, {
+    const result = await submitBookingReview(booking.id, {
       rating: rating as 1 | 2 | 3 | 4 | 5,
       title: title.trim() || undefined,
       body: body.trim() || undefined,

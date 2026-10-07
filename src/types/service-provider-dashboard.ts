@@ -146,7 +146,8 @@ export interface ServiceProviderReview {
 }
 
 export interface ServiceProviderReviewsSummary {
-  averageRating: number;
+  /** Null until the first review is published. */
+  averageRating: number | null;
   totalCount: number;
   distribution: { stars: number; count: number }[];
   recent: ServiceProviderReview[];

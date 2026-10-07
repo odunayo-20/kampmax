@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import {
   AlertCircle,
@@ -21,11 +22,10 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import {
-  fetchProviderBookingByIdLive,
   formatBookingDate,
   formatBookingDay,
   formatBookingTime,
-  getProviderBooking,
+  fetchProviderBooking,
   startBooking,
 } from "@/services/booking";
 import { BookingStatusBadge } from "./BookingStatusBadge";
@@ -41,11 +41,10 @@ import type { BookingError, ServiceBooking } from "@/types/booking";
 const START_WINDOW_MS = 30 * 60 * 1000;
 
 export function ServiceProviderBookingDetailView({ bookingId }: { bookingId: string }) {
-  const { user } = useAuth();
-  const [booking, setBooking] = useState<ServiceBooking | null>(() =>
-    getProviderBooking(bookingId)
-  );
-  const [loading, setLoading] = useState(!booking);
+  const queryClient = useQueryClient();
+  const [booking, setBooking] = useState<ServiceBooking | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [acceptOpen, setAcceptOpen] = useState(false);
   const [declineOpen, setDeclineOpen] = useState(false);
   const [completeOpen, setCompleteOpen] = useState(false);
@@ -54,15 +53,17 @@ export function ServiceProviderBookingDetailView({ bookingId }: { bookingId: str
 
   useEffect(() => {
     let cancelled = false;
-    fetchProviderBookingByIdLive(bookingId)
+    fetchProviderBooking(bookingId)
       .then((live) => {
-        if (!cancelled && live) {
-          setBooking(live);
-          setLoading(false);
-        }
+        if (cancelled) return;
+        setBooking(live);
+        setLoadError(null);
+        setLoading(false);
       })
-      .catch(() => {
-        if (!cancelled) setLoading(false);
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        setLoadError(e instanceof Error ? e.message : "Could not load this booking.");
+        setLoading(false);
       });
     return () => {
       cancelled = true;
@@ -73,6 +74,20 @@ export function ServiceProviderBookingDetailView({ bookingId }: { bookingId: str
     return (
       <div className="flex min-h-[400px] items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-primary-600/20 border-t-primary-600" />
+      </div>
+    );
+  }
+
+  if (loadError && !booking) {
+    return (
+      <div className="space-y-6">
+        <Link
+          href="/service-provider/bookings"
+          className="inline-flex items-center gap-1 text-xs font-semibold text-neutral-500 hover:text-primary-600"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> Bookings
+        </Link>
+        <BookingEmptyState title="We couldn't load this booking" description={loadError} />
       </div>
     );
   }
@@ -101,14 +116,20 @@ export function ServiceProviderBookingDetailView({ bookingId }: { bookingId: str
   const canComplete = booking.status === "in_progress";
   const pending = booking.status === "pending";
 
-  function runSimple(action: "start") {
+  /** Shows the booking the server just returned, and refreshes every list that includes it. */
+  function update(updated: ServiceBooking) {
+    setBooking(updated);
+    void queryClient.invalidateQueries({ queryKey: ["bookings"] });
+  }
+
+  async function runSimple(action: "start") {
     if (busyAction) return;
     setBusyAction(action);
     setError(null);
-    const result = startBooking(activeBookingId);
+    const result = await startBooking(activeBookingId);
     setBusyAction(null);
     if (result.ok) {
-      setBooking(result.booking);
+      update(result.booking);
     } else {
       setError(result.error);
     }
@@ -309,7 +330,7 @@ export function ServiceProviderBookingDetailView({ bookingId }: { bookingId: str
           booking={booking}
           onClose={() => setAcceptOpen(false)}
           onComplete={(updated) => {
-            setBooking(updated);
+            update(updated);
             setAcceptOpen(false);
           }}
         />
@@ -319,7 +340,7 @@ export function ServiceProviderBookingDetailView({ bookingId }: { bookingId: str
           booking={booking}
           onClose={() => setDeclineOpen(false)}
           onComplete={(updated) => {
-            setBooking(updated);
+            update(updated);
             setDeclineOpen(false);
           }}
         />
@@ -329,7 +350,7 @@ export function ServiceProviderBookingDetailView({ bookingId }: { bookingId: str
           booking={booking}
           onClose={() => setCompleteOpen(false)}
           onComplete={(updated) => {
-            setBooking(updated);
+            update(updated);
             setCompleteOpen(false);
           }}
         />

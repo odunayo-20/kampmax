@@ -119,11 +119,10 @@ export const SERVICE_PROBLEM_CATEGORIES: {
   },
 ];
 
-/** Issues on confirmed orders hand off to Kampmax support — the resolution
- * (dispute) engine arrives in a later module. */
+/** Issues on completed bookings go to Kampmax support, who settle the payment. */
 export const PROBLEM_ASSIGNED_TO = "kampmax_support" as const;
 
-// ── Payments & escrow readiness (no money is moved) ───────────
+// ── Payments & escrow ─────────────────────────────────────────
 
 export const PAYMENT_STATE_LABELS: Record<BookingPaymentState, string> = {
   not_required: "No payment required",
@@ -147,9 +146,9 @@ export const ESCROW_STATE_LABELS: Record<BookingEscrowState, string> = {
 };
 
 export const SETTLEMENT_DISCLAIMER =
-  "Preview only — Kampmax does not collect or move money in this prototype. Real payment, escrow, and payout open with payments infrastructure.";
+  "The provider is paid this amount once the customer confirms the service.";
 
-/** Illustrative platform fee used for the completion preview breakdown. */
+/** Platform fee on a booking; kept in step with the backend. */
 export const PLATFORM_FEE_RATE = 0.08;
 
 // ── Evidence upload limits (validated client-side, backend-owned files) ──

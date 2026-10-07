@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -21,12 +22,13 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import {
   createBooking,
-  createCustomerBookingLive,
+  fetchBookingAvailability,
   formatBookingDay,
   formatBookingTime,
   getBookingLocationOptions,
-  getBookingPageBundle,
 } from "@/services/booking";
+import { fetchMyWallet } from "@/services/wallet";
+import { formatNaira } from "@/lib/utils";
 import { BookingDayPicker } from "./BookingDayPicker";
 import { BookingTimeSlotGrid } from "./BookingTimeSlotGrid";
 import { BookingSummaryCard } from "./BookingSummaryCard";
@@ -72,14 +74,25 @@ export function BookingFlow({ serviceId }: { serviceId: string }) {
   const [created, setCreated] = useState<{ id: string; reference: string } | null>(null);
   const idempotencyRef = useRef<string>("");
 
-  // Rebuild availability from the backend when the step resets after a conflict.
-  const bundle = useMemo(
-    () => getBookingPageBundle(serviceId),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [serviceId, refreshKey]
-  );
+  const queryClient = useQueryClient();
 
-  const selectedDay: DayAvailability | undefined = bundle?.availability.days.find(
+  // Times come from the backend; they are fetched again when a slot is lost to someone else.
+  const availabilityQuery = useQuery({
+    queryKey: ["booking-availability", serviceId, refreshKey],
+    queryFn: () => fetchBookingAvailability(serviceId),
+    enabled: !!user,
+    retry: false,
+    staleTime: 0,
+  });
+  const availabilityData = availabilityQuery.data;
+  const walletQuery = useQuery({
+    queryKey: ["booking-wallet"],
+    queryFn: fetchMyWallet,
+    enabled: !!user,
+    retry: false,
+  });
+
+  const selectedDay: DayAvailability | undefined = availabilityData?.days.find(
     (d) => d.date === selectedDate
   );
 
@@ -99,11 +112,11 @@ export function BookingFlow({ serviceId }: { serviceId: string }) {
   }, [user?.phone]);
 
   useEffect(() => {
-    if (!bundle || selectedDate) return;
-    const first = bundle.availability.days.find((d) => d.available);
-    setSelectedDate(first?.date ?? bundle.availability.days[0]?.date ?? "");
+    if (!availabilityData || selectedDate) return;
+    const first = availabilityData.days.find((d) => d.available);
+    setSelectedDate(first?.date ?? availabilityData.days[0]?.date ?? "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bundle, selectedDate]);
+  }, [availabilityData, selectedDate]);
 
   if (status === "loading") {
     return (
@@ -115,18 +128,27 @@ export function BookingFlow({ serviceId }: { serviceId: string }) {
 
   if (!user) return null;
 
-  if (!bundle) {
+  if (availabilityQuery.isPending) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-primary-200 border-t-primary-600" />
+      </div>
+    );
+  }
+
+  if (!availabilityData) {
     return (
       <div className="mx-auto max-w-lg px-4 py-16 text-center">
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-neutral-100">
           <AlertCircle className="h-6 w-6 text-neutral-500" aria-hidden />
         </div>
         <h1 className="mt-4 text-lg font-bold text-neutral-900">
-          This service can&apos;t be booked online
+          This service can&apos;t be booked right now
         </h1>
         <p className="mt-2 text-sm text-neutral-500">
-          Some services (like quotes and group offers) go through the request-quote
-          flow instead.
+          {availabilityQuery.error instanceof Error
+            ? availabilityQuery.error.message
+            : "Some services go through the request-quote flow instead."}
         </p>
         <Link
           href="/services"
@@ -138,7 +160,12 @@ export function BookingFlow({ serviceId }: { serviceId: string }) {
     );
   }
 
-  const { availability, provider, service } = bundle;
+  const availability = availabilityData;
+  const service = { id: availability.serviceId, name: availability.serviceName };
+  const provider = { id: availability.providerId, displayName: availability.providerName };
+  const price = availability.price.amount;
+  const balance = walletQuery.data?.balance;
+  const shortBy = balance !== undefined && balance < price ? price - balance : 0;
 
   function goBack() {
     setError(null);
@@ -176,10 +203,9 @@ export function BookingFlow({ serviceId }: { serviceId: string }) {
     return null;
   }
 
-  function submit() {
+  async function submit() {
     if (!selectedSlot || submitting) return;
     setError(null);
-    setSubmitting(true);
 
     const options = getBookingLocationOptions(availability.locationType);
     const chosen = options[locationType] ?? options[0];
@@ -188,49 +214,44 @@ export function BookingFlow({ serviceId }: { serviceId: string }) {
     if (detailError) {
       setError({ code: "422", message: detailError, field: "phone", recoverable: true });
       setStep("details");
-      setSubmitting(false);
+      return;
+    }
+    if (shortBy > 0) {
+      setError({
+        code: "422",
+        message: `Your wallet has ${formatNaira(balance ?? 0)} and this booking costs ${formatNaira(price)}. Top up your wallet first.`,
+      });
       return;
     }
 
+    setSubmitting(true);
     if (!idempotencyRef.current) {
-      idempotencyRef.current = `bk_${Date.now()}_${Math.floor(
-        Math.random() * 1e9
-      )}`;
+      idempotencyRef.current = `bk_${Date.now()}_${Math.floor(Math.random() * 1e9)}`;
     }
 
-    // Synchronously create in local state and asynchronously sync to backend API
-    const result = createBooking({
+    const result = await createBooking({
       serviceId,
       startAt: selectedSlot.startAt,
       locationType: chosen.type,
-      address: chosen.type === "customer_location" || chosen.type === "flexible" ? address.trim() : undefined,
+      address: chosen.type === "customer_location" ? address.trim() : undefined,
       notes: notes.trim() || undefined,
       customerPhone: phone.trim(),
       idempotencyKey: idempotencyRef.current,
     });
-
-    createCustomerBookingLive({
-      providerId: provider.id,
-      serviceId,
-      scheduledDate: selectedSlot.startAt,
-      scheduledTime: formatBookingTime(selectedSlot.startAt),
-      durationMinutes: service.durationMinutes || 60,
-      customerNotes: notes.trim() || undefined,
-    }).catch(() => {});
-
     setSubmitting(false);
 
     if (result.ok) {
+      void queryClient.invalidateQueries({ queryKey: ["bookings"] });
+      void queryClient.invalidateQueries({ queryKey: ["booking-wallet"] });
+      void queryClient.invalidateQueries({ queryKey: ["wallet"] });
       setCreated({ id: result.booking.id, reference: result.booking.bookingReference });
       setStep("confirmation");
       return;
     }
 
     const err = result.error;
-    if (err.code === "409" || err.code === "timeout") {
-      // Slot raced away (or the result was ambiguous after a timeout): refresh
-      // the backend view and take the customer back to pick a fresh slot. Never
-      // auto-retry a mutation.
+    if (err.code === "409") {
+      // The slot went to someone else: show fresh times and pick again.
       setError(err);
       setRefreshKey((k) => k + 1);
       setStep("schedule");
@@ -273,7 +294,7 @@ export function BookingFlow({ serviceId }: { serviceId: string }) {
           </h1>
           <p className="mt-0.5 text-xs text-neutral-500">
             <span className="font-semibold text-neutral-700">{provider.displayName}</span> ·{" "}
-            {provider.rating.toFixed(1)}★ ({provider.ratingCount}) · {availability.bookingPreferenceLabel}
+            {availability.bookingPreferenceLabel}
           </p>
         </div>
         <Link
@@ -542,7 +563,26 @@ export function BookingFlow({ serviceId }: { serviceId: string }) {
                 />
                 <Row label="Phone" value={phone} />
                 {notes.trim() && <Row label="Notes" value={notes} />}
+                <Row label="Price" value={formatNaira(price)} sub={availability.price.note} />
+                <Row
+                  label="Your wallet"
+                  value={balance === undefined ? "Checking…" : formatNaira(balance)}
+                  sub={
+                    shortBy > 0
+                      ? `You need ${formatNaira(shortBy)} more to book this.`
+                      : "The price is taken now and held safely until you confirm the service."
+                  }
+                />
               </div>
+
+              {shortBy > 0 && (
+                <Link
+                  href="/profile/wallet"
+                  className="mt-3 inline-block rounded-lg bg-primary-50 px-3 py-2 text-xs font-semibold text-primary-700 hover:bg-primary-100"
+                >
+                  Top up your wallet
+                </Link>
+              )}
 
               {error && (
                 <p
@@ -564,8 +604,8 @@ export function BookingFlow({ serviceId }: { serviceId: string }) {
                 </button>
                 <button
                   type="button"
-                  disabled={submitting}
-                  onClick={submit}
+                  disabled={submitting || shortBy > 0}
+                  onClick={() => void submit()}
                   className={cn(
                     "inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition-colors",
                     submitting
@@ -582,8 +622,8 @@ export function BookingFlow({ serviceId }: { serviceId: string }) {
                     <>
                       <CalendarCheck2 className="h-4 w-4" aria-hidden />
                       {availability.bookingPreference === "instant"
-                        ? "Confirm booking"
-                        : "Send booking request"}
+                        ? `Pay ${formatNaira(price)} and book`
+                        : `Pay ${formatNaira(price)} and send request`}
                     </>
                   )}
                 </button>

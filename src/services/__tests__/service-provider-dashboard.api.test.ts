@@ -319,19 +319,24 @@ describe("service-provider-dashboard.api (live API implementation)", () => {
   });
 
   describe("fetchSpReviewsSummaryLive", () => {
-    it("computes distribution and average rating from real reviews endpoint", async () => {
+    it("shows what the backend reports for the provider's finished bookings", async () => {
       getMock.mockImplementation((url: string) => {
-        if (url.includes("/service-provider/profile/me")) {
-          return Promise.resolve({ data: mockProfile, error: null });
-        }
-        if (url.includes("/reviews")) {
+        if (url === "/bookings/provider/reviews") {
           return Promise.resolve({
             data: {
-              items: [
-                { id: "rev-1", rating: 5, comment: "Great work!", user: { firstName: "Emeka" }, createdAt: "2026-09-20Z" },
-                { id: "rev-2", rating: 4, comment: "Good job", user: { firstName: "Ada" }, createdAt: "2026-09-21Z" },
+              averageRating: 4.5,
+              totalCount: 2,
+              distribution: [
+                { stars: 5, count: 1 },
+                { stars: 4, count: 1 },
+                { stars: 3, count: 0 },
+                { stars: 2, count: 0 },
+                { stars: 1, count: 0 },
               ],
-              meta: { total: 2 },
+              recent: [
+                { id: "rev-1", rating: 5, comment: "Great work!", authorName: "Emeka O.", serviceName: "Socket Replacement", createdAt: "2026-09-20T00:00:00Z" },
+                { id: "rev-2", rating: 4, comment: "Good job", authorName: "Ada N.", serviceName: "Socket Replacement", createdAt: "2026-09-21T00:00:00Z" },
+              ],
             },
             error: null,
           });
@@ -343,8 +348,23 @@ describe("service-provider-dashboard.api (live API implementation)", () => {
       expect(summary.totalCount).toBe(2);
       expect(summary.averageRating).toBe(4.5);
       expect(summary.distribution.find((d) => d.stars === 5)?.count).toBe(1);
-      expect(summary.distribution.find((d) => d.stars === 4)?.count).toBe(1);
       expect(summary.recent).toHaveLength(2);
+      expect(summary.recent[0]).toMatchObject({ authorName: "Emeka O.", visible: true });
+    });
+
+    it("has no rating, not a made-up five stars, before the first review", async () => {
+      getMock.mockImplementation(() =>
+        Promise.resolve({
+          data: { averageRating: null, totalCount: 0, distribution: [], recent: [] },
+          error: null,
+        })
+      );
+      expect((await fetchSpReviewsSummaryLive()).averageRating).toBeNull();
+    });
+
+    it("throws instead of showing placeholder reviews when it cannot load", async () => {
+      getMock.mockImplementation(() => Promise.resolve({ data: null, error: new Error("down") }));
+      await expect(fetchSpReviewsSummaryLive()).rejects.toThrow("down");
     });
   });
 });

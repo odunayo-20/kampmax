@@ -21,7 +21,7 @@ const CATEGORY_DOT: Partial<Record<NotificationCategory, string>> = {
 
 // The same real feed as the main bell: what the store sees here is what the
 // notifications page shows.
-export function VendorNotifications() {
+export function VendorNotifications({ seeAllHref = "/vendor/notifications" }: { seeAllHref?: string } = {}) {
   const [open, setOpen] = useState(false);
   const list = useNotifications({ category: "all" }, { pageSize: 8 });
   const unreadQuery = useUnreadNotificationCount();
@@ -97,7 +97,7 @@ export function VendorNotifications() {
               )}
             </div>
             <Link
-              href="/vendor/notifications"
+              href={seeAllHref}
               onClick={() => setOpen(false)}
               className="block border-t border-kampmax-border px-4 py-2.5 text-center text-xs font-semibold text-primary-600 hover:bg-neutral-50"
             >

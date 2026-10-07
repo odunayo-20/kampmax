@@ -7,8 +7,7 @@ import { MapPin, Star, Clock, Calendar, CheckCircle, Shield, BadgeCheck, Wrench,
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { formatNaira } from "@/lib/utils";
-import { getSpPublicProfile, getSpPublicProfileLive } from "@/services/service-provider";
-import { getSpProfileByUserId } from "@/data/service-provider";
+import { getSpPublicProfileLive } from "@/services/service-provider";
 import type { ServiceProviderProfile } from "@/types/service-provider";
 
 const SERVICE_STATUS_LABELS: Record<string, string> = {

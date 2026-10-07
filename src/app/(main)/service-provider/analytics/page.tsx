@@ -11,7 +11,7 @@ import { SpAnalyticsTrendChart } from "@/components/service-provider/analytics/S
 import { SpAnalyticsCategoryChart } from "@/components/service-provider/analytics/SpAnalyticsCategoryChart";
 import { SpAnalyticsFunnelCard } from "@/components/service-provider/analytics/SpAnalyticsFunnelCard";
 import { SpAnalyticsPeakDayCard } from "@/components/service-provider/analytics/SpAnalyticsPeakDayCard";
-import { getSpAnalyticsOverview, getSpAnalyticsOverviewLive } from "@/services/service-provider-analytics";
+import { getSpAnalyticsOverviewLive } from "@/services/service-provider-analytics";
 import { SP_ANALYTICS_PERIOD } from "@/types/service-provider-analytics";
 import type { SpAnalyticsOverview, SpAnalyticsPeriod } from "@/types/service-provider-analytics";
 
@@ -31,13 +31,7 @@ export default function AnalyticsOverviewPage() {
       setOverview(data);
       setError(null);
     } catch {
-      try {
-        const data = getSpAnalyticsOverview(period);
-        setOverview(data);
-        setError(null);
-      } catch {
-        setError("You don't have access to analytics");
-      }
+      setError("We couldn't load your analytics.");
     } finally {
       setLoading(false);
     }
@@ -48,7 +42,14 @@ export default function AnalyticsOverviewPage() {
   }, [fetchOverview]);
 
   if (loading && !overview) return <SpAnalyticsSkeleton />;
-  if (error && !overview) return <div className="text-center py-12 text-kampmax-text-secondary">{error}</div>;
+  if (error && !overview) return (
+      <div role="alert" className="py-12 text-center text-kampmax-text-secondary">
+        {error}{" "}
+        <button type="button" onClick={() => void fetchOverview()} className="font-semibold text-primary-600 hover:underline">
+          Try again
+        </button>
+      </div>
+    );
   if (!overview) return null;
 
   return (

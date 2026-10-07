@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { X, AlertCircle, RefreshCcw, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getBookingAvailability, rescheduleBooking } from "@/services/booking";
+import { fetchBookingAvailability, rescheduleBooking } from "@/services/booking";
 import { BookingDayPicker } from "./BookingDayPicker";
 import { BookingTimeSlotGrid } from "./BookingTimeSlotGrid";
 import type { BookingError, BookingSlot, ServiceBooking } from "@/types/booking";
@@ -23,11 +24,13 @@ export function RescheduleModal({
   const [error, setError] = useState<BookingError | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const availability = useMemo(
-    () => getBookingAvailability(booking.serviceId),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [booking.serviceId, refreshKey]
-  );
+  const availabilityQuery = useQuery({
+    queryKey: ["booking-availability", booking.serviceId, refreshKey],
+    queryFn: () => fetchBookingAvailability(booking.serviceId),
+    retry: false,
+    staleTime: 0,
+  });
+  const availability = availabilityQuery.data;
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -47,11 +50,11 @@ export function RescheduleModal({
 
   const selectedDay = availability?.days.find((d) => d.date === selectedDate);
 
-  function submit() {
+  async function submit() {
     if (!selectedSlot || busy) return;
     setBusy(true);
     setError(null);
-    const result = rescheduleBooking({
+    const result = await rescheduleBooking({
       id: booking.id,
       startAt: selectedSlot.startAt,
       idempotencyKey: `bk_resched_${Date.now()}_${Math.floor(Math.random() * 1e9)}`,
@@ -94,9 +97,15 @@ export function RescheduleModal({
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
-          {!availability ? (
-            <p className="text-xs text-neutral-500">
-              This service can no longer be booked online. Use the provider chat instead.
+          {availabilityQuery.isPending ? (
+            <p className="flex items-center gap-2 text-xs text-neutral-500">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> Loading available times…
+            </p>
+          ) : !availability ? (
+            <p role="alert" className="text-xs text-neutral-500">
+              {availabilityQuery.error instanceof Error
+                ? availabilityQuery.error.message
+                : "This service can no longer be booked online. Use the provider chat instead."}
             </p>
           ) : (
             <>

@@ -3,14 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Wrench, Edit, Trash2, Clock, MapPin, Power, AlertCircle } from "lucide-react";
+import { Plus, Wrench, Edit, Clock, MapPin, Power, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui";
 import { cn, formatNaira } from "@/lib/utils";
 import {
   fetchSpServicesLive,
-  getSpServices,
-  removeSpDashboardService,
-  setSpDashboardServiceStatus,
   setSpDashboardServiceStatusLive,
 } from "@/services/service-provider-dashboard";
 import { spServiceCategoryName } from "@/data/service-categories";
@@ -51,49 +48,31 @@ export default function ServicesPage() {
   const router = useRouter();
   // Loads the SERVICE tree so category ids below resolve to names.
   useCategories("SERVICE");
-  const [services, setServices] = useState<ServiceProviderDashboardService[]>(() => getSpServices());
+  const [services, setServices] = useState<ServiceProviderDashboardService[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   async function refresh() {
     try {
-      const liveServices = await fetchSpServicesLive();
-      if (liveServices.length > 0 || services.length === 0) {
-        setServices(liveServices);
-        return;
-      }
+      setServices(await fetchSpServicesLive());
+      setError(null);
     } catch {
-      // Fallback
+      setError("We couldn't load your services.");
+    } finally {
+      setLoading(false);
     }
-    setServices(getSpServices());
   }
 
   useEffect(() => {
-    refresh();
+    void refresh();
   }, []);
 
   async function toggleStatus(service: ServiceProviderDashboardService) {
     const next = service.status === "active" ? "inactive" : "active";
     setError(null);
-    try {
-      const res = await setSpDashboardServiceStatusLive(service.id, next as "active" | "inactive");
-      if (res.ok) {
-        await refresh();
-        return;
-      }
-    } catch {
-      // Fallback to local
-    }
-    const localRes = setSpDashboardServiceStatus(service.id, next as "active" | "inactive");
-    if (localRes.ok) refresh();
-    else setError(localRes.error ?? "Unable to update the service.");
-  }
-
-  function remove(service: ServiceProviderDashboardService) {
-    const ok = window.confirm(`Remove "${service.name}" permanently?`);
-    if (!ok) return;
-    const res = removeSpDashboardService(service.id);
-    if (res.ok) refresh();
-    else setError(res.error ?? "Unable to remove the service.");
+    const res = await setSpDashboardServiceStatusLive(service.id, next);
+    if (res.ok) await refresh();
+    else setError(res.error ?? "Unable to update the service.");
   }
 
   const activeCount = services.filter((s) => s.status === SERVICE_PROVIDER_SERVICE_STATUS.ACTIVE).length;
@@ -123,7 +102,9 @@ export default function ServicesPage() {
         </div>
       )}
 
-      {services.length === 0 ? (
+      {loading ? (
+        <p className="py-10 text-center text-sm text-kampmax-text-secondary">Loading your services…</p>
+      ) : services.length === 0 ? (
         <div className="rounded-xl border border-dashed border-kampmax-border bg-white p-14 text-center">
           <Wrench className="mx-auto mb-3 h-10 w-10 text-neutral-300" aria-hidden />
           <h2 className="text-base font-bold text-kampmax-text">No services yet</h2>
@@ -175,9 +156,6 @@ export default function ServicesPage() {
                   <Button variant="outline" size="sm" onClick={() => router.push(`/service-provider/services/${service.id}/edit`)}>
                     <Edit className="h-4 w-4 mr-1" aria-hidden />
                     Edit
-                  </Button>
-                  <Button variant="ghost" size="sm" className="text-error-600 hover:bg-error-50" onClick={() => remove(service)} aria-label="Remove service">
-                    <Trash2 className="h-4 w-4" aria-hidden />
                   </Button>
                 </div>
               </div>

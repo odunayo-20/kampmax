@@ -27,11 +27,11 @@ export function CancelBookingModal({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
-  function submit() {
+  async function submit() {
     if (busy) return;
     setBusy(true);
     setError(null);
-    const result = cancelBooking({
+    const result = await cancelBooking({
       id: booking.id,
       reason: reason.trim() || undefined,
       cancelledBy: "customer",
@@ -75,7 +75,7 @@ export function CancelBookingModal({
               <span>Cancellation & Refund Policy</span>
             </p>
             <p>
-              {booking.serviceName} · <strong>100% Refund</strong> to Kampmax Student Wallet if cancelled at least 24 hours prior.
+              {booking.serviceName} · <strong>Full refund</strong> to your Kampmax wallet. You can cancel for free up to ${booking.cancellationPolicy.freeUntilHours} hours before the appointment.
             </p>
           </div>
 

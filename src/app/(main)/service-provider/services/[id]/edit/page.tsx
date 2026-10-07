@@ -5,8 +5,6 @@ import { useEffect, useState } from "react";
 import { ServiceForm } from "@/components/service-provider/dashboard/ServiceForm";
 import {
   fetchSpServicesLive,
-  getSpServices,
-  updateSpDashboardService,
   updateSpDashboardServiceLive,
 } from "@/services/service-provider-dashboard";
 import type {
@@ -17,22 +15,22 @@ import type {
 export default function EditServicePage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
-  const [service, setService] = useState<ServiceProviderDashboardService | undefined>(() =>
-    getSpServices().find((s) => s.id === params.id)
-  );
-  const [loading, setLoading] = useState(!service);
+  const [service, setService] = useState<ServiceProviderDashboardService | undefined>(undefined);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     fetchSpServicesLive()
       .then((items) => {
         if (cancelled) return;
-        const found = items.find((s) => s.id === params.id);
-        if (found) setService(found);
+        setService(items.find((s) => s.id === params.id));
         setLoading(false);
       })
       .catch(() => {
-        if (!cancelled) setLoading(false);
+        if (cancelled) return;
+        setLoadError(true);
+        setLoading(false);
       });
     return () => {
       cancelled = true;
@@ -50,7 +48,9 @@ export default function EditServicePage() {
   if (!service) {
     return (
       <div className="rounded-xl border border-kampmax-border bg-white p-10 text-center">
-        <p className="text-sm font-medium text-kampmax-text">Service not found.</p>
+        <p className="text-sm font-medium text-kampmax-text">
+          {loadError ? "We couldn't load this service." : "Service not found."}
+        </p>
         <button
           type="button"
           onClick={() => router.push("/service-provider/services")}
@@ -63,19 +63,9 @@ export default function EditServicePage() {
   }
 
   async function handleSubmit(input: ServiceProviderServiceInput) {
-    try {
-      const liveRes = await updateSpDashboardServiceLive(params.id, input);
-      if (liveRes.ok) {
-        updateSpDashboardService(params.id, input);
-        router.push("/service-provider/services");
-        return { ok: true };
-      }
-    } catch {
-      // Fallback
-    }
-    const res = updateSpDashboardService(params.id, input);
+    const res = await updateSpDashboardServiceLive(params.id, input);
     if (res.ok) router.push("/service-provider/services");
-    return { ok: res.ok, error: res.error };
+    return res;
   }
 
   return (

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import {
   AlertCircle,
@@ -19,13 +20,12 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PageContainer } from "@/components/layout/PageContainer";
-import { useAuth } from "@/lib/auth-context";
 import {
   formatBookingDate,
   formatBookingDay,
   formatBookingTime,
   getBookingReadyState,
-  getCustomerBooking,
+  fetchCustomerBooking,
 } from "@/services/booking";
 import { BookingStatusBadge } from "./BookingStatusBadge";
 import { FulfillmentStatusBadge } from "./FulfillmentStatusBadge";
@@ -41,15 +41,63 @@ import { BookingEmptyState } from "./BookingEmptyState";
 import type { ServiceBooking } from "@/types/booking";
 
 export function CustomerBookingDetailView({ bookingId }: { bookingId: string }) {
-  const { user } = useAuth();
-  const [booking, setBooking] = useState<ServiceBooking | null>(() =>
-    getCustomerBooking(bookingId)
-  );
+  const queryClient = useQueryClient();
+  const [booking, setBooking] = useState<ServiceBooking | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetchCustomerBooking(bookingId)
+      .then((b) => {
+        if (cancelled) return;
+        setBooking(b);
+        setLoadError(null);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setLoadError(e instanceof Error ? e.message : "Could not load this booking.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [bookingId]);
+
+  /** Shows the booking the server just returned, and refreshes every list that includes it. */
+  function update(updated: ServiceBooking) {
+    setBooking(updated);
+    void queryClient.invalidateQueries({ queryKey: ["bookings"] });
+  }
+
   const [cancelOpen, setCancelOpen] = useState(false);
   const [reschedOpen, setReschedOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
+
+  if (loading && !booking) {
+    return (
+      <PageContainer>
+        <p className="py-10 text-center text-sm text-kampmax-text-secondary">Loading your booking…</p>
+      </PageContainer>
+    );
+  }
+
+  if (loadError && !booking) {
+    return (
+      <PageContainer>
+        <BookingEmptyState
+          title="We couldn't load this booking"
+          description={loadError}
+          ctaHref="/customer/bookings"
+          ctaLabel="Back to my bookings"
+        />
+      </PageContainer>
+    );
+  }
 
   if (!booking) {
     return (
@@ -278,7 +326,7 @@ export function CustomerBookingDetailView({ bookingId }: { bookingId: string }) 
           booking={booking}
           onClose={() => setCancelOpen(false)}
           onComplete={(updated) => {
-            setBooking(updated);
+            update(updated);
             setCancelOpen(false);
           }}
         />
@@ -288,7 +336,7 @@ export function CustomerBookingDetailView({ bookingId }: { bookingId: string }) 
           booking={booking}
           onClose={() => setReschedOpen(false)}
           onComplete={(updated) => {
-            setBooking(updated);
+            update(updated);
             setReschedOpen(false);
           }}
         />
@@ -298,7 +346,7 @@ export function CustomerBookingDetailView({ bookingId }: { bookingId: string }) 
           booking={booking}
           onClose={() => setConfirmOpen(false)}
           onComplete={(updated) => {
-            setBooking(updated);
+            update(updated);
             setConfirmOpen(false);
           }}
         />
@@ -308,7 +356,7 @@ export function CustomerBookingDetailView({ bookingId }: { bookingId: string }) 
           booking={booking}
           onClose={() => setReportOpen(false)}
           onComplete={(updated) => {
-            setBooking(updated);
+            update(updated);
             setReportOpen(false);
           }}
         />
@@ -318,7 +366,7 @@ export function CustomerBookingDetailView({ bookingId }: { bookingId: string }) 
           booking={booking}
           onClose={() => setReviewOpen(false)}
           onComplete={(updated) => {
-            setBooking(updated);
+            update(updated);
             setReviewOpen(false);
           }}
         />

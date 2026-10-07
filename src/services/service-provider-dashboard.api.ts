@@ -50,6 +50,11 @@ export interface BackendSpProfile {
   locationState?: string | null;
   locationCountry?: string | null;
   serviceRadius?: string | null;
+  /** How bookings are taken. */
+  bookingPreference?: "INSTANT" | "REQUEST_APPROVAL";
+  minAdvanceNoticeHours?: number;
+  maxAdvanceBookingDays?: number;
+  bufferMinutes?: number;
   isActive: boolean;
   statusReason?: string | null;
   createdAt: string;
@@ -538,6 +543,10 @@ export async function updateSpProfileLive(
     locationCity: string;
     locationState: string;
     serviceRadius: string;
+    bookingPreference: "INSTANT" | "REQUEST_APPROVAL";
+    minAdvanceNoticeHours: number;
+    maxAdvanceBookingDays: number;
+    bufferMinutes: number;
   }>
 ): Promise<{ ok: boolean; error?: string; record?: ServiceProviderDashboardRecord }> {
   const payload: Record<string, unknown> = {};
@@ -549,6 +558,10 @@ export async function updateSpProfileLive(
   if (patch.locationCity !== undefined) payload.locationCity = patch.locationCity;
   if (patch.locationState !== undefined) payload.locationState = patch.locationState;
   if (patch.serviceRadius !== undefined) payload.serviceRadius = patch.serviceRadius;
+  if (patch.bookingPreference !== undefined) payload.bookingPreference = patch.bookingPreference;
+  if (patch.minAdvanceNoticeHours !== undefined) payload.minAdvanceNoticeHours = patch.minAdvanceNoticeHours;
+  if (patch.maxAdvanceBookingDays !== undefined) payload.maxAdvanceBookingDays = patch.maxAdvanceBookingDays;
+  if (patch.bufferMinutes !== undefined) payload.bufferMinutes = patch.bufferMinutes;
 
   const { data, error } = await apiClient.patch<Record<string, unknown>, BackendSpProfile>(
     "/service-provider/profile/me",
@@ -690,10 +703,10 @@ export async function fetchSpAvailabilityLive(): Promise<{
   return {
     availability: {
       days,
-      bookingPreference: "request_approval",
-      minAdvanceNoticeHours: 2,
-      maxAdvanceBookingDays: 30,
-      appointmentBufferMinutes: 15,
+      bookingPreference: profile?.bookingPreference === "INSTANT" ? "instant" : "request_approval",
+      minAdvanceNoticeHours: profile?.minAdvanceNoticeHours ?? 2,
+      maxAdvanceBookingDays: profile?.maxAdvanceBookingDays ?? 30,
+      appointmentBufferMinutes: profile?.bufferMinutes ?? 15,
     },
     pricing: {
       travelFee: 0,
@@ -758,70 +771,28 @@ export async function updateSpAvailabilityLive(
 }
 
 /**
- * Fetches real reviews summary for this service provider.
+ * The ratings customers left on this provider's finished bookings.
+ * Throws when it can't be read; there is no placeholder rating.
  */
 export async function fetchSpReviewsSummaryLive(): Promise<ServiceProviderReviewsSummary> {
-  const profileRes = await apiClient.get<BackendSpProfile>("/service-provider/profile/me");
-  if (!profileRes.data?.id) {
-    return {
-      averageRating: 5.0,
-      totalCount: 0,
-      distribution: [
-        { stars: 5, count: 0 },
-        { stars: 4, count: 0 },
-        { stars: 3, count: 0 },
-        { stars: 2, count: 0 },
-        { stars: 1, count: 0 },
-      ],
-      recent: [],
-    };
-  }
-
-  const res = await apiClient.get<{
-    items: Array<{
+  const { data, error } = await apiClient.get<{
+    averageRating: number | null;
+    totalCount: number;
+    distribution: { stars: number; count: number }[];
+    recent: Array<{
       id: string;
       rating: number;
       comment: string;
       createdAt: string;
-      user?: { firstName?: string; lastName?: string };
-      serviceName?: string;
+      authorName: string;
+      serviceName: string;
     }>;
-    meta?: { total: number };
-  }>(`/reviews?targetType=SERVICE_PROVIDER&targetId=${profileRes.data.id}&limit=20`);
-
-  const items = res.data?.items || [];
-  const totalCount = res.data?.meta?.total ?? items.length;
-
-  const distribution = [
-    { stars: 5, count: 0 },
-    { stars: 4, count: 0 },
-    { stars: 3, count: 0 },
-    { stars: 2, count: 0 },
-    { stars: 1, count: 0 },
-  ];
-
-  let sum = 0;
-  items.forEach((item) => {
-    const star = Math.min(5, Math.max(1, Math.round(item.rating || 5)));
-    const bucket = distribution.find((d) => d.stars === star);
-    if (bucket) bucket.count++;
-    sum += item.rating || 5;
-  });
-
-  const averageRating = items.length > 0 ? Math.round((sum / items.length) * 10) / 10 : 5.0;
-
+  }>("/bookings/provider/reviews");
+  if (error || !data) throw new Error(error?.message || "Could not load your reviews.");
   return {
-    averageRating,
-    totalCount,
-    distribution,
-    recent: items.map((r) => ({
-      id: r.id,
-      authorName: [r.user?.firstName, r.user?.lastName].filter(Boolean).join(" ") || "Student",
-      rating: r.rating,
-      comment: r.comment,
-      serviceName: r.serviceName || "Service",
-      createdAt: r.createdAt,
-      visible: true,
-    })),
+    averageRating: data.averageRating,
+    totalCount: data.totalCount,
+    distribution: data.distribution,
+    recent: data.recent.map((r) => ({ ...r, visible: true })),
   };
 }

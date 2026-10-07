@@ -4,119 +4,83 @@ import { useEffect, useState } from "react";
 import { AlertCircle, BadgeCheck, Save } from "lucide-react";
 import { Button, Input } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import {
-  fetchSpProfileRecordLive,
-  getSpProfileRecord,
-  updateSpProfile,
-  updateSpProfileLive,
-} from "@/services/service-provider-dashboard";
-import type { ServiceProviderDashboardProfileState } from "@/types/service-provider-dashboard";
+import { fetchSpProfileRecordLive, updateSpProfileLive } from "@/services/service-provider-dashboard";
 
-const EMPTY: ServiceProviderDashboardProfileState = {
-  displayName: "",
-  bio: "",
-  description: "",
-  languages: [],
-  qualifications: [],
-  certifications: [],
-};
+interface Form {
+  displayName: string;
+  bio: string;
+  yearsExperience?: number;
+}
 
 /**
- * Edits display name, tagline, bio, experience, languages, qualifications and
- * certifications. Changes to review-sensitive fields mark the profile for
- * re-verification (backend-decided); the provider can never change status.
+ * Edits the details customers see on the provider's public profile: display
+ * name, bio and years of experience. These are saved on the server; the
+ * provider can never change their verification status from here.
  */
 export function ProfessionalDetailsEditor({ onSaved }: { onSaved?: () => void }) {
-  const [initial] = useState<ServiceProviderDashboardProfileState>(
-    () => ({ ...EMPTY, ...getSpProfileRecord()?.profile })
-  );
-  const [form, setForm] = useState<ServiceProviderDashboardProfileState>(initial);
+  const [form, setForm] = useState<Form | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    setLoadFailed(false);
     fetchSpProfileRecordLive()
       .then((record) => {
-        if (!cancelled && record?.profile) {
-          setForm((prev) => ({
-            ...prev,
-            ...record.profile,
-            displayName: record.profile.displayName || prev.displayName,
-            bio: record.profile.bio || prev.bio,
-            description: record.profile.description || prev.description,
-            yearsExperience: record.profile.yearsExperience ?? prev.yearsExperience,
-          }));
-        }
+        if (cancelled) return;
+        setForm({
+          displayName: record.profile.displayName ?? "",
+          bio: record.profile.bio ?? record.profile.description ?? "",
+          yearsExperience: record.profile.yearsExperience,
+        });
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setLoadFailed(true);
+      });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
-  const set = <K extends keyof ServiceProviderDashboardProfileState>(key: K, value: ServiceProviderDashboardProfileState[K]) =>
-    setForm((f) => ({ ...f, [key]: value }));
+  if (!form) {
+    return loadFailed ? (
+      <p role="alert" className="text-sm text-kampmax-text-secondary">
+        We couldn&apos;t load your details.{" "}
+        <button type="button" onClick={() => setAttempt((n) => n + 1)} className="font-semibold text-primary-600 hover:underline">
+          Try again
+        </button>
+      </p>
+    ) : (
+      <p className="text-sm text-kampmax-text-secondary">Loading your details…</p>
+    );
+  }
+
+  const set = <K extends keyof Form>(key: K, value: Form[K]) => setForm((f) => (f ? { ...f, [key]: value } : f));
 
   async function handleSave() {
+    if (!form) return;
     if (!form.displayName.trim()) {
       setError("Display name is required.");
       setNotice(null);
       return;
     }
     setError(null);
+    setNotice(null);
     setSaving(true);
-
-    try {
-      const liveRes = await updateSpProfileLive({
-        displayName: form.displayName.trim(),
-        bio: form.bio?.trim(),
-        description: form.description?.trim(),
-        yearsExperience: form.yearsExperience,
-      });
-
-      if (liveRes.ok) {
-        updateSpProfile({
-          displayName: form.displayName.trim(),
-          tagline: form.tagline?.trim(),
-          bio: form.bio?.trim(),
-          description: form.description?.trim(),
-          yearsExperience: form.yearsExperience,
-          languages: form.languages,
-          qualifications: form.qualifications,
-          certifications: form.certifications,
-        });
-        setNotice("Profile saved to live server.");
-        onSaved?.();
-        return;
-      }
-    } catch {
-      // Fallback to local
-    } finally {
-      setSaving(false);
-    }
-
-    const res = updateSpProfile({
+    const res = await updateSpProfileLive({
       displayName: form.displayName.trim(),
-      tagline: form.tagline?.trim(),
-      bio: form.bio?.trim(),
-      description: form.description?.trim(),
+      bio: form.bio.trim(),
       yearsExperience: form.yearsExperience,
-      languages: form.languages,
-      qualifications: form.qualifications,
-      certifications: form.certifications,
     });
+    setSaving(false);
     if (!res.ok) {
-      setError(res.error ?? "Unable to save profile.");
-      setNotice(null);
+      setError(res.error ?? "Unable to save your profile.");
       return;
     }
-    setNotice(
-      res.mayRequireReview
-        ? "Saved. Profile changes are pending review and may require re-verification."
-        : "Profile saved."
-    );
+    setNotice("Profile saved.");
     onSaved?.();
   }
 
@@ -141,36 +105,27 @@ export function ProfessionalDetailsEditor({ onSaved }: { onSaved?: () => void })
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-kampmax-text">
-            Display name <span className="text-kampmax-error">*</span>
-          </label>
-          <Input value={form.displayName} onChange={(e) => set("displayName", e.target.value)} placeholder="e.g., Kelechi Technologies" />
-        </div>
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-kampmax-text">Tagline</label>
-          <Input value={form.tagline ?? ""} onChange={(e) => set("tagline", e.target.value)} placeholder="e.g., Fast, reliable device repair" />
-        </div>
-      </div>
-
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-kampmax-text">Short description</label>
-        <textarea
-          value={form.description ?? ""}
-          onChange={(e) => set("description", e.target.value)}
-          rows={2}
-          placeholder="One or two sentences about what you offer."
-          className="w-full text-sm rounded-lg border border-neutral-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
+        <label htmlFor="sp-display-name" className="mb-1.5 block text-sm font-medium text-kampmax-text">
+          Display name <span className="text-kampmax-error">*</span>
+        </label>
+        <Input
+          id="sp-display-name"
+          value={form.displayName}
+          onChange={(e) => set("displayName", e.target.value)}
+          placeholder="e.g., Kelechi Technologies"
         />
       </div>
 
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-kampmax-text">Bio / professional story</label>
+        <label htmlFor="sp-bio" className="mb-1.5 block text-sm font-medium text-kampmax-text">
+          Bio / professional story
+        </label>
         <textarea
-          value={form.bio ?? ""}
+          id="sp-bio"
+          value={form.bio}
           onChange={(e) => set("bio", e.target.value)}
-          rows={3}
+          rows={4}
           placeholder="Share your experience and approach."
           className="w-full text-sm rounded-lg border border-neutral-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
         />
@@ -178,8 +133,11 @@ export function ProfessionalDetailsEditor({ onSaved }: { onSaved?: () => void })
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-kampmax-text">Years of experience</label>
+          <label htmlFor="sp-years" className="mb-1.5 block text-sm font-medium text-kampmax-text">
+            Years of experience
+          </label>
           <Input
+            id="sp-years"
             type="number"
             min="0"
             value={form.yearsExperience ?? ""}
@@ -189,36 +147,17 @@ export function ProfessionalDetailsEditor({ onSaved }: { onSaved?: () => void })
           />
         </div>
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-kampmax-text">Service category</label>
+          <p className="mb-1.5 text-sm font-medium text-kampmax-text">Service category</p>
           <p className="rounded-lg border border-neutral-200 px-3 py-2 text-sm text-kampmax-text-secondary">
-            Managed in onboarding
-          </p>
-          <p className="mt-1 text-xs text-kampmax-text-muted">
-            Categories are set when you complete your application.
+            Set with each service
           </p>
         </div>
       </div>
 
-      {([["languages", "Languages"], ["qualifications", "Qualifications"], ["certifications", "Certifications"]] as const).map(
-        ([key, label]) => (
-          <div key={key}>
-            <label className="mb-1.5 block text-sm font-medium text-kampmax-text">{label}</label>
-            <Input
-              value={form[key].join(", ")}
-              onChange={(e) =>
-                set(key, e.target.value.split(",").map((s) => s.trim()).filter(Boolean))
-              }
-              placeholder="Comma separated"
-            />
-          </div>
-        )
-      )}
-
       <div className="flex items-center justify-end gap-2 border-t border-kampmax-border pt-4">
-        <p className="mr-auto text-xs text-kampmax-text-muted">Logo and cover photo are not editable in this prototype.</p>
-        <Button onClick={handleSave}>
-          <Save className="h-4 w-4 mr-1.5" />
-          Save changes
+        <Button onClick={() => void handleSave()} disabled={saving}>
+          <Save className="mr-1.5 h-4 w-4" />
+          {saving ? "Saving…" : "Save changes"}
         </Button>
       </div>
     </div>

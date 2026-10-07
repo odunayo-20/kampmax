@@ -96,10 +96,15 @@ export default function AdminServiceProvidersPage() {
         title="Service providers"
         description="Review, approve and moderate everyone who offers bookable services on Kampmax."
         actions={
-          <span className="inline-flex items-center gap-1.5 rounded-md border border-kampmax-border bg-white px-3 py-1.5 text-xs font-medium text-kampmax-text-secondary">
-            <Wrench className="h-3.5 w-3.5" />
-            {counts.data ? `${counts.data.all.toLocaleString("en-NG")} providers` : "…"}
-          </span>
+          <div className="flex items-center gap-2">
+            <a href="/admin/service-bookings" className="rounded-md border border-kampmax-border bg-white px-3 py-1.5 text-xs font-semibold text-kampmax-blue hover:bg-kampmax-muted">
+              Booking disputes
+            </a>
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-kampmax-border bg-white px-3 py-1.5 text-xs font-medium text-kampmax-text-secondary">
+              <Wrench className="h-3.5 w-3.5" />
+              {counts.data ? `${counts.data.all.toLocaleString("en-NG")} providers` : "…"}
+            </span>
+          </div>
         }
       />
 

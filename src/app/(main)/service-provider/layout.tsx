@@ -7,7 +7,6 @@ import { useAuth } from "@/lib/auth-context";
 import { isServiceProviderDashboardPath } from "@/lib/utils";
 import {
   getServiceProviderDashboardAccessApi,
-  getSpProfileRecord,
   SERVICE_PROVIDER_DASHBOARD_GATE,
   type ServiceProviderAccess,
 } from "@/services/service-provider-dashboard";
@@ -78,7 +77,7 @@ export default function ServiceProviderLayout({ children }: { children: React.Re
 
   const providerName = access.displayName ?? "Service Provider";
   const slug = access.slug;
-  const verification = getSpProfileRecord()?.verification.status ?? "not_required";
+  const verification = access.verification ?? "pending";
 
   return (
     <div className="min-h-screen bg-kampmax-bg">

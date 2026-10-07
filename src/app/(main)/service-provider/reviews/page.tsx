@@ -3,37 +3,55 @@
 import { useEffect, useState } from "react";
 import { Star } from "lucide-react";
 import { cn, timeAgo } from "@/lib/utils";
-import { fetchSpReviewsSummaryLive, getSpReviewsSummary } from "@/services/service-provider-dashboard";
+import { fetchSpReviewsSummaryLive } from "@/services/service-provider-dashboard";
 import type { ServiceProviderReviewsSummary, ServiceProviderReview } from "@/types/service-provider-dashboard";
 
 export default function ReviewsPage() {
-  const [summary, setSummary] = useState<ServiceProviderReviewsSummary>(() => getSpReviewsSummary());
-  const [loading, setLoading] = useState(false);
+  const [summary, setSummary] = useState<ServiceProviderReviewsSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setFailed(false);
     fetchSpReviewsSummaryLive()
-      .then((liveSummary) => {
-        if (!cancelled) {
-          setSummary(liveSummary);
-        }
+      .then((live) => {
+        if (!cancelled) setSummary(live);
       })
-      .catch(() => {})
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
+
+  if (loading && !summary) {
+    return <p className="py-10 text-center text-sm text-kampmax-text-secondary">Loading your reviews…</p>;
+  }
+  if (!summary) {
+    return (
+      <div role="alert" className="rounded-xl border border-kampmax-border bg-white p-10 text-center text-sm text-kampmax-text-secondary">
+        {failed ? "We couldn't load your reviews." : "Reviews aren't available right now."}{" "}
+        <button type="button" onClick={() => setAttempt((n) => n + 1)} className="font-semibold text-primary-600 hover:underline">
+          Try again
+        </button>
+      </div>
+    );
+  }
+  const average = summary.averageRating;
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-kampmax-text">Reviews</h1>
         <p className="mt-1 text-sm text-kampmax-text-secondary">
-          Customer feedback on completed bookings. Displayed on your public profile.
+          Customer feedback on completed bookings. Reviews appear here once Kampmax has approved them.
         </p>
       </div>
 
@@ -41,11 +59,11 @@ export default function ReviewsPage() {
         {/* Summary */}
         <div className="rounded-xl border border-kampmax-border bg-white p-5">
           <div className="flex items-center gap-3">
-            <span className="text-4xl font-bold text-kampmax-text">{summary.averageRating.toFixed(1)}</span>
+            <span className="text-4xl font-bold text-kampmax-text">{average === null ? "—" : average.toFixed(1)}</span>
             <div>
-              <div className="text-yellow-500" aria-label={`${summary.averageRating} out of 5 stars`}>
-                {"★★★★★".slice(0, Math.round(summary.averageRating))}
-                <span className="text-neutral-300">{"★★★★★".slice(Math.round(summary.averageRating))}</span>
+              <div className="text-yellow-500" aria-label={`${average ?? 0} out of 5 stars`}>
+                {"★★★★★".slice(0, Math.round(average ?? 0))}
+                <span className="text-neutral-300">{"★★★★★".slice(Math.round(average ?? 0))}</span>
               </div>
               <p className="text-xs text-kampmax-text-muted">{summary.totalCount} review{summary.totalCount !== 1 ? "s" : ""}</p>
             </div>

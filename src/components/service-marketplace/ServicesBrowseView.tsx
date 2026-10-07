@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import {
   Search,
@@ -27,7 +28,7 @@ import { ServiceCardSkeleton } from "./ServiceSkeletons";
 import { ServiceEmptyState } from "./ServiceEmptyState";
 import { ServicePagination } from "./ServicePagination";
 import { serviceSortLabel } from "./constants";
-import { marketplaceServiceProviders } from "@/data/service-marketplace";
+import { searchProviders } from "@/services/service-marketplace";
 import { Avatar } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
@@ -79,16 +80,14 @@ function FilteredSearchField({
   );
 }
 
-function VerifiedProsReel({ campusId }: { campusId: string }) {
-  const providers = useMemo(() => {
-    return marketplaceServiceProviders.filter(
-      (p) =>
-        p.verified &&
-        (!campusId ||
-          p.primaryCampusId === campusId ||
-          p.additionalCampusIds?.includes(campusId))
-    );
-  }, [campusId]);
+function VerifiedProsReel() {
+  const query = useQuery({
+    queryKey: ["services", "verified-pros"],
+    queryFn: () => searchProviders({ limit: 12 }),
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+  const providers = query.data ?? [];
 
   if (providers.length === 0) return null;
 
@@ -97,28 +96,20 @@ function VerifiedProsReel({ campusId }: { campusId: string }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <UserCheck className="h-4 w-4 text-primary-600" />
-          <h2 className="text-sm font-bold text-neutral-900">
-            Top Verified Campus Pros
-          </h2>
+          <h2 className="text-sm font-bold text-neutral-900">Verified providers</h2>
         </div>
-        <span className="text-xs text-neutral-500 font-medium">
-          {providers.length} verified
-        </span>
+        <span className="text-xs text-neutral-500 font-medium">{providers.length} verified</span>
       </div>
 
       <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0">
         {providers.map((p) => (
           <Link
             key={p.id}
-            href={`/services/providers/${p.id}`}
+            href={`/service-provider/${p.slug}`}
             className="flex-shrink-0 w-[200px] sm:w-[220px] bg-white rounded-2xl border border-neutral-200/90 p-3.5 shadow-2xs hover:border-primary-300 hover:shadow-md transition-all group"
           >
             <div className="flex items-center gap-2.5 mb-2">
-              <Avatar
-                name={p.displayName}
-                size="md"
-                className="h-10 w-10 ring-1 ring-neutral-200"
-              />
+              <Avatar name={p.displayName} size="md" className="h-10 w-10 ring-1 ring-neutral-200" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1">
                   <span className="text-xs sm:text-sm font-bold text-neutral-900 group-hover:text-primary-600 transition-colors truncate">
@@ -126,24 +117,9 @@ function VerifiedProsReel({ campusId }: { campusId: string }) {
                   </span>
                   <ShieldCheck className="h-3.5 w-3.5 text-primary-600 shrink-0" />
                 </div>
-                <div className="flex items-center gap-1 text-[11px] text-neutral-500 font-medium">
-                  <Star className="h-3 w-3 fill-amber-400 text-amber-400 shrink-0" />
-                  <span className="font-bold text-neutral-800">{p.rating}</span>
-                  <span>({p.ratingCount})</span>
-                </div>
               </div>
             </div>
-
-            <div className="flex flex-wrap gap-1 pt-1.5 border-t border-neutral-100">
-              {p.specialties?.slice(0, 2).map((s) => (
-                <span
-                  key={s}
-                  className="text-[9px] font-semibold px-2 py-0.5 bg-neutral-100 text-neutral-600 rounded-md truncate max-w-[90px]"
-                >
-                  {s}
-                </span>
-              ))}
-            </div>
+            {p.bio && <p className="line-clamp-2 border-t border-neutral-100 pt-1.5 text-[11px] text-neutral-500">{p.bio}</p>}
           </Link>
         ))}
       </div>
@@ -265,7 +241,7 @@ export function ServicesBrowseView() {
       </section>
 
       {/* 2. Top Verified Providers Highlight */}
-      <VerifiedProsReel campusId={effectiveCampusId} />
+      <VerifiedProsReel />
 
       {/* 3. Category Filter Strip */}
       <section aria-label="Browse services by category" className="space-y-2">

@@ -120,6 +120,8 @@ export interface ServiceBooking {
   customerId: string;
   providerId: string;
   serviceId: string;
+  /** Who the booking is with (the provider as customers know them). */
+  provider?: { id: string; displayName: string; slug: string; userId: string };
   serviceName: string;
   serviceImageUrl?: string;
   status: BookingStatus;
@@ -315,6 +317,8 @@ export interface BookingAvailabilityResponse {
   serviceId: string;
   providerId: string;
   serviceName: string;
+  /** The provider as customers know them. */
+  providerName: string;
   serviceImageUrl?: string;
   bookingPreference: "instant" | "request_approval";
   bookingPreferenceLabel: string;

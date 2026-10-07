@@ -1,19 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import {
-  fetchProviderBookingSummaryLive,
-  fetchProviderBookingsLive,
-  getProviderBookingSummary,
-  getProviderBookings,
+  fetchProviderBookingSummary,
+  fetchProviderBookings,
   type ProviderBookingFilter,
+  type ProviderBookingSummary,
 } from "@/services/booking";
 import { BookingListCard } from "./BookingListCard";
 import { BookingEmptyState } from "./BookingEmptyState";
 import { BookingFilters } from "./BookingFilters";
 import { BookingPagination } from "./BookingPagination";
 import type { BookingListQuery, BookingPageResult } from "@/types/booking";
+
+const EMPTY_PAGE: BookingPageResult = { items: [], page: 1, limit: 12, total: 0, totalPages: 1 };
 
 const TABS: { key: ProviderBookingFilter; label: string }[] = [
   { key: "pending", label: "Pending" },
@@ -39,33 +41,19 @@ export function ServiceProviderBookingsView() {
     [tab, page, filters]
   );
 
-  const localResult = useMemo(() => getProviderBookings(query), [query]);
-  const localSummary = useMemo(() => getProviderBookingSummary(), []);
-
-  const [liveResult, setLiveResult] = useState<BookingPageResult | null>(null);
-  const [liveSummary, setLiveSummary] = useState<ReturnType<typeof getProviderBookingSummary> | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchProviderBookingsLive(query)
-      .then((res) => {
-        if (!cancelled) setLiveResult(res);
-      })
-      .catch(() => {});
-
-    fetchProviderBookingSummaryLive()
-      .then((res) => {
-        if (!cancelled) setLiveSummary(res);
-      })
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
-  }, [query]);
-
-  const result = liveResult ?? localResult;
-  const summary = liveSummary ?? localSummary;
+  const listQuery = useQuery({
+    queryKey: ["bookings", "provider", query],
+    queryFn: () => fetchProviderBookings(query),
+    placeholderData: keepPreviousData,
+    retry: false,
+  });
+  const result = listQuery.data ?? EMPTY_PAGE;
+  const summaryQuery = useQuery({
+    queryKey: ["bookings", "provider", "summary"],
+    queryFn: fetchProviderBookingSummary,
+    retry: false,
+  });
+  const summary = summaryQuery.data ?? null;
 
   function switchTab(next: ProviderBookingFilter) {
     setTab(next);
@@ -145,7 +133,17 @@ export function ServiceProviderBookingsView() {
 
       <BookingFilters role="provider" query={query} onChange={patchFilters} />
 
-      {result.total === 0 ? (
+      {listQuery.isError && (
+        <div role="alert" className="rounded-xl border border-kampmax-border bg-white p-4 text-center text-sm text-kampmax-text-secondary">
+          {listQuery.error instanceof Error ? listQuery.error.message : "Could not load your bookings."}{" "}
+          <button type="button" onClick={() => void listQuery.refetch()} className="font-semibold text-primary-600 hover:underline">
+            Try again
+          </button>
+        </div>
+      )}
+      {listQuery.isPending && <p className="py-6 text-center text-sm text-kampmax-text-secondary">Loading your bookings…</p>}
+
+      {listQuery.isPending ? null : result.total === 0 ? (
         tab === "pending" ? (
           <BookingEmptyState
             title="No pending requests"
@@ -188,7 +186,7 @@ export function ServiceProviderBookingsView() {
 
 function pendingCountKey(
   key: ProviderBookingFilter,
-  summary: ReturnType<typeof getProviderBookingSummary>,
+  summary: ProviderBookingSummary | null,
   _result: { total: number }
 ): number {
   if (key === "pending") return summary?.pending ?? 0;

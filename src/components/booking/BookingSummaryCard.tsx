@@ -119,8 +119,8 @@ export function BookingSummaryCard({
         <p className="flex items-start gap-1.5">
           <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success-600" aria-hidden />
           <span>
-            Free cancellation up to 2 hours before. Payment &amp; escrow arrive in a later module — no
-            charge is taken during booking.
+            Free cancellation up to 2 hours before. The price is taken from your wallet when you book and
+            held safely until you confirm the service.
           </span>
         </p>
       </div>

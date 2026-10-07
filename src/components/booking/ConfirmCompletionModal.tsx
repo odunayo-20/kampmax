@@ -28,11 +28,11 @@ export function ConfirmCompletionModal({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
-  function submit() {
+  async function submit() {
     if (busy) return;
     setBusy(true);
     setError(null);
-    const result = confirmBookingCompletion(booking.id);
+    const result = await confirmBookingCompletion(booking.id);
     setBusy(false);
     if (result.ok) {
       onComplete(result.booking);

@@ -30,11 +30,11 @@ export function CompleteBookingModal({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
-  function submit() {
+  async function submit() {
     if (busy) return;
     setBusy(true);
     setError(null);
-    const result = completeBooking(booking.id, evidence.length > 0 ? evidence : undefined);
+    const result = await completeBooking(booking.id, evidence.length > 0 ? evidence : undefined);
     setBusy(false);
     if (result.ok) {
       onComplete(result.booking);

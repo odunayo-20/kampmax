@@ -6,31 +6,26 @@ import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { StepAvailability } from "@/components/service-provider/StepAvailability";
 import { StepLocation } from "@/components/service-provider/StepLocation";
-import { StepPricing } from "@/components/service-provider/StepPricing";
 import {
   fetchSpAvailabilityLive,
-  getSpAvailability,
-  updateSpAvailability,
   updateSpAvailabilityLive,
-  updateSpLocation,
-  updateSpPricing,
   updateSpProfileLive,
 } from "@/services/service-provider-dashboard";
 import type { ServiceProviderOnboardingDraft, ServiceProviderOnboardingStepId } from "@/types/service-provider";
 import type { ServiceProviderDashboardRecord } from "@/types/service-provider-dashboard";
 
 export default function AvailabilityPage() {
-  const [draft, setDraft] = useState<ServiceProviderOnboardingDraft | null>(() => {
-    const src = getSpAvailability();
-    if (!src) return null;
-    return buildDraft(src);
-  });
-  const [loading, setLoading] = useState(!draft);
+  const [draft, setDraft] = useState<ServiceProviderOnboardingDraft | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [saved, setSaved] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setLoadError(false);
     fetchSpAvailabilityLive()
       .then((live) => {
         if (cancelled) return;
@@ -38,12 +33,14 @@ export default function AvailabilityPage() {
         setLoading(false);
       })
       .catch(() => {
-        if (!cancelled) setLoading(false);
+        if (cancelled) return;
+        setLoadError(true);
+        setLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
   if (loading && !draft) {
     return (
@@ -55,8 +52,11 @@ export default function AvailabilityPage() {
 
   if (!draft) {
     return (
-      <div className="rounded-xl border border-kampmax-border bg-white p-10 text-center text-sm text-kampmax-text-secondary">
-        Availability isn&apos;t available right now. Please refresh.
+      <div role="alert" className="rounded-xl border border-kampmax-border bg-white p-10 text-center text-sm text-kampmax-text-secondary">
+        {loadError ? "We couldn't load your availability." : "Availability isn't available right now."}{" "}
+        <button type="button" onClick={() => setAttempt((n) => n + 1)} className="font-semibold text-primary-600 hover:underline">
+          Try again
+        </button>
       </div>
     );
   }
@@ -82,47 +82,34 @@ export default function AvailabilityPage() {
 
   async function saveAvailability() {
     const d = getDraft();
-    if (d.availability?.days) {
-      try {
-        const liveRes = await updateSpAvailabilityLive(d.availability.days);
-        if (liveRes.ok) {
-          updateSpAvailability(d.availability);
-          applyResult(true, undefined, "Weekly schedule saved to live server.");
-          return;
-        }
-      } catch {
-        // Fallback
-      }
-    }
-    const res = updateSpAvailability(d.availability ?? {});
-    applyResult(res.ok, res.error, "Weekly schedule saved.");
+    const a = d.availability;
+    setSaved(null);
+    setError(null);
+    // The weekly hours and how bookings are taken are saved together, and
+    // reported honestly: customers book against exactly what is saved here.
+    const [hours, rules] = await Promise.all([
+      a?.days ? updateSpAvailabilityLive(a.days) : Promise.resolve({ ok: true } as { ok: boolean; error?: string }),
+      updateSpProfileLive({
+        bookingPreference: a?.bookingPreference === "instant" ? "INSTANT" : "REQUEST_APPROVAL",
+        minAdvanceNoticeHours: a?.minAdvanceNoticeHours,
+        maxAdvanceBookingDays: a?.maxAdvanceBookingDays,
+        bufferMinutes: a?.appointmentBufferMinutes,
+      }),
+    ]);
+    const failure = !hours.ok ? hours.error : !rules.ok ? rules.error : null;
+    applyResult(!failure, failure ?? undefined, "Saved. Customers can now book these times.");
   }
 
   async function saveLocation() {
     const d = getDraft();
     const l = d.location ?? {};
-    try {
-      await updateSpProfileLive({
-        locationCity: l.serviceCities?.[0] || undefined,
-        serviceRadius: l.serviceRadiusKm ? String(l.serviceRadiusKm) : undefined,
-      });
-    } catch {
-      // ignore
-    }
-    const res = updateSpLocation({
-      type: l.type,
-      primaryCampusId: l.primaryCampusId,
-      additionalCampusIds: l.additionalCampusIds ?? [],
-      serviceCities: l.serviceCities ?? [],
-      serviceRadiusKm: l.serviceRadiusKm,
+    setSaved(null);
+    setError(null);
+    const res = await updateSpProfileLive({
+      locationCity: l.serviceCities?.[0] || undefined,
+      serviceRadius: l.serviceRadiusKm ? String(l.serviceRadiusKm) : undefined,
     });
-    applyResult(res.ok, res.error, "Service areas saved.");
-  }
-
-  function savePricing() {
-    const d = getDraft();
-    const res = updateSpPricing(d.pricing ?? {});
-    applyResult(res.ok, res.error, "Fees saved.");
+    applyResult(res.ok, res.error, "Saved your service city and radius.");
   }
 
   return (
@@ -130,7 +117,7 @@ export default function AvailabilityPage() {
       <div>
         <h1 className="text-2xl font-bold text-kampmax-text">Availability & services</h1>
         <p className="mt-1 text-sm text-kampmax-text-secondary">
-          Set your weekly schedule, service areas, and fees. Customers see available times on your public profile.
+          Set your weekly schedule and how bookings are taken. Customers book only the times you offer here.
         </p>
       </div>
 
@@ -161,12 +148,6 @@ export default function AvailabilityPage() {
         </div>
       </SectionCard>
 
-      <SectionCard>
-        <StepPricing draft={draft} onUpdate={handleUpdate} />
-        <div className="mt-4 flex justify-end border-t border-kampmax-border pt-4">
-          <Button onClick={savePricing}>Save fees</Button>
-        </div>
-      </SectionCard>
     </div>
   );
 }

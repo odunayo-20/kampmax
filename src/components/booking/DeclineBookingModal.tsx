@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { X, AlertCircle, Ban } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { declineBooking, rejectProviderBookingLive } from "@/services/booking";
+import { declineBooking } from "@/services/booking";
 import type { BookingError, ServiceBooking } from "@/types/booking";
 
 const REASONS = [
@@ -45,24 +45,7 @@ export function DeclineBookingModal({
     const finalReason = reason === "Other" ? note.trim() || "Other" : reason;
     setBusy(true);
     setError(null);
-    try {
-      const liveRes = await rejectProviderBookingLive(booking.id, finalReason);
-      if (liveRes.ok) {
-        declineBooking({
-          id: booking.id,
-          reason: finalReason,
-        });
-        setBusy(false);
-        onComplete(liveRes.booking);
-        return;
-      }
-    } catch {
-      // Fallback
-    }
-    const result = declineBooking({
-      id: booking.id,
-      reason: finalReason,
-    });
+    const result = await declineBooking(booking.id, finalReason);
     setBusy(false);
     if (result.ok) {
       onComplete(result.booking);

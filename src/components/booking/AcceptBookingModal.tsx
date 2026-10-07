@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { X, AlertCircle, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { acceptBooking, acceptProviderBookingLive } from "@/services/booking";
+import { acceptBooking } from "@/services/booking";
 import type { BookingError, ServiceBooking } from "@/types/booking";
 
 export function AcceptBookingModal({
@@ -15,10 +15,6 @@ export function AcceptBookingModal({
   onClose: () => void;
   onComplete: (updated: ServiceBooking) => void;
 }) {
-  const isRange = booking.price.model === "range";
-  const [amount, setAmount] = useState(
-    isRange ? String(booking.price.amount) : ""
-  );
   const [error, setError] = useState<BookingError | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -32,31 +28,9 @@ export function AcceptBookingModal({
 
   async function submit() {
     if (busy) return;
-    const parsed = Number(amount);
-    if (isRange && (!Number.isFinite(parsed) || parsed <= 0)) {
-      setError({ code: "422", message: "Enter a valid final amount in naira." });
-      return;
-    }
     setBusy(true);
     setError(null);
-    try {
-      const liveRes = await acceptProviderBookingLive(booking.id, isRange ? parsed : undefined);
-      if (liveRes.ok) {
-        acceptBooking({
-          id: booking.id,
-          finalFee: isRange ? parsed : undefined,
-        });
-        setBusy(false);
-        onComplete(liveRes.booking);
-        return;
-      }
-    } catch {
-      // Fallback
-    }
-    const result = acceptBooking({
-      id: booking.id,
-      finalFee: isRange ? parsed : undefined,
-    });
+    const result = await acceptBooking(booking.id);
     setBusy(false);
     if (result.ok) {
       onComplete(result.booking);
@@ -105,27 +79,10 @@ export function AcceptBookingModal({
             </p>
           )}
 
-          {isRange ? (
-            <label className="block">
-              <span className="text-xs font-medium text-neutral-600">
-                Final price in naira (₦)
-              </span>
-              <input
-                type="number"
-                inputMode="numeric"
-                min={1}
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder={String(booking.price.amount)}
-                className="mt-1.5 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:border-success-400 focus:outline-none"
-              />
-              <span className="mt-1 block text-[11px] text-neutral-400">
-                Quote range was ₦{booking.price.amount.toLocaleString("en-NG")}–
-                {booking.price.amountMax?.toLocaleString("en-NG")}. This locks the amount the
-                customer pays later.
-              </span>
-            </label>
-          ) : null}
+          <p className="rounded-lg bg-neutral-50 p-3 text-xs text-neutral-600">
+            The customer has already paid ₦{booking.price.amount.toLocaleString("en-NG")}. It is held safely
+            and paid to you once they confirm the service was done.
+          </p>
 
           <div className="flex gap-2">
             <button
