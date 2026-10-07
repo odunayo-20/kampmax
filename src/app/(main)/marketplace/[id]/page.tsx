@@ -13,7 +13,7 @@ import { getProductById, fetchProductById, fetchProducts } from "@/services/prod
 import { getVendorById } from "@/services/users";
 import { useEnsureVendors } from "@/hooks/use-vendor-cache";
 import { useApp } from "@/lib/app-context";
-import { isWishlisted, toggleWishlist } from "@/services/wishlist";
+import { useWishlist } from "@/services/wishlist";
 import { addRecentlyViewed } from "@/services/recently-viewed";
 import { fetchReviewEligibility } from "@/services/reviews";
 import { ProductReviewsSection } from "@/components/reviews";
@@ -52,7 +52,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const { campuses } = useApp();
 
   const [quantity, setQuantity] = useState(1);
-  const [liked, setLiked] = useState(() => isWishlisted(id));
+  const wishlist = useWishlist();
+  const liked = wishlist.has(id);
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
   const [added, setAdded] = useState(false);
   const [buyLoading, setBuyLoading] = useState(false);
@@ -292,10 +293,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
           <div className="space-y-5">
             <DesktopActions
-              initialLiked={liked}
-              onLikeToggle={(newLiked) => {
-                if (product) toggleWishlist(product.id);
-                setLiked(newLiked);
+              liked={liked}
+              onLikeToggle={async () => {
+                if (!product) return;
+                const res = await wishlist.toggle(product.id);
+                if (res.needsLogin) router.push(`/login?next=${encodeURIComponent(window.location.pathname)}`);
               }}
               onShare={() => navigator.share?.({ title: product.title, url: window.location.href }).catch(() => {})}
             />

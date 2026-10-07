@@ -20,7 +20,7 @@ import { Product } from "@/types";
 import { formatNaira } from "@/lib/utils";
 import { useCart } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
-import { isWishlisted, toggleWishlist } from "@/services/wishlist";
+import { useWishlist } from "@/services/wishlist";
 import { getVendorById } from "@/services/users";
 import { openVendorConversation } from "@/services/messages-api";
 import { addRecentlyViewed } from "@/services/recently-viewed";
@@ -38,12 +38,11 @@ export function QuickViewModal({ product, onClose }: QuickViewModalProps) {
 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
-  const [liked, setLiked] = useState(false);
+  const wishlist = useWishlist();
   const [addedToast, setAddedToast] = useState(false);
 
   useEffect(() => {
     if (product) {
-      setLiked(isWishlisted(product.id));
       setActiveImageIndex(0);
       setQuantity(1);
       addRecentlyViewed(product);
@@ -61,6 +60,7 @@ export function QuickViewModal({ product, onClose }: QuickViewModalProps) {
 
   if (!product) return null;
 
+  const liked = wishlist.has(product.id);
   const vendor = getVendorById(product.vendorId);
   const images = product.images && product.images.length > 0 ? product.images : [];
   const currentImage = images[activeImageIndex] || null;
@@ -72,10 +72,10 @@ export function QuickViewModal({ product, onClose }: QuickViewModalProps) {
   const inStock = product.stock === undefined || product.stock > 0;
   const lowStock = product.stock !== undefined && product.stock > 0 && product.stock <= 5;
 
-  function handleWishlistToggle(e: React.MouseEvent) {
+  async function handleWishlistToggle(e: React.MouseEvent) {
     e.stopPropagation();
-    toggleWishlist(product!.id);
-    setLiked(!liked);
+    const res = await wishlist.toggle(product!.id);
+    if (res.needsLogin) router.push(`/login?next=${encodeURIComponent(window.location.pathname)}`);
   }
 
   function handleAddToCart() {

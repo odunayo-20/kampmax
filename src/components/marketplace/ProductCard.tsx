@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Heart, Star, MapPin, Verified, Eye, ShoppingBag, Check } from "lucide-react";
 import { Product, ProductCondition } from "@/types";
 import { cn, formatNaira } from "@/lib/utils";
-import { isWishlisted, toggleWishlist } from "@/services/wishlist";
+import { useWishlist } from "@/services/wishlist";
 import { useCart } from "@/lib/cart-context";
 import { isOutOfStock } from "@/lib/stock";
 
@@ -34,7 +35,9 @@ export function ProductCard({
   className,
   onQuickView,
 }: ProductCardProps) {
-  const [saved, setSaved] = useState(() => isWishlisted(product.id));
+  const router = useRouter();
+  const wishlist = useWishlist();
+  const saved = wishlist.has(product.id);
   const [addedToast, setAddedToast] = useState(false);
   const [imgError, setImgError] = useState(false);
   const { addItem } = useCart();
@@ -43,11 +46,11 @@ export function ProductCard({
   const hasDiscount = !!product.originalPrice && product.originalPrice > product.price;
   const imageSrc = product.images && product.images.length > 0 ? product.images[0] : null;
 
-  function handleWishlistToggle(e: React.MouseEvent) {
+  async function handleWishlistToggle(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    toggleWishlist(product.id);
-    setSaved(!saved);
+    const res = await wishlist.toggle(product.id);
+    if (res.needsLogin) router.push(`/login?next=${encodeURIComponent(window.location.pathname)}`);
   }
 
   function handleQuickView(e: React.MouseEvent) {

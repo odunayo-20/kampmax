@@ -1,29 +1,23 @@
 "use client";
 
-import { useState } from "react";
 import { Heart, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface DesktopActionsProps {
-  initialLiked?: boolean;
-  onLikeToggle?: (liked: boolean) => void;
+  liked?: boolean;
+  onLikeToggle?: () => void;
   onShare?: () => void;
 }
 
-export function DesktopActions({ initialLiked = false, onLikeToggle, onShare }: DesktopActionsProps) {
-  const [liked, setLiked] = useState(initialLiked);
-
-  const handleLike = () => {
-    const next = !liked;
-    setLiked(next);
-    onLikeToggle?.(next);
-  };
+export function DesktopActions({ liked = false, onLikeToggle, onShare }: DesktopActionsProps) {
+  const handleLike = () => onLikeToggle?.();
 
   return (
     <div className="hidden lg:flex items-center justify-end gap-1">
       <button
         onClick={handleLike}
         aria-pressed={liked}
+        aria-label={liked ? "Remove from wishlist" : "Add to wishlist"}
         className={cn(
           "h-9 w-9 flex items-center justify-center rounded-full border transition-colors",
           liked ? "bg-error-50 border-error-100 text-error-600" : "bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50"

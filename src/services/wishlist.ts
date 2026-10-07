@@ -1,13 +1,22 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
-import { getProducts, getProductById } from "@/services/products";
+import { useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient, ApiError } from "@/lib/api-client";
-import type { Product } from "@/types";
+import { useAuth } from "@/lib/auth-context";
+import { getFriendlyErrorMessage } from "@/lib/error-messages";
 
 // ============================================================
-// BACKEND RESPONSE & DTO TYPES (from NestJS Wishlist Module)
+// WISHLIST (live)
 // ============================================================
+//
+//   GET    /wishlist          → { total, items[] }  (products come with their details)
+//   POST   /wishlist          → { targetType, targetId }
+//   DELETE /wishlist/:id      → remove one
+//   DELETE /wishlist          → clear
+//
+// The list lives on the server, so it follows the person to any device. Nothing
+// is invented locally: a heart only stays filled if the server kept it.
 
 export type WishlistTargetType =
   | "PRODUCT"
@@ -16,250 +25,184 @@ export type WishlistTargetType =
   | "SERVICE_PROVIDER"
   | "FREELANCER_PROFILE";
 
-export interface BackendWishlistItemResponse {
+export interface WishlistProduct {
+  id: string;
+  name: string;
+  price: number;
+  compareAtPrice: number | null;
+  image: string | null;
+  condition: string;
+  stockQuantity: number;
+  vendorId: string;
+  status: string;
+  /** Can be bought right now. */
+  available: boolean;
+}
+
+export interface WishlistEntry {
   id: string;
   targetType: WishlistTargetType;
   targetId: string;
-  createdAt: string | Date;
+  createdAt: string;
+  /** Present for products; null when the product no longer exists. */
+  product: WishlistProduct | null;
 }
 
-export interface BackendWishlistListResponse {
+interface WishlistData {
   total: number;
-  items: BackendWishlistItemResponse[];
+  items: WishlistEntry[];
 }
 
-export interface CreateWishlistItemPayload {
-  targetType: WishlistTargetType;
-  targetId: string;
-}
+// ── API calls ───────────────────────────────────────────────
 
-// In-memory cache for synchronous fallback access
-let wishlist: string[] = ["p1", "p3", "p5", "p8", "p12", "p17"];
-// Map of targetId -> backend wishlistItemId
-const wishlistItemIdMap = new Map<string, string>();
-
-// ============================================================
-// ASYNC API CLIENT METHODS
-// ============================================================
-
-/**
- * Fetch wishlist items from backend API.
- * GET /api/v1/wishlist
- */
-export async function fetchWishlist(): Promise<{
-  items: BackendWishlistItemResponse[];
-  total: number;
-  error: ApiError | null;
-}> {
-  const { data, error } = await apiClient.get<BackendWishlistListResponse>("/wishlist");
-
+/** The signed-in person's wishlist. On failure, `error` is set and nothing is made up. */
+export async function fetchWishlist(): Promise<{ items: WishlistEntry[]; total: number; error: ApiError | null }> {
+  const { data, error } = await apiClient.get<WishlistData>("/wishlist");
   if (error || !data || !Array.isArray(data.items)) {
-    return {
-      items: wishlist.map((id) => ({
-        id: `local_${id}`,
-        targetType: "PRODUCT",
-        targetId: id,
-        createdAt: new Date().toISOString(),
-      })),
-      total: wishlist.length,
-      error,
-    };
+    return { items: [], total: 0, error: error ?? ({ name: "ApiError", message: "Unexpected response" } as ApiError) };
   }
-
-  // Update in-memory cache
-  wishlist = data.items.map((i) => i.targetId);
-  wishlistItemIdMap.clear();
-  data.items.forEach((i) => {
-    wishlistItemIdMap.set(i.targetId, i.id);
-  });
-
-  return {
-    items: data.items,
-    total: data.total,
-    error: null,
-  };
+  return { items: data.items, total: data.total, error: null };
 }
 
-/**
- * Add an item to user wishlist.
- * POST /api/v1/wishlist
- */
 export async function addToWishlistApi(
   targetId: string,
   targetType: WishlistTargetType = "PRODUCT"
-): Promise<{ item: BackendWishlistItemResponse | null; error: ApiError | null }> {
-  // Optimistic local update
-  if (!wishlist.includes(targetId)) {
-    wishlist = [...wishlist, targetId];
-  }
-
-  const { data, error } = await apiClient.post<
-    CreateWishlistItemPayload,
-    BackendWishlistItemResponse
-  >("/wishlist", {
-    targetType,
-    targetId,
-  });
-
-  if (error || !data || !data.id) {
-    return { item: null, error };
-  }
-
-  wishlistItemIdMap.set(targetId, data.id);
+): Promise<{ item: WishlistEntry | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.post<{ targetType: WishlistTargetType; targetId: string }, WishlistEntry>(
+    "/wishlist",
+    { targetType, targetId }
+  );
+  if (error || !data?.id) return { item: null, error };
   return { item: data, error: null };
 }
 
-/**
- * Remove an item from user wishlist.
- * DELETE /api/v1/wishlist/:id
- */
-export async function removeFromWishlistApi(
-  targetId: string
-): Promise<{ success: boolean; error: ApiError | null }> {
-  // Optimistic local update
-  wishlist = wishlist.filter((id) => id !== targetId);
-
-  const backendItemId = wishlistItemIdMap.get(targetId) || targetId;
-  const { error } = await apiClient.delete<void>(`/wishlist/${backendItemId}`);
-
-  if (error) {
-    return { success: false, error };
-  }
-
-  wishlistItemIdMap.delete(targetId);
-  return { success: true, error: null };
+export async function removeFromWishlistApi(itemId: string): Promise<{ success: boolean; error: ApiError | null }> {
+  const { error } = await apiClient.delete<void>(`/wishlist/${encodeURIComponent(itemId)}`);
+  return error ? { success: false, error } : { success: true, error: null };
 }
 
-/**
- * Clear entire user wishlist.
- * DELETE /api/v1/wishlist
- */
 export async function clearWishlistApi(): Promise<{ success: boolean; error: ApiError | null }> {
-  wishlist = [];
-  wishlistItemIdMap.clear();
-
   const { error } = await apiClient.delete<void>("/wishlist");
-
-  if (error) {
-    return { success: false, error };
-  }
-
-  return { success: true, error: null };
+  return error ? { success: false, error } : { success: true, error: null };
 }
 
-// ============================================================
-// SYNCHRONOUS FALLBACK HELPERS
-// ============================================================
+// ── Shared state ────────────────────────────────────────────
 
-export function getWishlist(userId?: string): Product[] {
-  void userId;
-  const byId = getProducts().reduce<Record<string, Product>>(
-    (acc, p) => ((acc[p.id] = p), acc),
-    {}
-  );
-  return wishlist
-    .map((id) => byId[id] || getProductById(id))
-    .filter((p): p is Product => Boolean(p));
-}
+export const wishlistKey = (userId: string | null | undefined) => ["wishlist", userId ?? "guest"] as const;
 
-export function getWishlistIds(userId?: string): string[] {
-  void userId;
-  return [...wishlist];
-}
-
-export function getWishlistCount(userId?: string): number {
-  void userId;
-  return wishlist.length;
-}
-
-export function isWishlisted(productId: string): boolean {
-  return wishlist.includes(productId);
-}
-
-export function addToWishlist(productId: string): void {
-  if (!wishlist.includes(productId)) wishlist = [...wishlist, productId];
-  addToWishlistApi(productId).catch(() => {});
-}
-
-export function removeFromWishlist(productId: string): void {
-  wishlist = wishlist.filter((id) => id !== productId);
-  removeFromWishlistApi(productId).catch(() => {});
-}
-
-export function toggleWishlist(productId: string): boolean {
-  if (wishlist.includes(productId)) {
-    removeFromWishlist(productId);
-    return false;
-  }
-  addToWishlist(productId);
-  return true;
+export interface WishlistToggleResult {
+  ok: boolean;
+  /** The product is now saved (true) or no longer saved (false); only meaningful when ok. */
+  saved?: boolean;
+  /** Nobody is signed in: the caller should send them to sign in. */
+  needsLogin?: boolean;
+  error?: string;
 }
 
 /**
- * Client-side wishlist hook with backend synchronization.
+ * The signed-in person's wishlist, shared by every heart button and the wishlist
+ * page. Changes show instantly and are undone if the server says no.
  */
-export function useWishlist(userId?: string) {
-  const [items, setItems] = useState<Product[]>([]);
-  const [loaded, setLoaded] = useState(false);
+export function useWishlist() {
+  const { user, status } = useAuth();
+  const queryClient = useQueryClient();
+  const userId = user?.id ?? null;
+  const signedIn = status === "authenticated" && !!userId;
+  const key = wishlistKey(userId);
 
-  const reload = useCallback(() => {
-    fetchWishlist().then((res) => {
-      const byId = getProducts().reduce<Record<string, Product>>(
-        (acc, p) => ((acc[p.id] = p), acc),
-        {}
-      );
-      const productItems = res.items
-        .map((i) => byId[i.targetId] || getProductById(i.targetId))
-        .filter((p): p is Product => Boolean(p));
+  const query = useQuery({
+    queryKey: key,
+    enabled: signedIn,
+    staleTime: 60_000,
+    retry: false,
+    queryFn: async (): Promise<WishlistData> => {
+      const res = await fetchWishlist();
+      if (res.error) throw res.error;
+      return { items: res.items, total: res.total };
+    },
+  });
 
-      setItems(productItems);
-      setLoaded(true);
-    }).catch(() => {
-      setItems(getWishlist(userId));
-      setLoaded(true);
-    });
-  }, [userId]);
+  const items = query.data?.items ?? [];
 
-  useEffect(() => {
-    reload();
-  }, [reload]);
+  const has = useCallback(
+    (productId: string) => items.some((i) => i.targetType === "PRODUCT" && i.targetId === productId),
+    [items]
+  );
+
+  const setItems = useCallback(
+    (next: (current: WishlistEntry[]) => WishlistEntry[]) =>
+      queryClient.setQueryData<WishlistData>(key, (current) => {
+        const list = next(current?.items ?? []);
+        return { items: list, total: list.length };
+      }),
+    [queryClient, key]
+  );
+
+  const reload = useCallback(() => queryClient.invalidateQueries({ queryKey: key }), [queryClient, key]);
 
   const remove = useCallback(
-    (productId: string) => {
-      removeFromWishlist(productId);
-      setItems((prev) => prev.filter((p) => p.id !== productId));
+    async (productId: string): Promise<WishlistToggleResult> => {
+      if (!signedIn) return { ok: false, needsLogin: true };
+      const current = queryClient.getQueryData<WishlistData>(key)?.items ?? [];
+      const entry = current.find((i) => i.targetType === "PRODUCT" && i.targetId === productId);
+      if (!entry) return { ok: true, saved: false };
+      setItems((list) => list.filter((i) => i.id !== entry.id));
+      const res = await removeFromWishlistApi(entry.id);
+      // Already gone on the server is the outcome the person wanted.
+      if (res.error && res.error.status !== 404) {
+        setItems(() => current);
+        return { ok: false, error: getFriendlyErrorMessage(res.error) };
+      }
+      return { ok: true, saved: false };
     },
-    []
+    [signedIn, queryClient, key, setItems]
   );
 
   const add = useCallback(
-    (productId: string) => {
-      addToWishlist(productId);
-      const p = getProductById(productId);
-      if (p) setItems((prev) => (prev.some((x) => x.id === productId) ? prev : [...prev, p]));
+    async (productId: string): Promise<WishlistToggleResult> => {
+      if (!signedIn) return { ok: false, needsLogin: true };
+      const current = queryClient.getQueryData<WishlistData>(key)?.items ?? [];
+      const pending: WishlistEntry = {
+        id: `pending:${productId}`,
+        targetType: "PRODUCT",
+        targetId: productId,
+        createdAt: new Date().toISOString(),
+        product: null,
+      };
+      setItems((list) => [pending, ...list]);
+      const res = await addToWishlistApi(productId);
+      if (res.error?.status === 409) {
+        // Saved already (another tab or device): take the server's list.
+        void reload();
+        return { ok: true, saved: true };
+      }
+      if (res.error || !res.item) {
+        setItems(() => current);
+        return { ok: false, error: getFriendlyErrorMessage(res.error) };
+      }
+      const saved = res.item;
+      setItems((list) => list.map((i) => (i.id === pending.id ? saved : i)));
+      return { ok: true, saved: true };
     },
-    []
+    [signedIn, queryClient, key, setItems, reload]
   );
 
   const toggle = useCallback(
-    (productId: string) => {
-      const isCurrently = isWishlisted(productId);
-      if (isCurrently) {
-        remove(productId);
-      } else {
-        add(productId);
-      }
-    },
-    [add, remove]
+    (productId: string): Promise<WishlistToggleResult> => (has(productId) ? remove(productId) : add(productId)),
+    [has, add, remove]
   );
 
   return {
     items,
-    count: items.length,
-    loaded,
-    remove,
-    add,
+    total: query.data?.total ?? 0,
+    signedIn,
+    /** Waiting for the first answer from the server. */
+    loading: signedIn && query.isPending,
+    error: query.isError ? getFriendlyErrorMessage(query.error) : null,
+    has,
     toggle,
+    add,
+    remove,
     reload,
   };
 }
