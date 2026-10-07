@@ -4,11 +4,7 @@ import { Suspense } from "react";
 import { ServiceDetailView } from "@/components/service-marketplace/ServiceDetailView";
 import { ServiceCardSkeleton } from "@/components/service-marketplace/ServiceSkeletons";
 import { getSiteBaseUrl } from "@/lib/utils";
-import {
-  getRelatedProviders,
-  getRelatedServices,
-  getServiceDetail,
-} from "@/services/service-marketplace";
+import { fetchServiceDetail } from "@/services/service-marketplace";
 
 interface ServiceDetailPageProps {
   params: Promise<{ serviceId: string }>;
@@ -18,7 +14,7 @@ export async function generateMetadata({
   params,
 }: ServiceDetailPageProps): Promise<Metadata> {
   const { serviceId } = await params;
-  const detail = getServiceDetail(serviceId);
+  const detail = await fetchServiceDetail(serviceId).catch(() => null);
   if (!detail) {
     return { title: "Service not found | Kampmax" };
   }
@@ -45,12 +41,10 @@ export async function generateMetadata({
 
 export default async function ServiceDetailPage({ params }: ServiceDetailPageProps) {
   const { serviceId } = await params;
-  const detail = getServiceDetail(serviceId);
+  const detail = await fetchServiceDetail(serviceId);
   if (!detail) notFound();
 
-  const { service, provider } = detail;
-  const relatedServices = getRelatedServices(service.id, 4);
-  const similarProviders = getRelatedProviders(provider.id, 3);
+  const { service, provider, related, similarProviders, reviews, reviewSummary } = detail;
 
   return (
     <Suspense
@@ -72,8 +66,10 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
       <ServiceDetailView
         service={service}
         provider={provider}
-        relatedServices={relatedServices}
+        relatedServices={related}
         similarProviders={similarProviders}
+        reviews={reviews}
+        reviewSummary={reviewSummary}
       />
     </Suspense>
   );

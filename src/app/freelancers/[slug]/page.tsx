@@ -4,7 +4,7 @@ import { cache } from "react";
 import {
   getPublicFreelancerFromBackend,
 } from "@/services/freelancer-dashboard";
-import { getPublicFreelancerServices } from "@/services/freelancer-services";
+import { fetchPublicFreelancerServices } from "@/services/freelancer-services";
 import { getSiteBaseUrl, truncateText } from "@/lib/utils";
 import { PublicFreelancerProfileContent } from "@/components/freelancer/public/PublicFreelancerProfileContent";
 
@@ -70,7 +70,7 @@ export default async function FreelancerPage({ params }: FreelancerPageProps) {
     notFound();
   }
 
-  const services = getPublicFreelancerServices(profile.id);
+  const services = await fetchPublicFreelancerServices(profile.id);
 
   return <PublicFreelancerProfileContent profile={profile} services={services} />;
 }

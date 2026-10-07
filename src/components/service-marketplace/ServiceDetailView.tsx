@@ -18,15 +18,13 @@ import {
 import type {
   MarketplaceProvider,
   MarketplaceService,
+  MarketplaceServiceReview,
 } from "@/types/service-marketplace";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 import { useCategoryTree } from "@/hooks/use-taxonomy";
 import {
   categoryIdsFor,
-  getProviderById,
-  getProviderReviews,
-  getProviderReviewSummary,
   getOpenDaysLabel,
   getServiceCategories,
   getServiceCategoryName,
@@ -47,6 +45,10 @@ interface ServiceDetailViewProps {
   provider: MarketplaceProvider;
   relatedServices: MarketplaceService[];
   similarProviders: MarketplaceProvider[];
+  /** Recent reviews of this service. */
+  reviews: MarketplaceServiceReview[];
+  /** Rating across the provider's finished bookings. */
+  reviewSummary: { average: number; count: number };
 }
 
 export function ServiceDetailView({
@@ -54,6 +56,8 @@ export function ServiceDetailView({
   provider,
   relatedServices,
   similarProviders,
+  reviews: serviceReviews,
+  reviewSummary,
 }: ServiceDetailViewProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -70,12 +74,6 @@ export function ServiceDetailView({
     const root = (categoryTree ?? []).find((r) => categoryIdsFor(r).includes(service.categoryId));
     return root ? categories.find((c) => c.id === root.id) : undefined;
   }, [categoryTree, categories, service.categoryId]);
-  const reviewSummary = useMemo(() => getProviderReviewSummary(provider.id), [provider.id]);
-  const serviceReviews = useMemo(
-    () => getProviderReviews(provider.id, service.id).slice(0, 3),
-    [provider.id, service.id]
-  );
-
   const price = getServicePriceDisplay(service.pricingModel, service.price, service.priceMax);
   const openDaysLabel = getOpenDaysLabel(provider);
   const todayIndex = (new Date().getDay() + 6) % 7; // Map Sunday..Sat → Monday-first, matching backend dayIndex
@@ -85,14 +83,6 @@ export function ServiceDetailView({
   const rating = reviewSummary.count ? reviewSummary.average : provider.rating;
   const ratingCount = reviewSummary.count ? reviewSummary.count : provider.ratingCount;
 
-  const relatedProvidersMap = useMemo(() => {
-    const map: Record<string, MarketplaceProvider> = {};
-    for (const s of relatedServices) {
-      const p = getProviderById(s.providerId);
-      if (p) map[s.providerId] = p;
-    }
-    return map;
-  }, [relatedServices]);
 
   function requireLogin() {
     if (status === "authenticated") return true;
@@ -413,7 +403,7 @@ export function ServiceDetailView({
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
             {relatedServices.map((s) => (
-              <ServiceCard key={s.id} service={s} provider={relatedProvidersMap[s.providerId]} />
+              <ServiceCard key={s.id} service={s} />
             ))}
           </div>
         </section>

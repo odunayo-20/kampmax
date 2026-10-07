@@ -1,22 +1,21 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Pencil, Eye } from "lucide-react";
-import { getMyService } from "@/services/freelancer-services";
 import type { FreelancerService } from "@/types/freelancer-services";
 import { ServiceStatusBadge, ServicePreview, ServiceActions } from "@/components/freelancer/services";
 import type { ServiceActionKind } from "@/components/freelancer/services";
 import { categoryLabel, servicePriceLabel } from "@/components/freelancer/services";
 import { useCategories } from "@/hooks/use-taxonomy";
 import {
+  fetchMyService,
   pauseMyService,
   resumeMyService,
   archiveMyService,
   deleteMyService,
   publishMyService,
-  approveMyServiceForDemo,
 } from "@/services/freelancer-services";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui";
@@ -26,47 +25,56 @@ function DetailContent() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const id = params.id;
-  const [service, setService] = useState<FreelancerService | null>(() => getMyService(id));
+  const [service, setService] = useState<FreelancerService | null>(null);
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<ServiceActionKind | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
 
-  function runAction(kind: ServiceActionKind) {
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetchMyService(id)
+      .then((found) => {
+        if (!cancelled) setService(found);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Could not load this service.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  async function runAction(kind: ServiceActionKind) {
     if (!service) return;
     setBusy(kind);
     setError(null);
-    let result = { ok: true, message: "" };
-    switch (kind) {
-      case "publish":
-        result = publishMyService(service.id);
-        break;
-      case "approve":
-        result = approveMyServiceForDemo(service.id);
-        break;
-      case "pause":
-        result = pauseMyService(service.id);
-        break;
-      case "resume":
-        result = resumeMyService(service.id);
-        break;
-      case "archive":
-        result = archiveMyService(service.id);
-        break;
-      case "delete":
-        result = deleteMyService(service.id);
-        break;
-    }
+    const actions = {
+      publish: publishMyService,
+      pause: pauseMyService,
+      resume: resumeMyService,
+      archive: archiveMyService,
+      delete: deleteMyService,
+    } as const;
+    const result = await actions[kind](service.id);
     setBusy(null);
-    if (result.ok) {
-      if (kind === "delete") {
-        router.push("/freelancer/services");
-        return;
-      }
-      // Refetch authoritative state from the store.
-      setService(getMyService(id));
-    } else {
+    if (!result.ok) {
       setError(result.message);
+      return;
     }
+    if (kind === "delete") {
+      router.push("/freelancer/services");
+      return;
+    }
+    setService(await fetchMyService(id).catch(() => service));
+  }
+
+  if (loading && !service) {
+    return <p className="py-10 text-center text-sm text-neutral-500">Loading…</p>;
   }
 
   if (error && !service) {
@@ -120,7 +128,7 @@ function DetailContent() {
               Edit
             </Button>
           </Link>
-          <ServiceActions service={service} isDemo busy={busy} onAction={runAction} />
+          <ServiceActions service={service} busy={busy} onAction={(k) => void runAction(k)} />
         </div>
       </div>
 

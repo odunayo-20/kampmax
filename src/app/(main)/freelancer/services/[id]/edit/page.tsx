@@ -1,8 +1,9 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getMyService, updateMyService } from "@/services/freelancer-services";
+import { fetchMyService, updateMyService } from "@/services/freelancer-services";
+import type { FreelancerService } from "@/types/freelancer-services";
 import {
   ServiceForm,
   ServiceFormValues,
@@ -15,9 +16,30 @@ function EditContent() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const id = params.id;
-  const [service] = useState(() => getMyService(id));
+  const [service, setService] = useState<FreelancerService | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchMyService(id)
+      .then((found) => {
+        if (!cancelled) setService(found);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setLoadError(e instanceof Error ? e.message : "Could not load this service.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  if (loading) return <ServiceFormSkeleton />;
 
   if (!service) {
     return (
@@ -27,16 +49,16 @@ function EditContent() {
           role="alert"
           className="rounded-lg border border-error-100 bg-error-50 px-4 py-3 text-sm text-error-700"
         >
-          This service could not be found or you don&apos;t have access to it.
+          {loadError ?? "This service could not be found or you don&apos;t have access to it."}
         </div>
       </div>
     );
   }
 
-  function handleSubmit(values: ServiceFormValues) {
+  async function handleSubmit(values: ServiceFormValues) {
     setSubmitting(true);
     setError(null);
-    const result = updateMyService(id, values);
+    const result = await updateMyService(id, values);
     setSubmitting(false);
     if (result.ok) {
       router.push(`/freelancer/services/${id}`);

@@ -10,7 +10,6 @@ import { cn } from "@/lib/utils";
 
 export type ServiceActionKind =
   | "publish"
-  | "approve"
   | "pause"
   | "resume"
   | "archive"
@@ -18,13 +17,12 @@ export type ServiceActionKind =
 
 interface ServiceActionsProps {
   service: FreelancerService;
-  isDemo?: boolean;
   onAction: (kind: ServiceActionKind) => void;
   busy?: ServiceActionKind | null;
 }
 
 /** Which actions the backend allows for a given status. */
-function availableActions(service: FreelancerService, isDemo: boolean): ServiceActionKind[] {
+function availableActions(service: FreelancerService): ServiceActionKind[] {
   const actions: ServiceActionKind[] = [];
   switch (service.status) {
     case FREELANCER_SERVICE_STATUS.DRAFT:
@@ -35,7 +33,6 @@ function availableActions(service: FreelancerService, isDemo: boolean): ServiceA
     case FREELANCER_SERVICE_STATUS.SUBMITTED:
     case FREELANCER_SERVICE_STATUS.UNDER_REVIEW:
       actions.push("delete");
-      if (isDemo) actions.push("approve");
       break;
     case FREELANCER_SERVICE_STATUS.PUBLISHED:
       actions.push("pause");
@@ -59,20 +56,11 @@ const actionMeta: Record<
   { label: string; icon: typeof Eye; confirm?: { title: string; description: string } }
 > = {
   publish: {
-    label: "Submit for review",
+    label: "Publish",
     icon: Send,
     confirm: {
-      title: "Submit service for review?",
-      description:
-        "The service will be sent to our team for review. You cannot edit it while under review.",
-    },
-  },
-  approve: {
-    label: "Approve (demo)",
-    icon: Eye,
-    confirm: {
-      title: "Approve this service?",
-      description: "Simulates the backend finishing review and publishing the service.",
+      title: "Publish this service?",
+      description: "Clients will be able to find it and send you proposals right away.",
     },
   },
   pause: {
@@ -96,19 +84,19 @@ const actionMeta: Record<
     },
   },
   delete: {
-    label: "Delete",
+    label: "Remove",
     icon: Trash2,
     confirm: {
-      title: "Delete service?",
-      description: "This action cannot be undone. The service and its data will be removed.",
+      title: "Remove this service?",
+      description: "It is archived and hidden from clients. Your past work is not affected.",
     },
   },
 };
 
-export function ServiceActions({ service, isDemo, onAction, busy }: ServiceActionsProps) {
+export function ServiceActions({ service, onAction, busy }: ServiceActionsProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [pending, setPending] = useState<ServiceActionKind | null>(null);
-  const actions = availableActions(service, !!isDemo);
+  const actions = availableActions(service);
 
   function confirm(kind: ServiceActionKind) {
     const meta = actionMeta[kind];

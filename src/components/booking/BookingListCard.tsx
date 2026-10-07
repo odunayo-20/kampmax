@@ -7,7 +7,6 @@ import { BookingStatusBadge } from "./BookingStatusBadge";
 import { FulfillmentStatusBadge } from "./FulfillmentStatusBadge";
 import { BookingDateTime } from "./BookingDateTime";
 import { formatNaira } from "@/lib/utils";
-import { getProviderDisplayName } from "@/services/service-marketplace";
 import type { ServiceBooking } from "@/types/booking";
 
 /**
@@ -86,7 +85,7 @@ export function BookingListCard({
             {role === "customer" ? (
               <span className="inline-flex items-center gap-1">
                 <User className="h-3 w-3 text-neutral-400" aria-hidden />
-                {getProviderDisplayName(booking.providerId)}
+                {booking.provider?.displayName ?? "Service provider"}
               </span>
             ) : (
               <span className="inline-flex items-center gap-1">

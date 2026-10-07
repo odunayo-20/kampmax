@@ -177,7 +177,8 @@ export function ServicesBrowseView() {
     clearFilters,
     isLoading,
     services,
-    providers,
+    error,
+    retry,
     resultCount,
     totalPages,
     currentPage,
@@ -304,7 +305,14 @@ export function ServicesBrowseView() {
 
           {/* Service Cards Grid (Scalable 2-col mobile / 3-col desktop) */}
           <div className="flex-1 min-w-0">
-            {isLoading ? (
+            {error ? (
+              <div role="alert" className="rounded-2xl border border-neutral-200 bg-white p-8 text-center text-sm text-neutral-600">
+                {error}{" "}
+                <button type="button" onClick={retry} className="font-semibold text-primary-600 hover:underline">
+                  Try again
+                </button>
+              </div>
+            ) : isLoading ? (
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <ServiceCardSkeleton key={i} />
@@ -331,7 +339,6 @@ export function ServicesBrowseView() {
                     <ServiceCard
                       key={service.id}
                       service={service}
-                      provider={providers[service.providerId]}
                     />
                   ))}
                 </div>
@@ -413,7 +420,8 @@ export function ServicesCategoryView({
     clearFilters,
     isLoading,
     services,
-    providers,
+    error,
+    retry,
     resultCount,
     totalPages,
     currentPage,
@@ -478,7 +486,14 @@ export function ServicesCategoryView({
           />
 
           <div className="flex-1 min-w-0">
-            {isLoading ? (
+            {error ? (
+              <div role="alert" className="rounded-2xl border border-neutral-200 bg-white p-8 text-center text-sm text-neutral-600">
+                {error}{" "}
+                <button type="button" onClick={retry} className="font-semibold text-primary-600 hover:underline">
+                  Try again
+                </button>
+              </div>
+            ) : isLoading ? (
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <ServiceCardSkeleton key={i} />
@@ -502,7 +517,6 @@ export function ServicesCategoryView({
                     <ServiceCard
                       key={service.id}
                       service={service}
-                      provider={providers[service.providerId]}
                     />
                   ))}
                 </div>

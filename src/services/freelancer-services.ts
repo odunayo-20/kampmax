@@ -1,40 +1,14 @@
 // ============================================================
-// FREELANCER SERVICES & PORTFOLIO SERVICE  (Module 23B)
+// FREELANCER SERVICES & PORTFOLIO  (live)
 // ============================================================
 //
-// Mirrors future NestJS endpoints (documented at the bottom of this file).
-// SECURITY MODEL:
-//   - Ownership is ALWAYS derived from getCurrentUser().id (IDOR/BOLA-safe);
-//     the client never supplies ownerId — mass-assignment is impossible because
-//     we build stored services from a whitelisted FreelancerServiceInput.
-//   - Service status/visibility are backend-owned: only the store's transition
-//     functions write them. The frontend requests an action (publish/pause/
-//     archive) and the store resolves the resulting state.
-//   - External URLs (websites, cover images) are validated against an
-//     allowlist of schemes to reject javascript:/data:/vbscript:.
-//   - Validation is authoritative here (mirroring backend DTOs); the UI also
-//     validates for UX but never trusts the input blindly.
+// A freelancer's services and portfolio are read and written on the server.
+// Ownership comes from the signed-in account, and a service's status is
+// decided there: this module asks to publish, pause or archive and reports
+// what the server answers. Nothing is kept in the browser, and a failure is
+// reported as a failure.
 
-import { getCurrentUser } from "@/services/users";
-import { apiClient } from "@/lib/api-client";
-import {
-  approveServiceRecord,
-  archiveServiceRecord,
-  createServiceRecord,
-  deleteServiceRecord,
-  ensureOwnerRecord,
-  getServiceById,
-  getServicesRecord,
-  pauseServiceRecord,
-  publishServiceRecord,
-  resumeServiceRecord,
-  updateServiceRecord,
-} from "@/data/freelancer-services";
-import {
-  getFreelancerOnboardingDraft,
-  saveFreelancerDraft,
-} from "@/data/freelancer";
-import { pushUserNotification } from "@/services/notifications";
+import { apiClient, type ApiError } from "@/lib/api-client";
 import type {
   FreelancerService,
   FreelancerServiceInput,
@@ -42,26 +16,20 @@ import type {
   FreelancerServiceQuery,
   FreelancerServiceResult,
   FreelancerServiceResultCode,
+  FreelancerServiceStatus,
 } from "@/types/freelancer-services";
-import { FREELANCER_SERVICE_RESULT, FREELANCER_SERVICE_STATUS } from "@/types/freelancer-services";
+import {
+  FREELANCER_SERVICE_RESULT,
+  FREELANCER_SERVICE_STATUS,
+} from "@/types/freelancer-services";
 import type { FreelancerPortfolioItem } from "@/types/freelancer";
 import { FREELANCER_SERVICE_SAFE_SCHEMES } from "@/config/freelancer-services";
-
-// ── Owner context ───────────────────────────────────────────
-
-function currentUserId(): string | null {
-  const user = getCurrentUser();
-  return user?.id ?? null;
-}
 
 function ok(message: string, extra?: Partial<FreelancerServiceResult>): FreelancerServiceResult {
   return { ok: true, code: FREELANCER_SERVICE_RESULT.OK, message, ...extra };
 }
 
-function fail(
-  code: FreelancerServiceResultCode,
-  message: string
-): FreelancerServiceResult {
+function fail(code: FreelancerServiceResultCode, message: string): FreelancerServiceResult {
   return { ok: false, code, message };
 }
 
@@ -77,7 +45,7 @@ function isSafeExternalUrl(value: string | undefined | null): boolean {
   }
 }
 
-// ── Validation (mirrors backend DTO validation) ─────────────
+// ── Validation (the server checks again) ────────────────────
 
 interface ValidationIssue {
   field: string;
@@ -107,154 +75,171 @@ function validateServiceInput(input: FreelancerServiceInput): ValidationIssue[] 
     issues.push({ field: "price", message: "Price cannot be negative." });
   if (input.priceMax !== undefined && input.priceMax < 0)
     issues.push({ field: "priceMax", message: "Maximum price cannot be negative." });
-  if (
-    input.price !== undefined &&
-    input.priceMax !== undefined &&
-    input.priceMax < input.price
-  ) {
+  if (input.price !== undefined && input.priceMax !== undefined && input.priceMax < input.price) {
     issues.push({ field: "priceMax", message: "Maximum price must be at least the base price." });
   }
   if (input.deliveryValue !== undefined && input.deliveryValue <= 0)
     issues.push({ field: "deliveryValue", message: "Delivery estimate must be greater than zero." });
 
-  // Reject dangerously-schemed cover images.
   if (input.coverImageUrl && !isSafeExternalUrl(input.coverImageUrl)) {
     issues.push({ field: "coverImageUrl", message: "Cover image uses an unsupported URL scheme." });
   }
-
   return issues;
 }
 
-// ── My Services API ─────────────────────────────────────────
+// ── Server shape <-> editor shape ───────────────────────────
 
-/** Returns the current user's services (optionally filtered). */
-export function getMyServices(query: FreelancerServiceQuery = {}): FreelancerService[] {
-  const uid = currentUserId();
-  if (!uid) return [];
-  const list = getServicesRecord(uid);
-  let result = list;
-  if (query.status && query.status !== "all") {
-    result = result.filter((s) => s.status === query.status);
-  }
-  if (query.search && query.search.trim()) {
-    const q = query.search.trim().toLowerCase();
-    result = result.filter(
-      (s) =>
-        s.title.toLowerCase().includes(q) ||
-        s.shortDescription.toLowerCase().includes(q) ||
-        s.skills.some((k) => k.toLowerCase().includes(q))
-    );
-  }
-  return result;
+interface BackendService {
+  id: string;
+  freelancerId: string;
+  title: string;
+  slug: string;
+  description: string | null;
+  category: { id: string; name: string } | null;
+  startingPrice: number | null;
+  priceMax: number | null;
+  deliveryDays: number | null;
+  deliveryValue: number | null;
+  deliveryUnit: "HOURS" | "DAYS" | "WEEKS";
+  pricingModel: "FIXED" | "STARTING_AT" | "HOURLY" | "PROJECT";
+  shortDescription: string | null;
+  skills: string[];
+  revisions: number | null;
+  deliverables: string[];
+  coverImageUrl: string | null;
+  status: "DRAFT" | "PUBLISHED" | "PAUSED" | "ARCHIVED";
+  createdAt: string;
+  updatedAt: string;
 }
 
-export function getMyServicesPage(query: FreelancerServiceQuery = {}): FreelancerServicePage {
-  const filtered = getMyServices(query);
-  return { items: filtered, total: filtered.length };
+const STATUS_FROM_SERVER: Record<BackendService["status"], FreelancerServiceStatus> = {
+  DRAFT: FREELANCER_SERVICE_STATUS.DRAFT,
+  PUBLISHED: FREELANCER_SERVICE_STATUS.PUBLISHED,
+  PAUSED: FREELANCER_SERVICE_STATUS.PAUSED,
+  ARCHIVED: FREELANCER_SERVICE_STATUS.ARCHIVED,
+};
+
+export function fromBackendService(b: BackendService): FreelancerService {
+  return {
+    id: b.id,
+    userId: b.freelancerId,
+    title: b.title,
+    categoryId: b.category?.id ?? "",
+    skills: b.skills ?? [],
+    shortDescription: b.shortDescription ?? "",
+    description: b.description ?? "",
+    pricing: b.pricingModel.toLowerCase() as FreelancerService["pricing"],
+    price: b.startingPrice ?? undefined,
+    priceMax: b.priceMax ?? undefined,
+    deliveryValue: b.deliveryValue ?? b.deliveryDays ?? undefined,
+    deliveryUnit: b.deliveryUnit.toLowerCase() as FreelancerService["deliveryUnit"],
+    revisions: b.revisions ?? undefined,
+    deliverables: b.deliverables ?? [],
+    coverImageUrl: b.coverImageUrl ?? undefined,
+    status: STATUS_FROM_SERVER[b.status] ?? FREELANCER_SERVICE_STATUS.DRAFT,
+    visibility: b.status === "PUBLISHED" ? "visible" : "hidden",
+    createdAt: b.createdAt,
+    updatedAt: b.updatedAt,
+  };
 }
 
-// ── Public services reader (Module 32) ──────────────────────
-// Public freelancer profile preview: ONLY published + visible services are
-// surfaced. Ownership is passed by the server page (slug → owner), never taken
-// from the client. Status/visibility remain backend-authoritative.
-export function getPublicFreelancerServices(userId: string): FreelancerService[] {
-  if (!userId) return [];
-  return getServicesRecord(userId).filter(
-    (s) =>
-      s.status === FREELANCER_SERVICE_STATUS.PUBLISHED &&
-      s.visibility === "visible"
+function toBackendBody(input: FreelancerServiceInput) {
+  const has = (v: unknown) => v !== undefined && v !== null && v !== "";
+  return {
+    title: input.title.trim(),
+    description: input.description.trim(),
+    shortDescription: input.shortDescription.trim(),
+    categoryId: input.categoryId,
+    skills: input.skills,
+    pricingModel: input.pricing.toUpperCase(),
+    startingPrice: has(input.price) ? input.price : undefined,
+    priceMax: has(input.priceMax) ? input.priceMax : undefined,
+    deliveryValue: has(input.deliveryValue) ? input.deliveryValue : undefined,
+    deliveryUnit: input.deliveryUnit.toUpperCase(),
+    revisions: has(input.revisions) ? input.revisions : undefined,
+    deliverables: input.deliverables,
+    coverImageUrl: has(input.coverImageUrl) ? input.coverImageUrl : undefined,
+  };
+}
+
+function serviceFail(error: ApiError): FreelancerServiceResult {
+  if (error.status === 401) return fail(FREELANCER_SERVICE_RESULT.UNAUTHORIZED, "Please sign in again.");
+  if (error.status === 404) return fail(FREELANCER_SERVICE_RESULT.NOT_FOUND, "Service not found.");
+  if (error.status === 409) return fail(FREELANCER_SERVICE_RESULT.CONFLICT, error.message || "That conflicts with another service.");
+  return fail(FREELANCER_SERVICE_RESULT.VALIDATION, error.message || "Something went wrong. Please try again.");
+}
+
+// ── My Services ─────────────────────────────────────────────
+
+/** The signed-in freelancer's services, newest first. Throws a message the page can show. */
+export async function fetchMyServices(query: FreelancerServiceQuery = {}): Promise<FreelancerServicePage> {
+  const status =
+    query.status && query.status !== "all"
+      ? ({ draft: "DRAFT", published: "PUBLISHED", paused: "PAUSED", archived: "ARCHIVED" } as Record<string, string>)[query.status]
+      : undefined;
+  // The server has no "submitted/under review/rejected": those tabs are empty by design.
+  if (query.status && query.status !== "all" && !status) return { items: [], total: 0 };
+
+  const qs = new URLSearchParams({ limit: "100" });
+  if (status) qs.set("status", status);
+  if (query.search?.trim()) qs.set("search", query.search.trim());
+  const { data, error } = await apiClient.get<{ items: BackendService[]; meta: { total: number } }>(`/services/me?${qs}`);
+  if (error || !data) throw new Error(error?.message || "Could not load your services.");
+  return { items: data.items.map(fromBackendService), total: data.meta?.total ?? data.items.length };
+}
+
+/** One of your services; null when it does not exist or is not yours. */
+export async function fetchMyService(serviceId: string): Promise<FreelancerService | null> {
+  const { data, error } = await apiClient.get<BackendService>(`/services/me/${serviceId}`);
+  if (data) return fromBackendService(data);
+  if (error?.status === 404 || error?.status === 400) return null;
+  throw new Error(error?.message || "Could not load this service.");
+}
+
+/** Creates a service as a draft. */
+export async function createMyService(input: FreelancerServiceInput): Promise<FreelancerServiceResult> {
+  const issues = validateServiceInput(input);
+  if (issues.length > 0) return fail(FREELANCER_SERVICE_RESULT.VALIDATION, issues[0].message);
+  const { data, error } = await apiClient.post<ReturnType<typeof toBackendBody>, BackendService>("/services", toBackendBody(input));
+  if (error || !data) return serviceFail(error ?? (new Error("No response") as ApiError));
+  return ok("Service draft created.", { service: fromBackendService(data) });
+}
+
+export async function updateMyService(serviceId: string, input: FreelancerServiceInput): Promise<FreelancerServiceResult> {
+  const issues = validateServiceInput(input);
+  if (issues.length > 0) return fail(FREELANCER_SERVICE_RESULT.VALIDATION, issues[0].message);
+  const { data, error } = await apiClient.patch<ReturnType<typeof toBackendBody>, BackendService>(`/services/${serviceId}`, toBackendBody(input));
+  if (error || !data) return serviceFail(error ?? (new Error("No response") as ApiError));
+  return ok("Service updated.", { service: fromBackendService(data) });
+}
+
+async function transition(path: string, message: string): Promise<FreelancerServiceResult> {
+  const { data, error } = await apiClient.post<undefined, BackendService>(path);
+  if (error || !data) return serviceFail(error ?? (new Error("No response") as ApiError));
+  return ok(message, { status: STATUS_FROM_SERVER[data.status], service: fromBackendService(data) });
+}
+
+/** Publishes the service so clients can find it. */
+export const publishMyService = (serviceId: string) => transition(`/services/${serviceId}/publish`, "Service published.");
+export const resumeMyService = (serviceId: string) => transition(`/services/${serviceId}/publish`, "Service is live again.");
+export const pauseMyService = (serviceId: string) => transition(`/services/${serviceId}/pause`, "Service paused.");
+
+/** Archives the service; it is hidden but kept. */
+export async function archiveMyService(serviceId: string): Promise<FreelancerServiceResult> {
+  const { error } = await apiClient.delete(`/services/${serviceId}`);
+  return error ? serviceFail(error) : ok("Service archived.", { status: FREELANCER_SERVICE_STATUS.ARCHIVED });
+}
+
+/** The server archives rather than erases, so "delete" is the same as archive. */
+export const deleteMyService = archiveMyService;
+
+/** Published services of one freelancer (by profile id), for their public page. */
+export async function fetchPublicFreelancerServices(freelancerId: string): Promise<FreelancerService[]> {
+  const { data, error } = await apiClient.get<{ items: BackendService[] }>(
+    `/services/public/?freelancerId=${encodeURIComponent(freelancerId)}&limit=50`
   );
-}
-
-export function getMyService(serviceId: string): FreelancerService | null {
-  const uid = currentUserId();
-  if (!uid) return null;
-  return getServiceById(uid, serviceId);
-}
-
-/** Creates a service as a backend-owned DRAFT. */
-export function createMyService(input: FreelancerServiceInput): FreelancerServiceResult {
-  const uid = currentUserId();
-  if (!uid) return fail(FREELANCER_SERVICE_RESULT.UNAUTHORIZED, "Not authenticated.");
-  const issues = validateServiceInput(input);
-  if (issues.length > 0)
-    return { ok: false, code: FREELANCER_SERVICE_RESULT.VALIDATION, message: issues[0].message };
-  const service = createServiceRecord(uid, input);
-  return ok("Service draft created.", { service });
-}
-
-/** Updates an existing owned service (draft/published business fields). */
-export function updateMyService(serviceId: string, input: FreelancerServiceInput): FreelancerServiceResult {
-  const uid = currentUserId();
-  if (!uid) return fail(FREELANCER_SERVICE_RESULT.UNAUTHORIZED, "Not authenticated.");
-  const existing = getServiceById(uid, serviceId);
-  if (!existing) return fail(FREELANCER_SERVICE_RESULT.NOT_FOUND, "Service not found.");
-  const issues = validateServiceInput(input);
-  if (issues.length > 0)
-    return { ok: false, code: FREELANCER_SERVICE_RESULT.VALIDATION, message: issues[0].message };
-  // Rejected/draft services can be edited freely; published services keep
-  // editing their business fields (pricing/description) as allowed.
-  const updated = updateServiceRecord(uid, serviceId, input);
-  if (!updated) return fail(FREELANCER_SERVICE_RESULT.NOT_FOUND, "Service not found.");
-  return ok("Service updated.", { service: updated });
-}
-
-/** Requests publication — the backend resolves the resulting status. */
-export function publishMyService(serviceId: string): FreelancerServiceResult {
-  const uid = currentUserId();
-  if (!uid) return fail(FREELANCER_SERVICE_RESULT.UNAUTHORIZED, "Not authenticated.");
-  const res = publishServiceRecord(uid, serviceId);
-  if (!res.ok) return fail(FREELANCER_SERVICE_RESULT.CONFLICT, "This service cannot be published from its current state.");
-  pushUserNotification({
-    userId: uid,
-    type: "account",
-    category: "marketplace",
-    title: "Service submitted for review",
-    message: "Your service is now being reviewed by our team.",
-    actionUrl: "/freelancer/services",
-  });
-  return ok("Service submitted for review.", { status: res.status });
-}
-
-/** Simulates the backend completing review (prototype only). */
-export function approveMyServiceForDemo(serviceId: string): FreelancerServiceResult {
-  const uid = currentUserId();
-  if (!uid) return fail(FREELANCER_SERVICE_RESULT.UNAUTHORIZED, "Not authenticated.");
-  const res = approveServiceRecord(uid, serviceId);
-  if (!res.ok) return fail(FREELANCER_SERVICE_RESULT.CONFLICT, "This service cannot be approved from its current state.");
-  return ok("Service published.", { status: res.status });
-}
-
-export function pauseMyService(serviceId: string): FreelancerServiceResult {
-  const uid = currentUserId();
-  if (!uid) return fail(FREELANCER_SERVICE_RESULT.UNAUTHORIZED, "Not authenticated.");
-  const res = pauseServiceRecord(uid, serviceId);
-  if (!res.ok) return fail(FREELANCER_SERVICE_RESULT.CONFLICT, "Only published services can be paused.");
-  return ok("Service paused.", { status: res.status });
-}
-
-export function resumeMyService(serviceId: string): FreelancerServiceResult {
-  const uid = currentUserId();
-  if (!uid) return fail(FREELANCER_SERVICE_RESULT.UNAUTHORIZED, "Not authenticated.");
-  const res = resumeServiceRecord(uid, serviceId);
-  if (!res.ok) return fail(FREELANCER_SERVICE_RESULT.CONFLICT, "Only paused services can be resumed.");
-  return ok("Service submitted for review.", { status: res.status });
-}
-
-export function archiveMyService(serviceId: string): FreelancerServiceResult {
-  const uid = currentUserId();
-  if (!uid) return fail(FREELANCER_SERVICE_RESULT.UNAUTHORIZED, "Not authenticated.");
-  const res = archiveServiceRecord(uid, serviceId);
-  if (!res.ok) return fail(FREELANCER_SERVICE_RESULT.CONFLICT, "This service cannot be archived from its current state.");
-  return ok("Service archived.", { status: res.status });
-}
-
-export function deleteMyService(serviceId: string): FreelancerServiceResult {
-  const uid = currentUserId();
-  if (!uid) return fail(FREELANCER_SERVICE_RESULT.UNAUTHORIZED, "Not authenticated.");
-  const deleted = deleteServiceRecord(uid, serviceId);
-  if (!deleted) return fail(FREELANCER_SERVICE_RESULT.NOT_FOUND, "Service not found.");
-  return ok("Service deleted.");
+  if (error || !data) return [];
+  return data.items.map(fromBackendService);
 }
 
 // ── Portfolio API (backend: /portfolio) ─────────────────────
@@ -345,39 +330,18 @@ export async function deleteMyPortfolioItem(itemId: string): Promise<FreelancerS
   return error ? apiFail(error) : ok("Portfolio project deleted.");
 }
 
-// ── Aggregate (dashboard integration) ───────────────────────
+// ── Dashboard counts ────────────────────────────────────────
 
-export function getFreelancerContentSummary(): {
+export async function fetchFreelancerContentSummary(): Promise<{
   services: { total: number; published: number; draft: number };
-} {
-  const services = getMyServices();
+}> {
+  const { items } = await fetchMyServices();
   return {
     services: {
-      total: services.length,
-      published: services.filter((s) => s.status === FREELANCER_SERVICE_STATUS.PUBLISHED).length,
-      draft: services.filter(
-        (s) =>
-          s.status === FREELANCER_SERVICE_STATUS.DRAFT ||
-          s.status === FREELANCER_SERVICE_STATUS.REJECTED
-      ).length,
+      total: items.length,
+      published: items.filter((s) => s.status === FREELANCER_SERVICE_STATUS.PUBLISHED).length,
+      draft: items.filter((s) => s.status === FREELANCER_SERVICE_STATUS.DRAFT).length,
     },
   };
 }
 
-// ── Expected backend endpoints (service layer mirrors these) ──
-//
-//   GET   /freelancer/services          (?status&search)
-//   GET   /freelancer/services/:id
-//   POST  /freelancer/services          (create draft)
-//   PUT   /freelancer/services/:id      (update business fields)
-//   POST  /freelancer/services/:id/publish
-//   POST  /freelancer/services/:id/pause
-//   POST  /freelancer/services/:id/resume
-//   POST  /freelancer/services/:id/archive
-//   DELETE /freelancer/services/:id
-//   GET   /freelancer/portfolio         (from freelancer profile store)
-//   GET   /freelancer/portfolio/:id
-//   POST  /freelancer/portfolio         (create project)
-//   PUT   /freelancer/portfolio/:id     (update project)
-//   DELETE /freelancer/portfolio/:id
-//   GET   /freelancer/content/summary   (dashboard counts)

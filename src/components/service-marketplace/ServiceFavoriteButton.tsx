@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, usePathname } from "next/navigation";
 import { Heart } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
-import { isServiceFavorited, toggleServiceFavorite } from "@/services/service-marketplace";
+import { fetchServiceFavoriteIds, setServiceFavorite } from "@/services/service-marketplace";
 
 interface ServiceFavoriteButtonProps {
   serviceId: string;
@@ -17,21 +17,30 @@ interface ServiceFavoriteButtonProps {
  * Auth-aware "Save service" button.
  * - Guests are routed through login with a `returnTo` back to the current page,
  *   so no navigation context is lost.
- * - Uses the service-favorites abstraction (future `POST/DELETE /me/services/favorites`).
+ * - Saved services live on the account's wishlist, so they follow you across devices.
  * - Never shows who else favourited a service.
  */
 export function ServiceFavoriteButton({ serviceId, className, variant = "card" }: ServiceFavoriteButtonProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { status, user } = useAuth();
-  const [favorited, setFavorited] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const queryClient = useQueryClient();
+  const signedIn = status === "authenticated" && !!user;
 
-  useEffect(() => {
-    if (status === "authenticated" && user) {
-      setFavorited(isServiceFavorited(serviceId, user.id));
-    }
-  }, [status, user, serviceId]);
+  const saved = useQuery({
+    queryKey: ["service-favorites", user?.id],
+    queryFn: fetchServiceFavoriteIds,
+    enabled: signedIn,
+    staleTime: 60_000,
+    retry: false,
+  });
+  const favorited = !!saved.data?.includes(serviceId);
+
+  const toggle = useMutation({
+    mutationFn: () => setServiceFavorite(serviceId, !favorited),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["service-favorites", user?.id] }),
+  });
+  const busy = toggle.isPending;
 
   function handleClick() {
     if (status !== "authenticated" || !user) {
@@ -39,12 +48,7 @@ export function ServiceFavoriteButton({ serviceId, className, variant = "card" }
       router.push(`/login?returnTo=${encodeURIComponent(returnTo)}`);
       return;
     }
-    setBusy(true);
-    try {
-      setFavorited(toggleServiceFavorite(serviceId, user.id));
-    } finally {
-      setBusy(false);
-    }
+    toggle.mutate();
   }
 
   if (variant === "panel") {

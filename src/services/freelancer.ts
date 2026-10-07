@@ -253,61 +253,6 @@ export async function applyForFreelancerVerification(): Promise<{
 }
 
 // ═══════════════════════════════════════════════════════════
-// FREELANCER SERVICES (public browse)
-// ═══════════════════════════════════════════════════════════
-
-/**
- * List published freelancer services (public marketplace browse).
- * Endpoint: GET /services/public/
- */
-export async function listPublicFreelancerServices(query: {
-  page?: number;
-  limit?: number;
-  q?: string;
-  categoryId?: string;
-  freelancerId?: string;
-} = {}): Promise<{
-  services: FreelancerService[];
-  total: number;
-  page: number;
-  totalPages: number;
-  error: ApiError | null;
-}> {
-  const params = new URLSearchParams();
-  if (query.page) params.set("page", String(query.page));
-  if (query.limit) params.set("limit", String(query.limit));
-  if (query.q) params.set("q", query.q);
-  if (query.categoryId) params.set("categoryId", query.categoryId);
-  if (query.freelancerId) params.set("freelancerId", query.freelancerId);
-
-  const qs = params.toString();
-  const path = `/services/public/${qs ? `?${qs}` : ""}`;
-
-  const { data, error } = await apiClient.get<PaginatedResult<FreelancerService>>(path);
-  if (error) return { services: [], total: 0, page: 1, totalPages: 1, error };
-
-  return {
-    services: data.data ?? [],
-    total: data.total ?? 0,
-    page: data.page ?? 1,
-    totalPages: data.totalPages ?? 1,
-    error: null,
-  };
-}
-
-/**
- * Get a published freelancer service by slug.
- * Endpoint: GET /services/slug/:slug
- */
-export async function getFreelancerServiceBySlug(
-  slug: string
-): Promise<{ service: FreelancerService | null; error: ApiError | null }> {
-  const { data, error } = await apiClient.get<FreelancerService>(`/services/slug/${slug}`);
-  if (error) return { service: null, error };
-  return { service: data, error: null };
-}
-
-// ═══════════════════════════════════════════════════════════
 // ONBOARDING ASYNC API (backend-connected)
 // ═══════════════════════════════════════════════════════════
 //

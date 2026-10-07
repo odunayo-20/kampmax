@@ -14,10 +14,10 @@ function CreatePage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function handleSubmit(values: ServiceFormValues) {
+  async function handleSubmit(values: ServiceFormValues) {
     setSubmitting(true);
     setError(null);
-    const result = createMyService(values);
+    const result = await createMyService(values);
     setSubmitting(false);
     if (result.ok && result.service) {
       router.push(`/freelancer/services/${result.service.id}`);

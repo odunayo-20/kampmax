@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Search, SlidersHorizontal } from "lucide-react";
-import { getActiveServices, getProviderDisplayName } from "@/services/service-marketplace";
+import { fetchCustomerBookings, fetchProviderBookings } from "@/services/booking";
 import type { BookingListQuery, BookingSort } from "@/types/booking";
 
 const SORT_OPTIONS: { value: BookingSort; label: string }[] = [
@@ -26,27 +27,24 @@ export function BookingFilters({
   query: BookingListQuery;
   onChange: (patch: Partial<BookingListQuery>) => void;
 }) {
-  const { services, providers } = useMemo(() => {
-    const active = getActiveServices();
-    const serviceOptions = active
-      .map((s) => ({ value: s.id, label: s.name }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-    const seen = new Set<string>();
-    const providerOptions = active
-      .filter((s) => {
-        if (seen.has(s.providerId)) return false;
-        seen.add(s.providerId);
-        return true;
-      })
-      .map((s) => ({ value: s.providerId, label: getProviderDisplayName(s.providerId) }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-    return { services: serviceOptions, providers: providerOptions };
-  }, []);
+  // The service list is made from the bookings you actually have.
+  const known = useQuery({
+    queryKey: ["bookings", role, "filter-options"],
+    queryFn: () => (role === "customer" ? fetchCustomerBookings({ limit: 100 }) : fetchProviderBookings({ limit: 100 })),
+    staleTime: 60_000,
+    retry: false,
+  });
+  const services = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const b of known.data?.items ?? []) seen.set(b.serviceId, b.serviceName);
+    return [...seen.entries()]
+      .map(([value, label]) => ({ value, label }))
+      .sort((x, y) => x.label.localeCompare(y.label));
+  }, [known.data]);
 
   const hasActive =
     !!query.search ||
     !!query.serviceId ||
-    !!query.providerId ||
     !!query.dateFrom ||
     !!query.dateTo ||
     (query.sort && query.sort !== "newest");
@@ -80,24 +78,6 @@ export function BookingFilters({
             ))}
           </select>
         </label>
-
-        {role === "customer" && (
-          <label className="block">
-            <span className="sr-only">Filter by provider</span>
-            <select
-              value={query.providerId ?? ""}
-              onChange={(e) => onChange({ providerId: e.target.value || undefined })}
-              className="w-full rounded-lg border border-neutral-200 py-2 pl-2 pr-2 text-xs focus:border-primary-400 focus:outline-none"
-            >
-              <option value="">All providers</option>
-              {providers.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
 
         <div className="flex items-center gap-1.5">
           <label className="block min-w-0 flex-1">

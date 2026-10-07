@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import type { MarketplaceProvider, MarketplaceService } from "@/types/service-marketplace";
+import { useQuery } from "@tanstack/react-query";
+import type { MarketplaceService } from "@/types/service-marketplace";
 import { useApp } from "@/lib/app-context";
 import { useDebounce } from "@/hooks/use-debounce";
 import { campuses } from "@/data/campus";
@@ -10,9 +11,9 @@ import { useCategoryTree } from "@/hooks/use-taxonomy";
 import { findTaxonomyNode } from "@/services/taxonomy";
 import {
   categoryIdsFor,
-  getProviderById,
+  fetchCategoryCounts,
+  fetchServicePage,
   getServiceCategories,
-  getServicePage,
 } from "@/services/service-marketplace";
 import {
   defaultServiceFilters,
@@ -25,7 +26,13 @@ import {
 /** Browse categories: the root nodes of the SERVICE taxonomy (API), with live counts. */
 export function useServiceCategories() {
   const { data: tree } = useCategoryTree("SERVICE");
-  return useMemo(() => getServiceCategories(tree ?? []), [tree]);
+  const counts = useQuery({
+    queryKey: ["services", "category-counts"],
+    queryFn: fetchCategoryCounts,
+    staleTime: 60_000,
+    retry: false,
+  });
+  return useMemo(() => getServiceCategories(tree ?? [], counts.data ?? {}), [tree, counts.data]);
 }
 
 const PAGE_SIZE = 12;
@@ -96,8 +103,7 @@ function filtersEqual(a: ServiceMarketplaceFilters, b: ServiceMarketplaceFilters
 /**
  * Owns everything the browse page needs: filter state mirrored to URL search
  * params (state-preserving refresh/back), a debounced query, and paginated
- * results from the (future API-shaped) service layer. No external query cache —
- * matches the app's existing mock-layer convention.
+ * results from the live catalogue.
  */
 export function useServiceMarketplace(options?: UseServiceMarketplaceOptions) {
   const router = useRouter();
@@ -111,13 +117,14 @@ export function useServiceMarketplace(options?: UseServiceMarketplaceOptions) {
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [services, setServices] = useState<MarketplaceService[]>([]);
-  const [providers, setProviders] = useState<Record<string, MarketplaceProvider>>({});
+  const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [resultCount, setResultCount] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
 
   const { data: categoryTree } = useCategoryTree("SERVICE");
-  const categories = useMemo(() => getServiceCategories(categoryTree ?? []), [categoryTree]);
+  const categories = useServiceCategories();
   const campusOptions = useMemo(
     () => campuses.map((c) => ({ id: c.id, name: c.name, abbreviation: c.abbreviation })),
     []
@@ -139,8 +146,9 @@ export function useServiceMarketplace(options?: UseServiceMarketplaceOptions) {
     if (filters.categoryId && !categoryTree) return;
     setIsLoading(true);
     const node = filters.categoryId && categoryTree ? findTaxonomyNode(categoryTree, filters.categoryId) : undefined;
+    let cancelled = false;
     const timeout = setTimeout(() => {
-      const result = getServicePage({
+      fetchServicePage({
         q: debouncedQ,
         categoryId: filters.categoryId || undefined,
         categoryIds: node ? categoryIdsFor(node) : undefined,
@@ -151,21 +159,30 @@ export function useServiceMarketplace(options?: UseServiceMarketplaceOptions) {
         sort: filters.sort,
         page,
         pageSize: PAGE_SIZE,
-      });
-      const providerMap: Record<string, MarketplaceProvider> = {};
-      for (const s of result.items) {
-        const p = getProviderById(s.providerId);
-        if (p) providerMap[s.providerId] = p;
-      }
-      setServices(result.items);
-      setProviders(providerMap);
-      setResultCount(result.total);
-      setTotalPages(result.totalPages);
-      setCurrentPage(result.page);
-      setIsLoading(false);
+      })
+        .then((result) => {
+          if (cancelled) return;
+          setServices(result.items);
+          setResultCount(result.total);
+          setTotalPages(result.totalPages);
+          setCurrentPage(result.page);
+          setError(null);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setServices([]);
+          setResultCount(0);
+          setError("We couldn't load services right now.");
+        })
+        .finally(() => {
+          if (!cancelled) setIsLoading(false);
+        });
     }, 200);
-    return () => clearTimeout(timeout);
-  }, [categoryTree, debouncedQ, filters.categoryId, filters.campusId, filters.ratingMin, filters.priceBucket, filters.locationType, filters.sort, page, selectedCampus.id]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [categoryTree, debouncedQ, filters.categoryId, filters.campusId, filters.ratingMin, filters.priceBucket, filters.locationType, filters.sort, page, selectedCampus.id, attempt]);
 
   const setFilter = useCallback(
     <K extends keyof ServiceMarketplaceFilters>(key: K, value: ServiceMarketplaceFilters[K]) => {
@@ -204,8 +221,9 @@ export function useServiceMarketplace(options?: UseServiceMarketplaceOptions) {
     setPage: setPageAndSync,
     clearFilters,
     isLoading,
+    error,
+    retry: () => setAttempt((n) => n + 1),
     services,
-    providers,
     resultCount,
     totalPages,
     currentPage,

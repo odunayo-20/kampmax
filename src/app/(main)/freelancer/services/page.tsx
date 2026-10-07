@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from "react";
+import { useCallback, useEffect, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { getMyServicesPage } from "@/services/freelancer-services";
-import type { FreelancerServiceStatus } from "@/types/freelancer-services";
+import { fetchMyServices } from "@/services/freelancer-services";
+import type { FreelancerService, FreelancerServiceStatus } from "@/types/freelancer-services";
 import {
   ServiceHeader,
   ServiceFilters,
@@ -19,7 +19,10 @@ function ServicesContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const [all, setAll] = useState<FreelancerService[]>([]);
 
   const statusParam = (searchParams.get("status") ?? "all") as StatusFilter;
   const searchParam = searchParams.get("q") ?? "";
@@ -37,40 +40,58 @@ function ServicesContent() {
       isFirstRender.current = false;
       return;
     }
-    setLoading(true);
-    const t = setTimeout(() => setLoading(false), 200);
     const params = new URLSearchParams(searchParams.toString());
     if (debouncedSearch) params.set("q", debouncedSearch);
     else params.delete("q");
     if (status !== "all") params.set("status", status);
     else params.delete("status");
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch, status]);
 
-  const { items, total } = useMemo(
-    () => getMyServicesPage({ status, search: debouncedSearch }),
-    [status, debouncedSearch]
-  );
-
-  const counts = useMemo(() => {
-    const all = getMyServicesPage({});
-    const c: Record<StatusFilter, number> = {
-      all: all.total,
-      draft: 0,
-      submitted: 0,
-      under_review: 0,
-      published: 0,
-      paused: 0,
-      rejected: 0,
-      archived: 0,
+  // Everything is loaded once; the tabs and the search narrow it down here.
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetchMyServices()
+      .then((page) => {
+        if (cancelled) return;
+        setAll(page.items);
+        setLoadError(null);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setLoadError(e instanceof Error ? e.message : "Could not load your services.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
     };
-    for (const s of ["draft", "submitted", "under_review", "published", "paused", "rejected", "archived"] as FreelancerServiceStatus[]) {
-      c[s] = all.items.filter((x) => x.status === s).length;
-    }
-    return c;
-  }, []);
+  }, [attempt]);
+
+  const needle = debouncedSearch.trim().toLowerCase();
+  const items = all.filter(
+    (s) =>
+      (status === "all" || s.status === status) &&
+      (!needle ||
+        s.title.toLowerCase().includes(needle) ||
+        s.shortDescription.toLowerCase().includes(needle) ||
+        s.skills.some((k) => k.toLowerCase().includes(needle)))
+  );
+  const total = items.length;
+
+  const counts: Record<StatusFilter, number> = {
+    all: all.length,
+    draft: 0,
+    submitted: 0,
+    under_review: 0,
+    published: 0,
+    paused: 0,
+    rejected: 0,
+    archived: 0,
+  };
+  for (const s of all) counts[s.status] += 1;
 
   const handleStatusChange = useCallback(
     (value: StatusFilter) => {
@@ -94,7 +115,14 @@ function ServicesContent() {
         onSearchChange={setSearchInput}
         counts={counts}
       />
-      {loading && items.length === 0 ? (
+      {loadError ? (
+        <div role="alert" className="rounded-xl border border-neutral-200 bg-white p-8 text-center text-sm text-neutral-600">
+          {loadError}{" "}
+          <button type="button" onClick={() => setAttempt((n) => n + 1)} className="font-semibold text-primary-600 hover:underline">
+            Try again
+          </button>
+        </div>
+      ) : loading && items.length === 0 ? (
         <ServicesGridSkeleton />
       ) : items.length === 0 ? (
         <ServicesEmptyState

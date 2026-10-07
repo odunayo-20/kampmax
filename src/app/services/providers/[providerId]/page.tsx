@@ -3,13 +3,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ProviderProfileView } from "@/components/service-marketplace/ProviderProfileView";
 import { getSiteBaseUrl } from "@/lib/utils";
-import {
-  getMarketplaceProvider,
-  getProviderActiveServices,
-  getProviderReviews,
-  getProviderReviewSummary,
-  getRelatedProviders,
-} from "@/services/service-marketplace";
+import { fetchProviderProfile } from "@/services/service-marketplace";
 
 interface ProviderProfilePageProps {
   params: Promise<{ providerId: string }>;
@@ -19,7 +13,8 @@ export async function generateMetadata({
   params,
 }: ProviderProfilePageProps): Promise<Metadata> {
   const { providerId } = await params;
-  const provider = getMarketplaceProvider(providerId);
+  const profile = await fetchProviderProfile(providerId).catch(() => null);
+  const provider = profile?.provider;
   if (!provider) {
     return { title: "Provider not found | Kampmax" };
   }
@@ -47,14 +42,10 @@ export async function generateMetadata({
 
 export default async function ProviderProfilePage({ params }: ProviderProfilePageProps) {
   const { providerId } = await params;
-  const provider = getMarketplaceProvider(providerId);
-  if (!provider) notFound();
+  const profile = await fetchProviderProfile(providerId);
+  if (!profile) notFound();
 
-  const services = getProviderActiveServices(provider.id);
-  // Providers are considered available/in-range; we only list live services.
-  const reviews = getProviderReviews(provider.id);
-  const reviewSummary = getProviderReviewSummary(provider.id);
-  const relatedProviders = getRelatedProviders(provider.id, 3);
+  const { provider, services, reviews, reviewSummary, relatedProviders } = profile;
 
   return (
     <Suspense

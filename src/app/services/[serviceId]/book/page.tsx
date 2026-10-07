@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { getServiceDetail } from "@/services/service-marketplace";
+import { fetchServiceDetail } from "@/services/service-marketplace";
 import { BookingFlow } from "@/components/booking/BookingFlow";
 
 export const metadata: Metadata = {
@@ -14,7 +14,7 @@ interface BookPageProps {
 
 export default async function BookPage({ params }: BookPageProps) {
   const { serviceId } = await params;
-  const detail = getServiceDetail(serviceId);
+  const detail = await fetchServiceDetail(serviceId);
   if (!detail) notFound();
 
   const { service } = detail;

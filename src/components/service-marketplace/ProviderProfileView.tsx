@@ -99,7 +99,7 @@ export function ProviderProfileView({
                 </span>
                 <span className="inline-flex items-center gap-1 text-xs text-neutral-500">
                   <MapPin className="h-3.5 w-3.5 text-neutral-400" aria-hidden />
-                  {provider.primaryCampusId.toUpperCase()}
+                  {provider.serviceCities?.join(", ") || "Kampmax"}
                 </span>
               </div>
             </div>
