@@ -363,27 +363,35 @@ function RegisterForm() {
             return (
               <button
                 key={c.id}
+                type="button"
                 onClick={() => choose(c.id)}
                 className={cn(
-                  "w-full flex items-center gap-4 p-4 rounded-lg border text-left transition-all",
-                  "border-kampmax-border hover:border-kampmax-blue/50 bg-white"
+                  "group w-full flex items-start gap-4 p-4 sm:p-5 rounded-xl border text-left transition-all",
+                  "border-kampmax-border bg-white shadow-sm",
+                  "hover:border-kampmax-blue/50 hover:shadow-md",
+                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-kampmax-blue focus-visible:ring-offset-2"
                 )}
               >
-                <div className="w-12 h-12 rounded-xl bg-kampmax-blue/10 flex items-center justify-center flex-shrink-0">
-                  <Icon className="h-6 w-6 text-kampmax-blue" />
+                <div className="w-12 h-12 rounded-xl bg-kampmax-blue/10 flex items-center justify-center flex-shrink-0 transition-colors group-hover:bg-kampmax-blue/15">
+                  <Icon className="h-6 w-6 text-kampmax-blue" aria-hidden />
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-sm font-semibold text-kampmax-text">
+
+                {/* Text runs down the card, one row at a time */}
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <h3 className="text-base font-semibold text-kampmax-text">
                     {path.title}
                   </h3>
-                  <p className="text-xs text-kampmax-text-secondary mt-0.5">
+                  <p className="text-sm leading-snug text-kampmax-text-secondary">
                     {path.description}
                   </p>
+                  <span className="mt-1.5 inline-flex items-center gap-1 text-sm font-semibold text-kampmax-blue">
+                    {c.cta}
+                    <ArrowRight
+                      className="h-4 w-4 transition-transform group-hover:translate-x-0.5"
+                      aria-hidden
+                    />
+                  </span>
                 </div>
-                <span className="inline-flex items-center gap-1 text-xs font-semibold text-kampmax-blue shrink-0">
-                  {c.cta}
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </span>
               </button>
             );
           })}

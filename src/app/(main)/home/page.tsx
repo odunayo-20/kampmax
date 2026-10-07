@@ -28,6 +28,7 @@ import {
   HomeGigCard,
 } from "@/components/home";
 import { ServiceCard } from "@/components/service-marketplace/ServiceCard";
+import { Logo } from "@/components/ui/Logo";
 import { useEvents } from "@/hooks/use-events";
 import { useApp } from "@/lib/app-context";
 import { useAuth } from "@/lib/auth-context";
@@ -74,21 +75,25 @@ export default function HomePage() {
     <PageContainer className="space-y-5 lg:space-y-7 pb-12">
       {/* 1. Top Hub Header: Greeting, Campus Location Selector & Search */}
       <section className="space-y-3.5">
-        <div className="flex items-start justify-between">
-          <div className="space-y-0.5">
-            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-neutral-900 leading-tight">
-              {firstName ? `${greeting}, ${firstName}` : `${greeting}!`} <span aria-hidden>👋</span>
-            </h1>
-            <p className="text-xs sm:text-sm text-neutral-500 font-medium">
-              {user
-                ? "Discover what's happening around you"
-                : `Explore ${selectedCampus.abbreviation} marketplace, events & gigs`}
-            </p>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <Logo size="lg" href="/home" className="shrink-0" />
+            <div className="h-8 w-px bg-neutral-200 hidden sm:block shrink-0" />
+            <div className="space-y-0.5 min-w-0">
+              <h1 className="text-base sm:text-lg font-bold text-neutral-900 leading-tight">
+                {firstName ? `${greeting}, ${firstName}` : `${greeting}!`} <span aria-hidden>👋</span>
+              </h1>
+              <p className="text-xs text-neutral-500 font-medium truncate">
+                {user
+                  ? "Discover what's happening around you"
+                  : `Explore ${selectedCampus.abbreviation} marketplace, events & gigs`}
+              </p>
+            </div>
           </div>
 
           {/* Campus selector pill (shown once the live campus has loaded) */}
           {selectedCampus.id && (
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary-50/80 border border-primary-200/70 text-xs font-bold text-primary-700 shadow-2xs">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary-50/80 border border-primary-200/70 text-xs font-bold text-primary-700 shadow-2xs shrink-0">
             <MapPin className="h-3.5 w-3.5 text-primary-600 shrink-0" />
             <span className="truncate max-w-[120px] sm:max-w-none">
               {[selectedCampus.abbreviation, selectedCampus.location.split(",")[0]].filter(Boolean).join(", ")}
