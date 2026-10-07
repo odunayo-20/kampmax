@@ -75,6 +75,9 @@ export function StepProfile({ draft, onUpdate }: StepProfileProps) {
       </div>
 
       {/* Profile Images */}
+      <p role="note" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-800">
+        Photos are not saved with your application yet, so you can leave these blank. They show only while you are on this page.
+      </p>
       <div className="grid gap-6 sm:grid-cols-2">
         <div>
           <label className="block text-sm font-medium text-kampmax-text mb-3">

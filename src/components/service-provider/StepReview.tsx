@@ -1,12 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle, AlertCircle, XCircle, ChevronRight, Edit, Shield, BadgeCheck, Clock, MapPin, DollarSign, Image, Settings, User, FileText } from "lucide-react";
+import { CheckCircle, AlertCircle, XCircle, ChevronRight, Edit, Shield, Clock, MapPin, DollarSign, Image, Settings, User } from "lucide-react";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { formatNaira } from "@/lib/utils";
-import type { ServiceProviderOnboardingDraft, ServiceProviderVerificationStatus, ServiceProviderServiceStatus, ServiceProviderLocationType, ServiceProviderPricingModel, ServiceProviderBookingPreference } from "@/types/service-provider";
-import { SERVICE_PROVIDER_TYPE, SERVICE_PROVIDER_LOCATION_TYPE, SERVICE_PROVIDER_PRICING_MODEL, SERVICE_PROVIDER_BOOKING_PREFERENCE } from "@/types/service-provider";
+import type { ServiceProviderOnboardingDraft, ServiceProviderServiceStatus, ServiceProviderLocationType, ServiceProviderPricingModel, ServiceProviderBookingPreference } from "@/types/service-provider";
 
 const SERVICE_STATUS_LABELS: Record<ServiceProviderServiceStatus, string> = {
   draft: "Draft",
@@ -14,13 +13,6 @@ const SERVICE_STATUS_LABELS: Record<ServiceProviderServiceStatus, string> = {
   inactive: "Inactive",
   pending_review: "Pending Review",
   rejected: "Rejected",
-};
-
-const VERIFICATION_STATUS_LABELS: Record<ServiceProviderVerificationStatus, string> = {
-  not_required: "Not Required",
-  pending: "Under Review",
-  approved: "Verified",
-  action_required: "Action Required",
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -304,41 +296,6 @@ export function StepReview({ draft, onEditStep, onSubmit, canSubmit, isSubmittin
         </div>
       ),
     },
-    {
-      key: "verification",
-      label: "Verification",
-      icon: Shield,
-      content: (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <span className={cn(
-              "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium",
-              draft?.verification?.status === "approved" && "bg-success-100 text-success-700",
-              draft?.verification?.status === "pending" && "bg-warning-100 text-warning-700",
-              draft?.verification?.status === "action_required" && "bg-error-100 text-error-700",
-              "bg-neutral-100 text-neutral-700"
-            )}>
-              {draft?.verification?.status === "approved" && <BadgeCheck className="h-3.5 w-3.5" />}
-              {draft?.verification?.status === "pending" && <Clock className="h-3.5 w-3.5" />}
-              {draft?.verification?.status === "action_required" && <AlertCircle className="h-3.5 w-3.5" />}
-              {VERIFICATION_STATUS_LABELS[draft?.verification?.status ?? "not_required"]}
-            </span>
-            {draft?.verification?.type && (
-              <span className="text-sm text-kampmax-text-secondary">
-                ({draft.verification.type})
-              </span>
-            )}
-          </div>
-          <div>
-            <p className="text-sm text-kampmax-text-secondary">Documents</p>
-            <p className="font-medium text-kampmax-text">
-              {draft?.documents?.filter((d) => d.status === "approved").length ?? 0} approved,
-              {draft?.documents?.filter((d) => d.status === "uploaded" || d.status === "under_review").length ?? 0} pending
-            </p>
-          </div>
-        </div>
-      ),
-    },
   ];
 
   const allComplete = () => {
@@ -350,9 +307,6 @@ export function StepReview({ draft, onEditStep, onSubmit, canSubmit, isSubmittin
     if (!draft?.services?.length) return false;
     if (!draft?.location?.primaryCampusId) return false;
     if (!draft?.availability?.days?.some((d) => d.isAvailable)) return false;
-    if (draft?.verification?.status === "pending" || draft?.verification?.status === "action_required") return false;
-    const requiredDocMissing = draft?.documents?.some((d) => d.required && d.status !== "uploaded" && d.status !== "approved");
-    if (requiredDocMissing) return false;
     return true;
   };
 
@@ -492,9 +446,9 @@ export function StepReview({ draft, onEditStep, onSubmit, canSubmit, isSubmittin
 
       {/* Submit */}
       <div className="flex flex-col sm:flex-row gap-3 justify-end">
-        <Button variant="outline" onClick={() => onEditStep(9)} disabled={isSubmitting}>
+        <Button variant="outline" onClick={() => onEditStep(8)} disabled={isSubmitting}>
           <XCircle className="h-4 w-4 mr-2" />
-          Back to Verification
+          Back to Portfolio
         </Button>
         <Button
           variant="primary"

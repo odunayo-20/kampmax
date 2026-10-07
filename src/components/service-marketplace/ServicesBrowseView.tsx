@@ -105,7 +105,7 @@ function VerifiedProsReel() {
         {providers.map((p) => (
           <Link
             key={p.id}
-            href={`/service-provider/${p.slug}`}
+            href={`/services/providers/${p.slug}`}
             className="flex-shrink-0 w-[200px] sm:w-[220px] bg-white rounded-2xl border border-neutral-200/90 p-3.5 shadow-2xs hover:border-primary-300 hover:shadow-md transition-all group"
           >
             <div className="flex items-center gap-2.5 mb-2">

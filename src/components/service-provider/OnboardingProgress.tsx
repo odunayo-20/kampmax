@@ -16,8 +16,8 @@ const STEP_GROUPS = [
   { label: "Profile", steps: [1, 2] as ServiceProviderOnboardingStepId[] },
   { label: "Services", steps: [3, 4] as ServiceProviderOnboardingStepId[] },
   { label: "Location & Availability", steps: [5, 6] as ServiceProviderOnboardingStepId[] },
-  { label: "Portfolio & Verification", steps: [7, 8, 9] as ServiceProviderOnboardingStepId[] },
-  { label: "Review", steps: [10] as ServiceProviderOnboardingStepId[] },
+  { label: "Pricing & Portfolio", steps: [7, 8] as ServiceProviderOnboardingStepId[] },
+  { label: "Review", steps: [9] as ServiceProviderOnboardingStepId[] },
 ];
 
 export function OnboardingProgress({
@@ -129,7 +129,7 @@ export function OnboardingStepIndicator({
   currentStep: ServiceProviderOnboardingStepId;
   completedSteps?: ServiceProviderOnboardingStepId[];
 }) {
-  const allSteps: ServiceProviderOnboardingStepId[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  const allSteps: ServiceProviderOnboardingStepId[] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
   return (
     <div className="hidden md:flex items-center gap-1 overflow-x-auto pb-2 px-2 -mx-2" role="navigation" aria-label="Onboarding steps">

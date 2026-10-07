@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button, Input } from "@/components/ui";
 import { Plus, Trash2, Eye, EyeOff } from "lucide-react";
-import { freshId } from "@/data/freelancer";
+import { freshId } from "@/services/freelancer-onboarding";
 import type { FreelancerPortfolioItem, FreelancerOnboardingDraft } from "@/types/freelancer";
 import { useCategories } from "@/hooks/use-taxonomy";
 import { cn } from "@/lib/utils";
@@ -47,6 +47,9 @@ export function StepPortfolio({ draft, onUpdate }: Props) {
 
   return (
     <div className="space-y-6">
+      <p role="note" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-800">
+        Projects added here are not saved with your application. After you finish, add them from Portfolio in your dashboard.
+      </p>
       <div>
         <h2 className="text-xl font-semibold text-kampmax-text">Portfolio</h2>
         <p className="mt-1 text-sm text-kampmax-text-secondary">

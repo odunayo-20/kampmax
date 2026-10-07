@@ -72,7 +72,7 @@ export default function ProfilePage() {
           </p>
         </div>
         <Link
-          href={`/service-provider/${slug}`}
+          href={`/services/providers/${slug}`}
           className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-kampmax-border bg-white px-3.5 py-2 text-sm font-medium text-kampmax-text hover:bg-neutral-50"
         >
           <ExternalLink className="h-4 w-4" aria-hidden />

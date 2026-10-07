@@ -37,13 +37,12 @@ export const SERVICE_PROVIDER_ONBOARDING_STEP = {
   AVAILABILITY: 6,
   PRICING: 7,
   PORTFOLIO: 8,
-  VERIFICATION: 9,
-  REVIEW: 10,
+  REVIEW: 9,
 } as const;
 
-export type ServiceProviderOnboardingStepId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+export type ServiceProviderOnboardingStepId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 
-export const SERVICE_PROVIDER_ONBOARDING_STEPS = 10;
+export const SERVICE_PROVIDER_ONBOARDING_STEPS = 9;
 
 // ── Document status (single source of truth) ─────────────────
 
@@ -390,8 +389,7 @@ export const SP_ONBOARDING_STEP_LABELS: Record<ServiceProviderOnboardingStepId, 
   6: "Availability",
   7: "Pricing",
   8: "Portfolio",
-  9: "Verification",
-  10: "Review & Submit",
+  9: "Review & Submit",
 };
 
 export const SP_ONBOARDING_STEP_DESCRIPTIONS: Record<ServiceProviderOnboardingStepId, string> = {
@@ -403,8 +401,7 @@ export const SP_ONBOARDING_STEP_DESCRIPTIONS: Record<ServiceProviderOnboardingSt
   6: "Set your working hours, booking preferences, and buffers.",
   7: "Configure travel fees, emergency fees, and pricing rules.",
   8: "Showcase your work with portfolio images.",
-  9: "Submit identity or professional verification if required.",
-  10: "Review everything and submit your application.",
+  9: "Review everything and submit your application.",
 };
 
 /** Statuses that should show a focused "action" state, not the steps. */

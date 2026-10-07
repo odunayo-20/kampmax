@@ -1,39 +1,5 @@
-// ============================================================
-// FREELANCER SERVICE  (Module 22 + Freelancer Marketplace)
-// ============================================================
-//
-// This module has two responsibilities:
-//
-//  1. ONBOARDING (legacy mock path): draft persistence helpers used by
-//     the onboarding wizard prior to backend connection.
-//
-//  2. PUBLIC FREELANCER BROWSE API: async wrappers over the NestJS backend.
-//     These replace the mock data lookups previously used by the marketplace
-//     browse pages. Every async function calls apiClient and maps backend
-//     response shapes to the types used in the UI.
-//
-// SECURITY:
-//   - Profile ownership is ALWAYS derived from the authenticated user
-//     (getCurrentUser().id). The client never supplies freelancerId directly.
-//   - Status, verification, completion %, and availability are backend-
-//     authoritative. The frontend only displays the returned state.
-//   - Public-browse endpoints are unauthenticated; private (me/*) require
-//     a valid Bearer token, which the apiClient appends automatically.
 
-import { getCurrentUser } from "@/services/users";
-import {
-  createFreelancerApplication,
-  getFreelancerOnboardingDraft,
-  saveFreelancerDraft,
-  getFreelancerOnboardingStatus,
-  submitFreelancerApplication,
-} from "@/data/freelancer";
-import type {
-  FreelancerOnboardingDraft,
-  FreelancerOnboardingStepId,
-  FreelancerOnboardingStatus,
-} from "@/types/freelancer";
-import { FREELANCER_ONBOARDING_STEPS } from "@/types/freelancer";
+import type { FreelancerOnboardingDraft } from "@/types/freelancer";
 import { apiClient } from "@/lib/api-client";
 import type { ApiError } from "@/lib/api-client";
 
@@ -237,21 +203,6 @@ export async function updateMyFreelancerProfile(
   return { profile: data, error: null };
 }
 
-/**
- * Submit a verification request for the current user's freelancer profile.
- * Endpoint: POST /freelancers/me/verification
- */
-export async function applyForFreelancerVerification(): Promise<{
-  profile: FreelancerPrivateProfile | null;
-  error: ApiError | null;
-}> {
-  const { data, error } = await apiClient.post<undefined, FreelancerPrivateProfile>(
-    "/freelancers/me/verification"
-  );
-  if (error) return { profile: null, error };
-  return { profile: data, error: null };
-}
-
 // ═══════════════════════════════════════════════════════════
 // ONBOARDING ASYNC API (backend-connected)
 // ═══════════════════════════════════════════════════════════
@@ -331,22 +282,6 @@ export async function saveFlDraftApi(
   patch: Partial<CreateFreelancerProfileDto>
 ): Promise<{ profile: FreelancerPrivateProfile | null; error: ApiError | null }> {
   return updateMyFreelancerProfile(patch);
-}
-
-/**
- * Submit the freelancer profile for review (DRAFT → PENDING_REVIEW).
- * Endpoint: POST /freelancers/me/verification
- */
-export async function submitFlApplicationApi(): Promise<{
-  success: boolean;
-  profile: FreelancerPrivateProfile | null;
-  error: ApiError | null;
-}> {
-  const { data, error } = await apiClient.post<undefined, FreelancerPrivateProfile>(
-    "/freelancers/me/verification"
-  );
-  if (!error && data) return { success: true, profile: data, error: null };
-  return { success: false, profile: null, error };
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -470,60 +405,6 @@ export async function saveProfileSections(
       )
     ))
   );
-}
-
-// ═══════════════════════════════════════════════════════════
-// ONBOARDING HELPERS (sync/draft path — offline fallbacks)
-// ═══════════════════════════════════════════════════════════
-
-function currentUserId(): string | null {
-  const user = getCurrentUser();
-  return user?.id ?? null;
-}
-
-/**
- * Ensures an application record exists for the current user.
- * Returns `{ created: true }` on first call (fresh entry page).
- */
-export function createFlApplication(): { created: boolean } {
-  const uid = currentUserId();
-  if (!uid) return { created: false };
-  const { created } = createFreelancerApplication(uid);
-  return { created };
-}
-
-/**
- * Returns the current draft for the authenticated user, or null.
- */
-export function getFlOnboardingDraft(): FreelancerOnboardingDraft | null {
-  const uid = currentUserId();
-  if (!uid) return null;
-  return getFreelancerOnboardingDraft(uid);
-}
-
-/**
- * Persists draft changes (called on every step update + save-draft).
- */
-export function saveFlDraft(draft: FreelancerOnboardingDraft): void {
-  saveFreelancerDraft(draft);
-}
-
-/**
- * Returns the current onboarding status for the authenticated user.
- */
-export function getFlOnboardingStatus(): FreelancerOnboardingStatus {
-  const uid = currentUserId();
-  if (!uid) return "DRAFT" as FreelancerOnboardingStatus;
-  return getFreelancerOnboardingStatus(uid);
-}
-
-/**
- * Submits the freelancer profile for review.
- */
-export function submitFlApplication(): { success: boolean; message: string } {
-  const uid = currentUserId();
-  if (!uid) return { success: false, message: "Not authenticated." };
-  return submitFreelancerApplication(uid);
 }
 
 /**

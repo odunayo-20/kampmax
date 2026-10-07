@@ -7,7 +7,10 @@ import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import { FREELANCER_DASHBOARD_GATE, getFreelancerDashboardAccessApi } from "@/services/freelancer-dashboard";
-import { getFlOnboardingDraft, computeFlCompletion } from "@/services/freelancer";
+import { computeFlCompletion } from "@/services/freelancer";
+import { flDraftFromSaved } from "@/services/freelancer-onboarding";
+import type { FlSavedData } from "@/services/freelancer-onboarding";
+import { loadOnboardingDraft } from "@/services/onboarding-draft";
 
 const features = [
   {
@@ -57,7 +60,7 @@ const steps = [
 
 export default function FreelancerIntroPage() {
   const router = useRouter();
-  const { status: authStatus } = useAuth();
+  const { status: authStatus, user } = useAuth();
   const [checking, setChecking] = useState(true);
   const [completion, setCompletion] = useState(0);
 
@@ -85,12 +88,20 @@ export default function FreelancerIntroPage() {
     return () => { cancelled = true; };
   }, [authStatus, router]);
 
-  // Purely a local-progress nudge ("you're 60% done, continue") — never
-  // used to decide whether this page is reachable.
+  // Purely a progress nudge ("you're 60% done, continue") from the saved draft —
+  // never used to decide whether this page is reachable.
   useEffect(() => {
-    const draft = getFlOnboardingDraft();
-    if (draft) setCompletion(computeFlCompletion(draft));
-  }, []);
+    if (authStatus !== "authenticated" || !user) return;
+    let cancelled = false;
+    loadOnboardingDraft<Partial<FlSavedData>>("freelancer")
+      .then((saved) => {
+        if (!cancelled && saved) setCompletion(computeFlCompletion(flDraftFromSaved(user.id, saved).draft));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [authStatus, user]);
 
   if (authStatus === "loading" || (authStatus === "authenticated" && checking)) {
     return (

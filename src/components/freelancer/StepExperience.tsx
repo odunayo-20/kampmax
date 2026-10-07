@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button, Input } from "@/components/ui";
 import { Plus, Trash2 } from "lucide-react";
 import { FREELANCER_EMPLOYMENT_TYPES } from "@/config/freelancer";
-import { freshId } from "@/data/freelancer";
+import { freshId } from "@/services/freelancer-onboarding";
 import type { FreelancerExperience, FreelancerOnboardingDraft } from "@/types/freelancer";
 
 interface Props {

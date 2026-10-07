@@ -25,7 +25,7 @@ export function ServiceProviderTopbar({
       <div className="flex items-center gap-2">
         <ServiceProviderNotifications />
         <Link
-          href={slug ? `/service-provider/${slug}` : "/service-provider"}
+          href={slug ? `/services/providers/${slug}` : "/service-provider"}
           className="inline-flex items-center gap-1.5 rounded-md border border-kampmax-border px-3 py-1.5 text-sm font-medium text-kampmax-text hover:bg-neutral-50"
         >
           <Wrench className="h-4 w-4" aria-hidden />

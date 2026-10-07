@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { OnboardingLayout } from "@/components/freelancer/OnboardingLayout";
 import { StepProfile } from "@/components/freelancer/StepProfile";
@@ -13,72 +13,33 @@ import { StepRates } from "@/components/freelancer/StepRates";
 import { StepAvailability } from "@/components/freelancer/StepAvailability";
 import { StepPreferences } from "@/components/freelancer/StepPreferences";
 import { StepReview } from "@/components/freelancer/StepReview";
+import { useAuth } from "@/lib/auth-context";
+import { getFriendlyErrorMessage } from "@/lib/error-messages";
 import {
-  createFlApplication,
   createFlApplicationApi,
   freelancerDraftToCreateDto,
-  getFlOnboardingDraft,
   getFlOnboardingDraftApi,
   loadProfileSections,
-  saveProfileSections,
-  getFlOnboardingStatus,
-  saveFlDraft,
   saveFlDraftApi,
-  submitFlApplication,
-  computeFlCompletion,
+  saveProfileSections,
 } from "@/services/freelancer";
-import {
-  FREELANCER_ONBOARDING_STATUS,
-  FREELANCER_ONBOARDING_STEPS,
-  FREELANCER_ONBOARDING_STEP,
-} from "@/types/freelancer";
-import type {
-  FreelancerOnboardingDraft,
-  FreelancerOnboardingStepId,
-} from "@/types/freelancer";
+import { flDraftFromSaved, flDraftToSaved, mergeFreelancerProfile } from "@/services/freelancer-onboarding";
+import type { FlSavedData } from "@/services/freelancer-onboarding";
+import { discardOnboardingDraft, loadOnboardingDraft, saveOnboardingDraft } from "@/services/onboarding-draft";
+import { FREELANCER_ONBOARDING_STEPS } from "@/types/freelancer";
+import type { FreelancerOnboardingDraft, FreelancerOnboardingStepId } from "@/types/freelancer";
 
-const DRAFT_STORAGE_KEY = "kampmax:fl:onboarding:draft";
-const PROGRESS_STORAGE_KEY = "kampmax:fl:onboarding:progress";
+/** How long to wait after the last keystroke before saving progress. */
+const AUTOSAVE_MS = 800;
 
-function loadStoredDraft(): FreelancerOnboardingDraft | null {
+// Drafts used to live only in this browser; progress is on the server now.
+function clearOldBrowserDraft() {
   try {
-    if (typeof window === "undefined") return null;
-    const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as FreelancerOnboardingDraft) : null;
+    window.localStorage.removeItem("kampmax:fl:onboarding:draft");
+    window.localStorage.removeItem("kampmax:fl:onboarding:progress");
   } catch {
-    return null;
+    /* storage unavailable */
   }
-}
-
-function persistDraft(d: FreelancerOnboardingDraft | null) {
-  if (!d) return;
-  try {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(d));
-  } catch { /* noop */ }
-}
-
-function loadStoredProgress(): FreelancerOnboardingStepId[] {
-  try {
-    if (typeof window === "undefined") return [];
-    const raw = window.localStorage.getItem(PROGRESS_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as number[];
-    return parsed.filter((n) => n >= 1 && n <= 10) as FreelancerOnboardingStepId[];
-  } catch {
-    return [];
-  }
-}
-
-function persistProgress(steps: FreelancerOnboardingStepId[]) {
-  try {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(steps));
-  } catch { /* noop */ }
-}
-
-function syncStoreWithDraft(next: FreelancerOnboardingDraft) {
-  saveFlDraft({ ...next, currentStep: next.currentStep as FreelancerOnboardingStepId });
 }
 
 const STEP_COMPONENTS: Record<number, React.ComponentType<any>> = {
@@ -98,20 +59,21 @@ const STEP_VALIDATION: Record<number, (draft: FreelancerOnboardingDraft | null) 
   1: (d) => !!d?.profile?.headline?.trim() && !!d?.profile?.bio?.trim(),
   2: (d) => (d?.categories?.length ?? 0) > 0 && (d?.skills?.length ?? 0) > 0,
   3: (d) => (d?.experience?.length ?? 0) > 0,
-  4: (d) => true, // education is optional
-  5: (d) => true, // certifications are optional
-  6: (d) => true, // portfolio is optional
-  7: (d) => true, // rates are optional
+  4: () => true, // education is optional
+  5: () => true, // certifications are optional
+  6: () => true, // portfolio is optional
+  7: () => true, // rates are optional
   8: (d) => !!d?.availability?.status,
   9: (d) => (d?.preferences?.workArrangements?.length ?? 0) > 0,
-  10: (d) => true, // handled in review
+  10: () => true, // handled in review
 };
 
 export default function FreelancerOnboardingStepPage() {
   const router = useRouter();
   const params = useParams();
-  const stepParam = params.step as string;
-  const currentStep = parseInt(stepParam, 10) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
+  const currentStep = parseInt(params.step as string, 10) as FreelancerOnboardingStepId;
 
   const [draft, setDraft] = useState<FreelancerOnboardingDraft | null>(null);
   const [completedSteps, setCompletedSteps] = useState<FreelancerOnboardingStepId[]>([]);
@@ -119,95 +81,53 @@ export default function FreelancerOnboardingStepPage() {
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [hasBackendProfile, setHasBackendProfile] = useState(false);
 
+  // The latest values, for the debounced save and the unmount flush.
+  const latest = useRef<{ draft: FreelancerOnboardingDraft | null; completed: FreelancerOnboardingStepId[] }>({
+    draft: null,
+    completed: [],
+  });
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dirty = useRef(false);
+  const stepRef = useRef(currentStep);
+  stepRef.current = currentStep;
+
   useEffect(() => {
-    const loadDraft = async () => {
-      setLoading(true);
-      try {
-        createFlApplication();
-        const fresh = getFlOnboardingDraft();
-        const saved = loadStoredDraft();
+    if (!userId) return;
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
+    (async () => {
+      const saved = await loadOnboardingDraft<Partial<FlSavedData>>("freelancer");
+      const restored = flDraftFromSaved(userId, saved);
 
-        // The wizard's local draft store is a separate, purely client-side
-        // cache — it knows nothing about a profile already created on the
-        // backend in an earlier session. Without this, re-entering the
-        // wizard for an existing profile looks blank, and re-submitting
-        // hits POST /freelancers again, which 409s ("already has a
-        // profile"). Prefill from the real profile when one exists.
-        const { profile: backendProfile } = await getFlOnboardingDraftApi();
-        setHasBackendProfile(!!backendProfile);
-        const sections = backendProfile ? await loadProfileSections() : null;
+      // Someone who already has a profile and comes back to this wizard should
+      // see their real details, not a blank form (and submitting must update
+      // the profile rather than try to create a second one).
+      const { profile: backendProfile } = await getFlOnboardingDraftApi();
+      const sections = backendProfile ? await loadProfileSections() : null;
+      const next = backendProfile ? mergeFreelancerProfile(restored.draft, backendProfile, sections) : restored.draft;
 
-        let base: FreelancerOnboardingDraft | null;
-        if (saved && saved.userId === fresh?.userId) {
-          // The wizard itself never blocks on a locally-cached status —
-          // the backend has already decided (via the intro page's real
-          // access check) that this person belongs here. A stale
-          // "APPROVED"/"PENDING_REVIEW" from a previous local session
-          // must not disable the Next/Submit buttons, so normalize it
-          // back to an editable state before syncing.
-          const normalized = ["PENDING_REVIEW", "APPROVED", "REJECTED", "SUSPENDED"].includes(saved.status)
-            ? { ...saved, status: FREELANCER_ONBOARDING_STATUS.IN_PROGRESS }
-            : saved;
-          syncStoreWithDraft(normalized);
-          base = getFlOnboardingDraft() ?? normalized;
-        } else {
-          base = fresh;
-        }
-
-        // Overlay real backend fields onto the local draft wherever the
-        // local copy is still empty, so an existing profile's data shows
-        // up instead of a blank form.
-        const merged: FreelancerOnboardingDraft | null = base && backendProfile
-          ? {
-              ...base,
-              profile: {
-                ...base.profile,
-                headline: base.profile?.headline || backendProfile.professionalTitle || undefined,
-                bio: base.profile?.bio || backendProfile.bio || undefined,
-                city: base.profile?.city || backendProfile.city || undefined,
-                campusId: base.profile?.campusId || backendProfile.campusId || undefined,
-              },
-              skills: base.skills?.length ? base.skills : backendProfile.skills?.map((s) => s.name) ?? base.skills,
-              rates: {
-                ...base.rates,
-                hourlyRate: base.rates?.hourlyRate ?? backendProfile.hourlyRate ?? undefined,
-              },
-              // Server rows are authoritative once they exist.
-              experience: sections?.experience.length ? sections.experience : base.experience,
-              education: sections?.education.length ? sections.education : base.education,
-              certifications: sections?.certifications.length
-                ? sections.certifications
-                : base.certifications,
-            }
-          : base;
-
-        if (merged) syncStoreWithDraft(merged);
-        setDraft(merged);
-        persistDraft(merged);
-
-        const savedProgress = loadStoredProgress();
-        if (savedProgress.length > 0) {
-          setCompletedSteps(savedProgress);
-        } else {
-          const seed: FreelancerOnboardingStepId[] = [];
-          for (let i = 1; i < currentStep; i++) seed.push(i as FreelancerOnboardingStepId);
-          setCompletedSteps(seed);
-        }
-
-        if (fresh && currentStep !== 1 && fresh.status === "DRAFT" && !saved) {
-          router.push("/onboarding/freelancer/1");
-          return;
-        }
-      } catch {
-        setError("Failed to load application");
-      } finally {
-        setLoading(false);
-      }
+      if (cancelled) return;
+      clearOldBrowserDraft();
+      setHasBackendProfile(!!backendProfile);
+      setDraft(next);
+      setCompletedSteps(restored.completedSteps);
+      latest.current = { draft: next, completed: restored.completedSteps };
+    })()
+      .catch((e: unknown) => {
+        if (!cancelled) setLoadError(getFriendlyErrorMessage(e));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
     };
-    loadDraft();
-  }, [router]);
+  }, [userId, attempt]);
 
   useEffect(() => {
     if (!loading && currentStep > FREELANCER_ONBOARDING_STEPS) {
@@ -215,67 +135,94 @@ export default function FreelancerOnboardingStepPage() {
     }
   }, [loading, currentStep, router]);
 
-  const markStepCompleted = (step: number) => {
-    const next = Array.from(new Set([...completedSteps, step as FreelancerOnboardingStepId]));
+  /** Saves what's on screen now; resolves false (and says so) if the server didn't keep it. */
+  const flush = useCallback(async (step?: number): Promise<boolean> => {
+    if (timer.current) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+    const { draft: d, completed } = latest.current;
+    if (!d) return false;
+    try {
+      await saveOnboardingDraft(
+        "freelancer",
+        flDraftToSaved({ ...d, currentStep: (step ?? stepRef.current) as FreelancerOnboardingStepId }, completed)
+      );
+      dirty.current = false;
+      setError(null);
+      return true;
+    } catch (e) {
+      setError(`Your progress wasn't saved. ${getFriendlyErrorMessage(e)}`);
+      return false;
+    }
+  }, []);
+
+  // Don't lose the last edits when someone navigates away.
+  useEffect(
+    () => () => {
+      if (dirty.current) void flush();
+    },
+    [flush]
+  );
+
+  const update = useCallback(
+    (data: Partial<FreelancerOnboardingDraft>) => {
+      setDraft((prev) => {
+        if (!prev) return null;
+        const next = { ...prev, ...data };
+        latest.current = { ...latest.current, draft: next };
+        dirty.current = true;
+        if (timer.current) clearTimeout(timer.current);
+        timer.current = setTimeout(() => void flush(), AUTOSAVE_MS);
+        return next;
+      });
+    },
+    [flush]
+  );
+
+  const markCompleted = (step: FreelancerOnboardingStepId) => {
+    const next = Array.from(new Set([...completedSteps, step]));
     setCompletedSteps(next);
-    persistProgress(next);
+    latest.current = { ...latest.current, completed: next };
   };
 
   const handleSaveDraft = useCallback(async () => {
-    if (!draft) return;
     setSaving(true);
-    setError(null);
-    try {
-      syncStoreWithDraft({ ...draft, currentStep: currentStep as FreelancerOnboardingStepId });
-      const updated = getFlOnboardingDraft();
-      setDraft(updated);
-      persistDraft(updated);
-    } catch {
-      setError("Failed to save draft");
-    } finally {
-      setSaving(false);
-    }
-  }, [draft, currentStep]);
+    await flush();
+    setSaving(false);
+  }, [flush]);
 
-  const handleNext = useCallback(() => {
+  const handleNext = useCallback(async () => {
     if (!draft) return;
-    const isValid = STEP_VALIDATION[currentStep]?.(draft) ?? false;
-    if (!isValid) {
+    if (!(STEP_VALIDATION[currentStep]?.(draft) ?? false)) {
       setError("Please complete all required fields before continuing");
       return;
     }
     setError(null);
-    const nextStep = Math.min(currentStep + 1, FREELANCER_ONBOARDING_STEPS) as FreelancerOnboardingStepId;
-    const nextDraft = { ...draft, currentStep: nextStep };
-    syncStoreWithDraft(nextDraft);
-    persistDraft(nextDraft);
-    markStepCompleted(currentStep);
-    if (currentStep < FREELANCER_ONBOARDING_STEPS) {
-      router.push(`/onboarding/freelancer/${nextStep}`);
-    }
-  }, [currentStep, draft, router, completedSteps]);
+    const nextStep = Math.min(currentStep + 1, FREELANCER_ONBOARDING_STEPS);
+    markCompleted(currentStep);
+    // Stay put if the server didn't keep it: progress is read back from the server.
+    if (!(await flush(nextStep))) return;
+    if (currentStep < FREELANCER_ONBOARDING_STEPS) router.push(`/onboarding/freelancer/${nextStep}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep, draft, router, flush, completedSteps]);
 
-  const handleBack = useCallback(() => {
-    if (!draft) return;
-    const prevStep = Math.max(currentStep - 1, 1) as FreelancerOnboardingStepId;
-    const backDraft = { ...draft, currentStep: prevStep };
-    syncStoreWithDraft(backDraft);
-    persistDraft(backDraft);
-    markStepCompleted(currentStep);
-    if (currentStep > 1) {
-      router.push(`/onboarding/freelancer/${prevStep}`);
-    }
-  }, [currentStep, draft, router, completedSteps]);
+  const handleBack = useCallback(async () => {
+    if (!draft || currentStep <= 1) return;
+    const prevStep = currentStep - 1;
+    if (!(await flush(prevStep))) return;
+    router.push(`/onboarding/freelancer/${prevStep}`);
+  }, [currentStep, draft, router, flush]);
 
   const handleSubmit = useCallback(async () => {
     if (!draft) return;
     setSubmitting(true);
     setError(null);
     try {
-      // Activate the Freelancer capability on the backend — this is the
-      // real onboarding completion step. A profile already existing
-      // (detected on load, or discovered here via a 409 race) means this
-      // is an edit: update instead of trying to create a second one.
+      // Activate the Freelancer role on the backend — this is the real
+      // onboarding completion step. A profile already existing (detected on
+      // load, or discovered here via a 409 race) means this is an edit:
+      // update instead of trying to create a second one.
       const dto = freelancerDraftToCreateDto(draft);
       let apiError = hasBackendProfile
         ? (await saveFlDraftApi(dto)).error
@@ -296,24 +243,16 @@ export default function FreelancerOnboardingStepPage() {
         return;
       }
 
-      const res = submitFlApplication();
-      if (res.success) {
-        const allSteps: FreelancerOnboardingStepId[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-        setCompletedSteps(allSteps);
-        persistProgress(allSteps);
-        persistDraft(draft);
-        router.push("/freelancer/dashboard");
-      } else {
-        setError(res.message);
-      }
+      dirty.current = false;
+      if (timer.current) clearTimeout(timer.current);
+      await discardOnboardingDraft("freelancer");
+      router.push("/freelancer/dashboard");
     } catch {
       setError("Submission failed. Please try again.");
     } finally {
       setSubmitting(false);
     }
-  }, [draft, router]);
-
-  const canSubmit = draft?.status === "DRAFT" || draft?.status === "IN_PROGRESS";
+  }, [draft, hasBackendProfile, router]);
 
   const Component = STEP_COMPONENTS[currentStep];
 
@@ -325,12 +264,15 @@ export default function FreelancerOnboardingStepPage() {
     );
   }
 
-  if (error && !draft) {
+  // The URL says which step is on screen.
+  const shown = draft ? { ...draft, currentStep } : null;
+
+  if (loadError || !draft || !shown) {
     return (
       <div className="min-h-screen bg-kampmax-bg flex items-center justify-center px-6">
         <div className="max-w-md mx-auto text-center p-8 bg-white rounded-xl border border-kampmax-border">
-          <p className="text-kampmax-error mb-4">{error}</p>
-          <button onClick={() => router.refresh()} className="text-primary-600 hover:underline">
+          <p className="text-kampmax-error mb-4">{loadError ?? "We couldn't load your application."}</p>
+          <button onClick={() => setAttempt((n) => n + 1)} className="text-primary-600 hover:underline">
             Try again
           </button>
         </div>
@@ -339,46 +281,29 @@ export default function FreelancerOnboardingStepPage() {
   }
 
   const renderStepContent = () => {
-    if (currentStep === 10) {
-      return (
-        <StepReview
-          draft={draft}
-          onSubmit={handleSubmit}
-        />
-      );
+    if (currentStep === FREELANCER_ONBOARDING_STEPS) {
+      return <StepReview draft={shown} onSubmit={handleSubmit} />;
     }
-    return (
-      <Component
-        draft={draft}
-        onUpdate={(data: Partial<FreelancerOnboardingDraft>) =>
-          setDraft((prev) => {
-            if (!prev) return null;
-            const next = { ...prev, ...data };
-            persistDraft(next);
-            syncStoreWithDraft(next);
-            return next;
-          })
-        }
-      />
-    );
+    if (!Component) return null;
+    return <Component draft={shown} onUpdate={update} />;
   };
 
   return (
     <OnboardingLayout
-      draft={draft}
+      draft={shown}
       completedSteps={completedSteps}
       onSaveDraft={handleSaveDraft}
-      onNext={handleNext}
-      onBack={handleBack}
+      onNext={() => void handleNext()}
+      onBack={() => void handleBack()}
       onSubmit={handleSubmit}
-      canSubmit={canSubmit}
+      canSubmit
       isSaving={saving}
       isSubmitting={submitting}
-      nextDisabled={!STEP_VALIDATION[currentStep]?.(draft ?? null)}
-      showSaveDraft={currentStep < 10}
+      nextDisabled={!STEP_VALIDATION[currentStep]?.(draft)}
+      showSaveDraft={currentStep < FREELANCER_ONBOARDING_STEPS}
     >
       {error && (
-        <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+        <div role="alert" className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
           {error}
         </div>
       )}

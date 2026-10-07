@@ -6,6 +6,7 @@ import { ArrowLeft, Save, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { OnboardingProgress, OnboardingStepIndicator } from "./OnboardingProgress";
+import { SERVICE_PROVIDER_ONBOARDING_STEPS } from "@/types/service-provider";
 import type { ServiceProviderOnboardingDraft, ServiceProviderOnboardingStepId, ServiceProviderOnboardingStatus } from "@/types/service-provider";
 
 interface OnboardingLayoutProps {
@@ -91,7 +92,7 @@ export function OnboardingLayout({
               Become a Service Provider
             </h1>
             <p className="mt-1 text-sm text-kampmax-text-secondary">
-              Step {currentStep} of 10
+              Step {currentStep} of {SERVICE_PROVIDER_ONBOARDING_STEPS}
             </p>
           </div>
         </div>
@@ -134,7 +135,7 @@ export function OnboardingLayout({
                   Continue
                   <ChevronRight className="h-4 w-4 ml-2" />
                 </Button>
-              ) : currentStep === 10 ? (
+              ) : currentStep === SERVICE_PROVIDER_ONBOARDING_STEPS ? (
                 <>
                   <Button variant="outline" onClick={handleBackClick} className="w-full sm:w-auto">
                     <ChevronRight className="h-4 w-4 mr-2 rotate-180" />

@@ -93,6 +93,9 @@ export function StepPortfolio({ draft, onUpdate }: StepPortfolioProps) {
 
   return (
     <div className="space-y-8">
+      <p role="note" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-800">
+        Portfolio photos are not saved with your application yet. You can skip this step and nothing is lost.
+      </p>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">

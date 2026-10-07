@@ -44,6 +44,9 @@ export function StepProfile({ draft, onUpdate }: Props) {
       </div>
 
       {/* Photo */}
+      <p role="note" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-800">
+        Your photo is not saved with your application yet, so you can skip it. It shows only while you are on this page.
+      </p>
       <div>
         <label className="block text-sm font-medium text-kampmax-text mb-3">Profile Photo</label>
         <div className="relative w-32">

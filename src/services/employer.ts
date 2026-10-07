@@ -23,7 +23,6 @@ import { getCurrentUser } from "@/services/users";
 import { getCampuses, getCampusById } from "@/services/campus";
 import { apiClient } from "@/lib/api-client";
 import type { ApiError } from "@/lib/api-client";
-import { createEmployerApplication, getEmployerOnboardingDraft, saveEmployerDraft, getEmployerOnboardingStatus, submitEmployerApplication } from "@/data/employer";
 import { listPublicJobs } from "@/services/jobs";
 import { jobToOpportunity } from "@/lib/job-api-mapping";
 import type { EmployerOnboardingDraft, EmployerOnboardingStatus, EmployerVerificationStatus, EmployerPublicProfile } from "@/types/employer";
@@ -33,13 +32,6 @@ import {
 } from "@/types/employer";
 import { EMPLOYER_DASHBOARD_SECTIONS } from "@/config/employer-dashboard";
 import { EMPLOYER_GATE_EXEMPT_PATHS } from "@/config/employer-dashboard";
-
-// ── Owner context ───────────────────────────────────────────
-
-function currentUserId(): string | null {
-  const user = getCurrentUser();
-  return user?.id ?? null;
-}
 
 // ── Access gate (role activation) ───────────────────────────
 // Mirrors getFreelancerDashboardAccess / getVendorAccess.
@@ -286,56 +278,6 @@ export function backendProfileCompletion(profile: EmployerBackendProfile): numbe
     !!(p.city?.trim() || p.campusId),
   ];
   return Math.round((checks.filter(Boolean).length / checks.length) * 100);
-}
-
-// ── Sync/Local API ──────────────────────────────────────────
-
-/**
- * Ensures an application record exists for the current user.
- */
-export function createEmployerApplicationForUser(): { created: boolean } {
-  const uid = currentUserId();
-  if (!uid) return { created: false };
-  const { created } = createEmployerApplication(uid);
-  return { created };
-}
-
-/**
- * Returns the current draft for the authenticated user, or null.
- */
-export function getEmployerOnboardingDraftForUser(): EmployerOnboardingDraft | null {
-  const uid = currentUserId();
-  if (!uid) return null;
-  return getEmployerOnboardingDraft(uid);
-}
-
-/**
- * Persists draft changes (called on every step update + save-draft).
- */
-export function saveEmployerDraftForUser(draft: EmployerOnboardingDraft): void {
-  saveEmployerDraft(draft);
-}
-
-/**
- * Returns the current onboarding status for the authenticated user.
- */
-export function getEmployerOnboardingStatusForUser(): EmployerOnboardingStatus {
-  const uid = currentUserId();
-  if (!uid) return "DRAFT" as EmployerOnboardingStatus;
-  return getEmployerOnboardingStatus(uid);
-}
-
-/**
- * Submits the employer profile for review. Backend-authoritative: the
- * store (backend) sets the status to PENDING_REVIEW on success.
- */
-export function submitEmployerProfileForUser(): { success: boolean; message: string } {
-  const uid = currentUserId();
-  if (!uid) return { success: false, message: "Not authenticated." };
-  // The in-memory store resets on reload/HMR; make sure a record exists.
-  createEmployerApplication(uid);
-  const res = submitEmployerApplication(uid);
-  return res;
 }
 
 /**

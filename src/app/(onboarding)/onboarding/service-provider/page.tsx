@@ -33,7 +33,7 @@ const features = [
   {
     icon: Shield,
     title: "Verified & Trusted",
-    description: "Identity and professional verification builds trust. Verified providers get priority visibility.",
+    description: "Verify your identity from your dashboard whenever you are ready. Verified providers earn a trust badge.",
     color: "text-kampmax-gold",
   },
   {
@@ -53,8 +53,7 @@ const steps = [
   { number: 6, title: "Configure Availability", description: "Weekly schedule, booking preferences, buffers" },
   { number: 7, title: "Set Pricing Rules", description: "Travel fee, emergency fee, weekend fee" },
   { number: 8, title: "Add Portfolio", description: "Showcase your work with photos" },
-  { number: 9, title: "Verification", description: "Identity, business, or professional" },
-  { number: 10, title: "Review & Submit", description: "Final review and submit for approval" },
+  { number: 9, title: "Review & Submit", description: "Final review and submit for approval" },
 ];
 
 export default function ServiceProviderIntroPage() {
@@ -168,7 +167,7 @@ export default function ServiceProviderIntroPage() {
         {/* Onboarding steps overview */}
         <section className="mb-12 lg:mb-16">
           <h2 className="text-2xl font-bold text-kampmax-text text-center mb-8">
-            10-Step Onboarding
+            {steps.length}-Step Onboarding
           </h2>
           <p className="text-center text-kampmax-text-secondary mb-8 max-w-2xl mx-auto">
             Complete at your own pace. Save drafts and resume anytime.

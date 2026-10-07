@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button, Input } from "@/components/ui";
 import { Plus, Trash2, ExternalLink } from "lucide-react";
-import { freshId } from "@/data/freelancer";
+import { freshId } from "@/services/freelancer-onboarding";
 import type { FreelancerCertification, FreelancerOnboardingDraft } from "@/types/freelancer";
 
 interface Props {
