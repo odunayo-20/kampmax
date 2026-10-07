@@ -144,6 +144,7 @@ export default function FreelancerProfilePage() {
                       city: editSource.city,
                       hourlyRate: editSource.hourlyRate,
                       skills: editSource.skills?.map((s) => s.name),
+                      photoUrl: editSource.avatar,
                     }
                   : profile
               }

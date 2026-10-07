@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Camera, X } from "lucide-react";
+import { Camera, Loader2, X } from "lucide-react";
 import { Button, Input } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { useProviderImageUpload } from "@/hooks/useProviderImageUpload";
 import type { FreelancerOnboardingDraft } from "@/types/freelancer";
 
 interface Props {
@@ -12,26 +13,21 @@ interface Props {
 }
 
 export function StepProfile({ draft, onUpdate }: Props) {
-  const [photoPreview, setPhotoPreview] = useState<string | null>(draft?.profile?.photoUrl ?? null);
+  const { upload, busy, error: uploadError } = useProviderImageUpload();
+  const photoPreview = draft?.profile?.photoUrl || null;
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
-    if (!file.type.startsWith("image/")) { alert("Please select an image file"); return; }
-    if (file.size > 5 * 1024 * 1024) { alert("Image must be less than 5MB"); return; }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      setPhotoPreview(dataUrl);
-      onUpdate({ profile: { ...draft?.profile, photoUrl: dataUrl } });
-    };
-    reader.readAsDataURL(file);
+    const uploaded = await upload(file, "avatar");
+    if (uploaded) {
+      onUpdate({ profile: { ...draft?.profile, photoUrl: uploaded.url, photoMediaId: uploaded.mediaId } });
+    }
   };
 
   const removePhoto = () => {
-    setPhotoPreview(null);
-    onUpdate({ profile: { ...draft?.profile, photoUrl: null } });
+    onUpdate({ profile: { ...draft?.profile, photoUrl: null, photoMediaId: null } });
   };
 
   return (
@@ -44,9 +40,11 @@ export function StepProfile({ draft, onUpdate }: Props) {
       </div>
 
       {/* Photo */}
-      <p role="note" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-800">
-        Your photo is not saved with your application yet, so you can skip it. It shows only while you are on this page.
-      </p>
+      {uploadError && (
+        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {uploadError}
+        </p>
+      )}
       <div>
         <label className="block text-sm font-medium text-kampmax-text mb-3">Profile Photo</label>
         <div className="relative w-32">
@@ -72,10 +70,16 @@ export function StepProfile({ draft, onUpdate }: Props) {
                 <p className="text-xs text-kampmax-text-secondary">Add a photo</p>
               </div>
             )}
+            {busy && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white/70" role="status" aria-label="Uploading">
+                <Loader2 className="h-6 w-6 animate-spin text-primary-600" />
+              </div>
+            )}
             <input
               type="file"
               accept="image/*"
-              onChange={handlePhotoUpload}
+              disabled={busy}
+              onChange={(e) => void handlePhotoUpload(e)}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               aria-label="Upload profile photo"
             />

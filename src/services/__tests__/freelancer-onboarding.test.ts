@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { freelancerDraftToCreateDto } from "../freelancer";
 import {
   flDraftFromSaved,
   flDraftToSaved,
@@ -71,5 +72,42 @@ describe("opening the wizard with a profile that already exists", () => {
     const merged = mergeFreelancerProfile(base, profile, server);
     expect(merged.experience.map((e) => e.id)).toEqual(["server"]);
     expect(merged.education).toEqual([]);
+  });
+});
+
+describe("freelancer profile photo", () => {
+  const withPhoto = { ...(profile as object), avatar: "https://cdn.example.com/me.jpg", profileMediaId: "m1" } as never;
+
+  it("keeps the address of an uploaded photo in the draft, but never the picture itself", () => {
+    const d = newFlDraft("u1");
+    d.profile = { photoUrl: "https://cdn.example.com/me.jpg", photoMediaId: "m1" };
+    expect(flDraftToSaved(d, []).data.profile).toMatchObject({ photoUrl: "https://cdn.example.com/me.jpg", photoMediaId: "m1" });
+    d.profile = { photoUrl: "data:image/png;base64,AAAA", photoMediaId: "m1" };
+    expect(flDraftToSaved(d, []).data.profile.photoUrl).toBe("");
+  });
+
+  it("shows the photo of a profile that already exists, without overriding a newly chosen one", () => {
+    const merged = mergeFreelancerProfile(newFlDraft("u1"), withPhoto, null);
+    expect(merged.profile).toMatchObject({ photoUrl: "https://cdn.example.com/me.jpg", photoMediaId: "m1" });
+
+    const chosen = newFlDraft("u1");
+    chosen.profile = { photoUrl: "https://cdn.example.com/new.jpg", photoMediaId: "m2" };
+    expect(mergeFreelancerProfile(chosen, withPhoto, null).profile).toMatchObject({ photoMediaId: "m2" });
+
+    const removed = newFlDraft("u1");
+    removed.profile = { photoUrl: null, photoMediaId: null };
+    expect(mergeFreelancerProfile(removed, withPhoto, null).profile.photoMediaId).toBeNull();
+  });
+});
+
+describe("sending the photo to the server", () => {
+  it("sends the uploaded photo's media id, and null when it was removed", () => {
+    const d = newFlDraft("u1");
+    d.profile = { photoMediaId: "m1" };
+    expect(freelancerDraftToCreateDto(d).profileMediaId).toBe("m1");
+    d.profile = { photoMediaId: null };
+    expect(freelancerDraftToCreateDto(d).profileMediaId).toBeNull();
+    d.profile = {};
+    expect(freelancerDraftToCreateDto(d).profileMediaId).toBeUndefined();
   });
 });

@@ -6,9 +6,9 @@ import type { FreelancerPrivateProfile } from "@/services/freelancer";
 
 // What the freelancer wizard keeps on the server between visits: the form
 // values and which steps were finished. Status, approval and verification are
-// the backend's and never travel in a draft. Photos are not kept: a picture
-// held as inline data would swamp the draft (projects and photos are added
-// from the dashboard).
+// the backend's and never travel in a draft. The profile photo is uploaded as
+// soon as it is chosen, so a draft holds its address, never the picture itself.
+// Portfolio projects are added from the dashboard.
 
 export interface FlSavedData {
   profile: FreelancerOnboardingDraft["profile"];
@@ -129,6 +129,8 @@ export function mergeFreelancerProfile(
       headline: base.profile?.headline || profile.professionalTitle || undefined,
       bio: base.profile?.bio || profile.bio || undefined,
       city: base.profile?.city || profile.city || undefined,
+      photoUrl: base.profile?.photoUrl || profile.avatar || undefined,
+      photoMediaId: base.profile?.photoMediaId !== undefined ? base.profile.photoMediaId : profile.profileMediaId,
       campusId: base.profile?.campusId || profile.campusId || undefined,
     },
     skills: base.skills?.length ? base.skills : profile.skills?.map((s) => s.name) ?? base.skills,

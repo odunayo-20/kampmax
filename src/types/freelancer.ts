@@ -159,6 +159,8 @@ export interface FreelancerOnboardingDraft {
     headline?: string;
     bio?: string;
     photoUrl?: string | null;
+    /** The uploaded image behind `photoUrl`. */
+    photoMediaId?: string | null;
     campusId?: string;
     city?: string;
     remoteAvailable?: boolean;

@@ -222,6 +222,8 @@ export interface CreateFreelancerProfileDto {
   websiteUrl?: string;
   availabilityStatus?: "AVAILABLE" | "BUSY" | "UNAVAILABLE";
   skills?: string[];
+  /** An image the freelancer uploaded, shown as their photo; null removes it. */
+  profileMediaId?: string | null;
 }
 
 /**
@@ -258,6 +260,7 @@ export function freelancerDraftToCreateDto(
     campusId: draft.profile?.campusId || undefined,
     city: draft.profile?.city?.trim() || undefined,
     skills: draft.skills?.length ? draft.skills : undefined,
+    profileMediaId: draft.profile?.photoMediaId,
   };
 }
 

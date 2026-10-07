@@ -16,10 +16,10 @@ import { uploadFileDirect } from "@/services/media";
 //   PATCH  /service-provider/portfolio/:id
 //   DELETE /service-provider/portfolio/:id
 
-export type ProviderImageKind = "logo" | "coverImage" | "portfolio";
+export type ProviderImageKind = "avatar" | "logo" | "coverImage" | "portfolio";
 
 export const MAX_PORTFOLIO_ITEMS = 10;
-const MAX_IMAGE_MB: Record<ProviderImageKind, number> = { logo: 5, coverImage: 5, portfolio: 10 };
+const MAX_IMAGE_MB: Record<ProviderImageKind, number> = { avatar: 5, logo: 5, coverImage: 5, portfolio: 10 };
 
 export interface UploadedProviderImage {
   mediaId: string;
