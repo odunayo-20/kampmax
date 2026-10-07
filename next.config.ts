@@ -1,8 +1,17 @@
 import type { NextConfig } from "next";
 
+// Extra hosts uploaded pictures are served from (an S3/R2 bucket or CDN), comma-separated,
+// e.g. NEXT_PUBLIC_MEDIA_HOSTS=cdn.example.com,pub-abc123.r2.dev
+const extraMediaHosts = (process.env.NEXT_PUBLIC_MEDIA_HOSTS ?? "")
+  .split(",")
+  .map((h) => h.trim())
+  .filter(Boolean)
+  .map((hostname) => ({ protocol: "https" as const, hostname }));
+
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
+      ...extraMediaHosts,
       { protocol: "https", hostname: "images.unsplash.com" },
       { protocol: "https", hostname: "res.cloudinary.com" },
       // Locally stored uploads in development (backend STORAGE_PROVIDER=local).

@@ -653,6 +653,8 @@ export function ProductForm({ initialData, onSave, onCancel, isLoading }: Produc
                   const target = e.currentTarget;
                   if (!target.src.includes("placeholder-product.svg")) {
                     target.src = "/placeholder-product.svg";
+                    // Say so, instead of quietly showing the default picture.
+                    setImageErrors(["An image couldn't be loaded, so the default picture is shown. Remove it and upload it again."]);
                   }
                 }}
               />
