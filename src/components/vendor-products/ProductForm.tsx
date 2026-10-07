@@ -167,6 +167,21 @@ export function ProductForm({ initialData, onSave, onCancel, isLoading }: Produc
   const [imageErrors, setImageErrors] = useState<string[]>([]);
   const [uploadingCount, setUploadingCount] = useState(0);
 
+  const imagesRef = useRef(formData.images);
+  useEffect(() => {
+    imagesRef.current = formData.images;
+  }, [formData.images]);
+
+  useEffect(() => {
+    return () => {
+      imagesRef.current.forEach((img) => {
+        if (img.startsWith("blob:")) {
+          URL.revokeObjectURL(img);
+        }
+      });
+    };
+  }, []);
+
   const isDirty = useFormDirty(formData, initialData);
   useUnsavedChangesWarning(isDirty);
 
@@ -265,25 +280,53 @@ export function ProductForm({ initialData, onSave, onCancel, isLoading }: Produc
     else setImageErrors([]);
     if (batch.length === 0) return;
 
+    // 1. Generate instant local previews so the user immediately sees their images
+    const localPreviews = batch.map((file) => URL.createObjectURL(file));
+    setFormData((prev) => ({
+      ...prev,
+      images: [...prev.images.filter((src) => !isPlaceholder(src)), ...localPreviews],
+    }));
+    setTouched((prev) => ({ ...prev, images: true }));
+
+    // 2. Upload to backend in background and swap blob URLs with permanent server URLs
     setUploadingCount((n) => n + batch.length);
     const failures: string[] = [];
+
     await Promise.all(
-      batch.map(async (file) => {
+      batch.map(async (file, idx) => {
+        const previewUrl = localPreviews[idx];
         const { data, error } = await uploadFileDirect(file, "product");
         if (error || !data?.url) {
           failures.push(`${file.name}: ${error?.message ?? "upload failed"}`);
+          // Revert preview on failure
+          setFormData((prev) => {
+            const nextImages = prev.images.filter((img) => img !== previewUrl);
+            return {
+              ...prev,
+              images: nextImages.length > 0 ? nextImages : ["/placeholder-product.svg"],
+            };
+          });
+          URL.revokeObjectURL(previewUrl);
         } else {
-          const url = data.url;
-          setFormData((prev) => ({ ...prev, images: [...prev.images.filter((src) => !isPlaceholder(src)), url] }));
-          setTouched((prev) => ({ ...prev, images: true }));
+          const remoteUrl = data.url;
+          setFormData((prev) => ({
+            ...prev,
+            images: prev.images.map((img) => (img === previewUrl ? remoteUrl : img)),
+          }));
+          URL.revokeObjectURL(previewUrl);
         }
         setUploadingCount((n) => n - 1);
       })
     );
+
     if (failures.length > 0) setImageErrors(failures);
   };
 
   const removeImage = (index: number) => {
+    const target = formData.images[index];
+    if (target && target.startsWith("blob:")) {
+      URL.revokeObjectURL(target);
+    }
     if (formData.images.length <= 1) {
       setImageErrors(["At least one image is required"]);
       return;
@@ -347,6 +390,10 @@ export function ProductForm({ initialData, onSave, onCancel, isLoading }: Produc
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (uploadingCount > 0) {
+      setImageErrors(["Please wait for images to finish uploading before saving."]);
+      return;
+    }
     setTouched(
       Object.keys(formData).reduce((acc, k) => ({ ...acc, [k]: true }), {} as Record<string, boolean>)
     );
@@ -597,12 +644,28 @@ export function ProductForm({ initialData, onSave, onCancel, isLoading }: Produc
 
         <div className="flex gap-2 overflow-x-auto pb-2">
           {formData.images.map((img, idx) => (
-            <div key={idx} className="relative w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden border border-kampmax-border">
-              <img src={img} alt={`Product image ${idx + 1}`} className="w-full h-full object-cover" />
+            <div key={idx} className="relative w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden border border-kampmax-border bg-kampmax-muted/30">
+              <img
+                src={img}
+                alt={`Product image ${idx + 1}`}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (!target.src.includes("placeholder-product.svg")) {
+                    target.src = "/placeholder-product.svg";
+                  }
+                }}
+              />
+              {img.startsWith("blob:") && (
+                <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center gap-1 pointer-events-none">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span className="text-[10px] text-white font-medium">Uploading</span>
+                </div>
+              )}
               <button
                 type="button"
                 onClick={() => removeImage(idx)}
-                className="absolute top-1 right-1 p-1 rounded-full bg-black/50 text-white hover:bg-black/70"
+                className="absolute top-1 right-1 p-1 rounded-full bg-black/60 text-white hover:bg-black/80 z-10 transition-colors"
                 aria-label={`Remove image ${idx + 1}`}
               >
                 <Trash2 className="h-3 w-3" />

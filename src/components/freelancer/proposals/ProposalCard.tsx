@@ -3,13 +3,10 @@
 import Link from "next/link";
 import { Wallet, Clock, Calendar } from "lucide-react";
 import type { Proposal } from "@/types/opportunity";
-import { getOpportunity, categoryLabelFor } from "@/services/opportunity";
 import { formatNaira, timeAgo } from "@/lib/utils";
 import { ProposalStatusBadge } from "../opportunities/StatusBadges";
 
 export function ProposalCard({ proposal }: { proposal: Proposal }) {
-  const job = getOpportunity(proposal.opportunityId);
-  const category = job ? categoryLabelFor(job) : "Opportunity";
   const hasAmount = proposal.proposedAmount !== undefined && proposal.proposedAmount > 0;
 
   return (
@@ -20,10 +17,10 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <span className="text-xs font-medium uppercase tracking-wider text-primary-600">
-            {category}
+            Opportunity
           </span>
           <h3 className="mt-1 line-clamp-2 text-base font-semibold text-neutral-900 group-hover:text-primary-700">
-            {job?.title ?? proposal.jobTitle ?? "Opportunity"}
+            {proposal.jobTitle ?? "Opportunity"}
           </h3>
         </div>
         <ProposalStatusBadge status={proposal.status} />

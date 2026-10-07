@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import {
   getPublicFreelancerFromBackend,
-  getPublicFreelancerProfile,
   type PublicFreelancerProfile,
 } from "@/services/freelancer-dashboard";
 import { isBackendId } from "@/lib/job-api-mapping";
@@ -26,18 +25,16 @@ import { Avatar } from "@/components/ui";
  * details, internal notes and documents are never rendered.
  */
 export function CandidateProfilePreview({ candidateId }: { candidateId: string }) {
-  // Real candidates are addressed by freelancer profile id and loaded from the
-  // backend; legacy demo candidates (short ids) come from the local store.
+  // Candidates are addressed by freelancer profile id and loaded from the backend.
   const backend = isBackendId(candidateId);
-  const local = useMemo(
-    () => (backend ? null : getPublicFreelancerProfile(candidateId)),
-    [backend, candidateId]
-  );
   const [remote, setRemote] = useState<PublicFreelancerProfile | null>(null);
   const [loading, setLoading] = useState(backend);
 
   useEffect(() => {
-    if (!backend) return;
+    if (!backend) {
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     void getPublicFreelancerFromBackend(candidateId).then((p) => {
@@ -50,7 +47,7 @@ export function CandidateProfilePreview({ candidateId }: { candidateId: string }
     };
   }, [backend, candidateId]);
 
-  const profile = backend ? remote : local;
+  const profile = remote;
 
   if (loading) {
     return <div className="p-5 text-sm text-neutral-500">Loading candidate…</div>;

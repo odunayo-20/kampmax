@@ -1,7 +1,6 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { EmployerSessionsSettings } from "@/components/employer/settings";
-
-export default function EmployerSettingsSessionsRoute() {
-  return <EmployerSessionsSettings />;
+// There is nothing to configure here yet; the real settings live on the other tabs.
+export default function Page() {
+  redirect("/employer/settings");
 }

@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import {
-  getPublicFreelancerBySlug,
   getPublicFreelancerFromBackend,
 } from "@/services/freelancer-dashboard";
 import { getPublicFreelancerServices } from "@/services/freelancer-services";
@@ -16,13 +15,10 @@ interface FreelancerPageProps {
 const MAX_DESCRIPTION_LENGTH = 155;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Real profiles are addressed by their backend id; anything else is a legacy
-// demo slug served from the local mock store. cache() dedupes the lookup
+// Profiles are addressed by their backend id. cache() dedupes the lookup
 // between generateMetadata and the page render.
 const resolveProfile = cache(async (slug: string) =>
-  UUID_RE.test(slug)
-    ? getPublicFreelancerFromBackend(slug)
-    : getPublicFreelancerBySlug(slug)
+  UUID_RE.test(slug) ? getPublicFreelancerFromBackend(slug) : null
 );
 
 export async function generateMetadata({

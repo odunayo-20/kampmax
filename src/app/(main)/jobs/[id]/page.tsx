@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -19,12 +20,11 @@ import {
   Wallet,
   Settings2,
 } from "lucide-react";
-import { ELIGIBILITY_CODE } from "@/types/opportunity";
+import { ELIGIBILITY_CODE, type JobEligibility } from "@/types/opportunity";
+import { getJobEligibilityApi } from "@/services/proposals";
 import {
   categoryLabelFor,
   campusNameFor,
-  getJobEligibility,
-  recordOpportunityView,
 } from "@/services/opportunity";
 import { DURATION_LABEL, WORK_ARRANGEMENT_LABEL } from "@/config/opportunity";
 import { formatDate } from "@/lib/utils";
@@ -55,15 +55,17 @@ export default function JobDetailPage() {
     : unsaveMutation.isError ? getFriendlyErrorMessage(unsaveMutation.error)
     : null;
 
-  useEffect(() => {
-    recordOpportunityView(jobId);
-  }, [jobId]);
-
-  const eligibility = useMemo(
-    () => getJobEligibility(jobId),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [jobId]
-  );
+  const job = jobQuery.data;
+  const eligibilityQuery = useQuery({
+    queryKey: ["jobs", "eligibility", jobId, user?.id],
+    enabled: !!job,
+    queryFn: () => getJobEligibilityApi(job!),
+  });
+  const eligibility: JobEligibility = eligibilityQuery.data ?? {
+    code: ELIGIBILITY_CODE.NOT_APPLICABLE,
+    eligible: false,
+    reasons: ["Checking your eligibility…"],
+  };
 
   if (jobQuery.isPending) {
     return (

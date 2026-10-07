@@ -2,43 +2,21 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  ArrowLeft, Lock, Shield, Key, Smartphone, MonitorSmartphone,
-  AlertTriangle, Info, ChevronRight, Check,
-} from "lucide-react";
+import { ArrowLeft, Key, Info, ChevronRight, Check } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
-import { SettingsGroup, SettingsRow, SettingsToggle } from "@/components/profile/SettingsGroup";
-import { SecuritySettings as SecuritySettingsType } from "@/types";
-import {
-  getSecuritySettings,
-  updateSecuritySettings,
-} from "@/services/profile";
+import { SettingsGroup, SettingsRow } from "@/components/profile/SettingsGroup";
 import { useChangePassword } from "@/hooks/use-employer-settings";
-import { formatDate } from "@/lib/utils";
 
 export default function SecuritySettingsPage() {
   const router = useRouter();
   const changePassword = useChangePassword();
-  const [settings, setSettings] = useState<SecuritySettingsType>(getSecuritySettings);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordSaved, setPasswordSaved] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
-
-  function toggle2FA() {
-    const updated = { ...settings, twoFactorEnabled: !settings.twoFactorEnabled };
-    setSettings(updated);
-    updateSecuritySettings({ twoFactorEnabled: updated.twoFactorEnabled });
-  }
-
-  function toggleLoginNotifs() {
-    const updated = { ...settings, loginNotifications: !settings.loginNotifications };
-    setSettings(updated);
-    updateSecuritySettings({ loginNotifications: updated.loginNotifications });
-  }
 
   async function handlePasswordChange() {
     if (!currentPassword || !newPassword || newPassword !== confirmPassword) return;
@@ -83,7 +61,7 @@ export default function SecuritySettingsPage() {
         <SettingsRow
           icon={<Key className="h-5 w-5" />}
           label="Change Password"
-          description={`Last changed ${formatDate(settings.lastPasswordChange)}`}
+          description="Choose a new password for your account"
           action={<ChevronRight className="h-4 w-4 text-kampmax-text-secondary" />}
           onClick={() => setShowPasswordForm(!showPasswordForm)}
         />
@@ -141,73 +119,11 @@ export default function SecuritySettingsPage() {
         )}
       </SettingsGroup>
 
-      {/* Two-Factor */}
-      <SettingsGroup title="Two-Factor Authentication">
-        <SettingsRow
-          icon={<Smartphone className="h-5 w-5" />}
-          label="Enable 2FA"
-          description={settings.twoFactorEnabled ? `Via ${settings.twoFactorMethod.toUpperCase()}` : "Add an extra layer of security"}
-          action={
-            <SettingsToggle
-              enabled={settings.twoFactorEnabled}
-              onToggle={toggle2FA}
-            />
-          }
-        />
-        {settings.twoFactorEnabled && (
-          <SettingsRow
-            icon={<span className="text-lg">📱</span>}
-            label="Verification Method"
-            description={`Using ${settings.twoFactorMethod === "sms" ? "SMS to your phone" : "Email to your address"}`}
-            action={
-              <select
-                value={settings.twoFactorMethod}
-                onChange={(e) => {
-                  const method = e.target.value as "sms" | "email";
-                  setSettings((s) => ({ ...s, twoFactorMethod: method }));
-                  updateSecuritySettings({ twoFactorMethod: method });
-                }}
-                className="px-2 py-1 rounded border border-kampmax-border text-xs bg-white"
-              >
-                <option value="sms">SMS</option>
-                <option value="email">Email</option>
-              </select>
-            }
-          />
-        )}
-      </SettingsGroup>
-
-      {/* Sessions */}
-      <SettingsGroup title="Active Sessions">
-        <SettingsRow
-          icon={<MonitorSmartphone className="h-5 w-5" />}
-          label="Active Sessions"
-          description={`${settings.activeSessions} device(s) currently logged in`}
-          action={<ChevronRight className="h-4 w-4 text-kampmax-text-secondary" />}
-          onClick={() => {}}
-        />
-      </SettingsGroup>
-
-      {/* Login Alerts */}
-      <SettingsGroup title="Login Alerts">
-        <SettingsRow
-          icon={<Shield className="h-5 w-5" />}
-          label="Login Notifications"
-          description="Get notified when someone logs into your account"
-          action={
-            <SettingsToggle
-              enabled={settings.loginNotifications}
-              onToggle={toggleLoginNotifs}
-            />
-          }
-        />
-      </SettingsGroup>
-
-      {/* Info */}
       <div className="bg-kampmax-muted/50 rounded-xl p-4 flex items-start gap-2">
         <Info className="h-4 w-4 text-kampmax-text-secondary flex-shrink-0 mt-0.5" />
         <p className="text-xs text-kampmax-text-secondary leading-relaxed">
-          If you suspect unauthorized access, change your password immediately and enable two-factor authentication.
+          If you suspect unauthorized access, change your password immediately. Two-factor sign-in and device
+          management aren&apos;t available yet.
         </p>
       </div>
 

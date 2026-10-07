@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Sparkles, X, ArrowRight, Bell, Handshake } from "lucide-react";
 import { timeAgo } from "@/lib/utils";
-import { getFreelancerDashboardApi, getFreelancerDashboardAccessApi, getFreelancerNotificationSummary } from "@/services/freelancer-dashboard";
+import { getFreelancerDashboardApi, getFreelancerDashboardAccessApi } from "@/services/freelancer-dashboard";
+import { useNotificationSummary } from "@/hooks/use-notifications";
 import { FreelancerMetricCard } from "@/components/freelancer/dashboard/FreelancerMetricCard";
 import { FreelancerQuickActions } from "@/components/freelancer/dashboard/FreelancerQuickActions";
 import { FreelancerProfileStatusCard } from "@/components/freelancer/dashboard/FreelancerProfileStatusCard";
@@ -18,7 +19,7 @@ import { FreelancerFinancialSummary } from "@/components/freelancer/dashboard/Fr
 export default function FreelancerDashboardPage() {
   const [dashboard, setDashboard] = useState<Awaited<ReturnType<typeof getFreelancerDashboardApi>>>(null);
   const [loading, setLoading] = useState(true);
-  const [notif] = useState(() => getFreelancerNotificationSummary());
+  const notif = useNotificationSummary();
   const [showWelcome, setShowWelcome] = useState(true);
   const [displayName, setDisplayName] = useState("Freelancer");
 

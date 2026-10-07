@@ -21,14 +21,8 @@ import { ELIGIBILITY_CODE, OPPORTUNITY_STATUS } from "@/types/opportunity";
 import { getJobEligibilityApi } from "@/services/proposals";
 import { listSavedJobIds, saveJob, unsaveJob } from "@/services/jobs";
 import {
-  getDiscoverableOpportunity,
   getJobByIdApi,
   isBackendId,
-  getJobEligibility,
-  saveJobForUser,
-  unsaveJobForUser,
-  isJobSavedForUser,
-  recordOpportunityView,
   categoryLabelFor,
   campusNameFor,
 } from "@/services/opportunity";
@@ -46,21 +40,16 @@ export default function JobDetailPage() {
   const params = useParams<{ id: string }>();
   const jobId = String(params.id);
 
-  // Real jobs (UUID ids) come from the backend; legacy demo ids stay on the
-  // local mock store, including its save/view/eligibility behaviour.
   const backend = isBackendId(jobId);
-  const [opportunity, setOpportunity] = useState<Opportunity | null>(() =>
-    backend ? null : getDiscoverableOpportunity(jobId)
-  );
+  const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
   const [loading, setLoading] = useState(backend);
   const [remoteEligibility, setRemoteEligibility] = useState<JobEligibility | null>(null);
-  const [saved, setSaved] = useState<boolean>(() => (backend ? false : isJobSavedForUser(jobId)));
+  const [saved, setSaved] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!backend) {
-      // Record a view exactly once per mount (backend-authoritative counter).
-      recordOpportunityView(jobId);
+      setLoading(false);
       return;
     }
     let cancelled = false;
@@ -86,12 +75,7 @@ export default function JobDetailPage() {
     };
   }, [backend, jobId]);
 
-  const localEligibility = useMemo(
-    () => (backend ? null : getJobEligibility(jobId)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [backend, jobId, saved]
-  );
-  const eligibility: JobEligibility = (backend ? remoteEligibility : localEligibility) ?? {
+  const eligibility: JobEligibility = remoteEligibility ?? {
     code: ELIGIBILITY_CODE.NOT_APPLICABLE,
     eligible: false,
     reasons: ["Checking your eligibility…"],
@@ -129,23 +113,11 @@ export default function JobDetailPage() {
   const alreadyApplied = eligibility.code === ELIGIBILITY_CODE.ALREADY_APPLIED;
 
   async function toggleSave() {
-    if (backend) {
-      const { error: saveError } = saved ? await unsaveJob(o.id) : await saveJob(o.id);
-      if (saveError) setError(saveError.message ?? "Couldn't update your saved jobs.");
-      else {
-        setError(null);
-        setSaved(!saved);
-      }
-      return;
-    }
-    if (saved) {
-      const res = unsaveJobForUser(o.id);
-      if (!res.ok) setError(res.message);
-      else setSaved(false);
-    } else {
-      const res = saveJobForUser(o.id);
-      if (!res.ok) setError(res.message);
-      else setSaved(true);
+    const { error: saveError } = saved ? await unsaveJob(o.id) : await saveJob(o.id);
+    if (saveError) setError(saveError.message ?? "Couldn't update your saved jobs.");
+    else {
+      setError(null);
+      setSaved(!saved);
     }
   }
 

@@ -188,6 +188,7 @@ export interface JobBrowseQuery {
   search?: string;
   categoryId?: string;
   campusId?: string;
+  employerId?: string;
   budgetType?: string;
   experienceLevel?: string;
   locationType?: string;
@@ -268,6 +269,7 @@ export async function listPublicJobs(query: JobBrowseQuery = {}): Promise<{
   if (query.search) params.set("search", query.search);
   if (query.categoryId) params.set("categoryId", query.categoryId);
   if (query.campusId) params.set("campusId", query.campusId);
+  if (query.employerId) params.set("employerId", query.employerId);
   if (query.budgetType) params.set("budgetType", query.budgetType);
   if (query.experienceLevel) params.set("experienceLevel", query.experienceLevel);
   if (query.locationType) params.set("locationType", query.locationType);

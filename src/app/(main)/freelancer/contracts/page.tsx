@@ -4,13 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { cn, formatNaira } from "@/lib/utils";
 import {
   engagementToContract,
-  getFreelancerContracts,
   getFreelancerEngagementsApi,
 } from "@/services/contract";
 import type { Engagement } from "@/services/jobs";
 import { ContractStatusBadge } from "@/components/contracts/ContractStatusBadge";
 import { EngagementActions } from "@/components/engagements/EngagementActions";
-import { ContractCard } from "@/components/contracts/ContractCard";
 import { ContractEmptyState } from "@/components/contracts/ContractEmptyState";
 import type { Contract, ContractStatus } from "@/types/contract";
 import { CONTRACT_STATUS } from "@/types/contract";
@@ -33,10 +31,9 @@ const FILTERS: { key: FilterKey; label: string; match: (c: Contract) => boolean 
 
 export default function FreelancerContractsPage() {
   const [activeFilter, setActiveFilter] = useState<FilterKey>("ALL");
-  // Real engagements from the backend, plus any legacy demo contracts.
+  // The freelancer's real engagements from the backend.
   const [engagements, setEngagements] = useState<Engagement[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [legacy] = useState(() => getFreelancerContracts());
 
   const loadEngagements = useCallback(async () => {
     try {
@@ -50,7 +47,7 @@ export default function FreelancerContractsPage() {
     void loadEngagements();
   }, [loadEngagements]);
 
-  const contracts = [...engagements.map(engagementToContract), ...legacy];
+  const contracts = engagements.map(engagementToContract);
   const engagementById = new Map(engagements.map((e) => [e.id, e]));
 
   const activeContractCount = contracts.filter(
@@ -119,7 +116,7 @@ export default function FreelancerContractsPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
           {filtered.map((contract) => {
             const engagement = engagementById.get(contract.id);
-            // Real engagements have no detail workspace; the card's actions live here.
+            // Engagements have no detail workspace; the card's actions live here.
             return engagement ? (
               <div key={contract.id} className="rounded-xl border border-kampmax-border bg-white p-4">
                 <h2 className="text-sm font-bold text-kampmax-text">{contract.projectTitle}</h2>
@@ -140,9 +137,7 @@ export default function FreelancerContractsPage() {
                   onChanged={() => void loadEngagements()}
                 />
               </div>
-            ) : (
-              <ContractCard key={contract.id} contract={contract} />
-            );
+            ) : null;
           })}
         </div>
       )}

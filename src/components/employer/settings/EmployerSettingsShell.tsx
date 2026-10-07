@@ -5,8 +5,6 @@ import { usePathname } from "next/navigation";
 import {
   AlertTriangle,
   Bell,
-  Eye,
-  MonitorSmartphone,
   ShieldCheck,
   UserRound,
 } from "lucide-react";
@@ -17,8 +15,6 @@ const SETTINGS_SECTIONS = [
   { href: "/employer/settings", label: "Account", icon: UserRound },
   { href: "/employer/settings/security", label: "Security", icon: ShieldCheck },
   { href: "/employer/settings/notifications", label: "Notifications", icon: Bell },
-  { href: "/employer/settings/privacy", label: "Privacy & Visibility", icon: Eye },
-  { href: "/employer/settings/sessions", label: "Sessions", icon: MonitorSmartphone },
   { href: "/employer/settings/danger", label: "Danger Zone", icon: AlertTriangle },
 ] as const;
 

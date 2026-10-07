@@ -4,10 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, ShieldAlert, ArrowLeft } from "lucide-react";
 import {
-  createProposalDraft,
-  getDiscoverableOpportunity,
   getJobByIdApi,
-  getJobEligibility,
   isBackendId,
 } from "@/services/opportunity";
 import {
@@ -33,11 +30,8 @@ function CreateProposalContent() {
   const searchParams = useSearchParams();
   const jobId = searchParams.get("jobId");
 
-  // Real jobs (UUID ids) load from the backend; legacy demo ids use the local store.
   const backend = !!jobId && isBackendId(jobId);
-  const [opportunity, setOpportunity] = useState<Opportunity | null>(() =>
-    jobId && !backend ? getDiscoverableOpportunity(jobId) : null
-  );
+  const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
   const [loading, setLoading] = useState(backend);
   const [remoteEligibility, setRemoteEligibility] = useState<JobEligibility | null>(null);
 
@@ -84,11 +78,7 @@ function CreateProposalContent() {
     };
   }, [jobId, backend]);
 
-  const localEligibility = useMemo(
-    () => (jobId && !backend ? getJobEligibility(jobId) : null),
-    [jobId, backend]
-  );
-  const eligibility = backend ? remoteEligibility : localEligibility;
+  const eligibility = remoteEligibility;
 
   if (!jobId || (!loading && !opportunity)) {
     return <MissingJob />;
@@ -122,23 +112,13 @@ function CreateProposalContent() {
   async function handleSaveDraft() {
     setBusy(true);
     setError(null);
-    if (backend) {
-      const res = await saveProposalDraftApi(buildInput(values));
-      setBusy(false);
-      if (res.error || !res.proposal) {
-        setError(res.error?.message ?? "We couldn't save your draft.");
-        return;
-      }
-      router.push("/freelancer/proposals?status=draft");
-      return;
-    }
-    const res = createProposalDraft(buildInput(values));
+    const res = await saveProposalDraftApi(buildInput(values));
     setBusy(false);
-    if (!res.ok) {
-      setError(res.message);
+    if (res.error || !res.proposal) {
+      setError(res.error?.message ?? "We couldn't save your draft.");
       return;
     }
-    router.push("/freelancer/proposals");
+    router.push("/freelancer/proposals?status=draft");
   }
 
   async function handleSubmit() {

@@ -364,3 +364,34 @@ export function useDeleteNotification() {
     },
   });
 }
+
+/** The latest few notifications and the unread count, for dashboard bells and settings pages. */
+export function useNotificationSummary(sampleSize = 4) {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const userId = user?.id;
+
+  const query = useQuery({
+    queryKey: ["notifications", "summary", userId || "guest", sampleSize],
+    enabled: Boolean(userId),
+    refetchInterval: POLL_MS,
+    queryFn: async () => {
+      const feed = await loadFeed(queryClient, userId!);
+      return {
+        unreadCount: feed.unreadCount,
+        sample: feed.items.slice(0, sampleSize).map((n) => ({
+          id: n.id,
+          title: n.title,
+          body: n.message,
+          createdAt: n.createdAt,
+        })),
+      };
+    },
+  });
+
+  return {
+    unreadCount: query.data?.unreadCount ?? 0,
+    sample: query.data?.sample ?? [],
+    isLoading: query.isPending && Boolean(userId),
+  };
+}

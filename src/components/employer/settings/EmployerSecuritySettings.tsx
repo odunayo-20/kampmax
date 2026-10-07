@@ -1,27 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, KeyRound, ShieldCheck, Smartphone } from "lucide-react";
+import { Check, KeyRound } from "lucide-react";
 import { PasswordInput } from "@/components/ui/PasswordInput";
+import { SettingsGroup, SettingsRow } from "@/components/profile/SettingsGroup";
 import {
-  SettingsGroup,
-  SettingsRow,
-  SettingsToggle,
-} from "@/components/profile/SettingsGroup";
-import {
-  useSecuritySettings,
-  useUpdateSecuritySettings,
   useChangePassword,
 } from "@/hooks/use-employer-settings";
 import { validatePasswordPolicy } from "@/services/auth";
-import {
-  SettingsSectionHeader,
-  SettingsLoading,
-  SettingsError,
-  SettingsNote,
-} from "./EmployerSettingsShared";
-import { getFriendlyErrorMessage } from "@/lib/error-messages";
-import { cn, formatDate } from "@/lib/utils";
+import { SettingsSectionHeader, SettingsNote } from "./EmployerSettingsShared";
+import { cn } from "@/lib/utils";
 
 const PASSWORD_CHECKS = [
   (p: string) => p.length >= 8,
@@ -32,8 +20,6 @@ const PASSWORD_CHECKS = [
 ];
 
 export function EmployerSecuritySettings() {
-  const secQuery = useSecuritySettings();
-  const updateSec = useUpdateSecuritySettings();
   const changePassword = useChangePassword();
 
   const [currentPassword, setCurrentPassword] = useState("");
@@ -69,29 +55,6 @@ export function EmployerSecuritySettings() {
     />
   );
 
-  if (secQuery.isPending) {
-    return (
-      <>
-        {header}
-        <SettingsLoading label="Loading security settings" />
-      </>
-    );
-  }
-
-  if (secQuery.isError || !secQuery.data) {
-    return (
-      <>
-        {header}
-        <SettingsError
-          message={getFriendlyErrorMessage(secQuery.error)}
-          onRetry={() => void secQuery.refetch()}
-        />
-      </>
-    );
-  }
-
-  const sec = secQuery.data;
-
   async function handleSubmit() {
     setFormError(null);
     setFormSuccess(false);
@@ -115,7 +78,7 @@ export function EmployerSecuritySettings() {
 
       <SettingsGroup
         title="Password"
-        description={`Your Kampmax sign-in password. Last changed ${formatDate(sec.lastPasswordChange)}.`}
+        description="Your Kampmax sign-in password."
       >
         <div className="space-y-3 p-4">
           {formSuccess && (
@@ -193,47 +156,9 @@ export function EmployerSecuritySettings() {
       </SettingsGroup>
 
       <SettingsNote>
-        Your password is never stored or displayed in this app — it lives only
-        in the Kampmax auth store and is verified by the backend. After you
-        change it, you stay signed in on this device.
+        Your password is verified by the backend and never shown here. After you change it, you stay signed in
+        on this device. Two-factor sign-in and device management aren&apos;t available yet.
       </SettingsNote>
-
-      <SettingsGroup
-        title="Two-factor authentication"
-        description="An extra code required when you sign in."
-      >
-        <SettingsRow
-          icon={<Smartphone className="h-5 w-5" />}
-          label="Two-factor authentication"
-          description={
-            sec.twoFactorEnabled
-              ? `Enabled — verification via ${sec.twoFactorMethod.toUpperCase()}`
-              : "Off — not available for employer accounts yet"
-          }
-        />
-      </SettingsGroup>
-
-      <SettingsNote>
-        Two-factor authentication needs a verification flow backed by SMS or
-        email codes that the backend doesn&apos;t expose yet. Until it lands,
-        there is deliberately no toggle here — an on/off switch without a real
-        verification flow would be fake security.
-      </SettingsNote>
-
-      <SettingsGroup title="Login alerts">
-        <SettingsRow
-          icon={<ShieldCheck className="h-5 w-5" />}
-          label="Login notifications"
-          description="Get notified when someone signs in to your account"
-          action={
-            <SettingsToggle
-              enabled={sec.loginNotifications}
-              disabled={updateSec.isPending}
-              onToggle={(v) => updateSec.mutate({ loginNotifications: v })}
-            />
-          }
-        />
-      </SettingsGroup>
 
       <SettingsGroup title="Account keys">
         <SettingsRow

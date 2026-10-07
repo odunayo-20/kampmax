@@ -4,16 +4,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { employerKeys, dashboardKeys } from "@/lib/query-keys";
 import {
-  getEmployerOnboardingDraftForUser,
+  backendProfileCompletion,
+  backendProfileToDraft,
+  getEmployerProfileApi,
   updateEmployerProfileApi,
-  updateEmployerProfileForUser,
 } from "@/services/employer";
-import { computeEmployerCompletion } from "@/services/employer";
 import type { EmployerOnboardingDraft, EmployerProfileUpdatePayload } from "@/types/employer";
-
-function delay(ms = 250): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 /** Employer profile read (owner-scoped). */
 export function useEmployerProfile() {
@@ -28,10 +24,13 @@ export function useEmployerProfile() {
       draft: EmployerOnboardingDraft;
       completion: number;
     } | null> => {
-      await delay();
-      const draft = getEmployerOnboardingDraftForUser();
-      if (!draft) return null;
-      return { draft, completion: computeEmployerCompletion(draft) };
+      const { profile, error } = await getEmployerProfileApi();
+      if (error) {
+        if (error.status === 404) return null;
+        throw error;
+      }
+      if (!profile) return null;
+      return { draft: backendProfileToDraft(profile), completion: backendProfileCompletion(profile) };
     },
   });
 }
@@ -39,29 +38,21 @@ export function useEmployerProfile() {
 /** Employer profile update mutation. Invalidates profile + dashboard caches. */
 export function useUpdateEmployerProfile() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
-  const userId = user?.id ?? "";
 
   return useMutation({
     mutationFn: async (payload: EmployerProfileUpdatePayload) => {
-      await delay(200);
-      const result = updateEmployerProfileForUser(payload);
-      if (!result.success) {
-        throw new Error(result.error ?? "Could not save changes.");
-      }
-
-      // Live backend sync
-      updateEmployerProfileApi({
+      const { error } = await updateEmployerProfileApi({
         displayName: payload.profile?.displayName,
         companyName: payload.organization?.name,
         companyDescription: payload.organization?.description || payload.profile?.about,
         industry: payload.organization?.industry || payload.profile?.industry,
-        websiteUrl: payload.organization?.website || payload.profile?.website,
-        location: payload.location?.city ? `${payload.location.city}, ${payload.location.state || ""}`.trim() : undefined,
+        websiteUrl: payload.organization?.website || payload.profile?.website || undefined,
+        city: payload.location?.city || undefined,
+        state: payload.location?.state || undefined,
         campusId: payload.location?.campusId,
-      }).catch(() => {});
-
-      return result;
+      });
+      if (error) throw new Error(error.message || "Could not save changes.");
+      return { success: true };
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({

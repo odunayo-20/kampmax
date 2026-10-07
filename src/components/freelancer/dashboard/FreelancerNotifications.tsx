@@ -5,17 +5,15 @@ import Link from "next/link";
 import { Bell, BellRing } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { timeAgo } from "@/lib/utils";
-import { getFreelancerNotificationSummary } from "@/services/freelancer-dashboard";
-import type { FreelancerNotificationSummary } from "@/types/freelancer-dashboard";
+import { useNotificationSummary } from "@/hooks/use-notifications";
 
 /**
- * Freelancer dashboard notification bell. Reuses the existing global notification
- * system (getNotifications + unread count) — no duplicate feed is created. The
- * full notification centre is a future module, so this is a read-only summary.
+ * Freelancer dashboard notification bell: a summary of the same real feed as the
+ * notifications page.
  */
 export function FreelancerNotifications() {
   const [open, setOpen] = useState(false);
-  const [summary] = useState<FreelancerNotificationSummary>(() => getFreelancerNotificationSummary());
+  const summary = useNotificationSummary();
 
   const unread = summary.unreadCount;
 
@@ -81,11 +79,11 @@ export function FreelancerNotifications() {
             </div>
             <div className="border-t border-kampmax-border p-2">
               <Link
-                href="/freelancer/dashboard"
+                href="/notifications"
                 onClick={() => setOpen(false)}
                 className="block rounded-lg px-3 py-2 text-center text-xs font-medium text-primary-600 hover:bg-neutral-50"
               >
-                Manage notifications (coming soon)
+                See all notifications
               </Link>
             </div>
           </div>

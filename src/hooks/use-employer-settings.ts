@@ -5,25 +5,13 @@ import { useAuth } from "@/lib/auth-context";
 import { settingsKeys } from "@/lib/query-keys";
 import * as authService from "@/services/auth";
 import {
-  getNotificationPreferences,
-  updateNotificationPreferences,
-  getPrivacySettings,
-  updatePrivacySettings,
-  getSecuritySettings,
-  updateSecuritySettings,
-} from "@/services/profile";
-import {
-  getEmployerDashboardAccess,
-  getEmployerOnboardingDraftForUser,
-  getEmployerVerificationStatusForUser,
+  backendProfileToDraft,
+  employerVerificationFrom,
+  getEmployerDashboardAccessApi,
+  getEmployerProfileApi,
   type EmployerAccess,
 } from "@/services/employer";
 import { getCampusById } from "@/services/campus";
-import type {
-  NotificationPreferences,
-  PrivacySettings,
-  SecuritySettings,
-} from "@/types";
 import type {
   EmployerOnboardingStatus,
   EmployerVerificationStatus,
@@ -58,10 +46,10 @@ export function useEmployerAccountSettings() {
     queryKey: settingsKeys.account(userId ?? ""),
     enabled,
     queryFn: async (): Promise<EmployerAccountSettings | null> => {
-      await delay();
-      const access = getEmployerDashboardAccess();
-      const draft = getEmployerOnboardingDraftForUser();
-      if (!draft) {
+      const access = await getEmployerDashboardAccessApi();
+      const { profile, error } = await getEmployerProfileApi();
+      if (error && error.status !== 404) throw error;
+      if (!profile) {
         return {
           access,
           approval: {
@@ -74,185 +62,23 @@ export function useEmployerAccountSettings() {
           },
         };
       }
-      const campus = draft.location.campusId
-        ? getCampusById(draft.location.campusId)
-        : undefined;
+      const draft = backendProfileToDraft(profile);
+      const campus = draft.location.campusId ? getCampusById(draft.location.campusId) : undefined;
       return {
         access,
         approval: {
-          status: draft.status,
-          verification: getEmployerVerificationStatusForUser(),
-          orgName:
-            draft.organization?.name?.trim() ||
-            draft.profile?.displayName?.trim() ||
-            "",
+          status: access.status,
+          verification: employerVerificationFrom(String(profile.verificationStatus)),
+          orgName: draft.organization.name?.trim() || draft.profile.displayName?.trim() || "",
           campusName: campus?.name ?? null,
           approvedSlug: draft.approvedSlug ?? null,
-          isPublic: !!draft.approvedSlug && draft.status === "APPROVED",
+          isPublic: !!draft.approvedSlug,
         },
       };
     },
   });
 }
 
-// ============================================================
-// Notification preferences (share the platform-wide record)
-// ============================================================
-
-export function useNotificationPreferences() {
-  const { status, user } = useAuth();
-  const userId = user?.id ?? "";
-  const enabled = status === "authenticated";
-
-  return useQuery({
-    queryKey: settingsKeys.notificationPreferences(userId),
-    enabled,
-    queryFn: async (): Promise<NotificationPreferences> => {
-      await delay();
-      return getNotificationPreferences();
-    },
-  });
-}
-
-export function useUpdateNotificationPreferences() {
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
-  const userId = user?.id ?? "";
-  const key = settingsKeys.notificationPreferences(userId);
-
-  return useMutation({
-    mutationFn: async (data: Partial<NotificationPreferences>) => {
-      await delay(150);
-      return updateNotificationPreferences(data);
-    },
-    onMutate: async (data) => {
-      await queryClient.cancelQueries({ queryKey: settingsKeys.all });
-      const prev = queryClient.getQueryData<NotificationPreferences>(key);
-      if (prev) {
-        queryClient.setQueryData<NotificationPreferences>(key, {
-          ...prev,
-          ...data,
-        });
-      }
-      return { prev };
-    },
-    onError: (_err, _data, ctx) => {
-      if (ctx?.prev) {
-        queryClient.setQueryData<NotificationPreferences>(key, ctx.prev);
-      }
-    },
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: settingsKeys.all });
-    },
-  });
-}
-
-// ============================================================
-// Privacy settings (share the platform-wide record)
-// ============================================================
-
-export function usePrivacySettings() {
-  const { status, user } = useAuth();
-  const userId = user?.id ?? "";
-  const enabled = status === "authenticated";
-
-  return useQuery({
-    queryKey: settingsKeys.privacySettings(userId),
-    enabled,
-    queryFn: async (): Promise<PrivacySettings> => {
-      await delay();
-      return getPrivacySettings();
-    },
-  });
-}
-
-export function useUpdatePrivacySettings() {
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
-  const userId = user?.id ?? "";
-  const key = settingsKeys.privacySettings(userId);
-
-  return useMutation({
-    mutationFn: async (data: Partial<PrivacySettings>) => {
-      await delay(150);
-      return updatePrivacySettings(data);
-    },
-    onMutate: async (data) => {
-      await queryClient.cancelQueries({ queryKey: settingsKeys.all });
-      const prev = queryClient.getQueryData<PrivacySettings>(key);
-      if (prev) {
-        queryClient.setQueryData<PrivacySettings>(key, {
-          ...prev,
-          ...data,
-        });
-      }
-      return { prev };
-    },
-    onError: (_err, _data, ctx) => {
-      if (ctx?.prev) {
-        queryClient.setQueryData<PrivacySettings>(key, ctx.prev);
-      }
-    },
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: settingsKeys.all });
-    },
-  });
-}
-
-// ============================================================
-// Security settings (share the platform-wide record)
-// ============================================================
-
-export function useSecuritySettings() {
-  const { status, user } = useAuth();
-  const userId = user?.id ?? "";
-  const enabled = status === "authenticated";
-
-  return useQuery({
-    queryKey: settingsKeys.securitySettings(userId),
-    enabled,
-    queryFn: async (): Promise<SecuritySettings> => {
-      await delay();
-      return getSecuritySettings();
-    },
-  });
-}
-
-export function useUpdateSecuritySettings() {
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
-  const userId = user?.id ?? "";
-  const key = settingsKeys.securitySettings(userId);
-
-  return useMutation({
-    mutationFn: async (data: Partial<SecuritySettings>) => {
-      await delay(150);
-      return updateSecuritySettings(data);
-    },
-    onMutate: async (data) => {
-      await queryClient.cancelQueries({ queryKey: settingsKeys.all });
-      const prev = queryClient.getQueryData<SecuritySettings>(key);
-      if (prev) {
-        queryClient.setQueryData<SecuritySettings>(key, {
-          ...prev,
-          ...data,
-        });
-      }
-      return { prev };
-    },
-    onError: (_err, _data, ctx) => {
-      if (ctx?.prev) {
-        queryClient.setQueryData<SecuritySettings>(key, ctx.prev);
-      }
-    },
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: settingsKeys.all });
-    },
-  });
-}
-
-// ============================================================
-// Password / deactivate / delete (backend-authoritative)
 // ============================================================
 
 /** Change password for the authenticated user. Throws on rejection; the

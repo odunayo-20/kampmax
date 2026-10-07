@@ -13,16 +13,7 @@
 import { apiClient } from "@/lib/api-client";
 import { getCurrentUser } from "@/services/users";
 import { listMyEngagements, type Engagement, type EngagementStatus } from "@/services/jobs";
-import {
-  getContractsForFreelancer,
-  getContractForFreelancer,
-  acceptContract,
-  cancelContract,
-  completeContract,
-  submitDeliverable,
-  resubmitDeliverable,
-  type ActionResult,
-} from "@/data/contracts";
+import type { ActionResult } from "@/data/contracts";
 import type { Contract, ContractStatus } from "@/types/contract";
 import { CONTRACT_STATUS } from "@/types/contract";
 
@@ -235,68 +226,4 @@ export async function completeFreelancerContractApi(contractId: string): Promise
     return { ok: true, contract: data };
   }
   return { ok: false, code: "API_ERROR", message: error?.message ?? "Failed to complete engagement." };
-}
-
-// ── Reads ───────────────────────────────────────────────────
-
-export function getFreelancerContracts(): Contract[] {
-  const uid = currentUserId();
-  if (!uid) return [];
-  return getContractsForFreelancer(uid);
-}
-
-export function getFreelancerContract(contractId: string): Contract | null {
-  const uid = currentUserId();
-  if (!uid) return null;
-  return getContractForFreelancer(uid, contractId);
-}
-
-// ── Mutations (backend-authoritative) ───────────────────────
-
-export function acceptFreelancerContract(contractId: string): ActionResult {
-  const uid = currentUserId();
-  if (!uid) {
-    return { ok: false, code: "UNAUTHORIZED", message: "Authentication required." };
-  }
-  return acceptContract(uid, contractId);
-}
-
-export function cancelFreelancerContract(contractId: string, reason: string): ActionResult {
-  const uid = currentUserId();
-  if (!uid) {
-    return { ok: false, code: "UNAUTHORIZED", message: "Authentication required." };
-  }
-  return cancelContract(uid, contractId, reason);
-}
-
-export function completeFreelancerContract(contractId: string): ActionResult {
-  const uid = currentUserId();
-  if (!uid) {
-    return { ok: false, code: "UNAUTHORIZED", message: "Authentication required." };
-  }
-  return completeContract(uid, contractId);
-}
-
-export function submitFreelancerDeliverable(
-  contractId: string,
-  milestoneId: string,
-  payload: { title: string; description: string; message?: string; links?: string[] }
-): ActionResult {
-  const uid = currentUserId();
-  if (!uid) {
-    return { ok: false, code: "UNAUTHORIZED", message: "Authentication required." };
-  }
-  return submitDeliverable(uid, contractId, milestoneId, payload);
-}
-
-export function resubmitFreelancerDeliverable(
-  contractId: string,
-  deliverableId: string,
-  payload: { message: string; links?: string[] }
-): ActionResult {
-  const uid = currentUserId();
-  if (!uid) {
-    return { ok: false, code: "UNAUTHORIZED", message: "Authentication required." };
-  }
-  return resubmitDeliverable(uid, contractId, deliverableId, payload);
 }

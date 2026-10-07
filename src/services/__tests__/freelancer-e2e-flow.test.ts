@@ -232,6 +232,10 @@ describe("E2E Freelancer Flow: Browse Jobs -> View Details -> Submit Proposal ->
       },
       error: null,
     });
+    // experience, education, certifications, portfolio, wallet
+    for (const data of [[], [], [], { items: [], meta: { total: 0 } }, { balance: 0 }]) {
+      mocks.get.mockResolvedValueOnce({ data, error: null });
+    }
 
     const dashboard = await getFreelancerDashboardApi();
     expect(dashboard).not.toBeNull();

@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { Bell, ArrowLeft } from "lucide-react";
-import { getFreelancerNotificationSummary } from "@/services/freelancer-dashboard";
+import { useNotificationSummary } from "@/hooks/use-notifications";
 
 export default function FreelancerSettingsPage() {
-  const notif = getFreelancerNotificationSummary();
+  const notif = useNotificationSummary();
 
   return (
     <div className="space-y-6">
@@ -25,8 +25,8 @@ export default function FreelancerSettingsPage() {
             <h2 className="text-sm font-bold text-kampmax-text">Notifications</h2>
             <p className="mt-1 text-xs text-kampmax-text-secondary">
               You currently have {notif.unreadCount} unread notification
-              {notif.unreadCount === 1 ? "" : "s"}. A full notification centre is coming in a
-              future release.
+              {notif.unreadCount === 1 ? "" : "s"}. See them all on the
+              notifications page.
             </p>
           </div>
         </div>

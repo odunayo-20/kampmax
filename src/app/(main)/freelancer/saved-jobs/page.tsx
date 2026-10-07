@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { getSavedJobsForUser } from "@/services/opportunity";
+import { useEffect, useState } from "react";
 import { listSavedJobs } from "@/services/jobs";
 import { jobToOpportunity } from "@/lib/job-api-mapping";
 import type { Opportunity } from "@/types/opportunity";
@@ -12,9 +11,7 @@ import {
 } from "@/components/freelancer/opportunities";
 
 export default function SavedJobsPage() {
-  // Legacy demo jobs saved in the local store, plus real jobs saved on the backend.
-  const localJobs = useMemo(() => getSavedJobsForUser(), []);
-  const [backendJobs, setBackendJobs] = useState<Opportunity[]>([]);
+  const [jobs, setJobs] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,15 +20,13 @@ export default function SavedJobsPage() {
     void listSavedJobs({ limit: 100 }).then(({ jobs, error: loadError }) => {
       if (cancelled) return;
       if (loadError) setError(loadError.message ?? "We couldn't load your saved jobs.");
-      else setBackendJobs(jobs.map(jobToOpportunity));
+      else setJobs(jobs.map(jobToOpportunity));
       setLoading(false);
     });
     return () => {
       cancelled = true;
     };
   }, []);
-
-  const jobs = [...backendJobs, ...localJobs];
 
   return (
     <div className="space-y-6">

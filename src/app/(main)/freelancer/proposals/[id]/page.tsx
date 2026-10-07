@@ -4,11 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, ShieldAlert, FileText, Paperclip } from "lucide-react";
 import {
-  getProposal,
-  getOpportunity,
   getJobByIdApi,
   isBackendId,
-  withdrawProposal,
   categoryLabelFor,
 } from "@/services/opportunity";
 import {
@@ -31,19 +28,14 @@ export default function ProposalDetailPage() {
   const proposalId = String(params.id);
 
   const backend = isBackendId(proposalId);
-  const [proposal, setProposal] = useState<Proposal | null>(() =>
-    backend ? null : getProposal(proposalId)
-  );
+  const [proposal, setProposal] = useState<Proposal | null>(null);
   const [remoteJob, setRemoteJob] = useState<Opportunity | null>(null);
   const [loading, setLoading] = useState(backend);
   const [showWithdraw, setShowWithdraw] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const job = useMemo(
-    () => (proposal ? getOpportunity(proposal.opportunityId) ?? remoteJob : null),
-    [proposal, remoteJob]
-  );
+  const job = useMemo(() => (proposal ? remoteJob : null), [proposal, remoteJob]);
 
   const canWithdraw =
     !!proposal &&
@@ -52,7 +44,10 @@ export default function ProposalDetailPage() {
       proposal.status === PROPOSAL_STATUS.SHORTLISTED);
 
   useEffect(() => {
-    if (!backend) return;
+    if (!backend) {
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     void (async () => {
       const { proposal: found } = await getProposalByIdApi(proposalId);
@@ -79,24 +74,13 @@ export default function ProposalDetailPage() {
     if (busy) return;
     setBusy(true);
     setError(null);
-    if (backend) {
-      const res = await withdrawProposalApi(proposalId);
-      setBusy(false);
-      if (res.proposal) {
-        setShowWithdraw(false);
-        setProposal(res.proposal);
-      } else {
-        setError(res.error?.message ?? "We couldn't withdraw your proposal.");
-      }
-      return;
-    }
-    const res = withdrawProposal(proposalId);
+    const res = await withdrawProposalApi(proposalId);
     setBusy(false);
-    if (res.ok && res.proposal) {
+    if (res.proposal) {
       setShowWithdraw(false);
       setProposal(res.proposal);
     } else {
-      setError(res.message);
+      setError(res.error?.message ?? "We couldn't withdraw your proposal.");
     }
   }
 

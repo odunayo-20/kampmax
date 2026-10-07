@@ -2,14 +2,18 @@
 
 import Link from "next/link";
 import { ArrowRight, Handshake } from "lucide-react";
-import { getFreelancerContracts } from "@/services/contract";
+import { useQuery } from "@tanstack/react-query";
+import { getFreelancerContractsApi } from "@/services/contract";
 import { CONTRACT_STATUS } from "@/types/contract";
 
-// Dashboard "Next Contract Action" widget (Module 24). Reuses the contract
-// query/service layer so the dashboard never duplicates fetching logic.
+// Dashboard "Next Contract Action" widget, from the freelancer's real engagements.
 
 export function FreelancerNextContractAction() {
-  const contracts = getFreelancerContracts();
+  const { data: contracts = [] } = useQuery({
+    queryKey: ["freelancer", "contracts"],
+    queryFn: getFreelancerContractsApi,
+    retry: false,
+  });
 
   const next = contracts.find(
     (c) =>
@@ -46,10 +50,10 @@ export function FreelancerNextContractAction() {
       <p className="mt-1 text-base font-bold text-kampmax-text">{next.projectTitle}</p>
       <p className="mt-1 text-sm text-kampmax-text-secondary">{next.nextAction}</p>
       <Link
-        href={`/freelancer/contracts/${next.id}`}
+        href="/freelancer/contracts"
         className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-[#1258C7]"
       >
-        Open Workspace <ArrowRight className="h-4 w-4" aria-hidden />
+        Open contract <ArrowRight className="h-4 w-4" aria-hidden />
       </Link>
     </div>
   );

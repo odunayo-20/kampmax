@@ -33,12 +33,14 @@ import {
   submitEmployerApplication,
   getEmployerByApprovedSlug,
 } from "@/data/employer";
-import { getOpenJobsForEmployer } from "@/data/opportunity";
+import { listPublicJobs } from "@/services/jobs";
+import { jobToOpportunity } from "@/lib/job-api-mapping";
 import type {
   EmployerOnboardingDraft,
   EmployerOnboardingStatus,
   EmployerVerificationStatus,
   EmployerProfileUpdatePayload,
+  EmployerPublicProfile,
 } from "@/types/employer";
 import {
   EMPLOYER_ONBOARDING_STEPS,
@@ -307,6 +309,86 @@ export async function submitEmployerApplicationApi(): Promise<{
   >("/employers/me", { status: "PENDING_REVIEW" });
   if (!error && data) return { success: true, profile: data, error: null };
   return { success: false, profile: null, error };
+}
+
+/** The fields of GET /employers/me that the profile screens use. */
+interface BackendEmployerFields {
+  displayName?: string;
+  companyName?: string | null;
+  companyDescription?: string | null;
+  industry?: string | null;
+  websiteUrl?: string | null;
+  city?: string | null;
+  state?: string | null;
+  campusId?: string | null;
+  verificationStatus?: string;
+  isPublic?: boolean;
+  userId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+const VERIFICATION_FROM_BACKEND: Record<string, EmployerVerificationStatus> = {
+  UNVERIFIED: "not_started",
+  PENDING: "pending",
+  VERIFIED: "verified",
+  REJECTED: "rejected",
+};
+
+export function employerVerificationFrom(status: string | undefined): EmployerVerificationStatus {
+  return VERIFICATION_FROM_BACKEND[String(status).toUpperCase()] ?? "not_started";
+}
+
+/**
+ * The profile screens' draft shape, filled from the real backend profile.
+ * Fields the backend does not store (headline, contact, preferences) stay empty.
+ */
+export function backendProfileToDraft(profile: EmployerBackendProfile): EmployerOnboardingDraft {
+  const p = profile as unknown as BackendEmployerFields;
+  const now = new Date().toISOString();
+  return {
+    userId: p.userId ?? "",
+    status: employerVerificationFrom(p.verificationStatus) === "verified" ? "APPROVED" : "PENDING_REVIEW",
+    currentStep: 5,
+    createdAt: p.createdAt ?? now,
+    updatedAt: p.updatedAt ?? now,
+    clientType: p.companyName ? "business" : "individual",
+    profile: {
+      displayName: p.displayName ?? "",
+      about: p.companyDescription ?? "",
+      industry: p.industry ?? "",
+      website: p.websiteUrl ?? "",
+      logoUrl: null,
+    },
+    organization: {
+      name: p.companyName ?? "",
+      industry: p.industry ?? "",
+      description: p.companyDescription ?? "",
+      website: p.websiteUrl ?? "",
+    },
+    contact: {},
+    location: {
+      campusId: p.campusId ?? undefined,
+      city: p.city ?? "",
+      state: p.state ?? "",
+    },
+    preferences: { categories: [] },
+    verification: { status: employerVerificationFrom(p.verificationStatus) },
+    approvedSlug: p.isPublic && employerVerificationFrom(p.verificationStatus) === "verified" ? (profile.id as string) : undefined,
+  };
+}
+
+/** How complete the real profile is: the five things the backend stores. */
+export function backendProfileCompletion(profile: EmployerBackendProfile): number {
+  const p = profile as unknown as BackendEmployerFields;
+  const checks = [
+    !!p.displayName?.trim(),
+    !!p.companyName?.trim(),
+    !!p.companyDescription?.trim(),
+    !!p.industry?.trim(),
+    !!(p.city?.trim() || p.campusId),
+  ];
+  return Math.round((checks.filter(Boolean).length / checks.length) * 100);
 }
 
 // ── Sync/Local API ──────────────────────────────────────────
@@ -680,23 +762,54 @@ export function updateEmployerProfileForUser(
  * Used by the public /employers/[slug] page. No auth derivation — purely
  * a store lookup, identical to how a backend endpoint would work.
  */
-export function getEmployerPublicProfileBySlug(slug: string) {
-  const draft = getEmployerByApprovedSlug(slug);
-  if (!draft) return null;
+/**
+ * A public employer profile from the backend (GET /employers/:id), with the
+ * jobs they currently have open. Null when the profile is missing, private or
+ * suspended. Fields the backend does not store are left empty, not invented.
+ */
+export async function getEmployerPublicProfileFromBackend(
+  id: string
+): Promise<EmployerPublicProfile | null> {
+  if (!UUID_RE.test(id)) return null;
+  const { profile } = await getEmployerPublicProfileApi(id);
+  if (!profile) return null;
 
-  const preview = getEmployerPublicPreview(draft);
-  if (!preview) return null;
+  const raw = profile as unknown as {
+    id: string;
+    userId: string;
+    displayName: string;
+    companyName: string | null;
+    companyDescription: string | null;
+    industry: string | null;
+    websiteUrl: string | null;
+    city: string | null;
+    state: string | null;
+    verificationStatus: string;
+  };
 
-  const openJobs = getOpenJobsForEmployer(draft.userId);
+  const { jobs } = await listPublicJobs({ employerId: id, limit: 20 });
 
   return {
-    ...preview,
-    userId: draft.userId,
-    logoUrl: draft.profile.logoUrl ?? null,
-    website: draft.profile.website?.trim() || draft.organization.website?.trim() || "",
-    organizationSize: draft.organization.size?.trim() || "",
-    slug: draft.approvedSlug ?? slug,
-    openJobs,
+    userId: raw.userId,
+    name: raw.companyName?.trim() || raw.displayName,
+    descriptor: raw.industry ?? "",
+    about: raw.companyDescription ?? "",
+    location: [raw.city, raw.state].filter(Boolean).join(", "),
+    logoUrl: null,
+    website: raw.websiteUrl ?? "",
+    organizationSize: "",
+    verified: String(raw.verificationStatus).toUpperCase() === "VERIFIED",
+    slug: raw.id,
+    openJobs: jobs.map(jobToOpportunity).map((o) => ({
+      id: o.id,
+      title: o.title,
+      summary: o.summary,
+      budget: o.budget,
+      duration: o.duration,
+      experienceLevel: o.experienceLevel,
+      postedAt: o.postedAt,
+      location: o.location,
+    })),
   };
 }
 

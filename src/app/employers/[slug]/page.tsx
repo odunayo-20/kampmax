@@ -1,6 +1,6 @@
 import type { Metadata, ResolvingMetadata } from "next";
 import { notFound } from "next/navigation";
-import { getEmployerPublicProfileBySlug } from "@/services/employer";
+import { getEmployerPublicProfileFromBackend } from "@/services/employer";
 import { getSiteBaseUrl } from "@/lib/utils";
 import { EmployerPublicProfileContent } from "@/components/employer/public/EmployerPublicProfileContent";
 
@@ -12,7 +12,7 @@ export async function generateMetadata(
   { params }: EmployerPageProps
 ): Promise<Metadata> {
   const { slug } = await params;
-  const profile = getEmployerPublicProfileBySlug(slug);
+  const profile = await getEmployerPublicProfileFromBackend(slug);
 
   if (!profile) {
     return {
@@ -51,7 +51,7 @@ export async function generateMetadata(
 
 export default async function EmployerPage({ params }: EmployerPageProps) {
   const { slug } = await params;
-  const profile = getEmployerPublicProfileBySlug(slug);
+  const profile = await getEmployerPublicProfileFromBackend(slug);
 
   if (!profile) {
     notFound();

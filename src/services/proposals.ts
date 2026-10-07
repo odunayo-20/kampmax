@@ -28,7 +28,6 @@ import type { ApiError } from "@/lib/api-client";
 import { getCurrentUser } from "@/services/users";
 import { getCurrentAuthUser } from "@/lib/current-user-store";
 import { getMyFreelancerProfile } from "@/services/freelancer";
-import { getProposalsByFreelancer } from "@/data/opportunity";
 import type {
   EmployerApplicationStatus,
   EmployerApplicationsPage,
@@ -591,25 +590,4 @@ export async function getJobEligibilityApi(job: Opportunity): Promise<JobEligibi
     eligible: true,
     reasons: ["You're eligible to apply for this opportunity."],
   };
-}
-
-// ═══════════════════════════════════════════════════════════
-// SYNC HELPERS (offline / mock fallbacks)
-// ═══════════════════════════════════════════════════════════
-
-export function getMyProposals(): Proposal[] {
-  const uid = currentUserId();
-  if (!uid) return [];
-  return getProposalsByFreelancer(uid);
-}
-
-export function getActiveProposalCount(): number {
-  const uid = currentUserId();
-  if (!uid) return 0;
-  const active: ProposalStatus[] = [
-    PROPOSAL_STATUS.SUBMITTED,
-    PROPOSAL_STATUS.UNDER_REVIEW,
-    PROPOSAL_STATUS.SHORTLISTED,
-  ];
-  return getProposalsByFreelancer(uid).filter((p) => active.includes(p.status)).length;
 }
