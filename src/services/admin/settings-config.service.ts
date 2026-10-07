@@ -1,11 +1,4 @@
-import {
-  PlatformSettingsConfig,
-  PlatformSettingsState,
-  SettingsSectionKey,
-  SettingsSectionMeta,
-} from "@/types/admin";
-import { apiDelay } from "@/lib/admin/api";
-import { createSettingsConfigSeed } from "@/data/admin/settings-config";
+import { PlatformSettingsConfig, PlatformSettingsState, SettingsSectionKey } from "@/types/admin";
 
 // ------------------------------------------------------------
 // CONTRACT (NestJS resource: /admin/settings)
@@ -51,61 +44,4 @@ export class SettingsConflictError extends Error {
     super(message);
     this.name = "SettingsConflictError";
   }
-}
-
-const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
-
-export function createMockSettingsConfigService(): AdminSettingsConfigService {
-  let config = createSettingsConfigSeed();
-  const versions = new Map<SettingsSectionKey, number>();
-
-  const meta = (): Record<SettingsSectionKey, SettingsSectionMeta> =>
-    Object.fromEntries(
-      (Object.keys(config) as SettingsSectionKey[]).map((key) => [
-        key,
-        {
-          version: versions.get(key) ?? 0,
-          updatedAt: null,
-          updatedBy: null,
-          isDefault: !versions.has(key),
-        },
-      ])
-    ) as Record<SettingsSectionKey, SettingsSectionMeta>;
-
-  return {
-    async get() {
-      await apiDelay(180);
-      return clone(config);
-    },
-
-    async getState() {
-      await apiDelay(180);
-      return {
-        config: clone(config),
-        meta: meta(),
-        access: { canEdit: true, canManage: true },
-      };
-    },
-
-    async save(section, value) {
-      await apiDelay(300);
-      config = { ...config, [section]: clone(value) };
-      versions.set(section, (versions.get(section) ?? 0) + 1);
-      return clone(config);
-    },
-
-    async resetSection(section) {
-      await apiDelay(300);
-      config = { ...config, [section]: createSettingsConfigSeed()[section] };
-      versions.set(section, (versions.get(section) ?? 0) + 1);
-      return clone(config);
-    },
-
-    async resetToDefaults() {
-      await apiDelay(300);
-      config = createSettingsConfigSeed();
-      versions.clear();
-      return clone(config);
-    },
-  };
 }

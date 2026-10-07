@@ -1,18 +1,4 @@
-import type {
-  ServiceProviderOnboardingDraft,
-  ServiceProviderOnboardingDocument,
-  ServiceProviderOnboardingSummary,
-  ServiceProviderProfile,
-  ServiceProviderService,
-  ServiceProviderPortfolioItem,
-  ServiceProviderVerificationStatus,
-  ServiceProviderOnboardingStatus,
-  ServiceProviderType,
-  ServiceProviderLocationType,
-  ServiceProviderPricingModel,
-  ServiceProviderServiceStatus,
-  ServiceProviderAvailabilityDay,
-} from "@/types/service-provider";
+import type { ServiceProviderOnboardingDraft, ServiceProviderOnboardingDocument, ServiceProviderProfile, ServiceProviderAvailabilityDay } from "@/types/service-provider";
 import {
   SERVICE_PROVIDER_ONBOARDING_STATUS,
   SERVICE_PROVIDER_DOCUMENT_STATUS,
@@ -274,9 +260,3 @@ export const spOnboardingStore = {
 export const serviceProviderProfiles: ServiceProviderProfile[] = [
   mockServiceProviderProfile,
 ];
-
-// ── Helper ──────────────────────────────────────────────────
-
-export function getSpProfileByUserId(userId: string): ServiceProviderProfile | undefined {
-  return serviceProviderProfiles.find((p) => p.userId === userId);
-}

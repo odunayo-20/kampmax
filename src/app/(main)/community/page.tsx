@@ -21,9 +21,8 @@ import { CommunityEventCard } from "@/components/community/EventCard";
 import { useAuth } from "@/lib/auth-context";
 import { useApp } from "@/lib/app-context";
 import { useCommunityFeed, useSavedPosts, useUpcomingEvents } from "@/hooks/use-community";
-import { communityClubs } from "@/data/community-clubs";
 
-type CommunityMainTab = "clubs" | "discussions" | "announcements";
+type CommunityMainTab = "discussions" | "announcements";
 type DiscussionSubTab = "all" | "POLL" | "LOST_FOUND" | "saved";
 
 const DISCUSSION_SUBTABS: { id: DiscussionSubTab; label: string; icon?: React.ElementType }[] = [
@@ -42,20 +41,10 @@ export default function CommunityFeedPage() {
   const feed = useCommunityFeed(campusId);
   const events = useUpcomingEvents(campusId);
 
-  const [mainTab, setMainTab] = useState<CommunityMainTab>("clubs");
+  const [mainTab, setMainTab] = useState<CommunityMainTab>("discussions");
   const [discussionTab, setDiscussionTab] = useState<DiscussionSubTab>("all");
-  const [joinedClubs, setJoinedClubs] = useState<Record<string, boolean>>({
-    "club-entrepreneurship": true,
-  });
 
   const saved = useSavedPosts(discussionTab === "saved");
-
-  const toggleJoinClub = (clubId: string) => {
-    setJoinedClubs((prev) => ({
-      ...prev,
-      [clubId]: !prev[clubId],
-    }));
-  };
 
   // Determine active source & posts based on selection
   const source = discussionTab === "saved" ? saved : feed;
@@ -99,20 +88,8 @@ export default function CommunityFeedPage() {
         </div>
       </div>
 
-      {/* 2. Rebranded Primary Segmented Tabs (Screen 8: Clubs, Discussions, Announcements) */}
+      {/* 2. Rebranded Primary Segmented Tabs (Discussions, Announcements) */}
       <div className="flex items-center gap-2 border-b border-neutral-200/90 pb-2.5">
-        <button
-          type="button"
-          onClick={() => setMainTab("clubs")}
-          className={cn(
-            "px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-150",
-            mainTab === "clubs"
-              ? "bg-primary-600 text-white shadow-xs"
-              : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
-          )}
-        >
-          Clubs
-        </button>
         <button
           type="button"
           onClick={() => setMainTab("discussions")}
@@ -139,106 +116,14 @@ export default function CommunityFeedPage() {
         </button>
       </div>
 
-      {/* ═══════════════════════════════════════════════════════
-          TAB 1: CLUBS VIEW
-          ═══════════════════════════════════════════════════════ */}
-      {mainTab === "clubs" && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-neutral-900">Popular Clubs</h2>
-            <button
-              onClick={() => setMainTab("discussions")}
-              className="text-xs font-semibold text-primary-600 hover:underline"
-            >
-              See all
-            </button>
+      {mainTab === "discussions" && events.data && events.data.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-sm font-bold text-neutral-900">Upcoming campus events</h2>
+          <div className="space-y-2.5">
+            {events.data.slice(0, 2).map((event) => (
+              <CommunityEventCard key={event.id} event={event} />
+            ))}
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {communityClubs.map((club) => {
-              const isJoined = joinedClubs[club.id] ?? club.isJoined;
-              return (
-                <div
-                  key={club.id}
-                  className="flex items-center justify-between p-3.5 bg-white border border-neutral-200/90 rounded-2xl shadow-xs hover:shadow-sm transition-all gap-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-xl shrink-0">
-                      {club.avatar}
-                    </div>
-                    <div className="space-y-0.5">
-                      <h3 className="text-sm font-bold text-neutral-900">{club.name}</h3>
-                      <p className="text-xs text-neutral-500">
-                        {club.memberCount.toLocaleString()} members
-                      </p>
-                      {club.meetingInfo && (
-                        <p className="text-[10px] text-neutral-400 line-clamp-1">{club.meetingInfo}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => toggleJoinClub(club.id)}
-                    className={cn(
-                      "px-4 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0",
-                      isJoined
-                        ? "bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
-                        : "bg-primary-600 text-white hover:bg-primary-700 shadow-xs"
-                    )}
-                  >
-                    {isJoined ? "Joined" : "Join"}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Latest Announcements Banner */}
-          <div className="pt-2 space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold text-neutral-900">Latest Announcements</h2>
-              <button
-                onClick={() => setMainTab("announcements")}
-                className="text-xs font-semibold text-primary-600 hover:underline"
-              >
-                See all
-              </button>
-            </div>
-
-            <div className="p-4 bg-white border border-neutral-200/90 rounded-2xl shadow-xs space-y-2">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center font-bold text-xs shrink-0">
-                  📢
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-neutral-900">
-                    RUGIPO School Resumption Update
-                  </h4>
-                  <p className="text-[10px] text-neutral-500">
-                    School resumes on Monday, 29th September 2025 • 2h ago
-                  </p>
-                </div>
-              </div>
-              <p className="text-xs text-neutral-600 leading-relaxed pl-10.5">
-                All returning and newly admitted students are advised to complete their course
-                registration and hall allocations before the portal closes.
-              </p>
-            </div>
-          </div>
-
-          {/* Upcoming Campus Club Events */}
-          {events.data && events.data.length > 0 && (
-            <div className="pt-2 space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-bold text-neutral-900">Upcoming Club & Campus Events</h2>
-              </div>
-              <div className="space-y-2.5">
-                {events.data.slice(0, 2).map((event) => (
-                  <CommunityEventCard key={event.id} event={event} />
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
 

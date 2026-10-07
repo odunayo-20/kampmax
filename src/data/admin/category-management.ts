@@ -69,10 +69,6 @@ const EXTRA_CATEGORIES: ExtraCategorySeed[] = [
 
 const rand = seededRandom(909);
 
-function slugify(name: string): string {
-  return name.toLowerCase().replace(/[^a-z]+/g, "-").replace(/^-|-$/g, "");
-}
-
 function buildDataset(): ManagedCategory[] {
   const seeds = [...mockCategories];
 
@@ -155,16 +151,3 @@ export const CATEGORY_MANAGEMENT_SEED: ManagedCategory[] = buildDataset();
 export function buildCategoryManagementDataset(): ManagedCategory[] {
   return CATEGORY_MANAGEMENT_SEED.map((row) => ({ ...row }));
 }
-
-export const CATEGORY_ICON_KEYS = [
-  ...new Set([
-    ...mockCategories.map((c) => c.icon),
-    ...EXTRA_CATEGORIES.map((c) => c.icon),
-    "package",
-    "laptop",
-    "camera",
-    "bicycle",
-    "music",
-    "armchair",
-  ]),
-];

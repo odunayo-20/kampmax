@@ -10,12 +10,7 @@
 // never set by the frontend; the store (acting as the backend) is the
 // only writer of those values.
 
-import type {
-  EmployerOnboardingDraft,
-  EmployerOnboardingStepId,
-  EmployerOnboardingStatus,
-  EmployerVerificationStatus,
-} from "@/types/employer";
+import type { EmployerOnboardingDraft, EmployerOnboardingStepId, EmployerOnboardingStatus } from "@/types/employer";
 import { EMPLOYER_ONBOARDING_STATUS } from "@/types/employer";
 
 // ── Store ───────────────────────────────────────────────────
@@ -167,13 +162,6 @@ export function getEmployerOnboardingStatus(
   return rec ? rec.draft.status : EMPLOYER_ONBOARDING_STATUS.DRAFT;
 }
 
-export function getEmployerVerificationStatus(
-  userId: string
-): EmployerVerificationStatus {
-  const rec = store.get(userId);
-  return rec ? rec.draft.verification.status : "not_started";
-}
-
 export function submitEmployerApplication(
   userId: string
 ): { success: boolean; message: string } {
@@ -193,80 +181,8 @@ export function submitEmployerApplication(
   return { success: true, message: "Employer profile submitted for review." };
 }
 
-/**
- * Looks up an employer record by their approved slug (public lookup).
- * Returns a clone of the full draft, or null if no match.
- */
-export function getEmployerByApprovedSlug(
-  slug: string
-): EmployerOnboardingDraft | null {
-  for (const [, rec] of store) {
-    if (rec.draft.approvedSlug === slug) return cloneDraft(rec.draft);
-  }
-  return null;
-}
-
-// ── Admin reads & transitions ───────────────────────────────
-// Module 37: the admin console reads the SAME records the owner flows
-// write. Transitions go through the store (the backend surrogate) so the
-// employer facing surfaces immediately reflect admin decisions — there is
-// never a second copy of the status.
-
-/** All employer onboarding records (admin enumeration, backend-scoped). */
-export function listEmployerRecords(): EmployerOnboardingDraft[] {
-  return Array.from(store.values()).map((r) => cloneDraft(r.draft));
-}
-
 export type SetEmployerAdminStatusResult =
   | { ok: true; draft: EmployerOnboardingDraft }
   | { ok: false; code: "NOT_FOUND" | "TRANSITION_NOT_ALLOWED"; message: string };
-
-/** Backend-enforced admin transitions on the employer lifecycle. */
-const EMPLOYER_ADMIN_TRANSITIONS: Record<
-  EmployerOnboardingStatus,
-  EmployerOnboardingStatus[]
-> = {
-  DRAFT: [],
-  IN_PROGRESS: [],
-  PENDING_REVIEW: [
-    EMPLOYER_ONBOARDING_STATUS.APPROVED,
-    EMPLOYER_ONBOARDING_STATUS.REJECTED,
-    EMPLOYER_ONBOARDING_STATUS.SUSPENDED,
-  ],
-  APPROVED: [EMPLOYER_ONBOARDING_STATUS.SUSPENDED],
-  REJECTED: [],
-  SUSPENDED: [EMPLOYER_ONBOARDING_STATUS.APPROVED],
-};
-
-/**
- * Applies an admin-owned status transition (the backend surrogate). Only
- * the allowed source→target pairs below are permitted; anything else is
- * rejected here, not in the UI. `message` is surfaced to the employer as
- * the backend `adminMessage` (e.g. suspension/rejection reason).
- */
-export function setEmployerAdminStatus(
-  userId: string,
-  status: EmployerOnboardingStatus,
-  message?: string
-): SetEmployerAdminStatusResult {
-  const rec = store.get(userId);
-  if (!rec) {
-    return { ok: false, code: "NOT_FOUND", message: "Employer not found." };
-  }
-  const allowed = EMPLOYER_ADMIN_TRANSITIONS[rec.draft.status] ?? [];
-  if (!allowed.includes(status)) {
-    return {
-      ok: false,
-      code: "TRANSITION_NOT_ALLOWED",
-      message: `Cannot move an ${rec.draft.status} employer to ${status}.`,
-    };
-  }
-  rec.draft.status = status;
-  if (message !== undefined) {
-    rec.draft.adminMessage = message.trim() ? message.trim() : undefined;
-  }
-  rec.draft.updatedAt = nowIso();
-  return { ok: true, draft: cloneDraft(rec.draft) };
-}
 
 export { cloneDraft, freshId, EMPLOYER_ONBOARDING_STATUS };

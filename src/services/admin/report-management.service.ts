@@ -25,13 +25,6 @@ import type {
   Paginated,
   UpdateSafetyReportStatusInput,
 } from "@/types/admin";
-import {
-  buildTrustSafetyDataset,
-  buildTrustSafetyDetail,
-  computeTrustSafetyCounts,
-  computeTrustSafetyFacets,
-  filterTrustSafetyReports,
-} from "@/data/admin/report-management";
 
 export interface AdminTrustSafetyService {
   /** Backend-search / filter / sort / paginate over real reports. */
@@ -50,56 +43,6 @@ export interface AdminTrustSafetyService {
    * in the /admin/reviews console.
    */
   setReportStatus(id: string, input: UpdateSafetyReportStatusInput): Promise<TrustSafetyReportDetail>;
-}
-
-export function createTrustSafetyService(): AdminTrustSafetyService {
-  return {
-    async list(query = {}) {
-      const dataset = buildTrustSafetyDataset();
-      const result = filterTrustSafetyReports(dataset, query);
-      return {
-        items: result.items,
-        total: result.total,
-        page: result.page,
-        pageSize: Math.max(1, query.pageSize ?? 10),
-        totalPages: result.totalPages,
-      };
-    },
-
-    async getById(id) {
-      const dataset = buildTrustSafetyDataset();
-      return buildTrustSafetyDetail(dataset, id);
-    },
-
-    async getCounts() {
-      const { rows } = buildTrustSafetyDataset();
-      return computeTrustSafetyCounts(rows);
-    },
-
-    async getFacets() {
-      const dataset = buildTrustSafetyDataset();
-      return computeTrustSafetyFacets(dataset);
-    },
-
-    async getReasonOptions() {
-      const dataset = buildTrustSafetyDataset();
-      const { reasons } = computeTrustSafetyFacets(dataset);
-      return reasons.map((r) => ({ reason: r.reason, count: r.count }));
-    },
-
-    async setReportStatus(id, input) {
-      const dataset = buildTrustSafetyDataset();
-      const detail = dataset.details.get(id);
-      if (!detail) throw new Error("Report not found");
-      if (!detail.resolvable) {
-        throw new Error(
-          "Review-sourced reports resolve by moderating the review in /admin/reviews, not here."
-        );
-      }
-      detail.status = input.status;
-      return detail;
-    },
-  };
 }
 
 export type { TrustSafetySortField };

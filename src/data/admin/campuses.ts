@@ -114,11 +114,3 @@ export const mockCampuses: Campus[] = [
     launchDate: "2025-08-01T00:00:00.000Z",
   },
 ];
-
-export function getCampus(id: string): Campus | undefined {
-  return mockCampuses.find((c) => c.id === id);
-}
-
-export function getCampusShortName(id: string): string {
-  return getCampus(id)?.shortName ?? "—";
-}

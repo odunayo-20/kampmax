@@ -1,40 +1,9 @@
 import { apiClient } from "@/lib/api-client";
 import { addSpDashboardServiceLive, updateSpAvailabilityLive } from "@/services/service-provider-dashboard.api";
-import type {
-  ServiceProviderOnboardingDraft,
-  ServiceProviderOnboardingDocument,
-  ServiceProviderOnboardingSummary,
-  ServiceProviderProfile,
-  ServiceProviderServiceDraft,
-  ServiceProviderPortfolioItemDraft,
-  ServiceProviderOnboardingStatus,
-  ServiceProviderOnboardingStepId,
-  ServiceProviderSubmitResult,
-  ServiceProviderDocumentStatus,
-  ServiceProviderServiceStatus,
-  ServiceProviderType,
-  ServiceProviderLocationType,
-  ServiceProviderPricingModel,
-  ServiceProviderBookingPreference,
-  ServiceProviderVerificationStatus,
-} from "@/types/service-provider";
-import {
-  SERVICE_PROVIDER_ONBOARDING_STATUS,
-  SERVICE_PROVIDER_ONBOARDING_STEP,
-  SERVICE_PROVIDER_ONBOARDING_STEPS,
-  SERVICE_PROVIDER_SUBMIT_RESULT,
-  SERVICE_PROVIDER_DOCUMENT_STATUS,
-  SERVICE_PROVIDER_VERIFICATION_STATUS,
-  SERVICE_PROVIDER_SERVICE_STATUS,
-  SERVICE_PROVIDER_TYPE,
-  SERVICE_PROVIDER_LOCATION_TYPE,
-  SERVICE_PROVIDER_PRICING_MODEL,
-  SERVICE_PROVIDER_BOOKING_PREFERENCE,
-  BLOCKING_SP_ONBOARDING_STATUSES,
-} from "@/types/service-provider";
+import type { ServiceProviderOnboardingDraft, ServiceProviderProfile, ServiceProviderOnboardingStatus, ServiceProviderOnboardingStepId } from "@/types/service-provider";
+import { SERVICE_PROVIDER_ONBOARDING_STATUS, SERVICE_PROVIDER_ONBOARDING_STEPS, SERVICE_PROVIDER_TYPE, SERVICE_PROVIDER_LOCATION_TYPE, BLOCKING_SP_ONBOARDING_STATUSES } from "@/types/service-provider";
 import { getCurrentUser } from "@/services/users";
-import { spOnboardingStore, initialSpDraft, spDocumentRequirements, serviceProviderProfiles, getSpProfileByUserId } from "@/data/service-provider";
-import { categories } from "@/data/categories";
+import { spOnboardingStore, spDocumentRequirements, serviceProviderProfiles } from "@/data/service-provider";
 
 // ============================================================
 // SERVICE PROVIDER ONBOARDING SERVICE LAYER
@@ -75,31 +44,6 @@ function scramble(current: ServiceProviderOnboardingDraft): void {
   current.updatedAt = new Date().toISOString();
 }
 
-// ── Status & summary ─────────────────────────────────────────
-
-export function getSpOnboardingSummary(): ServiceProviderOnboardingSummary {
-  const uid = ownerId();
-  const app = store[uid];
-  if (!app) {
-    return {
-      userId: uid,
-      hasServiceProviderProfile: false,
-      status: null,
-      currentStep: null,
-    };
-  }
-  // Check if user has an approved profile
-  const profile = getSpProfileByUserId(uid);
-  return {
-    userId: uid,
-    hasServiceProviderProfile: !!profile,
-    status: app.status,
-    currentStep: app.currentStep,
-    displayName: app.profile.displayName || app.provider.displayName,
-    resumePath: "/onboarding/service-provider/1",
-  };
-}
-
 export function getSpOnboardingStatus(): ServiceProviderOnboardingStatus | null {
   return store[ownerId()]?.status ?? null;
 }
@@ -113,10 +57,6 @@ export function getSpOnboardingDraft(): ServiceProviderOnboardingDraft | null {
 /** Deep-ish clone so callers can't mutate the store accidentally. */
 function cloneSafe<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
-}
-
-export function getSpDocumentRequirements() {
-  return cloneSafe(spDocumentRequirements);
 }
 
 // ── Create / update (save progress) ──────────────────────────
@@ -194,67 +134,6 @@ export function saveSpDraft(
   return { ok: true };
 }
 
-// ── Service management ───────────────────────────────────────
-
-export function addSpService(
-  service: Omit<ServiceProviderServiceDraft, "id"> & { id?: string }
-): { ok: boolean; id?: string } {
-  const app = store[ownerId()];
-  if (!app) return { ok: false };
-  const newId = service.id ?? `svc_${Date.now()}`;
-  const newService = { ...service, id: newId };
-  app.services.push(newService);
-  scramble(app);
-  return { ok: true, id: newId };
-}
-
-export function updateSpService(
-  serviceId: string,
-  updates: Partial<ServiceProviderServiceDraft>
-): { ok: boolean } {
-  const app = store[ownerId()];
-  if (!app) return { ok: false };
-  const idx = app.services.findIndex((s) => s.id === serviceId);
-  if (idx === -1) return { ok: false };
-  Object.assign(app.services[idx], updates);
-  scramble(app);
-  return { ok: true };
-}
-
-export function removeSpService(serviceId: string): { ok: boolean } {
-  const app = store[ownerId()];
-  if (!app) return { ok: false };
-  const idx = app.services.findIndex((s) => s.id === serviceId);
-  if (idx === -1) return { ok: false };
-  app.services.splice(idx, 1);
-  scramble(app);
-  return { ok: true };
-}
-
-// ── Portfolio management ─────────────────────────────────────
-
-export function addSpPortfolioItem(
-  item: Omit<ServiceProviderPortfolioItemDraft, "id"> & { id?: string }
-): { ok: boolean; id?: string } {
-  const app = store[ownerId()];
-  if (!app) return { ok: false };
-  const newId = item.id ?? `port_${Date.now()}`;
-  const newItem = { ...item, id: newId };
-  app.portfolio.push(newItem);
-  scramble(app);
-  return { ok: true, id: newId };
-}
-
-export function removeSpPortfolioItem(portfolioId: string): { ok: boolean } {
-  const app = store[ownerId()];
-  if (!app) return { ok: false };
-  const idx = app.portfolio.findIndex((p) => p.id === portfolioId);
-  if (idx === -1) return { ok: false };
-  app.portfolio.splice(idx, 1);
-  scramble(app);
-  return { ok: true };
-}
-
 // ── Document upload / replace ────────────────────────────────
 // Simulates an authenticated upload endpoint. Returns a PRIVATE reference,
 // never a public URL. Only documents owned by the current user are affected.
@@ -264,89 +143,6 @@ export interface SpUploadResult {
   error?: string;
   privateRef?: string;
   fileName?: string;
-}
-
-const MAX_UPLOADS_PER_TIMESLOT = 10;
-
-export function uploadSpDocument(
-  documentType: string,
-  fileName: string,
-  fileSizeBytes: number,
-  fileType: string
-): SpUploadResult {
-  const app = store[ownerId()];
-  if (!app) return { ok: false, error: "No service provider application found." };
-
-  const req = spDocumentRequirements.find((d) => d.documentType === documentType);
-  if (!req) return { ok: false, error: "Unknown document type." };
-
-  const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
-  if (!req.acceptedFormats.includes(ext)) {
-    return { ok: false, error: `Only ${req.acceptedFormats.join(", ")} are allowed.` };
-  }
-  const maxBytes = req.maxSizeMb * 1024 * 1024;
-  if (fileSizeBytes > maxBytes) {
-    return { ok: false, error: `File must be ${req.maxSizeMb}MB or smaller.` };
-  }
-  void fileType;
-  if (fileSizeBytes === 0) return { ok: false, error: "File is empty." };
-
-  let doc = app.documents.find((d) => d.documentType === documentType);
-  if (!doc) {
-    doc = { ...req, id: `doc_${documentType}`, status: "not_uploaded" } as ServiceProviderOnboardingDocument;
-    app.documents.push(doc);
-  }
-  doc.fileName = fileName;
-  doc.status = SERVICE_PROVIDER_DOCUMENT_STATUS.UPLOADED;
-  doc.privateRef = `private://sp-app/${app.applicationId}/${documentType}/${Date.now()}`;
-  doc.actionMessage = undefined;
-  scramble(app);
-
-  void MAX_UPLOADS_PER_TIMESLOT;
-  return { ok: true, privateRef: doc.privateRef, fileName };
-}
-
-export function replaceSpDocument(
-  documentType: string,
-  fileName: string,
-  fileSizeBytes: number,
-  fileType: string
-): SpUploadResult {
-  if (!store[ownerId()]?.documents.some((d) => d.documentType === documentType)) {
-    return { ok: false, error: "No existing document to replace." };
-  }
-  return uploadSpDocument(documentType, fileName, fileSizeBytes, fileType);
-}
-
-export function removeSpDocument(documentType: string): { ok: boolean; error?: string } {
-  const app = store[ownerId()];
-  if (!app) return { ok: false, error: "No service provider application found." };
-  const doc = app.documents.find((d) => d.documentType === documentType);
-  if (!doc) return { ok: false, error: "Document not found." };
-  doc.status = SERVICE_PROVIDER_DOCUMENT_STATUS.NOT_UPLOADED;
-  doc.fileName = undefined;
-  doc.privateRef = undefined;
-  doc.actionMessage = undefined;
-  scramble(app);
-  return { ok: true };
-}
-
-// ── Verification submission ──────────────────────────────────
-
-export function submitSpVerification(type: "identity" | "business" | "professional"): {
-  ok: boolean;
-  status: ServiceProviderVerificationStatus;
-  message: string;
-} {
-  const app = store[ownerId()];
-  if (!app) return { ok: false, status: "not_required", message: "No application found." };
-
-  app.verification = {
-    type: type as "identity" | "business" | "professional",
-    status: SERVICE_PROVIDER_VERIFICATION_STATUS.PENDING,
-  };
-  scramble(app);
-  return { ok: true, status: SERVICE_PROVIDER_VERIFICATION_STATUS.PENDING, message: "Verification submitted for review." };
 }
 
 // ── Real backend activation (onboarding completion) ──────────
@@ -530,9 +326,4 @@ export async function getSpPublicProfileLive(slug: string): Promise<ServiceProvi
     // Fall back to local mock
   }
   return getSpPublicProfile(slug);
-}
-
-export function getSpCategories() {
-  // Reuse existing categories for now; backend would have service-specific taxonomy
-  return categories;
 }

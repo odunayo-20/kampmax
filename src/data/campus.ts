@@ -82,6 +82,4 @@ export const campuses: Campus[] = [
     emailDomains: ["futo.edu.ng"],
     departments: ["Computer Science", "Engineering", "Biotechnology"],
   },
-];
-
-export const defaultCampus = campuses[0]; // RUGIPO
+]; // RUGIPO

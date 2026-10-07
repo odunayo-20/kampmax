@@ -22,12 +22,6 @@ import type {
   ModerateReviewInput,
   Paginated,
 } from "@/types/admin";
-import {
-  buildReviewDataset,
-  computeReviewCounts,
-  computeReviewFacets,
-  filterReviews,
-} from "@/data/admin/review-management";
 
 export interface AdminReviewManagementService {
   /** Backend-search / filter / sort / paginate over real reviews. */
@@ -45,53 +39,6 @@ export interface AdminReviewManagementService {
   getVendorOptions(): Promise<{ id: string; name: string }[]>;
   /** Publishes, hides, flags or removes a review. Mock: in-memory only. */
   moderateReview(id: string, input: ModerateReviewInput): Promise<ManagedReviewDetail>;
-}
-
-export function createReviewManagementService(): AdminReviewManagementService {
-  return {
-    async list(query = {}) {
-      const dataset = buildReviewDataset();
-      const result = filterReviews(dataset, query);
-      return {
-        items: result.items,
-        total: result.total,
-        page: result.page,
-        pageSize: Math.max(1, query.pageSize ?? 10),
-        totalPages: result.totalPages,
-      };
-    },
-
-    async getById(id) {
-      const { details } = buildReviewDataset();
-      return details.get(id) ?? null;
-    },
-
-    async getCounts() {
-      const { rows } = buildReviewDataset();
-      return computeReviewCounts(rows);
-    },
-
-    async getFacets() {
-      const { rows } = buildReviewDataset();
-      return computeReviewFacets(rows);
-    },
-
-    async getVendorOptions() {
-      const { rows } = buildReviewDataset();
-      const { vendors } = computeReviewFacets(rows);
-      return vendors.map((v) => ({ id: v.id, name: v.name }));
-    },
-
-    async moderateReview(id, input) {
-      const { details } = buildReviewDataset();
-      const detail = details.get(id);
-      if (!detail) throw new Error("Review not found");
-      detail.review.status = input.status;
-      detail.review.updatedAt = new Date().toISOString();
-      detail.statusNote = `Moderated to "${input.status}" in this session only (mock store — not persisted).`;
-      return detail;
-    },
-  };
 }
 
 export type { ManagedReviewSortField };

@@ -1,68 +1,6 @@
-import {
-  AdminProfile,
-  AdminVendor,
-  PlatformUser,
-  VendorStatus,
-} from "@/types/admin";
+import { AdminVendor, PlatformUser, VendorStatus } from "@/types/admin";
 import { mockCampuses } from "./campuses";
 import { daysAgoIso, intBetween, pick, seededRandom } from "@/lib/admin/api";
-
-// ------------------------------------------------------------
-// ADMINS (operations team)
-// ------------------------------------------------------------
-
-export const mockAdmins: AdminProfile[] = [
-  {
-    id: "adm-001",
-    name: "Adebayo Ogundimu",
-    email: "adebayo@kampmax.ng",
-    role: "SUPER_ADMIN",
-    campusId: null,
-    avatar: "AO",
-    title: "Platform Owner",
-    lastLoginAt: "2026-08-22T08:12:00.000Z",
-  },
-  {
-    id: "adm-002",
-    name: "Chiamaka Eze",
-    email: "chiamaka@kampmax.ng",
-    role: "ADMIN",
-    campusId: null,
-    avatar: "CE",
-    title: "Operations Lead",
-    lastLoginAt: "2026-08-21T16:40:00.000Z",
-  },
-  {
-    id: "adm-003",
-    name: "Tunde Bakare",
-    email: "tunde.bakare@kampmax.ng",
-    role: "ADMIN",
-    campusId: null,
-    avatar: "TB",
-    title: "Finance & Payments",
-    lastLoginAt: "2026-08-20T11:05:00.000Z",
-  },
-  {
-    id: "adm-004",
-    name: "Fatima Yusuf",
-    email: "fatima.yusuf@kampmax.ng",
-    role: "CAMPUS_ADMIN",
-    campusId: "rugipo",
-    avatar: "FY",
-    title: "RUGIPO Campus Manager",
-    lastLoginAt: "2026-08-22T07:55:00.000Z",
-  },
-  {
-    id: "adm-005",
-    name: "Emeka Nwosu",
-    email: "emeka.nwosu@kampmax.ng",
-    role: "CAMPUS_ADMIN",
-    campusId: "futa",
-    avatar: "EN",
-    title: "FUTA Campus Manager",
-    lastLoginAt: "2026-08-19T14:22:00.000Z",
-  },
-];
 
 // ------------------------------------------------------------
 // PLATFORM USERS (students + vendor owners)
@@ -79,11 +17,6 @@ const LAST_NAMES = [
   "Okafor", "Adeyemi", "Balogun", "Okonkwo", "Lawal", "Igwe",
   "Adewale", "Mohammed", "Umeh", "Oyelaran", "Bassey", "Danjuma",
   "Nwachukwu", "Salami", "Abubakar", "Eze", "Ogbeide", "Ashiru",
-] as const;
-
-const HOSTELS = [
-  "Melody Hostel", "Campus Gate Annex", "Peace Villa", "Student Village Block C",
-  "De Truth Lodge", "Anglican Sabo", "Backline Quarters", "New Site Phase 2",
 ] as const;
 
 function makeEmail(name: string, i: number): string {
@@ -178,9 +111,3 @@ export function buildMockVendors(): AdminVendor[] {
 }
 
 export const mockVendors: AdminVendor[] = buildMockVendors();
-
-// Shared pools used by other mock modules
-export const USER_NAME_POOL = { FIRST_NAMES, LAST_NAMES };
-export const ACTIVE_CAMPUS_IDS = mockCampuses
-  .filter((c) => c.status === "active")
-  .map((c) => c.id);

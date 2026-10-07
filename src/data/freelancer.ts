@@ -451,16 +451,6 @@ export function getFreelancerOnboardingDraft(userId: string): FreelancerOnboardi
   return rec ? cloneDraft(rec.draft) : null;
 }
 
-/** Store lookup by approved slug (mirrors employer/marketplace patterns). */
-export function getFreelancerByApprovedSlug(
-  slug: string
-): FreelancerOnboardingDraft | null {
-  for (const rec of store.values()) {
-    if (rec.draft.approvedSlug === slug) return cloneDraft(rec.draft);
-  }
-  return null;
-}
-
 export function saveFreelancerDraft(draft: FreelancerOnboardingDraft): void {
   const existing = store.get(draft.userId);
   if (existing) {

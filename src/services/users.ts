@@ -1,9 +1,5 @@
 import { User, Vendor } from "@/types";
-import {
-  users as mockUsers,
-  currentUser as mockCurrentUser,
-  getUserById as _getUserById,
-} from "@/data/users";
+import { users as mockUsers, getUserById as _getUserById } from "@/data/users";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { getCurrentAuthUser } from "@/lib/current-user-store";
 
@@ -160,10 +156,8 @@ export async function fetchVendors(
 }
 
 /**
- * Returns the real authenticated user when a session is active, falling back
- * to the demo mock user only when signed out. Mock data services key their
- * per-user records off `.id`, so a real logged-in user with no seeded mock
- * record simply sees empty/fresh state instead of another account's data.
+ * The signed-in user. When nobody is signed in this is an anonymous guest with
+ * no id, so nothing can be read or written as someone else.
  */
 export function getCurrentUser(): User {
   const authUser = getCurrentAuthUser();
@@ -181,7 +175,18 @@ export function getCurrentUser(): User {
       isVerified: authUser.isVerified,
     };
   }
-  return mockCurrentUser;
+  return {
+    id: "",
+    name: "Guest",
+    email: "",
+    phone: "",
+    campusId: "",
+    role: "student",
+    avatar: "",
+    bio: "",
+    joinedDate: "",
+    isVerified: false,
+  };
 }
 
 export function getUserById(id: string): User | undefined {

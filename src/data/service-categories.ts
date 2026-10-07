@@ -25,8 +25,6 @@ export const SP_SERVICE_CATEGORIES: SpServiceCategory[] = [
   { id: "cat12", name: "Printing & Stationery", group: "Printing & Stationery" },
 ];
 
-export const SP_SERVICE_GROUP_NAMES = [...new Set(SP_SERVICE_CATEGORIES.map((c) => c.group))];
-
 /**
  * Display name for a service category id. New ids come from the SERVICE
  * taxonomy (resolved from the loaded tree); the static list only labels
@@ -38,13 +36,4 @@ export function spServiceCategoryName(categoryId: string): string {
     SP_SERVICE_CATEGORIES.find((c) => c.id === categoryId)?.name ??
     categoryId
   );
-}
-
-/** Remap legacy marketplace-style category ids to the service category set. */
-const LEGACY_CATEGORY_REMAP: Record<string, string> = {
-  cat8: "cat4", // marketplace "Services" → Repairs & Maintenance
-};
-
-export function remapSpCategoryId(categoryId: string): string {
-  return LEGACY_CATEGORY_REMAP[categoryId] ?? categoryId;
 }

@@ -23,12 +23,6 @@ const NOTIF_STATUS_PATTERN = [
   "scheduled", "sent", "draft", "sent",
 ] as const;
 
-const TYPE_CYCLE: ManagedNotificationType[] = [
-  "promotion", "system", "campus", "order", "security",
-  "payment", "marketplace", "campus", "system", "promotion",
-  "order", "security", "marketplace", "payment",
-];
-
 const AUDIENCE_CYCLE: ManagedNotificationAudience[] = [
   "all_users", "customers", "vendors", "campus_admins", "all_users",
   "vendors", "customers", "campus_admins", "all_users", "customers",

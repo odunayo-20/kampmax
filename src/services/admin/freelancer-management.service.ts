@@ -1,14 +1,4 @@
-import type {
-  AdminActingContext,
-  ListQuery,
-  ManagedFreelancer,
-  ManagedFreelancerDetail,
-  Paginated,
-  FreelancerActivityEvent,
-  FreelancerBucket,
-  FreelancerStatusCounts,
-  ManagedFreelancersListQuery,
-} from "@/types/admin";
+import type { AdminActingContext, ManagedFreelancer, ManagedFreelancerDetail, Paginated, FreelancerActivityEvent, FreelancerStatusCounts, ManagedFreelancersListQuery } from "@/types/admin";
 
 // ------------------------------------------------------------
 // CONTRACT (NestJS resource: /admin/freelancers, see ./freelancer-management.api.ts)

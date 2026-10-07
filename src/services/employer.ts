@@ -24,38 +24,14 @@ import { getCampuses, getCampusById } from "@/services/campus";
 import { pushUserNotification } from "@/services/notifications";
 import { apiClient } from "@/lib/api-client";
 import type { ApiError } from "@/lib/api-client";
-import {
-  createEmployerApplication,
-  getEmployerOnboardingDraft,
-  saveEmployerDraft,
-  getEmployerOnboardingStatus,
-  getEmployerVerificationStatus,
-  submitEmployerApplication,
-  getEmployerByApprovedSlug,
-} from "@/data/employer";
+import { createEmployerApplication, getEmployerOnboardingDraft, saveEmployerDraft, getEmployerOnboardingStatus, submitEmployerApplication } from "@/data/employer";
 import { listPublicJobs } from "@/services/jobs";
 import { jobToOpportunity } from "@/lib/job-api-mapping";
-import type {
-  EmployerOnboardingDraft,
-  EmployerOnboardingStatus,
-  EmployerVerificationStatus,
-  EmployerProfileUpdatePayload,
-  EmployerPublicProfile,
-} from "@/types/employer";
+import type { EmployerOnboardingDraft, EmployerOnboardingStatus, EmployerVerificationStatus, EmployerPublicProfile } from "@/types/employer";
 import {
   EMPLOYER_ONBOARDING_STEPS,
   isEmployerBlockingStatus,
 } from "@/types/employer";
-import {
-  EMPLOYER_EXPERIENCE_LEVELS,
-  EMPLOYER_WORK_TYPES,
-  EMPLOYER_PROJECT_DURATIONS,
-  EMPLOYER_BUSINESS_TYPES,
-  EMPLOYER_ORG_SIZES,
-  EMPLOYER_WORK_PREFERENCES,
-  EMPLOYER_CONTACT_METHODS,
-} from "@/config/employer";
-import { isValidEmail } from "@/lib/utils";
 import { EMPLOYER_DASHBOARD_SECTIONS } from "@/config/employer-dashboard";
 import { EMPLOYER_GATE_EXEMPT_PATHS } from "@/config/employer-dashboard";
 
@@ -87,67 +63,6 @@ export interface EmployerAccess {
   canUseDashboard: boolean;
   message: string | null;
   displayName?: string;
-}
-
-export function getEmployerDashboardAccess(): EmployerAccess {
-  const user = getCurrentUser();
-  const draft = getEmployerOnboardingDraft(user.id);
-  const status = getEmployerOnboardingStatus(user.id);
-
-  if (!draft) {
-    return {
-      kind: EMPLOYER_DASHBOARD_GATE.NO_EMPLOYER,
-      status: null,
-      canUseDashboard: false,
-      message: "You don't have an employer profile yet.",
-      displayName: user.name,
-    };
-  }
-
-  const base = { displayName: user.name };
-
-  switch (status) {
-    case "APPROVED":
-      return {
-        kind: EMPLOYER_DASHBOARD_GATE.APPROVED,
-        status,
-        canUseDashboard: true,
-        message: null,
-        ...base,
-      };
-    case "PENDING_REVIEW":
-      return {
-        kind: EMPLOYER_DASHBOARD_GATE.PENDING_REVIEW,
-        status,
-        canUseDashboard: false,
-        message: "Your employer profile is under review.",
-        ...base,
-      };
-    case "REJECTED":
-      return {
-        kind: EMPLOYER_DASHBOARD_GATE.REJECTED,
-        status,
-        canUseDashboard: false,
-        message: "Your employer profile requires changes before going live.",
-        ...base,
-      };
-    case "SUSPENDED":
-      return {
-        kind: EMPLOYER_DASHBOARD_GATE.SUSPENDED,
-        status,
-        canUseDashboard: false,
-        message: "Your employer profile is currently unavailable.",
-        ...base,
-      };
-    default:
-      return {
-        kind: EMPLOYER_DASHBOARD_GATE.IN_PROGRESS,
-        status,
-        canUseDashboard: false,
-        message: "Complete your employer profile to start hiring.",
-        ...base,
-      };
-  }
 }
 
 // ── Async Backend API (NestJS /employers) ───────────────────
@@ -294,23 +209,6 @@ export async function getEmployerPublicProfileApi(
   return { profile: null, error };
 }
 
-/**
- * Submit employer profile for review (DRAFT → PENDING_REVIEW).
- * Endpoint: PATCH /employers/me (with status field) — backend transitions the state.
- */
-export async function submitEmployerApplicationApi(): Promise<{
-  success: boolean;
-  profile: EmployerBackendProfile | null;
-  error: ApiError | null;
-}> {
-  const { data, error } = await apiClient.patch<
-    { status: "PENDING_REVIEW" },
-    EmployerBackendProfile
-  >("/employers/me", { status: "PENDING_REVIEW" });
-  if (!error && data) return { success: true, profile: data, error: null };
-  return { success: false, profile: null, error };
-}
-
 /** The fields of GET /employers/me that the profile screens use. */
 interface BackendEmployerFields {
   displayName?: string;
@@ -426,16 +324,6 @@ export function getEmployerOnboardingStatusForUser(): EmployerOnboardingStatus {
   const uid = currentUserId();
   if (!uid) return "DRAFT" as EmployerOnboardingStatus;
   return getEmployerOnboardingStatus(uid);
-}
-
-/**
- * Returns the verification status for the authenticated user.
- * Verification is backend-owned — the frontend only displays it.
- */
-export function getEmployerVerificationStatusForUser(): EmployerVerificationStatus {
-  const uid = currentUserId();
-  if (!uid) return "not_started";
-  return getEmployerVerificationStatus(uid);
 }
 
 /**
@@ -575,184 +463,6 @@ export function getEmployerPublicPreview(
  */
 export function getEmployerCampusOptions() {
   return getCampuses();
-}
-
-// ── Profile update (mass-assignment safe) ────────────────────
-
-const VALID_EXPERIENCE = new Set<string>(EMPLOYER_EXPERIENCE_LEVELS.map((e) => e.value));
-const VALID_WORK_TYPES = new Set<string>(EMPLOYER_WORK_TYPES.map((w) => w.value));
-const VALID_DURATIONS = new Set<string>(EMPLOYER_PROJECT_DURATIONS.map((d) => d.value));
-const VALID_BIZ_TYPES = new Set<string>(EMPLOYER_BUSINESS_TYPES.map((b) => b.value));
-const VALID_ORG_SIZES = new Set<string>(EMPLOYER_ORG_SIZES.map((s) => s.value));
-const VALID_WORK_PREFS = new Set<string>(EMPLOYER_WORK_PREFERENCES.map((w) => w.value));
-const VALID_CONTACT_METHODS = new Set<string>(EMPLOYER_CONTACT_METHODS.map((c) => c.value));
-
-function cap(input: string | undefined | null, max: number): string | undefined {
-  if (!input) return undefined;
-  const trimmed = input.trim();
-  return trimmed.length > 0 ? trimmed.slice(0, max) : undefined;
-}
-
-function capOrNull(input: string | undefined | null, max: number): string | null | undefined {
-  if (input === null) return null;
-  return cap(input, max);
-}
-
-/**
- * Updates the authenticated employer's profile. Only allow-listed fields are
- * applied; admin-owned fields (status, verification, userId, applicationId,
- * approvedSlug, currentStep, submittedAt, adminMessage, reviewReason,
- * clientType) are never modified.
- */
-export function updateEmployerProfileForUser(
-  payload: EmployerProfileUpdatePayload
-): { success: boolean; error?: string } {
-  const uid = currentUserId();
-  if (!uid) return { success: false, error: "Not authenticated." };
-
-  const draft = getEmployerOnboardingDraft(uid);
-  if (!draft) return { success: false, error: "No employer profile found." };
-
-  // Build the merged draft — only apply allowed fields.
-  const next: EmployerOnboardingDraft = { ...draft };
-
-  if (payload.profile) {
-    next.profile = {
-      displayName: cap(payload.profile.displayName, 80),
-      headline: cap(payload.profile.headline, 100),
-      about: cap(payload.profile.about, 800),
-      industry: cap(payload.profile.industry, 60),
-      website: cap(payload.profile.website, 200),
-      logoUrl: payload.profile.logoUrl,
-    };
-  }
-
-  if (payload.organization) {
-    next.organization = {
-      name: cap(payload.organization.name, 100),
-      businessType: cap(payload.organization.businessType, 40),
-      industry: cap(payload.organization.industry, 60),
-      description: cap(payload.organization.description, 800),
-      size: cap(payload.organization.size, 40),
-      website: cap(payload.organization.website, 200),
-    };
-  }
-
-  if (payload.contact) {
-    next.contact = {
-      email: cap(payload.contact.email, 200),
-      phone: cap(payload.contact.phone, 40),
-      preferredContact: cap(payload.contact.preferredContact, 40),
-    };
-  }
-
-  if (payload.location) {
-    next.location = {
-      campusId: capOrNull(payload.location.campusId, 60) ?? undefined,
-      city: cap(payload.location.city, 60),
-      state: cap(payload.location.state, 60),
-      workPreference: payload.location.workPreference || "",
-      remoteAvailable: !!payload.location.remoteAvailable,
-    };
-  }
-
-  if (payload.preferences) {
-    const rawCats = Array.isArray(payload.preferences.categories)
-      ? payload.preferences.categories
-      : [];
-    // Ids come from the JOB taxonomy API; only shape is checked here.
-    const categories = rawCats
-      .filter((c) => typeof c === "string" && c.length > 0 && c.length <= 64)
-      .slice(0, 12);
-
-    next.preferences = {
-      categories,
-      experience: cap(payload.preferences.experience, 40),
-      workType: cap(payload.preferences.workType, 40),
-      projectDuration: cap(payload.preferences.projectDuration, 40),
-      budgetMin:
-        typeof payload.preferences.budgetMin === "number" &&
-        Number.isFinite(payload.preferences.budgetMin) &&
-        payload.preferences.budgetMin >= 0
-          ? payload.preferences.budgetMin
-          : undefined,
-      budgetMax:
-        typeof payload.preferences.budgetMax === "number" &&
-        Number.isFinite(payload.preferences.budgetMax) &&
-        payload.preferences.budgetMax >= 0
-          ? payload.preferences.budgetMax
-          : undefined,
-    };
-    // Enforce min ≤ max when both present
-    if (
-      typeof next.preferences.budgetMin === "number" &&
-      typeof next.preferences.budgetMax === "number" &&
-      next.preferences.budgetMin > next.preferences.budgetMax
-    ) {
-      const swap = next.preferences.budgetMin;
-      next.preferences.budgetMin = next.preferences.budgetMax;
-      next.preferences.budgetMax = swap;
-    }
-  }
-
-  // Validate optional URLs
-  if (next.profile.website && !isSafeUrlCandidate(next.profile.website)) {
-    next.profile.website = undefined;
-  }
-  if (next.organization.website && !isSafeUrlCandidate(next.organization.website)) {
-    next.organization.website = undefined;
-  }
-
-  // Validate contact email
-  if (next.contact.email && !isValidEmail(next.contact.email)) {
-    next.contact.email = draft.contact.email; // revert to original
-  }
-
-  // Sanitize select values
-  if (next.organization.businessType && !VALID_BIZ_TYPES.has(next.organization.businessType)) {
-    next.organization.businessType = draft.organization.businessType;
-  }
-  if (next.organization.size && !VALID_ORG_SIZES.has(next.organization.size)) {
-    next.organization.size = draft.organization.size;
-  }
-  if (next.contact.preferredContact && !VALID_CONTACT_METHODS.has(next.contact.preferredContact)) {
-    next.contact.preferredContact = draft.contact.preferredContact;
-  }
-  if (next.location.workPreference && !VALID_WORK_PREFS.has(next.location.workPreference as string)) {
-    next.location.workPreference = draft.location.workPreference;
-  }
-  if (next.preferences.experience && !VALID_EXPERIENCE.has(next.preferences.experience)) {
-    next.preferences.experience = draft.preferences.experience;
-  }
-  if (next.preferences.workType && !VALID_WORK_TYPES.has(next.preferences.workType)) {
-    next.preferences.workType = draft.preferences.workType;
-  }
-  if (next.preferences.projectDuration && !VALID_DURATIONS.has(next.preferences.projectDuration)) {
-    next.preferences.projectDuration = draft.preferences.projectDuration;
-  }
-
-  // Preserve all admin/immutable fields
-  next.userId = draft.userId;
-  next.status = draft.status;
-  next.currentStep = draft.currentStep;
-  next.createdAt = draft.createdAt;
-  next.submittedAt = draft.submittedAt;
-  next.applicationId = draft.applicationId;
-  next.adminMessage = draft.adminMessage;
-  next.reviewReason = draft.reviewReason;
-  next.approvedSlug = draft.approvedSlug;
-  next.clientType = draft.clientType;
-  next.verification = draft.verification;
-
-  // If this is a DRAFT user, advance to IN_PROGRESS on first meaningful edit
-  if (next.status === "DRAFT" && next.profile.displayName?.trim()) {
-    next.status = "IN_PROGRESS" as EmployerOnboardingStatus;
-    next.currentStep = Math.max(next.currentStep, 1) as 1;
-  }
-
-  saveEmployerDraft(next);
-
-  return { success: true };
 }
 
 // ── Public employer profile lookup (by slug) ────────────────
