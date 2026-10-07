@@ -10,9 +10,8 @@ import type { SavedOnboardingDraft } from "@/services/onboarding-draft";
 
 // What the provider wizard keeps on the server between visits: the form values
 // and which steps were finished. Approval and verification are Kampmax's
-// decisions and never travel in a draft. Photos are not kept: the server has
-// nowhere to store a provider's logo, cover or portfolio yet, and a picture
-// held as inline data would swamp the draft.
+// decisions and never travel in a draft. Pictures are uploaded as soon as they
+// are chosen, so a draft holds their addresses, never the picture itself.
 
 export interface SpSavedData {
   provider: ServiceProviderOnboardingDraft["provider"];

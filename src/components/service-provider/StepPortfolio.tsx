@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Image, Trash2, X, Camera, ChevronLeft, ChevronRight } from "lucide-react";
+import { useRef, useState } from "react";
+import { Plus, Trash2, X, Camera, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { Button, Input, Select } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { TaxonomySelect } from "@/components/taxonomy";
+import { useProviderImageUpload } from "@/hooks/useProviderImageUpload";
+import { MAX_PORTFOLIO_ITEMS } from "@/services/service-provider-media";
 import type { ServiceProviderOnboardingDraft, ServiceProviderPortfolioItemDraft } from "@/types/service-provider";
 
 interface StepPortfolioProps {
@@ -17,45 +19,36 @@ export function StepPortfolio({ draft, onUpdate }: StepPortfolioProps) {
     draft?.portfolio?.map((p) => ({ ...p })) ?? []
   );
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const { upload, busy, error: uploadError } = useProviderImageUpload();
 
-  const handleFileUpload = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+  // Choosing a photo uploads it, and the item is created from the uploaded photo.
+  const handleFileChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      alert("Please select an image file");
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      alert("Image must be less than 10MB");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      setPortfolio((prev) => {
-        const updated = [...prev];
-        updated[index] = { ...updated[index], image: dataUrl };
-        onUpdate({ portfolio: updated });
-        return updated;
-      });
-    };
-    reader.readAsDataURL(file);
+    const uploaded = await upload(file, "portfolio");
+    if (!uploaded) return;
+    setPortfolio((prev) => {
+      if (prev.length >= MAX_PORTFOLIO_ITEMS) return prev;
+      const next: ServiceProviderPortfolioItemDraft[] = [
+        ...prev,
+        {
+          image: uploaded.url,
+          mediaId: uploaded.mediaId,
+          title: "",
+          description: "",
+          categoryId: draft?.category?.primaryCategoryId ?? "",
+        },
+      ];
+      onUpdate({ portfolio: next });
+      return next;
+    });
   };
 
   const addPortfolioItem = () => {
-    const current = draft?.portfolio ?? portfolio;
-    if (current.length >= 10) return;
-    const newItem: ServiceProviderPortfolioItemDraft = {
-      image: "",
-      title: "",
-      description: "",
-      categoryId: draft?.category?.primaryCategoryId ?? "",
-    };
-    const next = [...current, newItem];
-    setPortfolio(next);
-    onUpdate({ portfolio: next });
+    if (portfolio.length >= MAX_PORTFOLIO_ITEMS || busy) return;
+    fileInput.current?.click();
   };
 
   const updateItem = (index: number, updates: Partial<ServiceProviderPortfolioItemDraft>) => {
@@ -93,15 +86,25 @@ export function StepPortfolio({ draft, onUpdate }: StepPortfolioProps) {
 
   return (
     <div className="space-y-8">
-      <p role="note" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-800">
-        Portfolio photos are not saved with your application yet. You can skip this step and nothing is lost.
-      </p>
+      <input
+        ref={fileInput}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        aria-label="Choose a portfolio photo"
+        onChange={(e) => void handleFileChosen(e)}
+      />
+      {uploadError && (
+        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {uploadError}
+        </p>
+      )}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-xl font-semibold text-kampmax-text">Portfolio</h2>
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium rounded-full bg-primary-100 text-primary-700">
-              {portfolio.length}/10
+              {portfolio.length}/{MAX_PORTFOLIO_ITEMS}
             </span>
           </div>
           <p className="mt-1 text-sm text-kampmax-text-secondary">
@@ -109,13 +112,13 @@ export function StepPortfolio({ draft, onUpdate }: StepPortfolioProps) {
           </p>
         </div>
         <Button
-          variant={portfolio.length >= 10 ? "outline" : "primary"}
+          variant={portfolio.length >= MAX_PORTFOLIO_ITEMS ? "outline" : "primary"}
           onClick={addPortfolioItem}
-          disabled={portfolio.length >= 10}
+          disabled={portfolio.length >= MAX_PORTFOLIO_ITEMS || busy}
           className="self-start sm:self-auto"
         >
-          <Plus className="h-4 w-4 mr-2" />
-          {portfolio.length >= 10 ? "Limit Reached" : "Add Portfolio Item"}
+          {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
+          {portfolio.length >= MAX_PORTFOLIO_ITEMS ? "Limit Reached" : busy ? "Uploading…" : "Add a photo"}
         </Button>
       </div>
 
@@ -125,11 +128,11 @@ export function StepPortfolio({ draft, onUpdate }: StepPortfolioProps) {
           <Camera className="mx-auto h-12 w-12 text-neutral-300 mb-4" />
           <h3 className="text-lg font-medium text-kampmax-text">No portfolio items yet</h3>
           <p className="mt-1 text-sm text-kampmax-text-secondary">
-            Add photos of your work to show customers what you can do.
+            Add photos of your work to show customers what you can do. Each photo needs a title.
           </p>
-          <Button className="mt-4" onClick={addPortfolioItem}>
+          <Button className="mt-4" onClick={addPortfolioItem} disabled={busy}>
             <Plus className="h-4 w-4 mr-2" />
-            Add Your First Item
+            Add Your First Photo
           </Button>
         </div>
       ) : (

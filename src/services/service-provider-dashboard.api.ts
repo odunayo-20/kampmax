@@ -43,6 +43,8 @@ export interface BackendSpProfile {
   slug: string;
   bio?: string | null;
   profileImageId?: string | null;
+  logoUrl?: string | null;
+  coverImageUrl?: string | null;
   verificationStatus: "PENDING" | "VERIFIED" | "SUSPENDED" | "DEACTIVATED";
   providerType?: string | null;
   yearsOfExperience?: number | null;
@@ -268,8 +270,8 @@ export function buildDashboardRecordFromLive(
       displayName: profile.displayName,
       tagline: profile.bio ?? undefined,
       description: profile.bio ?? "",
-      logo: profile.profileImageId ?? null,
-      coverImage: null,
+      logo: profile.logoUrl ?? null,
+      coverImage: profile.coverImageUrl ?? null,
       bio: profile.bio ?? "",
       yearsExperience: profile.yearsOfExperience ?? 0,
       languages: ["English"],

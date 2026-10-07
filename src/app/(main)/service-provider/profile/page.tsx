@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ExternalLink, Image as ImageIcon, MapPin, User } from "lucide-react";
+import { ExternalLink, MapPin, User } from "lucide-react";
+import { PortfolioManager } from "@/components/service-provider/dashboard/PortfolioManager";
+import { ProfileImagesHeader } from "@/components/service-provider/dashboard/ProfileImagesHeader";
 import { ProfessionalDetailsEditor } from "@/components/service-provider/dashboard/ProfessionalDetailsEditor";
 import { ServiceProviderVerificationBadge } from "@/components/service-provider/dashboard/ServiceProviderStatusBadge";
 import {
@@ -81,33 +83,21 @@ export default function ProfilePage() {
       </div>
 
       {/* Cover / logo */}
-      <div className="overflow-hidden rounded-xl border border-kampmax-border bg-white">
-        <div className="h-36 w-full bg-gradient-to-r from-primary-600/20 to-kampmax-gold/30 sm:h-44">
-          {profile.coverImage && (
-            <img src={profile.coverImage} alt="Cover" className="h-full w-full object-cover" />
-          )}
-        </div>
-        <div className="px-5 pb-5">
-          <div className="-mt-10 flex items-end gap-4">
-            <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-xl border-4 border-white bg-primary-100 text-primary-600 shadow-sm">
-              {profile.logo ? (
-                <img src={profile.logo} alt={profile.displayName} className="h-full w-full object-cover" />
-              ) : (
-                <ImageIcon className="h-10 w-10" aria-hidden />
-              )}
-            </div>
-            <div className="pb-1">
-              <ServiceProviderVerificationBadge status={verification.status} />
-            </div>
-          </div>
-        </div>
-      </div>
+      <ProfileImagesHeader
+        displayName={profile.displayName}
+        logo={profile.logo}
+        coverImage={profile.coverImage}
+        badge={<ServiceProviderVerificationBadge status={verification.status} />}
+        onChanged={() => setAttempt((n) => n + 1)}
+      />
 
       {/* Editor */}
       <div className="rounded-xl border border-kampmax-border bg-white p-6">
         <h2 className="mb-5 text-base font-bold text-kampmax-text">Professional details</h2>
         <ProfessionalDetailsEditor />
       </div>
+
+      <PortfolioManager />
 
       {/* Service areas + pricing + account */}
       <div className="grid gap-4 lg:grid-cols-2">

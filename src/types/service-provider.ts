@@ -191,6 +191,9 @@ export interface ServiceProviderOnboardingDraft {
     displayName?: string;
     logo?: string | null;
     coverImage?: string | null;
+    /** The uploaded images behind `logo` and `coverImage`. */
+    logoMediaId?: string | null;
+    coverImageMediaId?: string | null;
     tagline?: string;
     description?: string;
   };
@@ -256,7 +259,10 @@ export interface ServiceProviderServiceDraft {
 
 export interface ServiceProviderPortfolioItemDraft {
   id?: string; // temporary local id for drafts
-  image: string; // private ref
+  /** Public URL of the uploaded photo. */
+  image: string;
+  /** The uploaded image behind `image`. */
+  mediaId?: string;
   title: string;
   description: string;
   categoryId: string;

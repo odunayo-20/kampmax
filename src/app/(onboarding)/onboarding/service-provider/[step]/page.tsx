@@ -54,7 +54,8 @@ const STEP_VALIDATION: Record<number, (draft: ServiceProviderOnboardingDraft | n
   5: (d) => !!d?.location?.primaryCampusId,
   6: (d) => d?.availability?.days?.some((day) => day.isAvailable) ?? false,
   7: () => true, // pricing is optional
-  8: () => true, // portfolio is optional
+  // Portfolio is optional, but every photo added needs a title.
+  8: (d) => (d?.portfolio ?? []).every((item) => !!item.title?.trim() && !!item.mediaId),
   9: () => true, // handled in review
 };
 

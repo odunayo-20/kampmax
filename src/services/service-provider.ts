@@ -1,5 +1,6 @@
 import { apiClient } from "@/lib/api-client";
 import { addSpDashboardServiceLive, updateSpAvailabilityLive } from "@/services/service-provider-dashboard.api";
+import { addMyPortfolioItem, fetchMyPortfolio, setMyProviderImages } from "@/services/service-provider-media";
 import type { ServiceProviderOnboardingDraft } from "@/types/service-provider";
 
 // ============================================================
@@ -116,6 +117,40 @@ export async function completeSpOnboarding(
         images: svc.images,
       });
       if (!res.ok) problems.push(`"${svc.name}" wasn't saved: ${res.error ?? "unknown error"}`);
+    }
+  }
+
+  // Logo and cover: pictures the person uploaded in the wizard.
+  const logoMediaId = draft.profile?.logoMediaId;
+  const coverMediaId = draft.profile?.coverImageMediaId;
+  if (logoMediaId || coverMediaId) {
+    const res = await setMyProviderImages({
+      ...(logoMediaId ? { logoMediaId } : {}),
+      ...(coverMediaId ? { coverMediaId } : {}),
+    });
+    if (!res.ok) problems.push(`Your logo and cover image weren't saved: ${res.error ?? "unknown error"}`);
+  }
+
+  // Portfolio: add photos that aren't already on the profile.
+  const photos = (draft.portfolio ?? []).filter((item) => item.mediaId);
+  if (photos.length > 0) {
+    const have = await fetchMyPortfolio().then(
+      (items) => new Set(items.map((i) => i.mediaId)),
+      () => null
+    );
+    if (!have) {
+      problems.push("We couldn't check your portfolio, so no photos were added. Try again.");
+    } else {
+      for (const item of photos) {
+        if (have.has(item.mediaId as string)) continue;
+        const res = await addMyPortfolioItem({
+          mediaId: item.mediaId as string,
+          title: item.title,
+          description: item.description,
+          categoryId: item.categoryId || undefined,
+        });
+        if (!res.ok) problems.push(`Portfolio photo "${item.title || "Untitled"}" wasn't saved: ${res.error}`);
+      }
     }
   }
 

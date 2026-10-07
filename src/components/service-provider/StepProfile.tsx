@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Image, Camera, X } from "lucide-react";
+import { Image, Camera, X, Loader2 } from "lucide-react";
 import { Button, Input } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { useProviderImageUpload } from "@/hooks/useProviderImageUpload";
 import type { ServiceProviderOnboardingDraft } from "@/types/service-provider";
 
 interface StepProfileProps {
@@ -12,8 +13,10 @@ interface StepProfileProps {
 }
 
 export function StepProfile({ draft, onUpdate }: StepProfileProps) {
-  const [logoPreview, setLogoPreview] = useState<string | null>(draft?.profile?.logo ?? null);
-  const [coverPreview, setCoverPreview] = useState<string | null>(draft?.profile?.coverImage ?? null);
+  const { upload, busy, error: uploadError } = useProviderImageUpload();
+  const [uploading, setUploading] = useState<"logo" | "coverImage" | null>(null);
+  const logoPreview = draft?.profile?.logo || null;
+  const coverPreview = draft?.profile?.coverImage || null;
 
   // Backfill provider display name from the profile for previously saved drafts.
   useEffect(() => {
@@ -25,44 +28,32 @@ export function StepProfile({ draft, onUpdate }: StepProfileProps) {
     }
   }, []);
 
-  const handleFileUpload = (
+  const handleFileUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
     field: "logo" | "coverImage"
   ) => {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      alert("Please select an image file");
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      alert("Image must be less than 5MB");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      if (field === "logo") {
-        setLogoPreview(dataUrl);
-        onUpdate({ profile: { ...draft?.profile, logo: dataUrl } });
-      } else {
-        setCoverPreview(dataUrl);
-        onUpdate({ profile: { ...draft?.profile, coverImage: dataUrl } });
-      }
-    };
-    reader.readAsDataURL(file);
+    setUploading(field);
+    const uploaded = await upload(file, field);
+    setUploading(null);
+    if (!uploaded) return;
+    onUpdate({
+      profile:
+        field === "logo"
+          ? { ...draft?.profile, logo: uploaded.url, logoMediaId: uploaded.mediaId }
+          : { ...draft?.profile, coverImage: uploaded.url, coverImageMediaId: uploaded.mediaId },
+    });
   };
 
   const removeImage = (field: "logo" | "coverImage") => {
-    if (field === "logo") {
-      setLogoPreview(null);
-      onUpdate({ profile: { ...draft?.profile, logo: null } });
-    } else {
-      setCoverPreview(null);
-      onUpdate({ profile: { ...draft?.profile, coverImage: null } });
-    }
+    onUpdate({
+      profile:
+        field === "logo"
+          ? { ...draft?.profile, logo: null, logoMediaId: null }
+          : { ...draft?.profile, coverImage: null, coverImageMediaId: null },
+    });
   };
 
   return (
@@ -75,9 +66,11 @@ export function StepProfile({ draft, onUpdate }: StepProfileProps) {
       </div>
 
       {/* Profile Images */}
-      <p role="note" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-800">
-        Photos are not saved with your application yet, so you can leave these blank. They show only while you are on this page.
-      </p>
+      {uploadError && (
+        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {uploadError}
+        </p>
+      )}
       <div className="grid gap-6 sm:grid-cols-2">
         <div>
           <label className="block text-sm font-medium text-kampmax-text mb-3">
@@ -113,10 +106,16 @@ export function StepProfile({ draft, onUpdate }: StepProfileProps) {
                   <p className="text-xs text-neutral-400">Square aspect ratio recommended</p>
                 </div>
               )}
+              {uploading === "logo" && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white/70" role="status" aria-label="Uploading">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary-600" />
+                </div>
+              )}
               <input
                 type="file"
                 accept="image/*"
-                onChange={(e) => handleFileUpload(e, "logo")}
+                onChange={(e) => void handleFileUpload(e, "logo")}
+                disabled={busy}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 aria-label="Upload profile image"
               />
@@ -158,10 +157,16 @@ export function StepProfile({ draft, onUpdate }: StepProfileProps) {
                   <p className="text-xs text-neutral-400">16:9 aspect ratio recommended</p>
                 </div>
               )}
+              {uploading === "coverImage" && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white/70" role="status" aria-label="Uploading">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary-600" />
+                </div>
+              )}
               <input
                 type="file"
                 accept="image/*"
-                onChange={(e) => handleFileUpload(e, "coverImage")}
+                onChange={(e) => void handleFileUpload(e, "coverImage")}
+                disabled={busy}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 aria-label="Upload cover image"
               />
