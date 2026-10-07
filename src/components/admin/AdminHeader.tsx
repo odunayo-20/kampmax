@@ -23,7 +23,6 @@ import {
   notificationTypeIcon,
   notificationTypeLabel,
 } from "@/components/admin/notifications/notifications-meta";
-import { markNotificationRead, markAllNotificationsRead } from "@/data/notifications";
 import { AdminBreadcrumbs } from "./AdminBreadcrumbs";
 
 const ROLE_LABELS = {
@@ -143,7 +142,7 @@ export function AdminHeader() {
         )}
       </div>
 
-      {/* Notifications (real in-app notifications store) */}
+      {/* Latest notifications across the platform. Read state belongs to each recipient, so admins only view it. */}
       <div className="relative" ref={notifRef}>
         <button
           type="button"
@@ -165,27 +164,15 @@ export function AdminHeader() {
             <div className="flex items-center justify-between border-b border-kampmax-border px-3.5 py-2.5">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-semibold text-kampmax-text">
-                  Notifications
+                  Platform notifications
                 </p>
                 {alertCount > 0 && (
                   <span className="rounded-full bg-kampmax-blue/10 px-1.5 py-0.5 text-[10px] font-semibold text-kampmax-blue">
-                    {alertCount} unread
+                    {alertCount} unread by recipients
                   </span>
                 )}
               </div>
               <div className="flex items-center gap-2.5">
-                {alertCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      notifications?.forEach((n) => markNotificationRead(n.id));
-                      markAllNotificationsRead("admin");
-                    }}
-                    className="text-xs font-semibold text-kampmax-blue hover:underline"
-                  >
-                    Mark all read
-                  </button>
-                )}
                 <Link
                   href="/admin/notifications"
                   onClick={() => setNotifOpen(false)}
@@ -216,10 +203,7 @@ export function AdminHeader() {
                     <li key={n.id}>
                       <Link
                         href={(typeof n.data?.actionUrl === "string" ? n.data.actionUrl : null) || `/admin/notifications/${n.id}`}
-                        onClick={() => {
-                          markNotificationRead(n.id);
-                          setNotifOpen(false);
-                        }}
+                        onClick={() => setNotifOpen(false)}
                         className={cn(
                           "flex w-full flex-col gap-0.5 px-3.5 py-2.5 text-left transition-colors hover:bg-kampmax-muted/50",
                           !n.read ? "bg-kampmax-blue/[0.05]" : "bg-white opacity-85"

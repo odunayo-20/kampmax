@@ -18,7 +18,6 @@ import {
   readStateVariant,
   previewText,
 } from "./notifications-meta";
-import { markNotificationRead } from "@/data/notifications";
 import type {
   ManagedNotificationRow,
   Paginated,
@@ -95,10 +94,7 @@ export function NotificationsTable(props: NotificationsTableProps) {
               {items.map((r) => (
                 <tr
                   key={r.id}
-                  onClick={() => {
-                    markNotificationRead(r.id);
-                    onView(r);
-                  }}
+                  onClick={() => onView(r)}
                   className={cn(
                     "cursor-pointer transition-colors hover:bg-kampmax-muted/40",
                     !r.read && "bg-kampmax-blue/[0.03]"
@@ -154,15 +150,9 @@ export function NotificationsTable(props: NotificationsTableProps) {
                       role="button"
                       tabIndex={0}
                       title="View details"
-                      onClick={() => {
-                        markNotificationRead(r.id);
-                        onView(r);
-                      }}
+                      onClick={() => onView(r)}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          markNotificationRead(r.id);
-                          onView(r);
-                        }
+                        if (e.key === "Enter") onView(r);
                       }}
                       className="inline-flex cursor-pointer rounded-md p-1.5 text-kampmax-text-secondary transition-colors hover:bg-kampmax-muted"
                     >
@@ -181,10 +171,7 @@ export function NotificationsTable(props: NotificationsTableProps) {
         {items.map((r) => (
           <li
             key={r.id}
-            onClick={() => {
-              markNotificationRead(r.id);
-              onView(r);
-            }}
+            onClick={() => onView(r)}
             className={cn(
               "cursor-pointer rounded-lg border border-kampmax-border bg-white p-3 transition-colors active:bg-kampmax-muted/50",
               !r.read && "border-l-4 border-l-kampmax-blue bg-kampmax-blue/[0.02]"

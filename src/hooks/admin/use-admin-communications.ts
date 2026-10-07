@@ -8,7 +8,7 @@
 // Keys are NOT campus-scoped — communications are restricted to full
 // operators (ADMIN/SUPER_ADMIN) at the nav-permission layer, so no
 // campus shard exists. Read-only namespace + one create mutation
-// (dispatches real in-app records via pushNotificationRecord).
+// (dispatches real in-app records through the backend).
 //
 // The AdminHeader bell and /admin/notifications console both read
 // from this live shared in-app notification store.

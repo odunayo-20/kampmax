@@ -17,8 +17,6 @@ import {
   readStateLabel,
   readStateVariant,
 } from "./notifications-meta";
-import { useEffect } from "react";
-import { markNotificationRead } from "@/data/notifications";
 import { useAdminNotificationDetail } from "@/hooks/admin/use-admin-communications";
 import type { ManagedNotificationRow } from "@/types/admin";
 
@@ -29,12 +27,6 @@ interface NotificationDetailProps {
 
 export function NotificationDetail({ id, onBack }: NotificationDetailProps) {
   const { data: row, isLoading, error } = useAdminNotificationDetail(id);
-
-  useEffect(() => {
-    if (row?.id && !row.read) {
-      markNotificationRead(row.id);
-    }
-  }, [row?.id, row?.read]);
 
   if (isLoading) return <DetailSkeleton />;
   if (error || !row) return <NotFound onBack={onBack} />;

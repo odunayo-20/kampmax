@@ -41,9 +41,6 @@ function normalizeDetail(detail: SupportTicketDetail | null): SupportTicketDetai
   };
 }
 
-import { getCurrentAuthUser } from "@/lib/current-user-store";
-import { pushUserNotification } from "@/services/notifications";
-
 export const supportService: SupportCustomerService = {
   async listMine() {
     const { data, error } = await apiClient.get<SupportTicket[]>("/support/tickets");
@@ -97,40 +94,6 @@ export const supportService: SupportCustomerService = {
     if (error) fail(error, "Couldn't submit your request.");
 
     const normalized = normalizeDetail(data)!;
-    const ticketId = normalized?.ticket?.id || "new";
-    const effectiveUserId = _userId || getCurrentAuthUser()?.id || "u1";
-
-    // 4. Trigger in-app notification for Customer support bell
-    pushUserNotification({
-      userId: effectiveUserId,
-      type: "system",
-      category: "account",
-      title: "Support Request Received",
-      message: `Your request "${input.subject}" has been submitted (#${ticketId}).`,
-      actionUrl: `/support/${ticketId}`,
-    });
-
-    if (effectiveUserId !== "u1") {
-      pushUserNotification({
-        userId: "u1",
-        type: "system",
-        category: "account",
-        title: "Support Request Received",
-        message: `Your request "${input.subject}" has been submitted (#${ticketId}).`,
-        actionUrl: `/support/${ticketId}`,
-      });
-    }
-
-    // 5. Trigger in-app notification for Admin support bell
-    pushUserNotification({
-      userId: "admin",
-      type: "system",
-      category: "account",
-      title: "New Support Ticket",
-      message: `Customer opened support ticket #${ticketId}: "${input.subject}"`,
-      actionUrl: `/admin/support/${ticketId}`,
-    });
-
     return normalized;
   },
 
@@ -141,40 +104,6 @@ export const supportService: SupportCustomerService = {
     );
     if (error?.status === 404) return null;
     if (error) fail(error, "Couldn't send your reply.");
-
-    const effectiveUserId = _userId || getCurrentAuthUser()?.id || "u1";
-    const snippet = input.body.length > 70 ? `${input.body.slice(0, 70)}…` : input.body;
-
-    // Trigger in-app notification for customer bell
-    pushUserNotification({
-      userId: effectiveUserId,
-      type: "message",
-      category: "messages",
-      title: "Support Message Sent",
-      message: `Your message was sent on ticket #${id}.`,
-      actionUrl: `/support/${id}`,
-    });
-
-    if (effectiveUserId !== "u1") {
-      pushUserNotification({
-        userId: "u1",
-        type: "message",
-        category: "messages",
-        title: "Support Message Sent",
-        message: `Your message was sent on ticket #${id}.`,
-        actionUrl: `/support/${id}`,
-      });
-    }
-
-    // Trigger in-app notification for admin bell
-    pushUserNotification({
-      userId: "admin",
-      type: "message",
-      category: "messages",
-      title: `Customer Message on Ticket #${id}`,
-      message: `New message on ticket #${id}: "${snippet}"`,
-      actionUrl: `/admin/support/${id}`,
-    });
 
     return normalizeDetail(data);
   },

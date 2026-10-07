@@ -21,7 +21,6 @@
 
 import { getCurrentUser } from "@/services/users";
 import { getCampuses, getCampusById } from "@/services/campus";
-import { pushUserNotification } from "@/services/notifications";
 import { apiClient } from "@/lib/api-client";
 import type { ApiError } from "@/lib/api-client";
 import { createEmployerApplication, getEmployerOnboardingDraft, saveEmployerDraft, getEmployerOnboardingStatus, submitEmployerApplication } from "@/data/employer";
@@ -336,16 +335,6 @@ export function submitEmployerProfileForUser(): { success: boolean; message: str
   // The in-memory store resets on reload/HMR; make sure a record exists.
   createEmployerApplication(uid);
   const res = submitEmployerApplication(uid);
-  if (res.success) {
-    pushUserNotification({
-      userId: uid,
-      type: "account",
-      category: "account",
-      title: "Employer profile submitted",
-      message: "Your employer profile has been submitted for review. You'll be notified once it's approved.",
-      actionUrl: "/onboarding/employer",
-    });
-  }
   return res;
 }
 
