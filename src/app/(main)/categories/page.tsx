@@ -10,7 +10,6 @@ import {
   Gamepad2,
   Home as HomeIcon,
   UtensilsCrossed,
-  Sparkles,
   Wrench,
   Search,
   ArrowRight,

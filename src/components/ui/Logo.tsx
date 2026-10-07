@@ -39,64 +39,75 @@ export function LogoIcon({
       aria-label="Kampmax Logo"
     >
       <defs>
-        {/* Left Stem Blue Gradient */}
-        <linearGradient id="kmBlueStem" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#0256E0" />
+        {/* Blue Stem Gradient */}
+        <linearGradient id="kpBlueStem" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#0052D4" />
+          <stop offset="50%" stopColor="#0066FF" />
+          <stop offset="100%" stopColor="#0A47B8" />
+        </linearGradient>
+
+        {/* Blue Lower Leg Gradient */}
+        <linearGradient id="kpBlueLeg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#0544B8" />
           <stop offset="60%" stopColor="#0066FF" />
-          <stop offset="100%" stopColor="#0047BA" />
+          <stop offset="100%" stopColor="#0A52D4" />
         </linearGradient>
 
-        {/* Lower Right Leg Blue Gradient */}
-        <linearGradient id="kmBlueLeg" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#0447C8" />
-          <stop offset="50%" stopColor="#0062F5" />
-          <stop offset="100%" stopColor="#003EAC" />
-        </linearGradient>
-
-        {/* Dynamic Golden Arrow Gradient */}
-        <linearGradient id="kmGoldArrow" x1="0%" y1="100%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#FF7200" />
-          <stop offset="30%" stopColor="#FFA600" />
-          <stop offset="70%" stopColor="#FFC500" />
+        {/* Arrow Ribbon Main Gradient */}
+        <linearGradient id="kpArrowGold" x1="0%" y1="100%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#FF7A00" />
+          <stop offset="25%" stopColor="#FFA800" />
+          <stop offset="70%" stopColor="#FFC700" />
           <stop offset="100%" stopColor="#FFD600" />
         </linearGradient>
 
-        {/* Ribbon Wrap Shadow/Gradient */}
-        <linearGradient id="kmRibbonWrap" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#D45000" />
-          <stop offset="40%" stopColor="#FF7A00" />
-          <stop offset="100%" stopColor="#FFA800" />
+        {/* Arrow Ribbon Back Wrap Curve */}
+        <linearGradient id="kpArrowWrap" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#D95700" />
+          <stop offset="50%" stopColor="#FF8A00" />
+          <stop offset="100%" stopColor="#FFB800" />
         </linearGradient>
 
-        {/* Arrow Shaft Ambient Shadow */}
-        <filter id="kmArrowShadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="-3" dy="6" stdDeviation="6" floodColor="#001F60" floodOpacity={0.28} />
+        {/* Drop Shadow for Arrow */}
+        <filter id="arrowShadow" x="-10%" y="-10%" width="130%" height="130%" filterUnits="userSpaceOnUse">
+          <feDropShadow dx="-4" dy="8" stdDeviation="8" floodColor="#00184A" floodOpacity={0.35} />
         </filter>
       </defs>
 
-      {/* 1. Main Left Vertical Blue Stem with Rounded Top-Left */}
+      {/* Left Vertical Blue Stem */}
       <path
-        d="M110 170 C110 128 144 104 186 104 L210 104 L210 408 L152 408 C128 408 110 390 110 366 Z"
-        fill="url(#kmBlueStem)"
+        d="M120 108 C120 108 170 108 212 108 C212 108 212 300 212 404 C190 404 150 404 120 404 C120 380 120 148 120 108 Z"
+        fill="url(#kpBlueStem)"
+      />
+      <path
+        d="M120 178 C120 138 152 108 192 108 L212 108 L212 404 L160 404 C138 404 120 386 120 364 Z"
+        fill="url(#kpBlueStem)"
       />
 
-      {/* 2. Bottom-Right Blue Diagonal Leg */}
+      {/* Bottom-Right Blue Diagonal Leg */}
       <path
-        d="M210 306 L302 408 L422 408 L286 266 L210 306 Z"
-        fill="url(#kmBlueLeg)"
+        d="M212 300 L304 404 L420 404 L296 268 L212 300 Z"
+        fill="url(#kpBlueLeg)"
       />
 
-      {/* 3. Under-Ribbon Loop (Wrapping from back of stem to front) */}
+      {/* Under-shadow overlay on lower stem for depth */}
       <path
-        d="M192 408 C150 408 112 376 112 334 C112 288 142 250 182 222 L234 186 L238 234 L196 264 C172 282 158 304 158 326 C158 350 176 368 200 368 L200 408 Z"
-        fill="url(#kmRibbonWrap)"
+        d="M120 310 C120 310 135 285 170 250 L212 215 L212 290 L160 404 C138 404 120 386 120 364 Z"
+        fill="#002D80"
+        opacity={0.25}
       />
 
-      {/* 4. Front Golden Arrow Ribbon with Head (Rising 45-deg diagonal) */}
-      <g filter="url(#kmArrowShadow)">
+      {/* Dynamic Gold Arrow Ribbon: Back Wrap Curve */}
+      <path
+        d="M192 404 C155 404 120 375 120 332 C120 286 150 248 188 220 L242 182 L248 232 L202 265 C176 284 162 305 162 328 C162 352 180 368 204 368 L204 404 Z"
+        fill="url(#kpArrowWrap)"
+      />
+
+      {/* Main Rising Arrow Shaft with Shadow */}
+      <g filter="url(#arrowShadow)">
         <path
-          d="M116 340 C118 296 146 258 190 228 L308 144 L276 116 L406 104 L394 214 L358 182 L218 280 C186 302 166 326 158 348 C144 358 126 354 116 340 Z"
-          fill="url(#kmGoldArrow)"
+          d="M124 336 C124 300 148 262 188 232 L344 116 L310 90 L404 104 L390 198 L356 172 L212 280 C182 302 166 324 162 344 C150 354 135 348 124 336 Z"
+          fill="url(#kpArrowGold)"
         />
       </g>
     </svg>
@@ -129,7 +140,7 @@ export function Logo({
             textClassName
           )}
         >
-          Kamp<span className="text-primary-600">max</span>
+          Kamp<span className={variant === "white" ? "text-primary-400" : "text-primary-600"}>max</span>
         </span>
       )}
     </div>

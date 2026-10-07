@@ -181,10 +181,10 @@ export function AdminMobileSidebar() {
       <div className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col bg-kampmax-navy shadow-xl">
         <div className="flex h-14 shrink-0 items-center justify-between border-b border-white/10 px-4">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-kampmax-gold text-sm font-black text-kampmax-navy">
-              K
-            </div>
-            <p className="text-sm font-bold text-white">Kampmax Admin</p>
+            <LogoIcon size={28} />
+            <p className="text-sm font-bold text-white">
+              Kamp<span className="text-primary-400">max</span> Admin
+            </p>
           </div>
           <button
             type="button"

@@ -3,6 +3,7 @@
 import { X, Printer, CheckCircle, MapPin } from "lucide-react";
 import { formatNaira } from "@/lib/utils";
 import { VendorOrder } from "@/types/vendor-orders";
+import { Logo } from "@/components/ui/Logo";
 
 interface OrderReceiptModalProps {
   order: VendorOrder;
@@ -63,8 +64,8 @@ export function OrderReceiptModal({ order, isOpen, onClose }: OrderReceiptModalP
           {/* Slip Header */}
           <div className="border-b border-neutral-200 pb-4 flex justify-between items-start">
             <div>
-              <h1 className="text-xl font-extrabold text-neutral-900 tracking-tight">KAMPMAX</h1>
-              <p className="text-xs text-neutral-500 font-medium">Campus Super-App Order Receipt</p>
+              <Logo size="sm" />
+              <p className="text-xs text-neutral-500 font-medium mt-1">Campus Super-App Order Receipt</p>
             </div>
             <div className="text-right">
               <span className="text-xs font-bold text-primary-700 bg-primary-50 px-2 py-0.5 rounded border border-primary-100">

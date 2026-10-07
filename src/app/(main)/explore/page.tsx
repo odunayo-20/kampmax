@@ -8,7 +8,6 @@ import {
   SlidersHorizontal,
   Calendar,
   MapPin,
-  Sparkles,
   ArrowRight,
   Store,
   Wrench,

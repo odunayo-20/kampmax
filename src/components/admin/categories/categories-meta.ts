@@ -16,9 +16,9 @@ import {
   Shirt,
   ShoppingBasket,
   Smartphone,
-  Sparkles,
   TabletSmartphone,
   type LucideIcon,
+  Flower2,
 } from "lucide-react";
 import type { BadgeVariant } from "@/components/admin/StatusBadge";
 import type { ManagedCategoryStatus } from "@/types/admin";
@@ -32,7 +32,9 @@ export const CATEGORY_ICONS: Record<string, LucideIcon> = {
   "graduation-cap": GraduationCap,
   shirt: Shirt,
   "shopping-basket": ShoppingBasket,
-  sparkles: Sparkles,
+  "flower-2": Flower2,
+  // Categories saved earlier may still carry the previous icon name.
+  sparkles: Flower2,
   lamp: Lamp,
   printer: Printer,
   dumbbell: Dumbbell,
@@ -63,7 +65,7 @@ export const ICON_PICKER_KEYS: string[] = [
   "shirt",
   "shopping-basket",
   "cookie",
-  "sparkles",
+  "flower-2",
   "lamp",
   "armchair",
   "bicycle",

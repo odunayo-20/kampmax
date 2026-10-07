@@ -17,6 +17,7 @@ import type { Order } from "@/types";
 import { formatDate, formatNaira } from "@/lib/utils";
 import { CampusPickupPinCard } from "@/components/orders/CampusPickupPinCard";
 import { OrderStatusBadge } from "@/components/atoms/Badge";
+import { Logo } from "@/components/ui/Logo";
 
 export default function OrderConfirmationPage({
   params,
@@ -70,6 +71,12 @@ export default function OrderConfirmationPage({
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 space-y-6">
+      {/* Top Brand Bar */}
+      <div className="flex items-center justify-between">
+        <Logo size="sm" href="/home" />
+        <span className="text-xs font-semibold text-kampmax-text-secondary">Official Order Confirmation</span>
+      </div>
+
       {/* Printable Area Wrapper */}
       <div className="space-y-6">
         {/* Banner */}

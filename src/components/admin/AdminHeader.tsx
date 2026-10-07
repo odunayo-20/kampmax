@@ -24,6 +24,7 @@ import {
   notificationTypeLabel,
 } from "@/components/admin/notifications/notifications-meta";
 import { AdminBreadcrumbs } from "./AdminBreadcrumbs";
+import { LogoIcon } from "@/components/ui/Logo";
 
 const ROLE_LABELS = {
   SUPER_ADMIN: "Super Admin",
@@ -109,9 +110,12 @@ export function AdminHeader() {
       <div className="hidden min-w-0 flex-1 md:block">
         <AdminBreadcrumbs />
       </div>
-      <p className="min-w-0 flex-1 truncate text-sm font-semibold text-kampmax-text md:hidden">
-        Kampmax Admin
-      </p>
+      <div className="flex items-center gap-2 min-w-0 flex-1 truncate md:hidden">
+        <LogoIcon size={22} />
+        <span className="truncate text-sm font-semibold text-kampmax-text">
+          Kamp<span className="text-primary-600">max</span> Admin
+        </span>
+      </div>
 
       {/* Global search */}
       <div className="relative hidden w-72 shrink-0 lg:block xl:w-80">

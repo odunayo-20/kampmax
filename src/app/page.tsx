@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { useApp } from "@/lib/app-context";
+import { LogoIcon } from "@/components/ui/Logo";
 
 export default function RootPage() {
   const router = useRouter();
@@ -20,10 +21,11 @@ export default function RootPage() {
     }
   }, [status, hasCompletedOnboarding, router]);
 
-  // Show nothing while determining auth state
+  // Show branded loading screen while determining auth state
   return (
-    <div className="min-h-screen flex items-center justify-center bg-kampmax-bg">
-      <div className="h-8 w-8 border-3 border-kampmax-blue/20 border-t-kampmax-blue rounded-full animate-spin" />
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-kampmax-bg">
+      <LogoIcon size={48} className="animate-pulse" />
+      <div className="h-4 w-4 border-2 border-kampmax-blue/20 border-t-kampmax-blue rounded-full animate-spin" />
     </div>
   );
 }

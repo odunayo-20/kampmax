@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Calendar, MapPin, Sparkles, ArrowRight, Ticket } from "lucide-react";
+import { Calendar, MapPin, ArrowRight, Ticket } from "lucide-react";
 import type { EventItem } from "@/types/event-ticketing";
 import { eventDate, eventTime } from "@/components/events/event-format";
 
@@ -27,7 +27,6 @@ export function HeroEventBanner({ event }: HeroEventBannerProps) {
       <div className="relative z-10 p-5 sm:p-6 flex flex-col justify-between min-h-[180px] sm:min-h-[195px]">
         <div className="flex items-center justify-between">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] sm:text-xs font-black bg-amber-400 text-neutral-950 shadow-md">
-            <Sparkles className="h-3.5 w-3.5 fill-neutral-950 text-neutral-950" />
             <span>{event?.isFeatured ? "FEATURED CAMPUS EVENT" : "CAMPUS EVENTS"}</span>
           </span>
 

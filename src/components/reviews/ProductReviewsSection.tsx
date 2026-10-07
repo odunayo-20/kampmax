@@ -7,7 +7,6 @@ import {
   MessageSquare,
   Flag,
   ChevronDown,
-  Sparkles,
   Store,
 } from "lucide-react";
 import { ReviewForm } from "@/components/reviews/ReviewForm";
@@ -286,7 +285,6 @@ export function ProductReviewsSection({
               : "cursor-not-allowed bg-kampmax-muted text-kampmax-text-secondary"
           )}
         >
-          <Sparkles className="h-4 w-4" aria-hidden />
           {writeButtonLabel}
         </button>
       </div>

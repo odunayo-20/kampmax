@@ -6,7 +6,6 @@ import {
   ChevronDown,
   CheckCircle2,
   X,
-  Sparkles,
   Award,
   Tag,
 } from "lucide-react";
@@ -165,7 +164,7 @@ export function ReferralCodeInput({
               {validation.type === "ambassador" ? (
                 <Award className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
               ) : (
-                <Sparkles className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                <Gift className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
               )}
               <div className="min-w-0">
                 <p className="font-semibold text-emerald-900 flex items-center gap-1.5">

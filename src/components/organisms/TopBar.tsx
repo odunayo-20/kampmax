@@ -6,6 +6,7 @@ import { useCart } from "@/lib/cart-context";
 import { useApp } from "@/lib/app-context";
 import { NotificationBell } from "@/components/notifications";
 import { cn } from "@/lib/utils";
+import { Logo } from "@/components/ui/Logo";
 
 export function TopBar() {
   const { itemCount } = useCart();
@@ -14,11 +15,7 @@ export function TopBar() {
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-kampmax-border">
       <div className="max-w-lg mx-auto flex items-center justify-between h-14 px-4">
-        <Link href="/home" className="flex items-center gap-1.5">
-          <span className="text-lg font-bold text-kampmax-navy tracking-tight">
-            Kampmax
-          </span>
-        </Link>
+        <Logo size="sm" href="/home" />
 
         <div className="flex items-center gap-1">
           <div className="flex items-center gap-1 text-xs text-kampmax-text-secondary mr-2">

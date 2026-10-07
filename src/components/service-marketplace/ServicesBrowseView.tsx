@@ -8,7 +8,6 @@ import {
   ShieldCheck,
   Star,
   MapPin,
-  Sparkles,
   CheckCircle2,
   Clock,
   ArrowRight,
@@ -203,7 +202,6 @@ export function ServicesBrowseView() {
               <span>{selectedCampus.name} ({campusAbbr})</span>
             </span>
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-400 text-neutral-950">
-              <Sparkles className="h-3 w-3" />
               <span>Verified Campus Gigs & Services</span>
             </span>
           </div>
@@ -363,7 +361,6 @@ export function ServicesBrowseView() {
       <section className="rounded-3xl bg-gradient-to-r from-neutral-900 to-neutral-950 border border-neutral-800 p-6 sm:p-8 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 shadow-lg">
         <div className="space-y-1">
           <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-primary-400 uppercase tracking-wider">
-            <Sparkles className="h-3.5 w-3.5" />
             Earn on Campus
           </span>
           <h2 className="text-lg sm:text-xl font-black tracking-tight">

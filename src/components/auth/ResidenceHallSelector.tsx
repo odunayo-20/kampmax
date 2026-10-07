@@ -9,7 +9,6 @@ import {
   Check,
   X,
   ChevronDown,
-  Sparkles,
   Info,
 } from "lucide-react";
 import { Button } from "@/components/ui";
@@ -354,7 +353,6 @@ export function ResidenceHallSelector({
                     }}
                     className="w-full py-2.5 px-3 rounded-lg border border-dashed border-kampmax-border hover:border-kampmax-blue/50 text-xs font-medium text-kampmax-blue flex items-center justify-center gap-1.5 transition-colors"
                   >
-                    <Sparkles className="h-3.5 w-3.5" />
                     Can&apos;t find yours? Type a custom hostel or street
                   </button>
                 ) : (

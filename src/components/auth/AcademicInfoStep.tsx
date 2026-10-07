@@ -7,7 +7,6 @@ import {
   ChevronDown,
   Layers,
   Hash,
-  Sparkles,
   School,
 } from "lucide-react";
 import { Campus } from "@/types";
@@ -126,7 +125,6 @@ export function AcademicInfoStep({
       {isExpanded && (
         <div className="px-4 pb-4 pt-1 space-y-3.5 border-t border-kampmax-border/60 animate-in fade-in slide-in-from-top-1 duration-150">
           <div className="flex items-center gap-1 text-[11px] text-kampmax-blue font-medium bg-kampmax-blue/5 p-2 rounded-lg border border-kampmax-blue/10">
-            <Sparkles className="h-3 w-3 shrink-0" />
             <span>
               Helps peers identify you in department study groups & textbook exchanges.
             </span>

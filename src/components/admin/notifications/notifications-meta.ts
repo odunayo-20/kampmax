@@ -9,13 +9,13 @@ import {
   Receipt,
   Send,
   ShieldCheck,
-  Sparkles,
   Star,
   Store,
   ThumbsUp,
   UserCircle,
   UserPlus,
   type LucideIcon,
+  Info,
 } from "lucide-react";
 import type { BadgeVariant } from "@/components/admin/StatusBadge";
 import type {
@@ -60,7 +60,7 @@ export const NOTIFICATION_TYPE_ICONS: Record<NotificationRecordType, LucideIcon>
   COMMENT: MessageSquareText,
   VENDOR: Store,
   ADMIN: Send,
-  SYSTEM: Sparkles,
+  SYSTEM: Info,
   LOYALTY: Award,
   JOB: Briefcase,
   PROPOSAL: Handshake,

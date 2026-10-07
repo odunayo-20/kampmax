@@ -13,7 +13,7 @@ import {
   ShieldCheck,
   CalendarClock,
   CheckCircle2,
-  Sparkles,
+  Image as ImageIcon,
 } from "lucide-react";
 import type {
   MarketplaceProvider,
@@ -120,7 +120,7 @@ export function ServiceDetailView({
               <img src={service.imageUrl} alt={service.name} className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-neutral-400/40">
-                <Sparkles className="w-16 h-16" aria-hidden />
+                <ImageIcon className="w-16 h-16" aria-hidden />
               </div>
             )}
           </div>
@@ -323,7 +323,6 @@ export function ServiceDetailView({
                     : "border border-neutral-200 text-neutral-700 hover:bg-neutral-100"
                 )}
               >
-                <Sparkles className="h-4 w-4" aria-hidden />
                 Request a quote
               </button>
 

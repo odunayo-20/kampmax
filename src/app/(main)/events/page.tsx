@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Calendar, MapPin, Search, Sparkles, Ticket, Users, Plus } from "lucide-react";
+import { Calendar, MapPin, Search, Ticket, Users, Plus } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { useApp } from "@/lib/app-context";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -166,7 +166,7 @@ function FeaturedEvent({ event }: { event: EventItem }) {
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/20" />
       <div className="relative flex min-h-[190px] flex-col justify-between p-5">
         <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-amber-400 px-3 py-1 text-[10px] font-black text-neutral-950">
-          <Sparkles className="h-3 w-3" /> {event.isFeatured ? "FEATURED" : "NEXT UP"}
+          {event.isFeatured ? "FEATURED" : "NEXT UP"}
         </span>
         <div className="space-y-1.5">
           <h2 className="text-xl font-black leading-tight">{event.title}</h2>

@@ -3,7 +3,7 @@
 import { Suspense, useState, FormEvent, useEffect, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Mail, UserRound, AtSign, ArrowRight, Sparkles } from "lucide-react";
+import { ArrowLeft, Mail, UserRound, AtSign, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui";
 import { Input } from "@/components/ui/Input";
 import { PasswordInput } from "@/components/ui/PasswordInput";
@@ -428,7 +428,6 @@ function RegisterForm() {
             Change role
           </button>
           <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-kampmax-blue/10 text-kampmax-blue">
-            <Sparkles className="h-3.5 w-3.5" />
             {KAMPMAX_ROLE_PATHS[choiceId].title}
           </span>
         </div>

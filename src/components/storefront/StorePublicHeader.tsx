@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Package, LogIn, User } from "lucide-react";
+import { LogIn, User } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/atoms/Button";
+import { Logo } from "@/components/ui/Logo";
 
 /**
  * Lightweight public header shown on public storefront pages. Links the brand
@@ -24,18 +25,7 @@ export function StorePublicHeader() {
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-kampmax-border">
       <div className="max-w-[1280px] mx-auto px-4 h-14 flex items-center justify-between">
-        <Link
-          href="/marketplace"
-          className="inline-flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 rounded"
-          aria-label="Kampmax home"
-        >
-          <span className="w-8 h-8 rounded-lg bg-kampmax-navy flex items-center justify-center text-white">
-            <Package className="h-4 w-4" />
-          </span>
-          <span className="text-lg font-bold text-kampmax-navy hidden sm:inline">
-            Kampmax
-          </span>
-        </Link>
+        <Logo size="sm" href="/marketplace" />
 
         <div className="flex items-center gap-2">
           {status === "authenticated" && user ? (

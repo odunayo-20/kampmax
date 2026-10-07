@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, CalendarDays, ExternalLink, Images, Plus, Sparkles, Wrench, X } from "lucide-react";
+import { ArrowRight, CalendarDays, ExternalLink, Images, Plus, Wrench, X, Lightbulb } from "lucide-react";
 import { cn, timeAgo } from "@/lib/utils";
 import {
   computeProfileCompletionFromLive,
@@ -133,7 +133,7 @@ export default function ServiceProviderOverviewPage() {
           </button>
           <div className="flex items-start gap-3 pr-8">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-primary-600 ring-1 ring-primary-200">
-              <Sparkles className="h-5 w-5" aria-hidden />
+              <Lightbulb className="h-5 w-5" aria-hidden />
             </div>
             <div>
               <h2 className="text-sm font-bold text-kampmax-text">Make the most of your profile</h2>

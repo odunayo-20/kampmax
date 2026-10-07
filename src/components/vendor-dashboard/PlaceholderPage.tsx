@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, Lock, Sparkles } from "lucide-react";
+import { ArrowLeft, Lock } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 /**
@@ -25,7 +25,7 @@ export function PlaceholderPage({
           <Icon className="h-8 w-8" aria-hidden />
         </div>
         <span className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-success-50 px-3 py-1 text-xs font-semibold text-success-700">
-          <Sparkles className="h-3.5 w-3.5" aria-hidden /> Coming soon
+          Coming soon
         </span>
         <h2 className="text-lg font-bold text-kampmax-text">{title}</h2>
         <p className="mt-2 max-w-md text-sm text-kampmax-text-secondary">{description}</p>

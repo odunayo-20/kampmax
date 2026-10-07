@@ -11,9 +11,9 @@ import {
   ChevronDown,
   Store as StoreIcon,
   ArrowRight,
-  Sparkles,
   Calendar,
   Briefcase,
+  Package,
 } from "lucide-react";
 import { ProductCard, CategoryCard } from "@/components/marketplace";
 import { PageContainer, SectionHeader, HorizontalScroll } from "@/components/layout";
@@ -122,7 +122,7 @@ export default function HomePage() {
               <div className="space-y-1 max-w-xl">
                 <div className="flex items-center gap-2">
                   <span className="inline-flex items-center gap-1 font-bold bg-white/20 px-2 py-0.5 rounded-full text-[10px] tracking-wide uppercase">
-                    <Sparkles className="h-3 w-3" /> Campus Ecosystem
+                    Campus Ecosystem
                   </span>
                   <span className="text-xs text-blue-100 font-semibold">
                     Guest Explorer
@@ -241,7 +241,7 @@ export default function HomePage() {
           <SectionHeader
             title="Fresh Arrivals"
             subtitle="Just listed across campus"
-            icon={<Sparkles className="h-4 w-4 text-primary-600" aria-hidden />}
+            icon={<Package className="h-4 w-4 text-primary-600" aria-hidden />}
             action={{ label: "View all", href: "/marketplace" }}
           />
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">

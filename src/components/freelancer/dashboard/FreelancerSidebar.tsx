@@ -8,7 +8,6 @@ import {
   Briefcase,
   FileText,
   Handshake,
-  Sparkles,
   Wallet,
   MessageSquare,
   Bell,
@@ -18,11 +17,13 @@ import {
   Search,
   Bookmark,
   ShieldCheck,
+  Images,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { FreelancerOnboardingStatus } from "@/types/freelancer";
 import { FreelancerStatusBadge } from "./FreelancerStatusBadge";
 import { useUnreadMessageCount } from "@/hooks/use-messages";
+import { LogoIcon } from "@/components/ui/Logo";
 
 interface NavItem {
   href?: string;
@@ -64,7 +65,7 @@ export function FreelancerSidebar({
       title: "Profile",
       items: [
         { label: "My Services", href: "/freelancer/services", icon: Briefcase },
-        { label: "Portfolio", href: "/freelancer/portfolio", icon: Sparkles },
+        { label: "Portfolio", href: "/freelancer/portfolio", icon: Images },
         { label: "Verification & Pro", href: "/freelancer/verification", icon: ShieldCheck },
       ],
     },
@@ -85,9 +86,9 @@ export function FreelancerSidebar({
       <div className="px-4 pt-5 pb-2">
         <Link
           href="/home"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-white/70 hover:text-white"
+          className="inline-flex items-center gap-2 text-sm font-medium text-white/80 hover:text-white"
         >
-          <Home className="h-4 w-4" aria-hidden />
+          <LogoIcon size={18} />
           Back to Kampmax
         </Link>
         <div className="mt-3 flex items-center gap-2">

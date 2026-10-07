@@ -8,7 +8,6 @@ import {
   CreditCard,
   LogOut,
   MapPin,
-  Sparkles,
   ArrowUpRight,
   User,
   ShoppingBag,
@@ -19,7 +18,7 @@ import { MORE_MENU_SECTIONS } from "@/config/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { useApp } from "@/lib/app-context";
 import { useCart } from "@/lib/cart-context";
-import { Avatar } from "@/components/ui";
+import { Avatar, LogoIcon } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 export default function MorePage() {
@@ -235,9 +234,12 @@ export default function MorePage() {
           </Link>
         )}
 
-        <p className="text-center text-[10px] text-neutral-400 font-medium mt-3">
-          Kampmax Hub v2.5.0 • Campus Ecosystem
-        </p>
+        <div className="flex flex-col items-center justify-center mt-6 gap-1 opacity-70">
+          <LogoIcon size={24} />
+          <p className="text-center text-[10px] text-neutral-400 font-medium">
+            Kampmax Hub v2.5.0 • Campus Ecosystem
+          </p>
+        </div>
       </div>
     </PageContainer>
   );

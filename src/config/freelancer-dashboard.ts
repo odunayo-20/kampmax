@@ -36,12 +36,12 @@ export const FREELANCER_AVAILABILITY_LABEL: Record<string, string> = {
 
 export const FREELANCER_ACTIVITY_META: Record<
   FreelancerActivityKind,
-  { icon: "check" | "briefcase" | "file" | "sparkles" | "clock" | "wallet" | "star" | "calendar" | "megaphone" }
+  { icon: "check" | "briefcase" | "file" | "clock" | "wallet" | "star" | "calendar" | "megaphone" }
 > = {
   profile_approved: { icon: "check" },
   portfolio_updated: { icon: "briefcase" },
   proposal_submitted: { icon: "file" },
-  proposal_accepted: { icon: "sparkles" },
+  proposal_accepted: { icon: "check" },
   contract_started: { icon: "briefcase" },
   payment_received: { icon: "wallet" },
   review_received: { icon: "star" },

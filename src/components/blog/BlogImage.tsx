@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { isOptimizableImage } from "@/lib/blog";
 import { cn } from "@/lib/utils";
+import { LogoIcon } from "@/components/ui/Logo";
 
 interface BlogImageProps {
   src: string;
@@ -38,9 +39,9 @@ export function BlogImagePlaceholder({ label }: { label: string }) {
     <div
       role="img"
       aria-label={label}
-      className="absolute inset-0 flex items-center justify-center bg-kampmax-navy text-3xl font-bold tracking-tight text-white/90"
+      className="absolute inset-0 flex items-center justify-center bg-kampmax-navy"
     >
-      K
+      <LogoIcon size={56} className="opacity-90" />
     </div>
   );
 }

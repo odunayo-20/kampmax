@@ -7,15 +7,15 @@ import {
   ShoppingBag,
   Briefcase,
   Users,
-  Sparkles,
   ArrowRight,
   ChevronRight,
   ChevronLeft,
   CheckCircle2,
   ShieldCheck,
   Building,
+  Ticket,
 } from "lucide-react";
-import { Button } from "@/components/ui";
+import { Button, Logo } from "@/components/ui";
 import { useApp } from "@/lib/app-context";
 import { cn } from "@/lib/utils";
 
@@ -119,7 +119,7 @@ const TOUR_SLIDES: TourSlide[] = [
     subtitle: "Your campus social pass",
     description:
       "Discover faculty dinners, hackathons, concerts, and sports fests. Grab digital passes and enjoy exclusive vendor discounts reserved for students.",
-    icon: Sparkles,
+    icon: Ticket,
     color: "text-emerald-600",
     accentBg: "bg-emerald-500/10",
     accentBorder: "border-emerald-500/20",
@@ -195,14 +195,7 @@ export default function OnboardingPage() {
     <div className="min-h-screen flex flex-col justify-between bg-gradient-to-b from-neutral-50 via-white to-neutral-50 text-kampmax-text">
       {/* Top Header */}
       <header className="px-6 pt-6 pb-2 flex items-center justify-between max-w-xl mx-auto w-full">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-kampmax-blue flex items-center justify-center text-white font-bold text-base shadow-sm">
-            K
-          </div>
-          <span className="font-bold text-lg tracking-tight text-kampmax-text">
-            Kampmax
-          </span>
-        </div>
+        <Logo size="sm" />
 
         <button
           onClick={handleExploreGuest}

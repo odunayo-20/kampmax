@@ -9,9 +9,9 @@ import {
   Globe,
   GraduationCap,
   MapPin,
-  Sparkles,
   Wrench,
   type LucideIcon,
+  User,
 } from "lucide-react";
 import { Avatar, Badge } from "@/components/ui";
 import { formatNaira, pluralize } from "@/lib/utils";
@@ -171,7 +171,6 @@ export function PublicFreelancerProfileContent({
           href="/freelancers"
           className="inline-flex items-center gap-1.5 text-xs font-medium text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 rounded"
         >
-          <Sparkles className="h-3.5 w-3.5" aria-hidden />
           Browse freelancers
         </Link>
       </div>
@@ -214,7 +213,7 @@ export function PublicFreelancerProfileContent({
 
       <div className="mt-6 space-y-4">
         {profile.bio && (
-          <Section icon={Sparkles} title="About">
+          <Section icon={User} title="About">
             <p className="whitespace-pre-line text-sm text-kampmax-text">
               {profile.bio}
             </p>

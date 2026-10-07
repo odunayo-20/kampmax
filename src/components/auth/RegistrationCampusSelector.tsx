@@ -11,7 +11,6 @@ import {
   School,
   AlertCircle,
   Loader2,
-  Sparkles,
   Navigation,
 } from "lucide-react";
 import type { Campus } from "@/types";
@@ -179,7 +178,6 @@ export function RegistrationCampusSelector({
                 </span>
                 {autoDetectedFromEmail && (
                   <span className="text-[10px] font-medium bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 animate-in fade-in duration-150">
-                    <Sparkles className="h-2.5 w-2.5 text-emerald-600" />
                     Auto-detected from email
                   </span>
                 )}

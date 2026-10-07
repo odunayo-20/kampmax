@@ -1,6 +1,6 @@
 "use client";
 
-import { ShieldCheck, GraduationCap, Sparkles, CheckCircle2 } from "lucide-react";
+import { ShieldCheck, GraduationCap, CheckCircle2 } from "lucide-react";
 import { CampusEmailDetectionResult } from "@/lib/campus-email";
 import { cn } from "@/lib/utils";
 
@@ -71,7 +71,6 @@ export function VerifiedStudentBadgeNotice({
           Higher buyer & seller trust
         </span>
         <span className="flex items-center gap-1">
-          <Sparkles className="h-3 w-3 text-emerald-600" />
           Campus peer badge
         </span>
       </div>

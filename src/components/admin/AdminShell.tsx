@@ -21,6 +21,7 @@ import { useAdminSession } from "@/lib/admin/admin-auth-context";
 import { canSeeSection, AdminNavItemKey } from "@/lib/admin/permissions";
 import { AdminSidebar, AdminMobileSidebar } from "./AdminSidebar";
 import { AdminHeader } from "./AdminHeader";
+import { LogoIcon } from "@/components/ui/Logo";
 import type { AdminRole } from "@/types/admin";
 
 const SEGMENT_TO_KEY: Record<string, AdminNavItemKey> = {
@@ -66,9 +67,7 @@ function sectionDenied(pathname: string, role: AdminRole): boolean {
 function SessionLoading() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-kampmax-bg">
-      <div className="flex h-10 w-10 animate-pulse items-center justify-center rounded-md bg-kampmax-navy text-sm font-black text-kampmax-gold">
-        K
-      </div>
+      <LogoIcon size={38} className="animate-pulse" />
       <p className="text-sm text-kampmax-text-secondary">Checking session…</p>
     </div>
   );

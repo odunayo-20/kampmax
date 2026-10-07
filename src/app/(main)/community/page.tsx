@@ -9,7 +9,6 @@ import {
   Calendar,
   MessageCircle,
   Megaphone,
-  Sparkles,
   HelpCircle,
   Vote,
   Bookmark,

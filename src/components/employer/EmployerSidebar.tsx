@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import type { EmployerOnboardingStatus } from "@/types/employer";
 import { EmployerStatusBadge } from "./EmployerStatusBadge";
 import { useUnreadMessageCount } from "@/hooks/use-messages";
+import { LogoIcon } from "@/components/ui/Logo";
 
 interface NavItem {
   href?: string;
@@ -68,9 +69,9 @@ export function EmployerSidebar({
       <div className="px-4 pt-5 pb-2">
         <Link
           href="/home"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-white/70 hover:text-white"
+          className="inline-flex items-center gap-2 text-sm font-medium text-white/80 hover:text-white"
         >
-          <Home className="h-4 w-4" aria-hidden />
+          <LogoIcon size={18} />
           Back to Kampmax
         </Link>
         <div className="mt-3 flex items-center gap-2">

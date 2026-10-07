@@ -2,7 +2,6 @@
 
 import { useState, useRef, useId } from "react";
 import {
-  Sparkles,
   ShoppingBag,
   Briefcase,
   Calendar,
@@ -216,7 +215,6 @@ export function PostRegistrationWelcomeModal({
           {/* Header */}
           <div className="text-center space-y-1.5">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-kampmax-blue/10 text-kampmax-blue text-xs font-bold mb-1">
-              <Sparkles className="h-3.5 w-3.5" />
               10-Second Setup
             </div>
             <h2

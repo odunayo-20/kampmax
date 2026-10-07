@@ -8,9 +8,9 @@ import {
   Gamepad2,
   Home,
   UtensilsCrossed,
-  Sparkles,
   Wrench,
   type LucideIcon,
+  Flower2,
 } from "lucide-react";
 import { Category } from "@/types";
 import { cn } from "@/lib/utils";
@@ -22,7 +22,7 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
   cat4: Gamepad2,
   cat5: Home,
   cat6: UtensilsCrossed,
-  cat7: Sparkles,
+  cat7: Flower2,
   cat8: Wrench,
 };
 

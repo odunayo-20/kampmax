@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Sparkles, X, ArrowRight, Bell, Handshake } from "lucide-react";
+import { X, ArrowRight, Bell, Handshake, Lightbulb } from "lucide-react";
 import { timeAgo } from "@/lib/utils";
 import { getFreelancerDashboardApi, getFreelancerDashboardAccessApi } from "@/services/freelancer-dashboard";
 import { useNotificationSummary } from "@/hooks/use-notifications";
@@ -59,7 +59,7 @@ export default function FreelancerDashboardPage() {
           </button>
           <div className="flex items-start gap-3 pr-8">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-primary-600 ring-1 ring-primary-200">
-              <Sparkles className="h-5 w-5" aria-hidden />
+              <Lightbulb className="h-5 w-5" aria-hidden />
             </div>
             <div>
               <h2 className="text-sm font-bold text-kampmax-text">Make the most of your profile</h2>
