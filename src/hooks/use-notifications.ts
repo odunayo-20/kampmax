@@ -9,25 +9,27 @@ import {
 } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { NotificationListFilters, notificationKeys } from "@/lib/query-keys";
+import type { NotificationCategorySummary } from "@/services/notifications";
 import {
-  getNotifications,
-  getNotificationCategorySummaries,
-  getUnreadNotificationCount,
-  markAsRead,
-  markAllAsRead,
-  deleteNotification,
-  NotificationCategorySummary,
-} from "@/services/notifications";
+  deleteNotificationLive,
+  fetchNotificationFeed,
+  markAllNotificationsReadLive,
+  markNotificationReadLive,
+  summarizeFeed,
+} from "@/services/notification-feed";
 import { Notification } from "@/types";
-import { persistNotificationRead } from "@/services/event-notification-sync";
-import { markAllServerNotificationsReadApi } from "@/services/event-tickets";
 
-/**
- * Simulates network latency for the sync, in-memory store so the UI
- * exercises the same loading states it will against the real API.
- */
-function delay(ms = 250): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+/** The bell and the notification centre poll so new notifications appear without a reload. */
+const POLL_MS = 30_000;
+const FEED_STALE_MS = 10_000;
+
+/** One shared fetch of the user's real feed; the list, badge and tabs all read from it. */
+function loadFeed(queryClient: ReturnType<typeof useQueryClient>, userId: string) {
+  return queryClient.fetchQuery({
+    queryKey: ["notifications", "feed", userId],
+    queryFn: () => fetchNotificationFeed(userId),
+    staleTime: FEED_STALE_MS,
+  });
 }
 
 export interface NotificationPagePayload {
@@ -51,6 +53,7 @@ export function useNotifications(
   options?: { pageSize?: number }
 ) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const userId = user?.id;
   const enabled = Boolean(userId);
   const pageSize = options?.pageSize ?? NOTIFICATION_PAGE_SIZE;
@@ -63,8 +66,7 @@ export function useNotifications(
       if (!userId) {
         return { items: [], nextCursor: null, hasMore: false };
       }
-      await delay();
-      const all = getNotifications(userId);
+      const all = (await loadFeed(queryClient, userId)).items;
       const visible =
         filters.category === "all"
           ? all
@@ -89,6 +91,7 @@ export function useNotifications(
  */
 export function useUnreadNotificationCount() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const userId = user?.id;
   const enabled = Boolean(userId);
 
@@ -96,10 +99,10 @@ export function useUnreadNotificationCount() {
     queryKey: notificationKeys.unreadCount(userId || "guest"),
     enabled,
     initialData: 0,
+    refetchInterval: POLL_MS,
     queryFn: async () => {
       if (!userId) return 0;
-      await delay(0);
-      return getUnreadNotificationCount(userId);
+      return (await loadFeed(queryClient, userId)).unreadCount;
     },
   });
 }
@@ -109,6 +112,7 @@ export function useUnreadNotificationCount() {
  */
 export function useNotificationCategorySummaries() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const userId = user?.id;
   const enabled = Boolean(userId);
 
@@ -118,8 +122,7 @@ export function useNotificationCategorySummaries() {
     initialData: [],
     queryFn: async () => {
       if (!userId) return [];
-      await delay(0);
-      return getNotificationCategorySummaries(userId);
+      return summarizeFeed(await loadFeed(queryClient, userId));
     },
   });
 }
@@ -243,6 +246,7 @@ function restoreNotificationCache(
 function invalidateNotificationQueries(
   queryClient: ReturnType<typeof useQueryClient>
 ): void {
+  queryClient.removeQueries({ queryKey: ["notifications", "feed"] });
   queryClient.invalidateQueries({ queryKey: notificationKeys.all });
 }
 
@@ -262,10 +266,7 @@ export function useMarkNotificationAsRead() {
 
   return useMutation({
     mutationFn: async (notificationId: string) => {
-      await delay();
-      markAsRead(notificationId);
-      // Mirrored backend notifications also persist their read state.
-      void persistNotificationRead(notificationId).catch(() => undefined);
+      await markNotificationReadLive(notificationId);
       return notificationId;
     },
     onMutate: async (notificationId: string) => {
@@ -304,11 +305,7 @@ export function useMarkAllNotificationsAsRead() {
   const userId = user?.id ?? null;
 
   return useMutation({
-    mutationFn: async () => {
-      await delay();
-      if (userId) markAllAsRead(userId);
-      void markAllServerNotificationsReadApi().catch(() => undefined);
-    },
+    mutationFn: markAllNotificationsReadLive,
     onMutate: async () => {
       if (!userId) return undefined;
       await queryClient.cancelQueries({ queryKey: notificationKeys.all });
@@ -340,10 +337,7 @@ export function useDeleteNotification() {
   const userId = user?.id ?? null;
 
   return useMutation({
-    mutationFn: async (notificationId: string) => {
-      await delay();
-      return deleteNotification(notificationId);
-    },
+    mutationFn: deleteNotificationLive,
     onMutate: async (notificationId: string) => {
       if (!userId) return undefined;
       await queryClient.cancelQueries({ queryKey: notificationKeys.all });

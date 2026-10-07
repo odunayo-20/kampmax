@@ -16,14 +16,6 @@ import {
   VENDOR_PERMISSIONS,
 } from "@/types/vendor-dashboard";
 import { VENDOR_ONBOARDING_STATUS } from "@/types/onboarding";
-import { getCurrentUser, getVendorByUserId } from "@/services/users";
-import {
-  dashboardOverview,
-  notificationsMock,
-  initialActionRequired,
-  initialStoreHealth,
-  recentOrders as mockRecentOrders,
-} from "@/data/vendor-dashboard";
 
 import { apiClient, type ApiError } from "@/lib/api-client";
 import { uploadFileDirect } from "@/services/media";
@@ -63,45 +55,15 @@ let liveVendorAccess: VendorAccess | null = null;
 
 export function getVendorAccess(): VendorAccess {
   if (liveVendorAccess) return liveVendorAccess;
-  const user = getCurrentUser();
-  const vendor = getVendorByUserId(user.id);
-
-  if (!vendor) {
-    return {
-      kind: VENDOR_DASHBOARD_GATE.NO_VENDOR,
-      status: null,
-      canUseDashboard: false,
-      message:
-        "You don't have a vendor profile yet. Complete vendor onboarding to start selling.",
-      resumeStep: null,
-    };
-  }
-
-  const base: VendorAccess = {
-    kind: VENDOR_DASHBOARD_GATE.APPROVED,
-    status: VENDOR_ONBOARDING_STATUS.APPROVED,
-    canUseDashboard: true,
-    message: null,
+  // Until the backend has answered, assume nothing: no management UI.
+  return {
+    kind: VENDOR_DASHBOARD_GATE.NO_VENDOR,
+    status: null,
+    canUseDashboard: false,
+    message:
+      "You don't have a vendor profile yet. Complete vendor onboarding to start selling.",
     resumeStep: null,
-    storeName: vendor.storeName,
-    storeSlug: vendor.slug,
   };
-
-  // The prototype's approved vendor demo. In production this mapping comes
-  // from the backend keyed to the authenticated identity. We model the other
-  // states explicitly so gating is correct across all vendor lifecycle states.
-  if (!vendor.verified) {
-    return {
-      ...base,
-      kind: VENDOR_DASHBOARD_GATE.PENDING_REVIEW,
-      status: VENDOR_ONBOARDING_STATUS.PENDING_REVIEW,
-      canUseDashboard: false,
-      message:
-        "Your vendor application is under review. You'll get full access once approved.",
-    };
-  }
-
-  return base;
 }
 
 /** Minimal shape actually returned by GET /vendors/me — see VendorPrivateProfile
@@ -203,79 +165,6 @@ export async function createVendorProfileApi(
   return { profile: null, error };
 }
 
-/**
- * Simple, presentation-only evaluation of which states map to which gate.
- * Kept separate so UI can render correct state screens; backend remains the
- * authority. Accepts an explicit status for testing pending / more-info /
- * rejected / suspended states.
- */
-export function evaluateGateStatus(status: string): VendorAccess {
-  const user = getCurrentUser();
-  const vendor = getVendorByUserId(user.id);
-  const base = {
-    storeName: vendor?.storeName,
-    storeSlug: vendor?.slug,
-  };
-
-  if (status === VENDOR_ONBOARDING_STATUS.PENDING_REVIEW) {
-    return {
-      kind: VENDOR_DASHBOARD_GATE.PENDING_REVIEW,
-      status: VENDOR_ONBOARDING_STATUS.PENDING_REVIEW,
-      canUseDashboard: false,
-      message: "Your vendor application is under review.",
-      resumeStep: null,
-      ...base,
-    };
-  }
-  if (status === VENDOR_ONBOARDING_STATUS.MORE_INFORMATION_REQUIRED) {
-    return {
-      kind: VENDOR_DASHBOARD_GATE.MORE_INFORMATION,
-      status: VENDOR_ONBOARDING_STATUS.MORE_INFORMATION_REQUIRED,
-      canUseDashboard: false,
-      message: "We need more information before we can approve your store.",
-      resumeStep: 5, // verification step
-      ...base,
-    };
-  }
-  if (status === VENDOR_ONBOARDING_STATUS.REJECTED) {
-    return {
-      kind: VENDOR_DASHBOARD_GATE.REJECTED,
-      status: VENDOR_ONBOARDING_STATUS.REJECTED,
-      canUseDashboard: false,
-      message:
-        "Your vendor application was not approved. You may re-apply after resolving the reasons.",
-      resumeStep: null,
-      ...base,
-    };
-  }
-  if (status === VENDOR_ONBOARDING_STATUS.SUSPENDED) {
-    return {
-      kind: VENDOR_DASHBOARD_GATE.SUSPENDED,
-      status: VENDOR_ONBOARDING_STATUS.SUSPENDED,
-      canUseDashboard: false,
-      message:
-        "Your store is currently suspended. Contact support for help restoring access.",
-      resumeStep: null,
-      ...base,
-    };
-  }
-  return getVendorAccess();
-}
-
-export function getVendorProfileSummary(): VendorProfileSummary | null {
-  const access = getVendorAccess();
-  const vendor = getVendorByUserId(getCurrentUser().id);
-  if (!vendor || access.kind !== VENDOR_DASHBOARD_GATE.APPROVED) return null;
-  return {
-    userId: getCurrentUser().id,
-    vendorId: vendor.id,
-    storeName: vendor.storeName,
-    storeSlug: vendor.slug,
-    status: VENDOR_ONBOARDING_STATUS.APPROVED,
-    verified: vendor.verified,
-  };
-}
-
 // ── Permissions (presentation only) ──────────────────────────
 
 export function getVendorPermissions(): VendorPermissions {
@@ -293,52 +182,6 @@ export function getVendorPermissions(): VendorPermissions {
     };
   }
   return { ...VENDOR_PERMISSIONS };
-}
-
-// ── Overview / metrics ───────────────────────────────────────
-
-export function getDashboardOverview(): DashboardOverview {
-  // Financial metrics are NOT shown here unless the backend authorizes them.
-  // DashboardOverview only carries non-financial, backend-provided metrics.
-  return dashboardOverview;
-}
-
-export function getRecentOrders(): VendorRecentOrder[] {
-  return mockRecentOrders;
-}
-
-// ── Notifications ────────────────────────────────────────────
-
-export function getNotifications(): VendorNotifications {
-  return notificationsMock.notifications;
-}
-
-export function markNotificationsRead(all: boolean, id?: string): void {
-  if (all) {
-    notificationsMock.notifications.items.forEach((n) => (n.read = true));
-    notificationsMock.notifications.unreadCount = 0;
-  } else if (id) {
-    const item = notificationsMock.notifications.items.find((n) => n.id === id);
-    if (item && !item.read) {
-      item.read = true;
-      notificationsMock.notifications.unreadCount = Math.max(
-        0,
-        notificationsMock.notifications.unreadCount - 1
-      );
-    }
-  }
-}
-
-// ── Action required (backend-supplied only) ──────────────────
-
-export function getActionRequired(): ActionRequiredItem[] {
-  return initialActionRequired;
-}
-
-// ── Store health (backend-authoritative) ─────────────────────
-
-export function getStoreHealth(): StoreHealth {
-  return initialStoreHealth;
 }
 
 // ── Store management (live: GET/PATCH /vendors/me/store) ─────

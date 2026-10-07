@@ -5,7 +5,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { subscribeToNotificationChanges } from "@/data/notifications";
 import { adminKeys, notificationKeys, supportKeys } from "@/lib/query-keys";
-import { syncEventNotifications } from "@/services/event-notification-sync";
 
 /**
  * Bridges the authoritative in-memory notification store to the TanStack
@@ -26,26 +25,6 @@ export function NotificationSyncBridge() {
       queryClient.invalidateQueries({ queryKey: supportKeys.all });
     });
   }, [queryClient]);
-
-  // Mirror real event notifications (tickets, reminders, organizer decisions)
-  // from the backend into the store: once on sign-in, then every minute.
-  useEffect(() => {
-    if (!userId) return;
-    let cancelled = false;
-    const pull = () => {
-      syncEventNotifications(userId).catch(() => {
-        // Offline or signed out: the feed simply keeps what it has.
-      });
-    };
-    pull();
-    const timer = window.setInterval(() => {
-      if (!cancelled && document.visibilityState === "visible") pull();
-    }, 60_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [userId]);
 
   // Scrub the previous user's notification cache the moment the session
   // changes so data can never leak across accounts.

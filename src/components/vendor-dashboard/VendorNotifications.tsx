@@ -4,29 +4,32 @@ import { useState } from "react";
 import Link from "next/link";
 import { Bell, Check, BellRing } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getNotifications, markNotificationsRead } from "@/services/vendor-dashboard";
-import type { VendorNotification } from "@/types/vendor-dashboard";
+import {
+  useMarkAllNotificationsAsRead,
+  useMarkNotificationAsRead,
+  useNotifications,
+  useUnreadNotificationCount,
+} from "@/hooks/use-notifications";
+import type { Notification, NotificationCategory } from "@/types";
 
-const KIND_DOT: Record<VendorNotification["kind"], string> = {
-  new_order: "bg-success-500",
-  order_update: "bg-info-600",
-  product_issue: "bg-error-600",
-  review_received: "bg-primary-600",
-  store_warning: "bg-warning-600",
-  verification_update: "bg-success-600",
-  platform_announcement: "bg-neutral-400",
-  payout_update: "bg-kampmax-blue",
+const CATEGORY_DOT: Partial<Record<NotificationCategory, string>> = {
+  orders: "bg-success-500",
+  payments: "bg-kampmax-blue",
+  marketplace: "bg-primary-600",
+  account: "bg-warning-600",
 };
 
+// The same real feed as the main bell: what the store sees here is what the
+// notifications page shows.
 export function VendorNotifications() {
   const [open, setOpen] = useState(false);
-  const [data, setData] = useState(() => getNotifications());
+  const list = useNotifications({ category: "all" }, { pageSize: 8 });
+  const unreadQuery = useUnreadNotificationCount();
+  const markRead = useMarkNotificationAsRead();
+  const markAll = useMarkAllNotificationsAsRead();
 
-  function refresh() {
-    setData(getNotifications());
-  }
-
-  const unread = data.unreadCount;
+  const items = list.data?.pages[0]?.items ?? [];
+  const unread = unreadQuery.data ?? 0;
 
   return (
     <div className="relative">
@@ -59,10 +62,7 @@ export function VendorNotifications() {
               {unread > 0 && (
                 <button
                   type="button"
-                  onClick={() => {
-                    markNotificationsRead(true);
-                    refresh();
-                  }}
+                  onClick={() => markAll.mutate()}
                   className="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:underline"
                 >
                   <Check className="h-3.5 w-3.5" aria-hidden /> Mark all read
@@ -70,22 +70,39 @@ export function VendorNotifications() {
               )}
             </div>
             <div className="max-h-96 overflow-y-auto">
-              {data.items.length === 0 ? (
+              {list.isPending ? (
+                <p className="px-4 py-8 text-center text-sm text-kampmax-text-secondary">Loading…</p>
+              ) : list.isError ? (
+                <p role="alert" className="px-4 py-8 text-center text-sm text-kampmax-text-secondary">
+                  Couldn&apos;t load notifications.{" "}
+                  <button type="button" onClick={() => void list.refetch()} className="font-medium text-primary-600 hover:underline">
+                    Try again
+                  </button>
+                </p>
+              ) : items.length === 0 ? (
                 <div className="px-4 py-8 text-center">
                   <BellRing className="mx-auto mb-2 h-6 w-6 text-neutral-300" aria-hidden />
-                  <p className="text-sm text-kampmax-text-secondary">You're all caught up.</p>
+                  <p className="text-sm text-kampmax-text-secondary">You&apos;re all caught up.</p>
                 </div>
               ) : (
-                data.items.map((n) => (
-                  <NotificationRow key={n.id} n={n} onConsume={() => {
-                    if (!n.read) {
-                      markNotificationsRead(false, n.id);
-                      refresh();
-                    }
-                  }} />
+                items.map((n) => (
+                  <NotificationRow
+                    key={n.id}
+                    n={n}
+                    onConsume={() => {
+                      if (!n.read) markRead.mutate(n.id);
+                    }}
+                  />
                 ))
               )}
             </div>
+            <Link
+              href="/vendor/notifications"
+              onClick={() => setOpen(false)}
+              className="block border-t border-kampmax-border px-4 py-2.5 text-center text-xs font-semibold text-primary-600 hover:bg-neutral-50"
+            >
+              See all
+            </Link>
           </div>
         </>
       )}
@@ -93,10 +110,10 @@ export function VendorNotifications() {
   );
 }
 
-function NotificationRow({ n, onConsume }: { n: VendorNotification; onConsume: () => void }) {
+function NotificationRow({ n, onConsume }: { n: Notification; onConsume: () => void }) {
   const content = (
     <>
-      <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", KIND_DOT[n.kind])} aria-hidden />
+      <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", CATEGORY_DOT[n.category] ?? "bg-neutral-400")} aria-hidden />
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5">
           <span className={cn("truncate text-sm font-medium text-kampmax-text", !n.read && "font-bold")}>
@@ -104,7 +121,7 @@ function NotificationRow({ n, onConsume }: { n: VendorNotification; onConsume: (
           </span>
           {!n.read && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary-600" aria-label="Unread" />}
         </span>
-        <span className="block text-xs text-kampmax-text-secondary">{n.body}</span>
+        <span className="block text-xs text-kampmax-text-secondary">{n.message}</span>
         <span className="block text-[10px] text-kampmax-text-muted">{formatRelative(n.createdAt)}</span>
       </span>
     </>
@@ -115,9 +132,9 @@ function NotificationRow({ n, onConsume }: { n: VendorNotification; onConsume: (
     n.read ? "bg-white" : "bg-primary-50/50"
   );
 
-  if (n.href) {
+  if (n.actionUrl) {
     return (
-      <Link href={n.href} onClick={onConsume} className={cls}>
+      <Link href={n.actionUrl} onClick={onConsume} className={cls}>
         {content}
       </Link>
     );

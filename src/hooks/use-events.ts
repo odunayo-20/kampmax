@@ -35,7 +35,6 @@ import {
   updateTierApi,
   type ListEventsParams,
 } from "@/services/event-tickets";
-import { syncEventNotifications } from "@/services/event-notification-sync";
 import type {
   ApplyOrganizerInput,
   CreateEventInput,
@@ -91,18 +90,15 @@ export function useMyTicket(id: string) {
 /** Buys a ticket. Refreshes seat counts, "my tickets" and (for paid tiers) the wallet. */
 export function usePurchaseTicket(eventId: string) {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
-  const userId = user?.id;
   return useMutation({
     mutationFn: (tierId: string) => purchaseTicketApi(eventId, tierId),
     onSuccess: () => {
       // The backend writes the confirmation notifications a moment after the
-      // purchase commits; pull them into the feed shortly after.
-      if (userId) {
-        window.setTimeout(() => {
-          syncEventNotifications(userId).catch(() => undefined);
-        }, 1500);
-      }
+      // purchase commits; refresh the feed shortly after.
+      window.setTimeout(() => {
+        queryClient.removeQueries({ queryKey: ["notifications", "feed"] });
+        queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      }, 1500);
       queryClient.invalidateQueries({ queryKey: eventKeys.all });
       queryClient.invalidateQueries({ queryKey: ticketKeys.all });
       queryClient.invalidateQueries({ queryKey: ["wallet"] });

@@ -1,29 +1,20 @@
 "use client";
 
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import { Wallet, ArrowUpRight, Clock } from "lucide-react";
 import { formatNaira } from "@/lib/utils";
-import {
-  getFinancialOverview,
-  getPayoutEligibility,
-} from "@/services/freelancer-financials";
+import { fetchMyWallet } from "@/services/wallet";
 
-// Dashboard widget (spec §7 integration). Backend-computed balance only — the
-// widget renders what the service returns and never derives money.
-
+// Dashboard widget: the real wallet balance, or nothing when it can't be read.
 export function FreelancerFinancialSummary() {
-  const [balance, cards, eligibility] = (() => {
-    try {
-      const overview = getFinancialOverview();
-      return [overview.balance, overview.cards, getPayoutEligibility()];
-    } catch {
-      return [null, [], null];
-    }
-  })();
+  const { data: wallet, isError } = useQuery({
+    queryKey: ["wallet", "freelancer-summary"],
+    queryFn: fetchMyWallet,
+    retry: false,
+  });
 
-  if (!balance) return null;
-
-  const totalEarnedCard = cards.find((c) => c.key === "totalEarned");
+  if (isError || !wallet) return null;
 
   return (
     <Link
@@ -40,35 +31,15 @@ export function FreelancerFinancialSummary() {
         <ArrowUpRight className="h-4 w-4 text-kampmax-text-secondary group-hover:text-primary-600" aria-hidden />
       </div>
 
-      <p className="mt-4 text-2xl font-bold text-kampmax-text">
-        {formatNaira(balance.available)}
-      </p>
+      <p className="mt-4 text-2xl font-bold text-kampmax-text">{formatNaira(wallet.balance)}</p>
       <p className="text-xs text-kampmax-text-secondary">Available balance</p>
 
-      <div className="mt-3 space-y-1.5 text-sm">
-        <p className="flex items-center justify-between text-kampmax-text-secondary">
-          <span className="flex items-center gap-1.5">
-            <Clock className="h-3.5 w-3.5" aria-hidden /> Pending
-          </span>
-          <span className="font-medium text-kampmax-text">{formatNaira(balance.pending)}</span>
-        </p>
-        <p className="flex items-center justify-between text-kampmax-text-secondary">
-          <span>Total earned</span>
-          <span className="font-medium text-kampmax-text">
-            {formatNaira(totalEarnedCard?.value ?? 0)}
-          </span>
-        </p>
-      </div>
-
-      {eligibility && !eligibility.canRequest ? (
-        <p className="mt-3 rounded-md bg-kampmax-muted px-2.5 py-1.5 text-xs text-kampmax-text-secondary">
-          {eligibility.reason}
-        </p>
-      ) : (
-        <p className="mt-3 rounded-md bg-success-50 px-2.5 py-1.5 text-xs font-medium text-kampmax-success">
-          You can withdraw funds now
-        </p>
-      )}
+      <p className="mt-3 flex items-center justify-between text-sm text-kampmax-text-secondary">
+        <span className="flex items-center gap-1.5">
+          <Clock className="h-3.5 w-3.5" aria-hidden /> Pending
+        </span>
+        <span className="font-medium text-kampmax-text">{formatNaira(wallet.pendingAmount)}</span>
+      </p>
     </Link>
   );
 }
