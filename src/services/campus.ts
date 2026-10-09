@@ -70,6 +70,9 @@ export function mapBackendCampusToFrontend(
   const location = locationParts.length > 0 ? locationParts.join(", ") : (raw.country || "");
   const abbreviation = raw.slug ? raw.slug.toUpperCase() : raw.name?.slice(0, 6).toUpperCase() || "";
 
+  const lat = raw.latitude == null ? NaN : Number(raw.latitude);
+  const lng = raw.longitude == null ? NaN : Number(raw.longitude);
+
   return {
     id: raw.id || raw.slug || "",
     name: raw.name || "",
@@ -78,8 +81,8 @@ export function mapBackendCampusToFrontend(
     departments: [],
     imageUrl: raw.coverImage || raw.logo || undefined,
     coordinates:
-      typeof raw.latitude === "number" && typeof raw.longitude === "number"
-        ? { latitude: raw.latitude, longitude: raw.longitude }
+      Number.isFinite(lat) && Number.isFinite(lng)
+        ? { latitude: lat, longitude: lng }
         : undefined,
   };
 }

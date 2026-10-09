@@ -100,9 +100,9 @@ interface NigerianPhoneInputProps {
 export function NigerianPhoneInput({
   value,
   onChange,
-  label = "Phone number (optional)",
+  label = "Phone number",
   error,
-  required = false,
+  required = true,
   className,
 }: NigerianPhoneInputProps) {
   const id = useId();

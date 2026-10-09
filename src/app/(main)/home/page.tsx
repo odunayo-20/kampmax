@@ -77,7 +77,7 @@ export default function HomePage() {
       <section className="space-y-3.5">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3.5 min-w-0">
-            <Logo size="lg" href="/home" className="shrink-0" />
+            
             <div className="h-8 w-px bg-neutral-200 hidden sm:block shrink-0" />
             <div className="space-y-0.5 min-w-0">
               <h1 className="text-base sm:text-lg font-bold text-neutral-900 leading-tight">

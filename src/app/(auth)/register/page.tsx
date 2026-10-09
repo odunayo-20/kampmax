@@ -15,14 +15,11 @@ import {
   PasswordStrengthMeter,
   NigerianPhoneInput,
   CampusSafetyAgreement,
-  ResidenceHallSelector,
   ReferralCodeInput,
   VerifiedStudentBadgeNotice,
-  AcademicInfoStep,
   PostRegistrationWelcomeModal,
   detectCampusFromEmail,
 } from "@/components/auth";
-import { updateMyProfile } from "@/services/profile";
 import { cn } from "@/lib/utils";
 import { Campus, UserRole } from "@/types";
 import { KAMPMAX_ROLE_PATHS, type KampmaxRoleId } from "@/components/layout/footer/role-paths";
@@ -47,6 +44,10 @@ const ROLE_CHOICES: RoleChoice[] = [
 function choiceById(id: KampmaxRoleId): RoleChoice {
   return ROLE_CHOICES.find((c) => c.id === id) ?? ROLE_CHOICES[0];
 }
+
+/** Mainstream mailbox providers plus Nigerian institutional (.edu.ng) emails. Mirrors the backend RegisterDto. */
+const ALLOWED_EMAIL_DOMAIN =
+  /@(?:(?:[a-z0-9-]+\.)*edu\.ng|gmail\.com|googlemail\.com|yahoo\.(?:com|co\.uk|co\.in|fr)|ymail\.com|outlook\.com|hotmail\.com|live\.com|msn\.com|icloud\.com|me\.com|proton\.me|protonmail\.com)$/i;
 
 /**
  * Validates the password against the backend's RegisterDto policy:
@@ -116,7 +117,6 @@ function RegisterForm() {
       setChosenCampus(campus);
       setSelectedCampus(campus);
       setCampusAutoDetected(false);
-      setResidenceHall("");
       setErrors((prev) => {
         if (!prev.campus) return prev;
         const copy = { ...prev };
@@ -145,12 +145,7 @@ function RegisterForm() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [residenceHall, setResidenceHall] = useState("");
   const [referralCode, setReferralCode] = useState("");
-  const [faculty, setFaculty] = useState("");
-  const [department, setDepartment] = useState("");
-  const [level, setLevel] = useState("");
-  const [matricNumber, setMatricNumber] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
 
@@ -199,9 +194,13 @@ function RegisterForm() {
       newErrors.email = "Email is required";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       newErrors.email = "Enter a valid email address";
+    } else if (!ALLOWED_EMAIL_DOMAIN.test(email.trim())) {
+      newErrors.email = "Use a standard email (e.g. Gmail, Yahoo, Outlook) or your school email";
     }
 
-    if (phone.trim()) {
+    if (!phone.trim()) {
+      newErrors.phone = "Phone number is required";
+    } else {
       // Validate Nigerian E.164 phone: e.g. +2348012345678 (14 chars)
       const digits = phone.replace(/\D/g, "");
       if (digits.length < 10 || digits.length > 14) {
@@ -253,36 +252,21 @@ function RegisterForm() {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         password,
-        // Only send phone if provided
-        ...(phone.trim() ? { phone: phone.trim() } : {}),
+        phone: phone.trim(),
       });
 
       if (result.success) {
         // Sync selected campus across the app
         setSelectedCampus(chosenCampus);
 
-        // Store student residence hall, referral preferences, queued verified student badge, and academic info in localStorage
+        // Store referral preferences and queued verified student badge in localStorage
         if (typeof window !== "undefined") {
-          if (residenceHall.trim()) {
-            localStorage.setItem("kampmax_user_residence", residenceHall.trim());
-          }
           if (referralCode.trim()) {
             localStorage.setItem("kampmax_referral_code", referralCode.trim());
           }
           if (emailDetection.badgeQueued) {
             localStorage.setItem("kampmax_verified_student_queued", "true");
             localStorage.setItem("kampmax_institutional_email", email.trim().toLowerCase());
-          }
-          if (faculty || department || level || matricNumber) {
-            localStorage.setItem(
-              "kampmax_academic_info",
-              JSON.stringify({
-                faculty: faculty.trim(),
-                department: department.trim(),
-                level: level.trim(),
-                matricNumber: matricNumber.trim(),
-              })
-            );
           }
         }
 
@@ -291,20 +275,6 @@ function RegisterForm() {
           await joinCampus(chosenCampus.id);
         } catch {
           // If offline or mock backend, local selection remains persisted
-        }
-
-        // Persist academic info directly to real backend profile
-        if (faculty.trim() || department.trim() || level.trim() || matricNumber.trim()) {
-          try {
-            await updateMyProfile({
-              ...(faculty.trim() ? { faculty: faculty.trim() } : {}),
-              ...(department.trim() ? { department: department.trim() } : {}),
-              ...(level.trim() ? { level: level.trim() } : {}),
-              ...(matricNumber.trim() ? { matricNumber: matricNumber.trim() } : {}),
-            });
-          } catch {
-            // Non-blocking fallback
-          }
         }
 
         // Trigger lightweight 10-second post-registration welcome & feed customizer
@@ -465,27 +435,6 @@ function RegisterForm() {
           autoDetectedFromEmail={campusAutoDetected}
         />
 
-        {/* Hall of Residence / Delivery Hub (Optional) */}
-        <ResidenceHallSelector
-          campusId={chosenCampus?.id}
-          campusName={chosenCampus?.name}
-          value={residenceHall}
-          onChange={(val) => setResidenceHall(val)}
-        />
-
-        {/* Academic Details (Optional) — Faculty, Department, Level, Matric */}
-        <AcademicInfoStep
-          selectedCampus={chosenCampus}
-          faculty={faculty}
-          department={department}
-          level={level}
-          matricNumber={matricNumber}
-          onChangeFaculty={setFaculty}
-          onChangeDepartment={setDepartment}
-          onChangeLevel={setLevel}
-          onChangeMatricNumber={setMatricNumber}
-        />
-
         <div className="grid grid-cols-2 gap-3">
           <Input
             label="First name"
@@ -522,7 +471,7 @@ function RegisterForm() {
         <Input
           label="Email address"
           type="email"
-          placeholder="you@school.edu.ng"
+          placeholder="you@gmail.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           error={errors.email}

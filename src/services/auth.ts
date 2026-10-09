@@ -187,7 +187,7 @@ function extractUserFromMeResponse(raw: unknown): AuthUser | null {
  * Register a new user.
  * POST /api/v1/auth/register
  * 
- * The backend RegisterDto accepts: email, username, firstName, lastName, password, phone (optional).
+ * The backend RegisterDto accepts: email, username, firstName, lastName, password, phone (required, unique).
  * DO NOT send: campusId, role, department, level — the backend uses its own RBAC system
  * and will reject requests with unsupported properties (whitelist: true, forbidNonWhitelisted: true).
  */

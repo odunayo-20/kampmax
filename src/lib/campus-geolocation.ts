@@ -97,6 +97,26 @@ export function findNearestCampus(
 }
 
 /**
+ * Backend campuses are only as good as the data admins entered; when one has no
+ * coordinates, borrow them from the built-in directory (matched by id,
+ * abbreviation or name) so GPS detection still works.
+ */
+function withFallbackCoordinates(campusList: Campus[]): Campus[] {
+  const norm = (s?: string) => (s ?? "").trim().toLowerCase();
+  return campusList.map((c) => {
+    if (c.coordinates) return c;
+    const known = defaultCampuses.find(
+      (d) =>
+        d.coordinates &&
+        (norm(d.id) === norm(c.id) ||
+          norm(d.abbreviation) === norm(c.abbreviation) ||
+          norm(d.name) === norm(c.name))
+    );
+    return known ? { ...c, coordinates: known.coordinates } : c;
+  });
+}
+
+/**
  * One-click browser geolocation detector that identifies if the student is currently
  * at or near a supported campus.
  */
@@ -115,7 +135,11 @@ export async function detectCampusFromGeolocation(
       longitude: position.longitude,
     };
 
-    const nearest = findNearestCampus(coords, campusList, maxProximityThresholdKm);
+    const nearest = findNearestCampus(
+      coords,
+      withFallbackCoordinates(campusList),
+      maxProximityThresholdKm
+    );
 
     if (!nearest) {
       return {
