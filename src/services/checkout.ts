@@ -76,7 +76,8 @@ interface CheckoutFeatureFlags {
 
 const FEATURE_FLAGS: CheckoutFeatureFlags = {
   couponValidationEnabled: true,
-  kampmaxCoinEnabled: true,
+  // Loyalty points are earned, never spent on payment.
+  kampmaxCoinEnabled: false,
   loyaltyEnabled: true,
   paystackEnabled: true,
 };

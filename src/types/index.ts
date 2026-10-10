@@ -307,6 +307,8 @@ export interface Order {
   backendId?: string;
   buyerId: string;
   vendorId: string;
+  /** Store name, supplied by the API. */
+  vendorName?: string;
   items: CartItem[];
   subtotal: number;
   platformFee: number;

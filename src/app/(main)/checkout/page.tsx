@@ -15,7 +15,6 @@ import {
   SavedAddresses,
   VendorCheckoutGroup,
   CouponSection,
-  KampmaxCoinSection,
   LoyaltySection,
   PaymentMethod,
   OrderSummary,
@@ -58,8 +57,6 @@ export default function CheckoutPage() {
     coupon,
     applyCouponCode,
     removeCoupon,
-    coin,
-    toggleUseCoin,
     loyalty,
     paymentMethod,
     setPayment,
@@ -195,11 +192,6 @@ export default function CheckoutPage() {
               onApply={applyCouponCode}
               onRemove={removeCoupon}
               enabled={flags.couponValidationEnabled}
-            />
-
-            <KampmaxCoinSection
-              coin={coin}
-              onToggle={toggleUseCoin}
             />
 
             <LoyaltySection loyalty={loyalty} />

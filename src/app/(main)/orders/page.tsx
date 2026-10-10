@@ -107,7 +107,7 @@ export default function OrdersPage() {
     orders.forEach((o) => {
       if (!cache[o.vendorId]) {
         const v = getVendorById(o.vendorId);
-        cache[o.vendorId] = v?.storeName || "Unknown";
+        cache[o.vendorId] = o.vendorName || v?.storeName || "Unknown store";
       }
     });
     return cache;

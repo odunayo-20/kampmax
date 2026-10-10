@@ -63,13 +63,22 @@ export default function VendorOrderDetailPage({ params }: { params: Promise<{ id
 
   const order = orderQuery.data;
   if (orderQuery.isError || !order) {
+    // Only a real 404 means "not yours / doesn't exist"; anything else is a failure to load.
+    const status = (orderQuery.error as { status?: number } | null)?.status;
+    const missing = status === 404 || (!orderQuery.isError && !order);
+    const reason =
+      (orderQuery.error as { message?: string } | null)?.message ?? "";
     return (
       <div className="space-y-4">
         <BackButton onClick={() => router.back()} />
         <div className="rounded-xl border border-kampmax-border bg-white p-10 text-center">
-          <p className="text-sm font-medium text-kampmax-text">Order not found</p>
+          <p className="text-sm font-medium text-kampmax-text">
+            {missing ? "Order not found" : "Couldn't load this order"}
+          </p>
           <p className="mt-1 text-xs text-kampmax-text-secondary">
-            It may belong to another store or no longer exist.
+            {missing
+              ? "It may belong to another store or no longer exist."
+              : `Something went wrong while loading it${reason ? `: ${reason}` : "."} Try again, or sign in again if the problem continues.`}
           </p>
           <button
             type="button"

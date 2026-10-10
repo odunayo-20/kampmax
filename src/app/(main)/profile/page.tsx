@@ -181,23 +181,27 @@ export default function ProfilePage() {
       </div>
 
       {/* Loyalty */}
-      {loyalty && (
-        <div className="bg-white rounded-xl border border-kampmax-border p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-kampmax-blue/10 text-kampmax-blue flex items-center justify-center">
-            <Star className="h-5 w-5" />
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-kampmax-text">
-              {loyalty.pointsBalance.toLocaleString()} Kampmax points
-            </p>
-            <p className="text-xs text-kampmax-text-secondary">
-              {loyalty.nairaPerPoint > 0
-                ? `Worth ${formatNaira(loyalty.pointsBalance * loyalty.nairaPerPoint)} on your next order`
-                : "Earn points on every order"}
-            </p>
-          </div>
+      <div className="bg-white rounded-xl border border-kampmax-border p-4 flex items-center gap-3">
+        <div className="w-10 h-10 rounded-lg bg-kampmax-blue/10 text-kampmax-blue flex items-center justify-center">
+          <Star className="h-5 w-5" />
         </div>
-      )}
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-kampmax-text">
+            {loyalty
+              ? `${loyalty.pointsBalance.toLocaleString()} Kampmax points`
+              : loyaltyQuery.isError
+                ? "Kampmax points"
+                : "Loading points..."}
+          </p>
+          <p className="text-xs text-kampmax-text-secondary">
+            {loyaltyQuery.isError
+              ? "We couldn't load your points right now."
+              : loyalty && loyalty.lifetimeEarned > 0
+                ? `${loyalty.lifetimeEarned.toLocaleString()} earned in total · earned on delivered orders`
+                : "Earn points on every delivered order"}
+          </p>
+        </div>
+      </div>
 
       {/* Vendor Card */}
       {vendor && showVendorCard && (

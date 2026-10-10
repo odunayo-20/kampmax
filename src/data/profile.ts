@@ -29,7 +29,7 @@ export const faqItems = [
     id: "faq5",
     question: "How are loyalty points calculated?",
     answer:
-      "You earn 5% of your order value as loyalty points (1 point = ₦1). Points can be redeemed at checkout for up to 30% of your order total. Your tier increases with more lifetime points.",
+      "You earn 5% of your order value as loyalty points (1 point = ₦1). Points are yours to keep and can't be used to pay for orders. Your tier increases with more lifetime points.",
   },
   {
     id: "faq6",

@@ -236,6 +236,7 @@ export function mapBackendOrderToFrontend(
     backendId: raw.id,
     buyerId: "", // authorized user
     vendorId: raw.vendorId,
+    vendorName: raw.vendorName || undefined,
     items: items,
     subtotal,
     platformFee,
