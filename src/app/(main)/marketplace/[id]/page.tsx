@@ -234,7 +234,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   function serverVariations(): Array<{ name: string; option: string }> | undefined {
     const picks = variantGroups.flatMap((group) => {
       const option = group.options.find((o) => o.id === selectedVariants[group.id]);
-      return option ? [{ name: group.name, option: option.id }] : [];
+      return option ? [{ name: group.name, option: option.value || option.label || option.id }] : [];
     });
     return picks.length ? picks : undefined;
   }

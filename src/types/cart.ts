@@ -52,6 +52,8 @@ export interface CartLineItem {
   variantLabel?: string;
   /** Selected variant values keyed by variant group id. */
   selectedVariants?: Record<string, string>;
+  /** Selected variation pair { name, option } compatible with backend. */
+  selectedVariation?: { name: string; option: string } | null;
   /** Sent to "Save for later" rather than the active cart. */
   savedForLater?: boolean;
   /** Client-relevant availability / stock constraints. */

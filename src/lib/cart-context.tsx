@@ -140,6 +140,7 @@ function readStoredCart(): CartItem[] | null {
         savedForLater: entry.savedForLater ?? false,
         variantLabel: entry.variantLabel,
         selectedVariants: entry.selectedVariants,
+        selectedVariation: entry.selectedVariation,
         unitPrice: typeof entry?.unitPrice === "number"
           ? entry.unitPrice
           : product.price,
@@ -164,6 +165,7 @@ function writeStoredCart(items: CartItem[]) {
       savedForLater: i.savedForLater ?? false,
       variantLabel: (i as CartLineItem).variantLabel,
       selectedVariants: (i as CartLineItem).selectedVariants,
+      selectedVariation: (i as CartLineItem).selectedVariation,
       unitPrice: (i as CartLineItem).unitPrice ?? i.product.price,
       availabilityStatus: (i as CartLineItem).availabilityStatus,
       maxPurchaseQuantity: (i as CartLineItem).maxPurchaseQuantity,
@@ -222,12 +224,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const saved = items.filter((i) => i.savedForLater);
 
       if (guest.length > 0) {
-        // Send guest items to backend cart
+        // Send guest items to backend cart, preserving chosen varieties
         let failed = 0;
         for (const g of guest) {
+          const selectedVariations = g.selectedVariants
+            ? Object.entries(g.selectedVariants).map(([name, option]) => ({ name, option }))
+            : g.selectedVariation
+            ? [{ name: g.selectedVariation.name, option: g.selectedVariation.option }]
+            : undefined;
+
           const res = await addToServerCart({
             productId: g.productId,
             quantity: g.quantity,
+            selectedVariations,
           });
           if (res.error) failed += 1;
         }
@@ -328,10 +337,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
       // Send to backend if authenticated
       if (status === "authenticated") {
+        const resolvedVariations =
+          options?.serverVariations ??
+          (options?.selectedVariants
+            ? Object.entries(options.selectedVariants).map(([name, option]) => ({ name, option }))
+            : undefined);
+
         addToServerCart({
           productId: product.id,
           quantity,
-          selectedVariations: options?.serverVariations,
+          selectedVariations: resolvedVariations,
         }).then(async (res) => {
           if (res.error) {
             setFeedback({

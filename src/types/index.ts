@@ -278,9 +278,14 @@ export interface Product {
 // ============================================================
 
 export interface CartItem {
+  id?: string;
   product: Product;
   quantity: number;
   savedForLater?: boolean;
+  variantLabel?: string;
+  selectedVariants?: Record<string, string>;
+  selectedVariation?: { name: string; option: string } | null;
+  unitPrice?: number;
 }
 
 // ============================================================
@@ -291,6 +296,9 @@ export interface OrderItem {
   product: Product;
   quantity: number;
   unitPrice: number;
+  variantLabel?: string;
+  selectedVariants?: Record<string, string>;
+  selectedVariation?: { name: string; option: string } | null;
 }
 
 export interface Order {

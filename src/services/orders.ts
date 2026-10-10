@@ -180,9 +180,22 @@ export function mapBackendOrderToFrontend(
       createdAt: typeof raw.createdAt === "string" ? raw.createdAt : new Date(raw.createdAt).toISOString(),
     };
 
+    const selectedVariation = item.selectedVariation;
+    const variantLabel = selectedVariation
+      ? `${selectedVariation.name}: ${selectedVariation.option}`
+      : undefined;
+    const selectedVariants = selectedVariation
+      ? { [selectedVariation.name]: selectedVariation.option }
+      : undefined;
+
     return {
+      id: item.id,
       product,
       quantity: Number(item.quantity || 1),
+      variantLabel,
+      selectedVariants,
+      selectedVariation,
+      unitPrice: Number(item.unitPrice || product.price),
     };
   });
 

@@ -176,6 +176,7 @@ export default function CheckoutPage() {
                 g.selectedDelivery ? [g.selectedDelivery] : []
               )}
               vendorNames={vendorNames}
+              vendorGroups={session.vendorGroups}
             />
 
             {/* ── Multi-vendor items & delivery ── */}

@@ -12,6 +12,7 @@ interface OrderActionsProps {
   onReview: () => void;
   onContactVendor: () => void;
   onTrack?: () => void;
+  isReviewed?: boolean;
 }
 
 export function OrderActions({
@@ -21,11 +22,13 @@ export function OrderActions({
   onReview,
   onContactVendor,
   onTrack,
+  isReviewed = false,
 }: OrderActionsProps) {
   const isActive =
     order.status !== "delivered" && order.status !== "cancelled";
   const canCancel = order.status === "placed" || order.status === "confirmed";
   const isDelivered = order.status === "delivered";
+  const singleProduct = order.items.length === 1 ? order.items[0].product : null;
 
   return (
     <div className="flex flex-wrap gap-2">
@@ -73,14 +76,28 @@ export function OrderActions({
       {!isActive && (
         <button
           onClick={onReorder}
+          title="Add items back to cart and proceed to checkout"
+          className={cn(
+            "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors",
+            "border-kampmax-navy bg-kampmax-navy text-white hover:bg-kampmax-navy/90"
+          )}
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          Reorder (Checkout)
+        </button>
+      )}
+
+      {/* Direct link to product details if single item */}
+      {!isActive && singleProduct && (
+        <Link
+          href={`/marketplace/${singleProduct.id}`}
           className={cn(
             "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors",
             "border-kampmax-border bg-white text-kampmax-text hover:bg-kampmax-muted"
           )}
         >
-          <RotateCcw className="w-3.5 h-3.5" />
-          Reorder
-        </button>
+          View Product
+        </Link>
       )}
 
       {/* Review — delivered only */}
@@ -89,11 +106,13 @@ export function OrderActions({
           onClick={onReview}
           className={cn(
             "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors",
-            "border-kampmax-gold/30 bg-white text-kampmax-gold hover:bg-kampmax-gold/10"
+            isReviewed
+              ? "border-green-300 bg-green-50 text-green-700 hover:bg-green-100"
+              : "border-kampmax-gold/30 bg-white text-kampmax-gold hover:bg-kampmax-gold/10"
           )}
         >
-          <Star className="w-3.5 h-3.5" />
-          Review
+          <Star className={cn("w-3.5 h-3.5", isReviewed && "fill-current")} />
+          {isReviewed ? "Reviewed" : "Review"}
         </button>
       )}
     </div>

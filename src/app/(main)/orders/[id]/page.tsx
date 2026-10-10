@@ -26,6 +26,7 @@ import { OrderTimeline } from "@/components/orders/OrderTimeline";
 import { OrderItems } from "@/components/orders/OrderItems";
 import { OrderFees } from "@/components/orders/OrderFees";
 import { OrderActions } from "@/components/orders/OrderActions";
+import { OrderReviewModal } from "@/components/orders/OrderReviewModal";
 import { CampusPickupPinCard } from "@/components/orders/CampusPickupPinCard";
 import { OrderProgressStepper } from "@/components/orders/OrderProgressStepper";
 import { OpenDisputeModal } from "@/components/orders/OpenDisputeModal";
@@ -40,6 +41,8 @@ import { createReview } from "@/services/reviews";
 import { getVendorById } from "@/services/users";
 import { openVendorConversation } from "@/services/messages-api";
 import { useAuth } from "@/lib/auth-context";
+import { useCart } from "@/lib/cart-context";
+import { useMyReviewedTargets, reviewedKey } from "@/hooks/use-target-reviews";
 import { PICKUP_LOCATION_LABELS, PickupLocation, Order } from "@/types";
 import { formatDate } from "@/lib/utils";
 
@@ -51,6 +54,8 @@ export default function OrderDetailPage({
   const { id } = use(params);
   const router = useRouter();
   const { user } = useAuth();
+  const { addItem } = useCart();
+  const { data: reviewedTargets } = useMyReviewedTargets();
 
   const [order, setOrder] = useState<Order | null>(() => getOrderById(id) || null);
   const [isLoading, setIsLoading] = useState(true);
@@ -67,6 +72,15 @@ export default function OrderDetailPage({
   const [disputeFiled, setDisputeFiled] = useState(false);
   const [disputeDetails, setDisputeDetails] = useState<{ reason: string; statement: string } | null>(null);
   const [escrowReleased, setEscrowReleased] = useState(false);
+
+  // Customer Review Modal State
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewInitialTarget, setReviewInitialTarget] = useState<{
+    type: "vendor" | "product";
+    id: string;
+    name?: string;
+  } | undefined>(undefined);
+  const [hasReviewedVendor, setHasReviewedVendor] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -166,15 +180,47 @@ export default function OrderDetailPage({
   }
 
   function handleReorder() {
-    router.push("/marketplace");
+    if (!order) return;
+
+    // Add all items from the order into the cart, preserving variant selections and unit prices
+    order.items.forEach((item) => {
+      const serverVariations = item.selectedVariation
+        ? [{ name: item.selectedVariation.name, option: item.selectedVariation.option }]
+        : item.selectedVariants
+        ? Object.entries(item.selectedVariants).map(([name, option]) => ({ name, option }))
+        : undefined;
+
+      addItem(item.product, item.quantity, {
+        variantLabel: item.variantLabel,
+        selectedVariants: item.selectedVariants,
+        serverVariations,
+        unitPrice: item.unitPrice ?? item.product.price,
+        openDrawer: false,
+      });
+    });
+
+    // Reorder action directly leads to checkout
+    router.push("/checkout");
   }
 
   function handleReview() {
-    if (vendor) {
-      router.push(`/store/${vendor.slug || vendor.id}#reviews`);
-    } else {
-      router.push("/marketplace");
-    }
+    if (!order) return;
+    setReviewInitialTarget({
+      type: "vendor",
+      id: order.vendorId,
+      name: vendor?.storeName || "Vendor",
+    });
+    setReviewModalOpen(true);
+  }
+
+  function handleReviewProduct(productId: string, productTitle: string) {
+    if (!order) return;
+    setReviewInitialTarget({
+      type: "product",
+      id: productId,
+      name: productTitle,
+    });
+    setReviewModalOpen(true);
   }
 
   async function handleContactVendor() {
@@ -354,7 +400,14 @@ export default function OrderDetailPage({
         )}
 
         {/* Order Items */}
-        <OrderItems items={order.items} />
+        <OrderItems
+          items={order.items}
+          canReview={currentStatus === "delivered"}
+          onReviewItem={handleReviewProduct}
+          isItemReviewed={(productId) =>
+            Boolean(reviewedTargets?.has(reviewedKey("product", productId)))
+          }
+        />
 
         {/* Delivery / Pickup Info */}
         <div className="bg-white rounded-xl border border-kampmax-border p-4 space-y-3">
@@ -439,6 +492,10 @@ export default function OrderDetailPage({
           onReorder={handleReorder}
           onReview={handleReview}
           onContactVendor={handleContactVendor}
+          isReviewed={Boolean(
+            hasReviewedVendor ||
+              (order && reviewedTargets?.has(reviewedKey("vendor", order.vendorId)))
+          )}
         />
 
         {/* Back button */}
@@ -450,6 +507,18 @@ export default function OrderDetailPage({
           Back to Orders
         </Button>
       </div>
+
+      {/* Customer Review Modal */}
+      <OrderReviewModal
+        order={displayOrder}
+        isOpen={reviewModalOpen}
+        vendorName={vendor?.storeName || "Vendor"}
+        initialTarget={reviewInitialTarget}
+        onClose={() => setReviewModalOpen(false)}
+        onSuccess={(type) => {
+          if (type === "vendor") setHasReviewedVendor(true);
+        }}
+      />
 
       {/* Dispute Modal */}
       <OpenDisputeModal

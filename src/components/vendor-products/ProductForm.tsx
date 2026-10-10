@@ -770,7 +770,8 @@ export function ProductForm({ initialData, onSave, onCancel, isLoading }: Produc
                         />
                         <Input
                           type="number"
-                          placeholder="Price +₦"
+                          placeholder="Extra ₦ on base price"
+                          title="Amount added to the product price when this option is chosen (0 or empty = same price)"
                           value={option.priceModifier?.toString() ?? ""}
                           onChange={(e) =>
                             updateVariantGroup(group.id, {
@@ -779,7 +780,7 @@ export function ProductForm({ initialData, onSave, onCancel, isLoading }: Produc
                               ),
                             })
                           }
-                          className="w-24 text-sm"
+                          className="w-36 text-sm"
                         />
                         <Input
                           type="number"

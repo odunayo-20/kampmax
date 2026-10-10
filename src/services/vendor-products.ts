@@ -180,15 +180,20 @@ function vendorFieldsPayload(input: VendorFieldsInput, basePrice: number | undef
         : undefined,
     variations:
       groups !== undefined && basePrice !== undefined
-        ? (input.hasVariants === false ? [] : groups).map((g) => ({
-            name: g.name,
-            options: g.options.map((o) => ({
-              label: o.value,
-              price: basePrice + (o.priceModifier ?? 0),
-              stockQuantity: o.stock ?? 0,
-              sku: null,
-            })),
-          }))
+        ? (input.hasVariants === false ? [] : groups)
+            .map((g) => ({
+              name: g.name.trim(),
+              options: g.options
+                .filter((o) => o.value?.trim())
+                .map((o) => ({
+                  label: o.value.trim(),
+                  price: basePrice + (o.priceModifier ?? 0),
+                  // No stock entered means unlimited (-1), not out of stock.
+                  stockQuantity: o.stock ?? -1,
+                  sku: null,
+                })),
+            }))
+            .filter((g) => g.name && g.options.length > 0)
         : undefined,
   };
 }

@@ -193,6 +193,9 @@ export function mapBackendCartToFrontend(cart: BackendCartResponse): CartLineIte
         quantity: item.quantity,
         variantLabel,
         selectedVariants,
+        selectedVariation: item.selectedVariation
+          ? { name: item.selectedVariation.name, option: item.selectedVariation.option }
+          : null,
         savedForLater: false,
         availableStock: item.availableStock,
         maxPurchaseQuantity: Math.min(10, item.availableStock || 10),
@@ -216,6 +219,7 @@ export function buildCartLine(
   options?: {
     variantLabel?: string;
     selectedVariants?: Record<string, string>;
+    selectedVariation?: { name: string; option: string } | null;
     unitPrice?: number;
   }
 ): CartLineItem {
@@ -234,14 +238,25 @@ export function buildCartLine(
   const maxPurchaseQuantity =
     availabilityStatus === "available" ? Math.min(10, stock ?? 10) : 0;
 
+  const variantLabel =
+    options?.variantLabel ||
+    (selectedVariants
+      ? Object.entries(selectedVariants)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(" · ")
+      : options?.selectedVariation
+      ? `${options.selectedVariation.name}: ${options.selectedVariation.option}`
+      : undefined);
+
   return {
     id: makeLineId(),
     productId: product.id,
     vendorId: product.vendorId,
     product,
     quantity: Math.max(1, quantity),
-    variantLabel: options?.variantLabel,
+    variantLabel,
     selectedVariants,
+    selectedVariation: options?.selectedVariation,
     savedForLater: false,
     availableStock: stock,
     maxPurchaseQuantity,
