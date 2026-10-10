@@ -161,6 +161,8 @@ export function EmployerProfileEditForm({
   const [form, setForm] = useState<EditFormState>(() => toFormState(draft));
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [logoError, setLogoError] = useState<string | null>(null);
+  // undefined = unchanged, File = upload on save, null = remove.
+  const [logoFile, setLogoFile] = useState<File | null | undefined>(undefined);
   const [campuses, setCampuses] = useState(getEmployerCampusOptions());
 
   // Load real campuses (UUID ids) — the sync cache starts with mock slug ids.
@@ -199,6 +201,7 @@ export function EmployerProfileEditForm({
     setLogoError(null);
     if (!file) {
       set("logoUrl", null);
+      setLogoFile(null);
       return;
     }
     if (!file.type.startsWith("image/")) {
@@ -209,6 +212,7 @@ export function EmployerProfileEditForm({
       setLogoError("Image must be less than 5MB.");
       return;
     }
+    setLogoFile(file);
     const reader = new FileReader();
     reader.onload = (event) => {
       set("logoUrl", (event.target?.result as string) ?? null);
@@ -246,7 +250,7 @@ export function EmployerProfileEditForm({
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
-    onSave(toPayload(form));
+    onSave({ ...toPayload(form), logoFile });
   };
 
   const budgetReadOnly = !form.budgetMin.trim() && !form.budgetMax.trim();
@@ -279,7 +283,7 @@ export function EmployerProfileEditForm({
             {form.logoUrl && (
               <button
                 type="button"
-                onClick={() => set("logoUrl", null)}
+                onClick={() => handleLogo(null)}
                 className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-error-600 hover:bg-error-50"
               >
                 <Trash2 className="h-3.5 w-3.5" aria-hidden /> Remove

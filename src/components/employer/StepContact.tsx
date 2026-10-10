@@ -40,6 +40,14 @@ export function StepContact({ draft, onUpdate }: StepContactProps) {
     else setEmailError(undefined);
   }, [draft?.contact.email]);
 
+  // The box shows the account email as a default; store it in the draft too,
+  // otherwise validation sees an empty email and blocks "Next".
+  useEffect(() => {
+    if (!draft || draft.contact.email || !userEmail) return;
+    onUpdate({ contact: { ...draft.contact, email: userEmail } });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft?.contact.email, userEmail, !!draft]);
+
   return (
     <div className="space-y-8">
       <div>

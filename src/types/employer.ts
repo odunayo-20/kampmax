@@ -197,6 +197,8 @@ export type EmployerSubmitResult =
 // currentStep, submittedAt, or clientType — those are backend-owned.
 
 export interface EmployerProfileUpdatePayload {
+  /** A new logo to upload; null removes it; undefined leaves it unchanged. */
+  logoFile?: File | null;
   profile?: {
     displayName?: string;
     headline?: string;

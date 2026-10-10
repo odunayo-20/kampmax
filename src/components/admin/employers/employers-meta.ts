@@ -137,10 +137,13 @@ export interface EmployerActionAvailability {
 export function getEmployerActionAvailability(
   employer: ManagedEmployer
 ): EmployerActionAvailability {
+  // Matches what the backend accepts: anything not suspended can be approved
+  // (unless already active) or suspended; reject needs a decision still open.
+  const s = employer.status;
   return {
-    canApprove: employer.status === "pending_review",
-    canReject: employer.status === "pending_review",
-    canSuspend: employer.status === "active" || employer.status === "pending_review",
-    canRestore: employer.status === "suspended",
+    canApprove: s === "pending_review" || s === "incomplete" || s === "rejected",
+    canReject: s === "pending_review" || s === "incomplete",
+    canSuspend: s === "active" || s === "pending_review" || s === "incomplete" || s === "rejected",
+    canRestore: s === "suspended",
   };
 }

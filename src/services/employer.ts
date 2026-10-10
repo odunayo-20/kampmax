@@ -72,6 +72,8 @@ export interface EmployerBackendProfile {
 /** Flat shape the backend's CreateEmployerProfileDto actually expects —
  * NOT the nested EmployerOnboardingDraft shape used by the onboarding UI. */
 export interface CreateEmployerProfileDto {
+  /** Onboarding answers the profile has no column for (client type, headline, contact, preferences...). */
+  onboardingDetails?: Record<string, unknown>;
   displayName: string;
   companyName?: string;
   companyDescription?: string;
@@ -102,6 +104,27 @@ export async function createEmployerProfileApi(
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** The answers the backend profile has no column for, kept as JSON beside it. */
+export function buildOnboardingDetails(src: {
+  clientType?: string;
+  profile?: { headline?: string };
+  organization?: { businessType?: string; size?: string };
+  contact?: Record<string, unknown>;
+  location?: { workPreference?: string; remoteAvailable?: boolean };
+  preferences?: Record<string, unknown>;
+}): Record<string, unknown> {
+  return {
+    clientType: src.clientType,
+    headline: src.profile?.headline,
+    businessType: src.organization?.businessType,
+    orgSize: src.organization?.size,
+    contact: src.contact,
+    workPreference: src.location?.workPreference,
+    remoteAvailable: src.location?.remoteAvailable,
+    preferences: src.preferences,
+  };
+}
+
 /** Maps the onboarding wizard's nested draft into the flat backend DTO. */
 export function employerDraftToCreateDto(
   draft: EmployerOnboardingDraft
@@ -115,6 +138,7 @@ export function employerDraftToCreateDto(
     city: draft.location?.city?.trim() || undefined,
     // Backend requires a UUID; ignore mock slug ids (e.g. "rugipo").
     campusId: UUID_RE.test(draft.location?.campusId ?? "") ? draft.location.campusId : undefined,
+    onboardingDetails: buildOnboardingDetails(draft),
   };
 }
 
@@ -211,6 +235,8 @@ interface BackendEmployerFields {
   state?: string | null;
   campusId?: string | null;
   verificationStatus?: string;
+  onboardingDetails?: Record<string, any> | null;
+  logoUrl?: string | null;
   isPublic?: boolean;
   userId?: string;
   createdAt?: string;
@@ -235,49 +261,67 @@ export function employerVerificationFrom(status: string | undefined): EmployerVe
 export function backendProfileToDraft(profile: EmployerBackendProfile): EmployerOnboardingDraft {
   const p = profile as unknown as BackendEmployerFields;
   const now = new Date().toISOString();
+  const extra = p.onboardingDetails ?? {};
   return {
     userId: p.userId ?? "",
     status: employerVerificationFrom(p.verificationStatus) === "verified" ? "APPROVED" : "PENDING_REVIEW",
     currentStep: 5,
     createdAt: p.createdAt ?? now,
     updatedAt: p.updatedAt ?? now,
-    clientType: p.companyName ? "business" : "individual",
+    clientType: extra.clientType ?? (p.companyName ? "business" : "individual"),
     profile: {
       displayName: p.displayName ?? "",
       about: p.companyDescription ?? "",
       industry: p.industry ?? "",
       website: p.websiteUrl ?? "",
-      logoUrl: null,
+      headline: extra.headline ?? "",
+      logoUrl: p.logoUrl ?? null,
     },
     organization: {
       name: p.companyName ?? "",
       industry: p.industry ?? "",
       description: p.companyDescription ?? "",
       website: p.websiteUrl ?? "",
+      businessType: extra.businessType ?? "",
+      size: extra.orgSize ?? "",
     },
-    contact: {},
+    contact: { ...(extra.contact ?? {}) },
     location: {
       campusId: p.campusId ?? undefined,
       city: p.city ?? "",
       state: p.state ?? "",
+      workPreference: extra.workPreference ?? "",
+      remoteAvailable: !!extra.remoteAvailable,
     },
-    preferences: { categories: [] },
+    preferences: { categories: [], ...(extra.preferences ?? {}) },
     verification: { status: employerVerificationFrom(p.verificationStatus) },
     approvedSlug: p.isPublic && employerVerificationFrom(p.verificationStatus) === "verified" ? (profile.id as string) : undefined,
   };
 }
 
-/** How complete the real profile is: the five things the backend stores. */
+/**
+ * How complete the profile is: one check per thing a freelancer looks at.
+ * Company details only count for business-type accounts, so an individual
+ * can reach 100%.
+ */
 export function backendProfileCompletion(profile: EmployerBackendProfile): number {
-  const p = profile as unknown as BackendEmployerFields;
+  const d = backendProfileToDraft(profile);
+  const orgLike = isOrgLikeClientType(d.clientType);
   const checks = [
-    !!p.displayName?.trim(),
-    !!p.companyName?.trim(),
-    !!p.companyDescription?.trim(),
-    !!p.industry?.trim(),
-    !!(p.city?.trim() || p.campusId),
+    !!d.profile.displayName?.trim(),
+    !!d.profile.headline?.trim(),
+    !!(d.profile.about?.trim() || d.organization.description?.trim()),
+    !!(d.profile.industry?.trim() || d.organization.industry?.trim()),
+    !!(d.location.city?.trim() || d.location.campusId),
+    !!(d.contact.email?.trim() && d.contact.phone?.trim()),
+    (d.preferences.categories?.length ?? 0) > 0,
+    ...(orgLike ? [!!d.organization.name?.trim(), !!d.organization.businessType?.trim()] : []),
   ];
   return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+}
+
+function isOrgLikeClientType(t: string | undefined): boolean {
+  return t === "business" || t === "organization" || t === "campus_group";
 }
 
 /**

@@ -19,6 +19,7 @@ import {
 import { getReceivedApplicationsApi } from "@/services/proposals";
 import { listMyEmployerEngagements, type Engagement, type EngagementStatus } from "@/services/jobs";
 import {
+  backendProfileCompletion,
   getEmployerProfileApi,
 } from "@/services/employer";
 import { CONTRACT_STATUS } from "@/types/contract";
@@ -220,18 +221,8 @@ export async function getEmployerDashboardApi(): Promise<EmployerDashboardSummar
   for (const { error } of [jobs, apps, jobCounts]) if (error) throw error;
 
   const appCounts = apps.page.counts;
-  // Profile completion from the fields the backend stores.
-  const fields = [
-    profile.displayName,
-    profile.companyName,
-    profile.companyDescription,
-    profile.industry,
-    profile.location,
-    profile.websiteUrl,
-  ];
-  const profileCompletion = Math.round(
-    (fields.filter((f) => typeof f === "string" && f.trim()).length / fields.length) * 100
-  );
+  // Same calculation as the profile page, so the two always show one number.
+  const profileCompletion = backendProfileCompletion(profile);
 
   const attention = buildAttentionFrom(appCounts, contracts, jobCounts.counts, profileCompletion);
 

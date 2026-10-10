@@ -33,6 +33,11 @@ export default function EmployerLayout({ children }: { children: React.ReactNode
 
   const dashboardPath = isEmployerDashboardPath(pathname);
 
+  // Close the mobile drawer once navigation has happened.
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
   useEffect(() => {
     if (!dashboardPath || status !== "authenticated") return;
     let cancelled = false;
@@ -113,7 +118,13 @@ export default function EmployerLayout({ children }: { children: React.ReactNode
             aria-hidden
             onClick={() => setMobileOpen(false)}
           />
-          <div className="absolute inset-y-0 left-0 w-72 bg-kampmax-navy">
+          <div
+            className="absolute inset-y-0 left-0 w-72 bg-kampmax-navy"
+            // Also covers a link to the page you're already on (no route change).
+            onClick={(e) => {
+              if ((e.target as HTMLElement).closest("a")) setMobileOpen(false);
+            }}
+          >
             <div className="flex items-center justify-between px-4 pt-3">
               <span className="text-sm font-bold text-white">{displayName}</span>
               <button

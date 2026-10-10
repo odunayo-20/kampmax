@@ -33,6 +33,11 @@ export default function ServiceProviderLayout({ children }: { children: React.Re
   // Static dashboard sub-routes take precedence over the dynamic [slug] route.
   const isPublicProfile = !isServiceProviderDashboardPath(pathname);
 
+  // Close the mobile drawer once navigation has happened.
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
   useEffect(() => {
     if (isPublicProfile || status !== "authenticated") return;
     let cancelled = false;
@@ -107,7 +112,13 @@ export default function ServiceProviderLayout({ children }: { children: React.Re
             aria-hidden
             onClick={() => setMobileOpen(false)}
           />
-          <div className="absolute inset-y-0 left-0 w-72 bg-kampmax-navy">
+          <div
+            className="absolute inset-y-0 left-0 w-72 bg-kampmax-navy"
+            // Also covers a link to the page you're already on (no route change).
+            onClick={(e) => {
+              if ((e.target as HTMLElement).closest("a")) setMobileOpen(false);
+            }}
+          >
             <div className="flex items-center justify-between px-4 pt-3">
               <span className="text-sm font-bold text-white">{providerName}</span>
               <button

@@ -2,10 +2,12 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
+import { uploadFileDirect } from "@/services/media";
 import { employerKeys, dashboardKeys } from "@/lib/query-keys";
 import {
   backendProfileCompletion,
   backendProfileToDraft,
+  buildOnboardingDetails,
   getEmployerProfileApi,
   updateEmployerProfileApi,
 } from "@/services/employer";
@@ -41,7 +43,17 @@ export function useUpdateEmployerProfile() {
 
   return useMutation({
     mutationFn: async (payload: EmployerProfileUpdatePayload) => {
+      // A chosen logo is uploaded first; the profile then points at it.
+      let profileMediaId: string | null | undefined;
+      if (payload.logoFile) {
+        const { data: media, error: uploadError } = await uploadFileDirect(payload.logoFile, "logo");
+        if (uploadError || !media) throw new Error(uploadError?.message || "Could not upload the logo.");
+        profileMediaId = media.id;
+      } else if (payload.logoFile === null) {
+        profileMediaId = null;
+      }
       const { error } = await updateEmployerProfileApi({
+        profileMediaId,
         displayName: payload.profile?.displayName,
         companyName: payload.organization?.name,
         companyDescription: payload.organization?.description || payload.profile?.about,
@@ -50,6 +62,7 @@ export function useUpdateEmployerProfile() {
         city: payload.location?.city || undefined,
         state: payload.location?.state || undefined,
         campusId: payload.location?.campusId,
+        onboardingDetails: buildOnboardingDetails(payload),
       });
       if (error) throw new Error(error.message || "Could not save changes.");
       return { success: true };
