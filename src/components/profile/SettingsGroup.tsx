@@ -60,11 +60,12 @@ export function SettingsRow({
   danger,
   className,
 }: SettingsRowProps) {
+  // A row with no click action is plain content: it may hold its own control
+  // (e.g. a toggle), and a button cannot sit inside another button.
+  const Tag = onClick ? "button" : "div";
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={!onClick}
+    <Tag
+      {...(onClick ? { type: "button" as const, onClick } : {})}
       className={cn(
         "w-full flex items-center gap-3 px-4 py-3 text-left transition-colors",
         onClick && "active:bg-kampmax-muted",
@@ -93,7 +94,7 @@ export function SettingsRow({
         )}
       </div>
       {action && <span className="flex-shrink-0">{action}</span>}
-    </button>
+    </Tag>
   );
 }
 
