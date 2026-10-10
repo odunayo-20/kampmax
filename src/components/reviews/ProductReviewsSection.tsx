@@ -167,7 +167,7 @@ function ReviewCard({
 
       {/* Actions */}
       <div className="mt-3 flex items-center gap-3">
-        {userId && (
+        {userId && review.userId !== userId && (
           <button
             type="button"
             onClick={() => onReport(review.id)}
