@@ -277,8 +277,14 @@ function RegisterForm() {
           // If offline or mock backend, local selection remains persisted
         }
 
-        // Trigger lightweight 10-second post-registration welcome & feed customizer
-        setShowWelcomeModal(true);
+        // Someone who came to become a vendor, freelancer, provider or employer
+        // goes straight to that setup; the shopper feed customizer is only for
+        // customers, so it never interrupts a role they already chose.
+        if (choice.next) {
+          router.push(choice.next);
+        } else {
+          setShowWelcomeModal(true);
+        }
       } else {
         setErrors({ general: result.message ?? "Registration failed." });
       }

@@ -41,7 +41,7 @@ function VendorOnboardingForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const campusParam = searchParams.get("campus");
-  const { status } = useAuth();
+  const { status, user } = useAuth();
 
   const [campuses, setCampuses] = useState<Campus[]>([]);
   const [campusesLoading, setCampusesLoading] = useState(true);
@@ -52,6 +52,11 @@ function VendorOnboardingForm() {
   const [description, setDescription] = useState("");
   const [phone, setPhone] = useState("");
   const [businessAddress, setBusinessAddress] = useState("");
+
+  // Carry over the phone number given at sign-up instead of asking again.
+  useEffect(() => {
+    if (user?.phone) setPhone((current) => current || (user.phone ?? ""));
+  }, [user?.phone]);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -191,6 +196,15 @@ function VendorOnboardingForm() {
 
         <form onSubmit={handleSubmit} className="space-y-5 rounded-2xl border border-kampmax-border p-6 lg:p-8">
           <h2 className="text-lg font-semibold text-kampmax-text">Store details</h2>
+          {user && (
+            <p className="text-xs text-kampmax-text-secondary">
+              Creating this store for{" "}
+              <span className="font-medium text-kampmax-text">
+                {user.name || user.email}
+              </span>
+              {user.email ? ` (${user.email})` : ""}. Your account details stay the same.
+            </p>
+          )}
 
           <Input
             label="Store name"
