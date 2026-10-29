@@ -209,10 +209,11 @@ export function useCheckout() {
   }, [flags.kampmaxCoinEnabled]);
 
   // ── Session refresh ──
+  // Functional update: it must extend the latest session, not the one captured
+  // when this callback was created, or it undoes a delivery choice just made.
   const refreshSession = useCallback(() => {
-    if (!session) return;
-    setSession(getCheckoutSession(session));
-  }, [session]);
+    setSession((prev) => (prev ? getCheckoutSession(prev) : prev));
+  }, []);
 
   // ── Computed: selected address object ──
   const selectedAddress = useMemo(
