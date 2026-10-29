@@ -86,7 +86,7 @@ describe("geocoding", () => {
 });
 
 describe("device geolocation", () => {
-  const geo = (impl: (ok: PositionCallback, err: PositionErrorCallback) => void) =>
+  const geo = (impl: (ok: PositionCallback, err: PositionErrorCallback, opts?: PositionOptions) => void) =>
     ({ getCurrentPosition: impl }) as unknown as Geolocation;
 
   it("resolves with coordinates and accuracy", async () => {
@@ -106,6 +106,27 @@ describe("device geolocation", () => {
   ])("maps error code %i to %s", async (code, expected) => {
     const g = geo((_ok, err) => err({ code } as GeolocationPositionError));
     await expect(getDevicePosition(g)).rejects.toMatchObject({ code: expected });
+  });
+
+  it("falls back to high accuracy when the fast lookup fails", async () => {
+    const calls: boolean[] = [];
+    const g = geo((ok, err, opts) => {
+      calls.push(!!opts?.enableHighAccuracy);
+      if (!opts?.enableHighAccuracy) err({ code: 3 } as GeolocationPositionError);
+      else ok({ coords: { latitude: 1, longitude: 2, accuracy: 5 } } as GeolocationPosition);
+    });
+    await expect(getDevicePosition(g)).resolves.toMatchObject({ latitude: 1, accuracyMeters: 5 });
+    expect(calls).toEqual([false, true]);
+  });
+
+  it("does not retry after a permission denial", async () => {
+    let n = 0;
+    const g = geo((_ok, err) => {
+      n++;
+      err({ code: 1 } as GeolocationPositionError);
+    });
+    await expect(getDevicePosition(g)).rejects.toMatchObject({ code: "denied" });
+    expect(n).toBe(1);
   });
 
   it("reports unsupported browsers", async () => {

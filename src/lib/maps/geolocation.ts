@@ -21,26 +21,33 @@ export function getDevicePosition(
       reject(new DeviceLocationError("insecure", "Location needs a secure (HTTPS) connection."));
       return;
     }
+    const onSuccess: PositionCallback = (pos) => {
+      const { latitude, longitude, accuracy } = pos.coords;
+      resolve({
+        latitude,
+        longitude,
+        accuracyMeters: typeof accuracy === "number" && Number.isFinite(accuracy) ? accuracy : null,
+      });
+    };
+    const onFailure: PositionErrorCallback = (err) => {
+      // PERMISSION_DENIED = 1 also covers the user dismissing the prompt.
+      if (err.code === 1) {
+        reject(new DeviceLocationError("denied", "Location permission was denied. You can allow it in your browser settings, or search instead."));
+      } else if (err.code === 3) {
+        reject(new DeviceLocationError("timeout", "Finding your location took too long. Try again or search instead."));
+      } else {
+        reject(new DeviceLocationError("unavailable", "Your location isn't available right now. Try searching instead."));
+      }
+    };
+    // Desktops have no GPS, so a high-accuracy request just waits and times out.
+    // Try the fast Wi-Fi/IP lookup first and only ask for a precise fix if that fails.
     geo.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude, accuracy } = pos.coords;
-        resolve({
-          latitude,
-          longitude,
-          accuracyMeters: typeof accuracy === "number" && Number.isFinite(accuracy) ? accuracy : null,
-        });
-      },
+      onSuccess,
       (err) => {
-        // PERMISSION_DENIED = 1 also covers the user dismissing the prompt.
-        if (err.code === 1) {
-          reject(new DeviceLocationError("denied", "Location permission was denied. You can allow it in your browser settings, or search instead."));
-        } else if (err.code === 3) {
-          reject(new DeviceLocationError("timeout", "Finding your location took too long. Try again or search instead."));
-        } else {
-          reject(new DeviceLocationError("unavailable", "Your location isn't available right now. Try searching instead."));
-        }
+        if (err.code === 1) return onFailure(err);
+        geo.getCurrentPosition(onSuccess, onFailure, { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 });
       },
-      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 },
+      { enableHighAccuracy: false, timeout: 15_000, maximumAge: 5 * 60_000 },
     );
   });
 }
