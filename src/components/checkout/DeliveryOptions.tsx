@@ -71,9 +71,9 @@ export function DeliveryOptions({
               <p className="text-sm font-medium text-kampmax-text">
                 {opt.label}
               </p>
-              {opt.estimatedDelivery && (
+              {(disabled ? opt.message : opt.estimatedDelivery) && (
                 <p className="text-[11px] text-kampmax-text-secondary">
-                  {opt.estimatedDelivery}
+                  {disabled ? opt.message : opt.estimatedDelivery}
                 </p>
               )}
             </div>

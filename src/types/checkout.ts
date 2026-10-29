@@ -169,7 +169,8 @@ export interface CheckoutVendorGroup {
   items: CartLineItem[];
   subtotal: number; // display only
   deliveryOptions: VendorDeliveryOption[];
-  selectedDelivery: VendorDeliverySelection;
+  /** null when the vendor offers no usable method. */
+  selectedDelivery: VendorDeliverySelection | null;
   deliveryReady: boolean;
 }
 
@@ -283,7 +284,19 @@ export interface CheckoutActionResult<T = void> {
   error?: CheckoutErrorInfo;
 }
 
+/** What a vendor offers, as set in their "Delivery & pickup" store settings. */
+export interface VendorDeliveryOffer {
+  vendorId: string;
+  deliveryAvailable: boolean;
+  pickupAvailable: boolean;
+  prepTimeMinutes: number;
+  deliveryFee: number;
+  pickupLocation: string | null;
+}
+
 export interface CheckoutSessionOptions {
+  /** Per-vendor offers; a vendor missing here only gets its pickup options. */
+  deliveryOffers?: Record<string, VendorDeliveryOffer>;
   customerId?: string;
   campusId: string;
   items: CartLineItem[];

@@ -1,6 +1,7 @@
 import { Order, OrderStatus, DeliveryMethod, PaymentMethod, PaymentStatus, OrderTimelineEntry, CartItem, Product } from "@/types";
 import { getProductById } from "@/services/products";
 import { apiClient, ApiError } from "@/lib/api-client";
+import type { CheckoutDeliveryMethod, VendorDeliveryOffer } from "@/types/checkout";
 
 // ============================================================
 // BACKEND RESPONSE & DTO TYPES (from NestJS Orders Module)
@@ -96,9 +97,22 @@ export interface CheckoutPayload {
   vendorId?: string;
   address: CheckoutAddressPayload;
   notes?: string;
-  deliveryFee?: number;
+  /** Chosen method per vendor; the server prices it from the vendor's settings. */
+  deliveries?: Array<{ vendorId: string; method: CheckoutDeliveryMethod }>;
   /** Promotion code to apply; the server re-validates and prices it. */
   promotionCode?: string;
+}
+
+/** Delivery/pickup settings of the given vendors (GET /orders/delivery-options). */
+export async function fetchDeliveryOffers(
+  vendorIds: string[]
+): Promise<Record<string, VendorDeliveryOffer>> {
+  const ids = [...new Set(vendorIds)];
+  if (ids.length === 0) return {};
+  const { data } = await apiClient.get<VendorDeliveryOffer[]>(
+    `/orders/delivery-options?vendorIds=${ids.join(",")}`
+  );
+  return Object.fromEntries((Array.isArray(data) ? data : []).map((o) => [o.vendorId, o]));
 }
 
 // In-memory cache for fast lookups and sync fallbacks

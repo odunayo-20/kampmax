@@ -71,15 +71,13 @@ export interface UpdateCartItemPayload {
 
 // ── Local helpers (no I/O) ────────────────────────────────────────────────
 
-const DELIVERY_FEE_HOSTEL = 500;
-
 export function buildPricingSummary(items: CartLineItem[]): CartPricingSummary {
   const itemsSubtotal = items.reduce(
     (sum, i) => sum + (i.unitPrice ?? i.product.price) * i.quantity,
     0
   );
-  const hasItems = items.length > 0;
-  const deliveryFee = hasItems ? DELIVERY_FEE_HOSTEL : 0;
+  // Delivery depends on each vendor's settings and the method chosen at checkout.
+  const deliveryFee = 0;
   const discountTotal = 0; // established at checkout / coupon application
   const total = itemsSubtotal + deliveryFee - discountTotal;
   const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);

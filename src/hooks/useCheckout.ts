@@ -19,7 +19,7 @@ import {
   applyCoupon,
   removeCoupon as removeCouponService,
   selectDelivery,
-  getDefaultSelectedDelivery,
+  pickDefaultDelivery,
   initializePaystackPayment,
   payOrdersWithWallet,
   getPaymentStatus,
@@ -27,7 +27,7 @@ import {
   checkoutFeatureFlags,
   estimateLoyaltyPointsEarned,
 } from "@/services/checkout";
-import { checkoutOrdersApi, cancelUnpaidOrders } from "@/services/orders";
+import { checkoutOrdersApi, cancelUnpaidOrders, fetchDeliveryOffers } from "@/services/orders";
 import type { AddressFormValues } from "@/components/checkout/AddressForm";
 import {
   CHECKOUT_STATES,
@@ -43,6 +43,7 @@ import {
   VendorDeliveryOption,
   VendorDeliverySelection,
 } from "@/types/checkout";
+import type { VendorDeliveryOffer } from "@/types/checkout";
 
 /** Record-friendly error bag for the shared inputs. */
 type CustomerErrorBag = Record<string, string | undefined>;
@@ -146,20 +147,42 @@ export function useCheckout() {
   // Vendor names come from the shared vendor cache; load any that are missing.
   const vendorsLoaded = useEnsureVendors(activeItems.map((i) => i.vendorId));
 
+  // What each vendor in the cart offers (delivery/pickup/fee), keyed so a
+  // result is only used for the vendors + auth state it was fetched for.
+  const offersKey = `${status}|${[...new Set(activeItems.map((i) => i.vendorId))].sort().join(",")}`;
+  const [offers, setOffers] = useState<{
+    key: string;
+    data: Record<string, VendorDeliveryOffer>;
+  } | null>(null);
+  useEffect(() => {
+    const vendorIds = offersKey.split("|")[1].split(",").filter(Boolean);
+    if (vendorIds.length === 0 || status === "loading") return;
+    let cancelled = false;
+    void fetchDeliveryOffers(vendorIds).then((data) => {
+      if (!cancelled) setOffers({ key: offersKey, data });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [offersKey, status]);
+
   // Build/maintain the presentation session from the live cart.
+  const deliveryOffers = offers?.key === offersKey ? offers.data : undefined;
   useEffect(() => {
     if (activeItems.length === 0) {
       setSession(null);
       return;
     }
+    if (!deliveryOffers) return; // wait for the vendors' delivery settings
     setSession(
       createCheckoutSession({
         items: activeItems,
         campusId: selectedCampus.id,
         customerId: user?.id,
+        deliveryOffers,
       })
     );
-  }, [activeItems, selectedCampus.id, user?.id, vendorsLoaded]);
+  }, [activeItems, selectedCampus.id, user?.id, vendorsLoaded, deliveryOffers]);
 
   useEffect(() => {
     if (status === "authenticated" && user) {
@@ -279,10 +302,10 @@ export function useCheckout() {
         const next = { ...prev, campusId: campus.id };
         next.vendorGroups = prev.vendorGroups.map((g) => ({
           ...g,
-          selectedDelivery: getDefaultSelectedDelivery(g.vendorId),
+          selectedDelivery: pickDefaultDelivery(g.vendorId, g.deliveryOptions),
         }));
-        next.deliveryTotal = 0;
-        next.pricing = { ...next.pricing, deliveryTotal: 0, finalTotal: finalTotalFor(next) };
+        next.deliveryTotal = next.vendorGroups.reduce((s, g) => s + (g.selectedDelivery?.fee ?? 0), 0);
+        next.pricing = { ...next.pricing, deliveryTotal: next.deliveryTotal, finalTotal: finalTotalFor(next) };
         return next;
       });
     },
@@ -435,6 +458,15 @@ export function useCheckout() {
       return false;
     }
 
+    const stuck = session.vendorGroups.find((g) => !g.selectedDelivery);
+    if (stuck) {
+      setErrorInfo({
+        code: "validation_failed",
+        message: `${stuck.vendorName} isn't offering delivery or pickup right now. Remove their items to continue.`,
+      });
+      return false;
+    }
+
     // Catch a short wallet before any order is created.
     if (
       paymentMethod === "wallet" &&
@@ -474,7 +506,10 @@ export function useCheckout() {
           campus: selectedCampus?.name || selectedAddress.campusId,
           locationNote: selectedAddress.notes,
         },
-        deliveryFee: session.pricing.deliveryTotal,
+        // The server prices delivery from each vendor's settings.
+        deliveries: session.vendorGroups.flatMap((g) =>
+          g.selectedDelivery ? [{ vendorId: g.vendorId, method: g.selectedDelivery.method }] : []
+        ),
         notes: `Deliver to ${selectedAddress.label}`,
         promotionCode: coupon.status === "valid" ? coupon.code : undefined,
       });

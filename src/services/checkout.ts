@@ -1,6 +1,5 @@
 import type { CartLineItem } from "@/types/cart";
 import { getVendorById, getCurrentUser } from "@/services/users";
-import { estimateDelivery } from "@/services/cart";
 import { checkoutOrdersApi, CheckoutPayload } from "@/services/orders";
 import { apiClient, ApiError } from "@/lib/api-client";
 import type {
@@ -9,6 +8,8 @@ import type {
   CheckoutVendorGroup,
   VendorDeliveryOption,
   VendorDeliverySelection,
+  VendorDeliveryOffer,
+  CheckoutDeliveryMethod,
   CheckoutActionResult,
   CheckoutErrorInfo,
   CouponState,
@@ -97,34 +98,61 @@ function makeSessionId(): string {
   return `cs_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function buildVendorDeliveryOptions(vendorId: string): VendorDeliveryOption[] {
-  const estimated = estimateDelivery(vendorId);
+export function buildVendorDeliveryOptions(
+  vendorId: string,
+  offer?: VendorDeliveryOffer
+): VendorDeliveryOption[] {
+  const pickupState = offer?.pickupAvailable === false ? "unavailable" : "available";
+  const pickupMessage = pickupState === "unavailable" ? "This vendor doesn't offer pickup" : undefined;
+  const deliveryState = offer?.deliveryAvailable ? "available" : "unavailable";
+  const deliveryMessage = offer
+    ? "This vendor doesn't offer delivery"
+    : "Delivery details couldn't be loaded";
   return [
     {
       id: `${vendorId}:campus_delivery`,
       method: "campus_delivery",
       label: "Campus Delivery",
-      fee: 500,
-      estimatedDelivery: estimated,
-      state: "available",
+      fee: offer?.deliveryFee ?? 0,
+      estimatedDelivery: offer ? `Ready in about ${offer.prepTimeMinutes} min` : undefined,
+      state: deliveryState,
+      message: deliveryState === "unavailable" ? deliveryMessage : undefined,
     },
     {
       id: `${vendorId}:campus_pickup`,
       method: "campus_pickup",
       label: "Campus Pickup",
       fee: 0,
-      estimatedDelivery: "Same day",
-      state: "available",
+      estimatedDelivery: "Collect on campus",
+      state: pickupState,
+      message: pickupMessage,
     },
     {
       id: `${vendorId}:vendor_pickup`,
       method: "vendor_pickup",
       label: "Vendor Pickup",
       fee: 0,
-      estimatedDelivery: "As agreed with vendor",
-      state: "available",
+      estimatedDelivery: offer?.pickupLocation
+        ? `Collect at ${offer.pickupLocation}`
+        : "Vendor will confirm the pickup spot",
+      state: pickupState,
+      message: pickupMessage,
     },
   ];
+}
+
+/** The first available option; pickup is listed after delivery but preferred when free. */
+export function pickDefaultDelivery(
+  vendorId: string,
+  options: VendorDeliveryOption[]
+): VendorDeliverySelection | null {
+  const order: CheckoutDeliveryMethod[] = ["campus_pickup", "vendor_pickup", "campus_delivery"];
+  const opt = order
+    .map((m) => options.find((o) => o.method === m && o.state === "available"))
+    .find(Boolean);
+  return opt
+    ? { vendorId, method: opt.method, optionId: opt.id, fee: opt.fee, estimatedDelivery: opt.estimatedDelivery }
+    : null;
 }
 
 function groupVendorItems(
@@ -151,28 +179,19 @@ function groupVendorItems(
  * Creates presentation session from a live cart.
  */
 export function createCheckoutSession(options: CheckoutSessionOptions): CheckoutSession {
-  const { items, campusId, customerId } = options;
+  const { items, campusId, customerId, deliveryOffers = {} } = options;
   const active = items.filter((i) => !i.savedForLater);
 
   const vendorRaw = groupVendorItems(active);
   const itemsSubtotal = vendorRaw.reduce((s, v) => s + v.subtotal, 0);
   const itemCount = active.reduce((s, i) => s + i.quantity, 0);
-  const deliveryTotal = 0;
   const discountTotal = 0;
   const coinDeduction = 0;
-  const finalTotal =
-    Math.max(0, itemsSubtotal + deliveryTotal - discountTotal - coinDeduction);
 
   const vendorGroups: CheckoutVendorGroup[] = vendorRaw.map((v) => {
     const vendor = getVendorById(v.vendorId);
-    const optionsList = buildVendorDeliveryOptions(v.vendorId);
-    const defaultDelivery: VendorDeliverySelection = {
-      vendorId: v.vendorId,
-      method: "campus_pickup",
-      optionId: `${v.vendorId}:campus_pickup`,
-      fee: 0,
-      estimatedDelivery: "Same day",
-    };
+    const optionsList = buildVendorDeliveryOptions(v.vendorId, deliveryOffers[v.vendorId]);
+    const defaultDelivery = pickDefaultDelivery(v.vendorId, optionsList);
     return {
       vendorId: v.vendorId,
       vendorName: vendor?.storeName || "Unknown Vendor",
@@ -181,9 +200,12 @@ export function createCheckoutSession(options: CheckoutSessionOptions): Checkout
       subtotal: v.subtotal,
       deliveryOptions: optionsList,
       selectedDelivery: defaultDelivery,
-      deliveryReady: true,
+      deliveryReady: defaultDelivery !== null,
     };
   });
+  const deliveryTotal = vendorGroups.reduce((sum, g) => sum + (g.selectedDelivery?.fee ?? 0), 0);
+  const finalTotal =
+    Math.max(0, itemsSubtotal + deliveryTotal - discountTotal - coinDeduction);
 
   return {
     sessionId: makeSessionId(),
@@ -327,18 +349,6 @@ export async function selectDelivery(
   return {
     ok: true,
     data: selection,
-  };
-}
-
-export function getDefaultSelectedDelivery(
-  vendorId: string
-): VendorDeliverySelection {
-  return {
-    vendorId,
-    method: "campus_pickup",
-    optionId: `${vendorId}:campus_pickup`,
-    fee: 0,
-    estimatedDelivery: "Same day",
   };
 }
 

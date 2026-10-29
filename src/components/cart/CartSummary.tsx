@@ -34,12 +34,10 @@ export function CartSummary({ summary }: CartSummaryProps) {
 
         <div className="flex justify-between">
           <span className="text-kampmax-text-secondary">
-            Delivery (Hostel)
+            Delivery
           </span>
-          <span className="text-kampmax-text tabular-nums">
-            {summary.deliveryFee === 0
-              ? "Free"
-              : formatNaira(summary.deliveryFee)}
+          <span className="text-kampmax-text-secondary text-xs self-center">
+            Calculated at checkout
           </span>
         </div>
 
