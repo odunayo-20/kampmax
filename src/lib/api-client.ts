@@ -421,9 +421,31 @@ export class ApiClient {
     this.credentials = options.credentials || "include";
   }
 
-  /** GET */
-  async get<T = unknown>(path: string, options: RequestInit = {}): Promise<{ data: T; error: ApiError | null }> {
-    const response = await fetchApi(path, { ...options, method: "GET" });
+  /**
+   * Shared request path. Never throws: a network failure (backend down, CORS,
+   * offline) comes back as an `error` with no `status`, like any other failure.
+   */
+  private async request<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    options: RequestInit = {}
+  ): Promise<{ data: T; error: ApiError | null }> {
+    let response: Response;
+    try {
+      response = await fetchApi(path, {
+        ...options,
+        method,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      });
+    } catch (err) {
+      const apiError = new Error(
+        err instanceof Error && err.message ? err.message : "Network request failed"
+      ) as ApiError;
+      apiError.code = "NETWORK_ERROR";
+      return { data: {} as T, error: apiError };
+    }
+
     const parsed = await parseResponse<T>(response);
 
     if (parsed.parsed.success && parsed.parsed.data !== undefined) {
@@ -434,52 +456,29 @@ export class ApiClient {
     return { data: {} as T, error: parsed.apiError };
   }
 
+  /** GET */
+  async get<T = unknown>(path: string, options: RequestInit = {}): Promise<{ data: T; error: ApiError | null }> {
+    return this.request<T>("GET", path, undefined, options);
+  }
+
   /** POST */
   async post<T = unknown, R = T>(path: string, body?: T, options: RequestInit = {}): Promise<{ data: R; error: ApiError | null }> {
-    const response = await fetchApi(path, { ...options, method: "POST", body: body !== undefined ? JSON.stringify(body) : undefined });
-    const parsed = await parseResponse<R>(response);
-
-    if (parsed.parsed.success && parsed.parsed.data !== undefined) {
-      return { data: parsed.parsed.data as R, error: null };
-    }
-
-    return { data: {} as R, error: parsed.apiError };
+    return this.request<R>("POST", path, body, options);
   }
 
   /** PUT */
   async put<T = unknown, R = T>(path: string, body?: T, options: RequestInit = {}): Promise<{ data: R; error: ApiError | null }> {
-    const response = await fetchApi(path, { ...options, method: "PUT", body: body !== undefined ? JSON.stringify(body) : undefined });
-    const parsed = await parseResponse<R>(response);
-
-    if (parsed.parsed.success && parsed.parsed.data !== undefined) {
-      return { data: parsed.parsed.data as R, error: null };
-    }
-
-    return { data: {} as R, error: parsed.apiError };
+    return this.request<R>("PUT", path, body, options);
   }
 
   /** PATCH */
   async patch<T = unknown, R = T>(path: string, body?: T, options: RequestInit = {}): Promise<{ data: R; error: ApiError | null }> {
-    const response = await fetchApi(path, { ...options, method: "PATCH", body: body !== undefined ? JSON.stringify(body) : undefined });
-    const parsed = await parseResponse<R>(response);
-
-    if (parsed.parsed.success && parsed.parsed.data !== undefined) {
-      return { data: parsed.parsed.data as R, error: null };
-    }
-
-    return { data: {} as R, error: parsed.apiError };
+    return this.request<R>("PATCH", path, body, options);
   }
 
   /** DELETE */
   async delete<R = unknown>(path: string, options: RequestInit = {}): Promise<{ data: R; error: ApiError | null }> {
-    const response = await fetchApi(path, { ...options, method: "DELETE" });
-    const parsed = await parseResponse<R>(response);
-
-    if (parsed.parsed.success && parsed.parsed.data !== undefined) {
-      return { data: parsed.parsed.data as R, error: null };
-    }
-
-    return { data: {} as R, error: parsed.apiError };
+    return this.request<R>("DELETE", path, undefined, options);
   }
 }
 

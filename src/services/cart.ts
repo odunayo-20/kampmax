@@ -427,7 +427,11 @@ export function validateCartItems(
   message?: string;
 }> {
   return items.map((item) => {
-    const product = getProductById(item.productId);
+    // The catalog cache is empty after a page refresh, so fall back to the
+    // line's own snapshot (built from the server cart, which already carries
+    // availability) instead of calling every product "no longer available".
+    const live = getProductById(item.productId);
+    const product = live ?? item.product;
 
     if (!product) {
       return {
@@ -445,18 +449,14 @@ export function validateCartItems(
       };
     }
 
-    const vendor = getVendorById(product.vendorId);
-    if (!vendor) {
-      return {
-        id: item.id,
-        status: "vendor_unavailable",
-        message: "This vendor is currently unavailable.",
-      };
-    }
-
-    const stock = item.selectedVariants
-      ? getStockForSelection(product, item.selectedVariants)
-      : undefined;
+    // A snapshot carries no variant data, so trust the server's stock verdict.
+    const stock = live
+      ? item.selectedVariants
+        ? getStockForSelection(product, item.selectedVariants)
+        : undefined
+      : item.availabilityStatus === "out_of_stock"
+        ? 0
+        : undefined;
     if (stock === 0) {
       return {
         id: item.id,
@@ -465,8 +465,10 @@ export function validateCartItems(
       };
     }
 
+    // Only a live catalog entry can show a price change; a snapshot is the price
+    // the line was added at (and variant lines are priced per option).
     const stored = item.unitPrice ?? product.price;
-    if (stored !== product.price && item.unitPrice !== undefined) {
+    if (live && !item.selectedVariants && stored !== product.price && item.unitPrice !== undefined) {
       const increased = product.price > stored;
       return {
         id: item.id,
