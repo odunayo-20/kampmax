@@ -6,7 +6,6 @@ import { useQuery } from "@tanstack/react-query";
 import type { MarketplaceService } from "@/types/service-marketplace";
 import { useApp } from "@/lib/app-context";
 import { useDebounce } from "@/hooks/use-debounce";
-import { campuses } from "@/data/campus";
 import { useCategoryTree } from "@/hooks/use-taxonomy";
 import { findTaxonomyNode } from "@/services/taxonomy";
 import {
@@ -108,7 +107,7 @@ function filtersEqual(a: ServiceMarketplaceFilters, b: ServiceMarketplaceFilters
 export function useServiceMarketplace(options?: UseServiceMarketplaceOptions) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { selectedCampus } = useApp();
+  const { selectedCampus, campuses } = useApp();
 
   const basePath = options?.basePath ?? "/services";
   const lockedCategoryId = options?.lockedCategoryId;
@@ -127,7 +126,7 @@ export function useServiceMarketplace(options?: UseServiceMarketplaceOptions) {
   const categories = useServiceCategories();
   const campusOptions = useMemo(
     () => campuses.map((c) => ({ id: c.id, name: c.name, abbreviation: c.abbreviation })),
-    []
+    [campuses]
   );
 
   // Keep local state in sync with the URL (first load, refresh, back/forward).
