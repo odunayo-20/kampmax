@@ -20,8 +20,10 @@ import { useDashboardAccess, usePrefetchDashboardQueries } from "./use-dashboard
 
 const STALE_MS = 30_000;
 
-function useAuthenticated() {
-  return useAuth().status === "authenticated";
+/** Whether the vendor queries may run, and the user id their cache keys carry. */
+function useVendorSession() {
+  const { status, user } = useAuth();
+  return { enabled: status === "authenticated", userId: user?.id };
 }
 
 /** Backend-authoritative dashboard access (vendor profile + approval state). */
@@ -34,10 +36,17 @@ export function useVendorAccess() {
   });
 }
 
-// What the overview page reads first (see `useVendorOverview`).
-const vendorOverviewQueries = () => [
-  { queryKey: vendorDashboardKeys.analytics(), queryFn: fetchVendorAnalytics },
-  { queryKey: vendorDashboardKeys.orderStatus(), queryFn: fetchVendorOrderStatusCounts },
+const RECENT_ORDERS_LIMIT = 5;
+
+// What the overview page reads first (see `useVendorOverview` and its widgets).
+const vendorOverviewQueries = (userId: string | undefined) => [
+  { queryKey: vendorDashboardKeys.profile(userId), queryFn: fetchVendorProfile },
+  { queryKey: vendorDashboardKeys.analytics(userId), queryFn: fetchVendorAnalytics },
+  { queryKey: vendorDashboardKeys.orderStatus(userId), queryFn: fetchVendorOrderStatusCounts },
+  {
+    queryKey: vendorDashboardKeys.recentOrders(userId, RECENT_ORDERS_LIMIT),
+    queryFn: () => fetchVendorRecentOrders(RECENT_ORDERS_LIMIT),
+  },
 ];
 
 /** Warms the overview metrics while the access check runs. */
@@ -46,9 +55,9 @@ export function usePrefetchVendorDashboard({ enabled }: { enabled: boolean }) {
 }
 
 export function useVendorProfile() {
-  const enabled = useAuthenticated();
+  const { enabled, userId } = useVendorSession();
   return useQuery({
-    queryKey: vendorDashboardKeys.profile(),
+    queryKey: vendorDashboardKeys.profile(userId),
     queryFn: fetchVendorProfile,
     enabled,
     staleTime: STALE_MS,
@@ -56,9 +65,9 @@ export function useVendorProfile() {
 }
 
 function useVendorAnalytics() {
-  const enabled = useAuthenticated();
+  const { enabled, userId } = useVendorSession();
   return useQuery({
-    queryKey: vendorDashboardKeys.analytics(),
+    queryKey: vendorDashboardKeys.analytics(userId),
     queryFn: fetchVendorAnalytics,
     enabled,
     staleTime: STALE_MS,
@@ -66,9 +75,9 @@ function useVendorAnalytics() {
 }
 
 function useVendorOrderStatus() {
-  const enabled = useAuthenticated();
+  const { enabled, userId } = useVendorSession();
   return useQuery({
-    queryKey: vendorDashboardKeys.orderStatus(),
+    queryKey: vendorDashboardKeys.orderStatus(userId),
     queryFn: fetchVendorOrderStatusCounts,
     enabled,
     staleTime: STALE_MS,
@@ -89,10 +98,10 @@ export function useVendorOverview() {
   };
 }
 
-export function useVendorRecentOrders(limit = 5) {
-  const enabled = useAuthenticated();
+export function useVendorRecentOrders(limit = RECENT_ORDERS_LIMIT) {
+  const { enabled, userId } = useVendorSession();
   return useQuery({
-    queryKey: vendorDashboardKeys.recentOrders(limit),
+    queryKey: vendorDashboardKeys.recentOrders(userId, limit),
     queryFn: () => fetchVendorRecentOrders(limit),
     enabled,
     staleTime: STALE_MS,

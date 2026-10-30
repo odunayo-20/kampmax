@@ -14,8 +14,8 @@ import { getCurrentAuthUser } from "@/lib/current-user-store";
  * storage:
  *  - only the dashboard queries listed in `PERSISTED_ROOTS`;
  *  - only queries whose key contains the signed-in user's id, so the saved data is
- *    always one user's own (this is also why the vendor dashboard, whose keys carry
- *    no user id, is not saved);
+ *    always one user's own. A new dashboard's keys must carry the user id to be saved
+ *    (the vendor low-stock query is keyed by vendor id, so it is not);
  *  - nothing at all when nobody is signed in;
  *  - for `QUERY_CACHE_MAX_AGE_MS` at most.
  * It is removed together with the auth tokens (see `clearAuthTokens`), and
@@ -27,6 +27,7 @@ const PERSISTED_ROOTS: ReadonlySet<unknown> = new Set([
   "freelancer-dashboard",
   "employer-dashboard",
   "service-provider-dashboard",
+  "vendor-dashboard",
   "dashboard-access",
 ]);
 

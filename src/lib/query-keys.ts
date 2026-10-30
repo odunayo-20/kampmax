@@ -732,13 +732,20 @@ export const adminKeys = {
       ["admin", "support", "detail", id, scopeCampusId ?? "platform"] as const,
   } as const,
 };
-/** Vendor dashboard (owner-scoped; identity comes from the JWT server-side). */
+/**
+ * Vendor dashboard. The server picks the vendor from the JWT, but the keys still
+ * carry the signed-in user's id so cached data is tied to its owner — that is also
+ * what lets these queries be saved for a page refresh (see lib/query-persistence.ts).
+ * `all` is the prefix to invalidate the whole dashboard.
+ */
 export const vendorDashboardKeys = {
   all: ["vendor-dashboard"] as const,
-  profile: () => ["vendor-dashboard", "profile"] as const,
-  analytics: () => ["vendor-dashboard", "analytics"] as const,
-  orderStatus: () => ["vendor-dashboard", "order-status"] as const,
-  recentOrders: (limit: number) => ["vendor-dashboard", "recent-orders", limit] as const,
+  profile: (userId: string | undefined) => ["vendor-dashboard", "profile", userId] as const,
+  analytics: (userId: string | undefined) => ["vendor-dashboard", "analytics", userId] as const,
+  orderStatus: (userId: string | undefined) =>
+    ["vendor-dashboard", "order-status", userId] as const,
+  recentOrders: (userId: string | undefined, limit: number) =>
+    ["vendor-dashboard", "recent-orders", userId, limit] as const,
   lowStock: (vendorId: string) => ["vendor-dashboard", "low-stock", vendorId] as const,
 };
 

@@ -8,6 +8,7 @@ import {
 import type { AuthUser } from "@/types";
 import { QUERY_CACHE_KEY, clearAuthTokens } from "../auth-storage";
 import { setCurrentAuthUser } from "../current-user-store";
+import { vendorDashboardKeys } from "../query-keys";
 import {
   QUERY_CACHE_MAX_AGE_MS,
   createQueryPersistOptions,
@@ -32,6 +33,16 @@ describe("isPersistableQuery", () => {
     expect(isPersistableQuery(["employer-dashboard", "summary", "u1"], "success", "u1")).toBe(true);
   });
 
+  it("saves the vendor overview queries, but not ones keyed by something other than the user", () => {
+    expect(isPersistableQuery(vendorDashboardKeys.analytics("u1"), "success", "u1")).toBe(true);
+    expect(isPersistableQuery(vendorDashboardKeys.profile("u1"), "success", "u1")).toBe(true);
+    expect(isPersistableQuery(vendorDashboardKeys.recentOrders("u1", 5), "success", "u1")).toBe(true);
+    // Keyed by vendor id, so there's nothing tying it to the signed-in user.
+    expect(isPersistableQuery(vendorDashboardKeys.lowStock("v1"), "success", "u1")).toBe(false);
+    // Another user's vendor data.
+    expect(isPersistableQuery(vendorDashboardKeys.analytics("u2"), "success", "u1")).toBe(false);
+  });
+
   it("skips queries that aren't successful", () => {
     expect(isPersistableQuery(["freelancer-dashboard", "overview", "u1"], "error", "u1")).toBe(false);
     expect(isPersistableQuery(["freelancer-dashboard", "overview", "u1"], "pending", "u1")).toBe(false);
@@ -43,7 +54,7 @@ describe("isPersistableQuery", () => {
   });
 
   it("skips queries that don't carry the signed-in user's id", () => {
-    // Another user's data, and keys with no user id at all (the vendor dashboard).
+    // Another user's data, and keys with no user id at all.
     expect(isPersistableQuery(["freelancer-dashboard", "overview", "u2"], "success", "u1")).toBe(false);
     expect(isPersistableQuery(["freelancer-dashboard", "overview", undefined], "success", "u1")).toBe(false);
     expect(isPersistableQuery(["vendor-dashboard", "analytics"], "success", "u1")).toBe(false);
