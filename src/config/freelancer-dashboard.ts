@@ -66,4 +66,5 @@ export const FREELANCER_DASHBOARD_SECTIONS = [
   "/freelancer/find-work",
   "/freelancer/proposals",
   "/freelancer/saved-jobs",
+  "/freelancer/verification",
 ] as const;
