@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
 import { AlertCircle, SendHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSendMessage } from "@/hooks/use-messages";
@@ -14,7 +14,7 @@ interface MessageComposerProps {
 /**
  * Compose and send a plain-text message.
  *
- * - Enter inserts a newline; the Send button submits (documented UX choice).
+ * - Enter sends; Shift+Enter inserts a newline. The Send button also submits.
  * - The draft is trimmed, validated and capped at MESSAGE_MAX_LENGTH; the send
  *   button is disabled while the mutation is pending so a message can never be
  *   double-sent.
@@ -61,6 +61,13 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
     setDraft(event.target.value);
   }
 
+  function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    // Enter during IME composition confirms the candidate, it must not send.
+    if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    handleSend();
+  }
+
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
     handleSend();
@@ -89,6 +96,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
           ref={textareaRef}
           value={text}
           onChange={handleChange}
+          onKeyDown={handleKeyDown}
           rows={1}
           maxLength={MESSAGE_MAX_LENGTH}
           placeholder="Type a message..."
@@ -118,7 +126,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
       </div>
 
       <div className="mt-1 flex items-center justify-between text-[10px] text-kampmax-text-secondary/70">
-        <span>Enter for a new line &middot; Send button submits</span>
+        <span>Enter to send &middot; Shift+Enter for a new line</span>
         <span className={cn(overLimit && "font-semibold text-kampmax-error")}>
           {text.length}/{MESSAGE_MAX_LENGTH}
         </span>
