@@ -70,6 +70,10 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     isVendorSection || isServiceProviderSection || isFreelancerSection || isEmployerSection;
 
   const isProtected = isProtectedPath(pathname);
+  // Only pages that can't render without a session wait for it. Public pages paint
+  // straight away, and dashboards paint their own shell skeleton (see
+  // DashboardShellSkeleton), so neither sits behind a blank full-screen spinner.
+  const waitsForSession = isProtected && !isDashboardSection;
 
   useEffect(() => {
     if (status === "unauthenticated" && isProtected) {
@@ -94,7 +98,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     }
   };
 
-  if (status === "loading") {
+  if (status === "loading" && waitsForSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-kampmax-bg">
         <div className="h-8 w-8 border-[3px] border-kampmax-blue/20 border-t-kampmax-blue rounded-full animate-spin" />

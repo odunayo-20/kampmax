@@ -10,6 +10,7 @@ import {
   SERVICE_PROVIDER_DASHBOARD_GATE,
   type ServiceProviderAccess,
 } from "@/services/service-provider-dashboard";
+import { DashboardShellSkeleton } from "@/components/layout/DashboardShellSkeleton";
 import { ServiceProviderAccessGate } from "@/components/service-provider/dashboard/ServiceProviderAccessGate";
 import { ServiceProviderSidebar } from "@/components/service-provider/dashboard/ServiceProviderSidebar";
 import { ServiceProviderTopbar } from "@/components/service-provider/dashboard/ServiceProviderTopbar";
@@ -54,11 +55,7 @@ export default function ServiceProviderLayout({ children }: { children: React.Re
   }
 
   if (status === "loading" || (status === "authenticated" && !access && !loadError)) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-kampmax-bg">
-        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-kampmax-blue/20 border-t-kampmax-blue" />
-      </div>
-    );
+    return <DashboardShellSkeleton />;
   }
 
   if (loadError || !access) {

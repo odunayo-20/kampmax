@@ -8,13 +8,18 @@ import { useAuth } from "@/lib/auth-context";
 import {
   FREELANCER_DASHBOARD_GATE,
   isFreelancerDashboardPath,
+  isFreelancerOverviewPath,
 } from "@/services/freelancer-dashboard";
-import { useFreelancerAccess } from "@/hooks/use-freelancer-dashboard";
+import {
+  useFreelancerAccess,
+  usePrefetchFreelancerDashboard,
+} from "@/hooks/use-freelancer-dashboard";
 import { freelancerDashboardKeys } from "@/lib/query-keys";
 import { FreelancerAccessGate } from "@/components/freelancer/dashboard/FreelancerAccessGate";
 import { FreelancerSidebar } from "@/components/freelancer/dashboard/FreelancerSidebar";
 import { FreelancerTopbar } from "@/components/freelancer/dashboard/FreelancerTopbar";
 import { FREELANCER_ONBOARDING_STATUS } from "@/types/freelancer";
+import { DashboardShellSkeleton } from "@/components/layout/DashboardShellSkeleton";
 import { VerificationStatusBanner } from "@/components/verification/VerificationStatusBanner";
 import { useFreelancerVerification } from "@/hooks/use-verification";
 
@@ -40,6 +45,7 @@ export default function FreelancerLayout({ children }: { children: React.ReactNo
 
   const dashboardPath = isFreelancerDashboardPath(pathname);
   const accessQuery = useFreelancerAccess({ enabled: dashboardPath });
+  usePrefetchFreelancerDashboard({ enabled: isFreelancerOverviewPath(pathname) });
   // Keep the last known access if a background refresh fails.
   const access = accessQuery.data ?? null;
   const loadError = accessQuery.isError && !access;
@@ -63,11 +69,7 @@ export default function FreelancerLayout({ children }: { children: React.ReactNo
   }
 
   if (status === "loading" || (status === "authenticated" && !access && !loadError)) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-kampmax-bg">
-        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-kampmax-blue/20 border-t-kampmax-blue" />
-      </div>
-    );
+    return <DashboardShellSkeleton />;
   }
 
   if (loadError || !access) {

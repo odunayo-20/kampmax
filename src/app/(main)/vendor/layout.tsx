@@ -9,6 +9,7 @@ import {
   getVendorPermissions,
 } from "@/services/vendor-dashboard";
 import { VENDOR_DASHBOARD_GATE, type VendorAccess } from "@/types/vendor-dashboard";
+import { DashboardShellSkeleton } from "@/components/layout/DashboardShellSkeleton";
 import { VendorAccessGate } from "@/components/vendor-dashboard/VendorAccessGate";
 import { VendorSidebar } from "@/components/vendor-dashboard/VendorSidebar";
 import { VendorTopbar } from "@/components/vendor-dashboard/VendorTopbar";
@@ -62,11 +63,7 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
   }, [status, pathname]);
 
   if (status === "loading" || (status === "authenticated" && !access && !loadError)) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-kampmax-bg">
-        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-kampmax-blue/20 border-t-kampmax-blue" />
-      </div>
-    );
+    return <DashboardShellSkeleton />;
   }
 
   if (!access) {

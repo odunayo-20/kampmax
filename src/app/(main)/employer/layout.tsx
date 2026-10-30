@@ -11,6 +11,7 @@ import {
   isEmployerGateExemptPath,
   type EmployerAccess,
 } from "@/services/employer";
+import { DashboardShellSkeleton } from "@/components/layout/DashboardShellSkeleton";
 import { EmployerAccessGate } from "@/components/employer/EmployerAccessGate";
 import { EmployerSidebar } from "@/components/employer/EmployerSidebar";
 import { EmployerOnboardingStatus } from "@/types/employer";
@@ -54,11 +55,7 @@ export default function EmployerLayout({ children }: { children: React.ReactNode
   }
 
   if (status === "loading" || (status === "authenticated" && !access && !loadError)) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-kampmax-bg">
-        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-kampmax-blue/20 border-t-kampmax-blue" />
-      </div>
-    );
+    return <DashboardShellSkeleton />;
   }
 
   if (loadError || !access) {

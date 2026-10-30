@@ -144,6 +144,11 @@ export function isFreelancerDashboardPath(pathname: string): boolean {
   );
 }
 
+/** True on the pages that show the dashboard overview (`/freelancer` redirects to it). */
+export function isFreelancerOverviewPath(pathname: string): boolean {
+  return pathname === "/freelancer" || pathname === "/freelancer/dashboard";
+}
+
 // ── Availability mapping (onboarding enum → dashboard enum) ─
 
 const AVAILABILITY_ALIASES: Record<string, FreelancerDashAvailability | undefined> = {
