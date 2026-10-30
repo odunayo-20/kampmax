@@ -3,6 +3,8 @@
 import { FormPageSkeleton } from "@/components/ui/Skeleton";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { freelancerDashboardKeys } from "@/lib/query-keys";
 import { getFreelancerDashboardApi } from "@/services/freelancer-dashboard";
 import { getMyFreelancerProfile } from "@/services/freelancer";
 import type { FreelancerPrivateProfile } from "@/services/freelancer";
@@ -63,6 +65,8 @@ export default function FreelancerProfilePage() {
   const [loadError, setLoadError] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editSource, setEditSource] = useState<FreelancerPrivateProfile | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const user = getCurrentUser();
 
   const load = useCallback(async () => {
@@ -83,7 +87,13 @@ export default function FreelancerProfilePage() {
   }, [load]);
 
   async function startEditing() {
+    setEditError(null);
     const { profile } = await getMyFreelancerProfile();
+    // Editing without the saved profile would overwrite fields (e.g. availability) with defaults.
+    if (!profile) {
+      setEditError("We couldn't load your profile details. Please try again.");
+      return;
+    }
     setEditSource(profile);
     setEditing(true);
   }
@@ -140,6 +150,7 @@ export default function FreelancerProfilePage() {
                       bio: editSource.bio,
                       city: editSource.city,
                       hourlyRate: editSource.hourlyRate,
+                      availabilityStatus: editSource.availabilityStatus,
                       skills: editSource.skills?.map((s) => s.name),
                       photoUrl: editSource.avatar,
                     }
@@ -148,6 +159,8 @@ export default function FreelancerProfilePage() {
               onCancel={() => setEditing(false)}
               onSaved={() => {
                 setEditing(false);
+                // The dashboard and gate read this profile too; don't leave them stale.
+                void queryClient.invalidateQueries({ queryKey: freelancerDashboardKeys.all });
                 void load();
               }}
             />
@@ -158,6 +171,11 @@ export default function FreelancerProfilePage() {
             <p className="mt-1 text-xs text-kampmax-text-secondary">
               Update your title, bio, rate, availability and skills right here.
             </p>
+            {editError && (
+              <p role="alert" className="mt-3 text-xs text-error-700">
+                {editError}
+              </p>
+            )}
             <div className="mt-4 flex flex-wrap gap-2">
               <button
                 onClick={() => void startEditing()}

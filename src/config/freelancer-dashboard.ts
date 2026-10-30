@@ -2,35 +2,9 @@
 // FREELANCER DASHBOARD CONFIG  (Module 22 — Dashboard)
 // ============================================================
 // Presentation constants for the freelancer dashboard. No business logic,
-// no money math — only labels, orderings and display metadata.
+// no money math — only display metadata.
 
-import type { FreelancerActivityKind, FreelancerDashboardMetric } from "@/types/freelancer-dashboard";
-
-// ── Metric icon/order metadata ──────────────────────────────
-
-export type FreelancerMetricKey = FreelancerDashboardMetric["key"];
-
-export const FREELANCER_METRIC_ORDER: FreelancerMetricKey[] = [
-  "active_proposals",
-  "active_contracts",
-  "completed_projects",
-  "total_earnings",
-];
-
-export const FREELANCER_METRIC_META: Record<FreelancerMetricKey, { label: string }> = {
-  active_proposals: { label: "Active Proposals" },
-  active_contracts: { label: "Active Contracts" },
-  completed_projects: { label: "Completed Projects" },
-  total_earnings: { label: "Total Earnings" },
-};
-
-// ── Availability options ────────────────────────────────────
-
-export const FREELANCER_AVAILABILITY_LABEL: Record<string, string> = {
-  available: "Available for work",
-  available_later: "Available later",
-  unavailable: "Not available",
-};
+import type { FreelancerActivityKind } from "@/types/freelancer-dashboard";
 
 // ── Activity metadata (colour-free + icon by kind) ──────────
 

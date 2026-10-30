@@ -2,13 +2,12 @@
 // FREELANCER DASHBOARD TYPES  (Module 22 — Dashboard)
 // ============================================================
 //
-// Maps 1:1 to future backend endpoints:
-//   GET /freelancer/dashboard  → overview + profile + activity summaries
+// The dashboard service aggregates these from the profile, proposal, contract
+// and wallet endpoints.
 //
-// BACKEND-AUTHORITATIVE: earnings, proposal/contract counts, profile approval,
-// verification, availability and visibility are all supplied by the dashboard
-// service (which mirrors the future API). The UI only renders these values and
-// never derives authoritative business numbers client-side.
+// BACKEND-AUTHORITATIVE: wallet figures, proposal/contract counts, profile approval,
+// verification, availability and visibility all come from the backend. The UI only
+// renders these values and never derives authoritative business numbers client-side.
 
 import type { FreelancerOnboardingStatus } from "@/types/freelancer";
 
@@ -42,7 +41,7 @@ export interface FreelancerProfileStatus {
   /** Publicly discoverable. Backend-owned — never forced here. */
   isPublic: boolean;
   /** Identity verification state (user-facing only). */
-  verification: "verified" | "pending" | "not_required";
+  verification: "verified" | "pending" | "rejected" | "not_required";
 }
 
 export interface FreelancerProfileMissing {
@@ -52,12 +51,7 @@ export interface FreelancerProfileMissing {
   href: string;
 }
 
-// ── Future module summaries (empty until M23–M25 APIs exist) ─
-
-export interface FreelancerOpportunitySummary {
-  total: number;
-  sample: never[]; // reserved for M23 job marketplace
-}
+// ── Proposal / contract / earnings summaries ────────────────
 
 export interface FreelancerProposalSummary {
   submitted: number;
@@ -77,8 +71,8 @@ export interface FreelancerDeadline {
   dueDate: string;
 }
 
+/** Wallet figures. The dashboard's `earnings` is null when the wallet can't be read. */
 export interface FreelancerEarningsSummary {
-  thisMonth: number;
   pending: number;
   available: number;
 }
@@ -86,7 +80,7 @@ export interface FreelancerEarningsSummary {
 // ── Dashboard statistics (backend-supplied or —) ────────────
 
 export interface FreelancerDashboardMetric {
-  key: "active_proposals" | "active_contracts" | "completed_projects" | "total_earnings";
+  key: "active_proposals" | "active_contracts" | "completed_projects" | "wallet_balance";
   label: string;
   /** Pre-formatted display string. `—` when no real data exists. */
   valueLabel: string;
@@ -137,10 +131,9 @@ export interface FreelancerDashboard {
     status: FreelancerDashAvailability | null;
     label: string;
   };
-  opportunities: FreelancerOpportunitySummary;
   proposals: FreelancerProposalSummary;
   contracts: FreelancerContractSummary;
   deadlines: FreelancerDeadline[];
-  earnings: FreelancerEarningsSummary;
+  earnings: FreelancerEarningsSummary | null;
   activity: FreelancerActivityEvent[];
 }

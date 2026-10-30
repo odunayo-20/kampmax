@@ -3,7 +3,9 @@
 import { FormPageSkeleton } from "@/components/ui/Skeleton";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, ShieldAlert, ArrowLeft } from "lucide-react";
+import { freelancerDashboardKeys } from "@/lib/query-keys";
 import {
   getJobByIdApi,
   isBackendId,
@@ -28,6 +30,7 @@ type Step = "form" | "review" | "success";
 
 function CreateProposalContent() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const jobId = searchParams.get("jobId");
 
@@ -132,6 +135,7 @@ function CreateProposalContent() {
       setError(res.error?.message ?? "We couldn't submit your proposal.");
       return;
     }
+    void queryClient.invalidateQueries({ queryKey: freelancerDashboardKeys.all });
     setSubmittedProposal(res.proposal);
     setStep("success");
   }
@@ -198,7 +202,7 @@ function CreateProposalContent() {
 
       {alreadyApplied && (
         <div className="rounded-xl border border-neutral-200 bg-white p-6 text-center">
-          <h2 className="text-sm font-semibold text-neutral-900">You've already applied</h2>
+          <h2 className="text-sm font-semibold text-neutral-900">You&apos;ve already applied</h2>
           <p className="mt-1 text-xs text-neutral-500">
             Head to My Proposals to track or manage your existing application.
           </p>

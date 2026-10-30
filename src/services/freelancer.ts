@@ -193,12 +193,12 @@ export async function getMyFreelancerProfile(): Promise<{
  * Endpoint: PATCH /freelancers/me
  */
 export async function updateMyFreelancerProfile(
-  patch: Partial<CreateFreelancerProfileDto>
+  patch: UpdateFreelancerProfileDto
 ): Promise<{ profile: FreelancerPrivateProfile | null; error: ApiError | null }> {
-  const { data, error } = await apiClient.patch<
-    Partial<CreateFreelancerProfileDto>,
-    FreelancerPrivateProfile
-  >("/freelancers/me", patch);
+  const { data, error } = await apiClient.patch<UpdateFreelancerProfileDto, FreelancerPrivateProfile>(
+    "/freelancers/me",
+    patch
+  );
   if (error) return { profile: null, error };
   return { profile: data, error: null };
 }
@@ -225,6 +225,16 @@ export interface CreateFreelancerProfileDto {
   /** An image the freelancer uploaded, shown as their photo; null removes it. */
   profileMediaId?: string | null;
 }
+
+/** PATCH /freelancers/me — omitted fields are kept; `null` clears an optional field,
+ * and an empty `skills` array removes every skill. */
+export type UpdateFreelancerProfileDto = Omit<
+  Partial<CreateFreelancerProfileDto>,
+  "city" | "hourlyRate"
+> & {
+  city?: string | null;
+  hourlyRate?: number | null;
+};
 
 /**
  * Create a new freelancer profile on the backend — this IS the onboarding

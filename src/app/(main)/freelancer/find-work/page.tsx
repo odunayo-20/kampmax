@@ -25,6 +25,7 @@ function FindWorkContent() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const isFirstRender = useRef(true);
 
   const qParam = searchParams.get("q") ?? "";
@@ -109,6 +110,7 @@ function FindWorkContent() {
       categoryId: query.categoryId,
       experience: query.experience,
       arrangement: query.arrangement,
+      sort: query.sort,
       page: query.page,
       size: query.size,
     }).then((response) => {
@@ -125,7 +127,7 @@ function FindWorkContent() {
       if (!cancelled) setLoading(false);
     });
     return () => { cancelled = true; };
-  }, [query]);
+  }, [query, attempt]);
 
   const hasFilters = Boolean(searchInput.trim() || categoryParam || expParam || arrParam);
 
@@ -143,7 +145,7 @@ function FindWorkContent() {
     return (
       <div className="space-y-6">
         <FindWorkHeader count={0} />
-        <OpportunityErrorState message={error} onRetry={() => setError(null)} />
+        <OpportunityErrorState message={error} onRetry={() => setAttempt((n) => n + 1)} />
       </div>
     );
   }

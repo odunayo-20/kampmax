@@ -123,6 +123,10 @@ export default function JobDetailPage() {
   }
 
   function goToCreateProposal() {
+    if (alreadyApplied) {
+      router.push("/freelancer/proposals");
+      return;
+    }
     router.push(`/freelancer/proposals/create?jobId=${encodeURIComponent(o.id)}`);
   }
 
@@ -233,7 +237,11 @@ export default function JobDetailPage() {
                 : eligibility.reasons.join(" ")}
             </p>
           </div>
-          <Button onClick={goToCreateProposal} disabled={!canApply} className="sm:shrink-0">
+          <Button
+            onClick={goToCreateProposal}
+            disabled={!canApply && !alreadyApplied}
+            className="sm:shrink-0"
+          >
             <Send className="mr-1.5 h-4 w-4" aria-hidden />
             {alreadyApplied ? "View my proposal" : "Apply now"}
           </Button>
@@ -244,7 +252,7 @@ export default function JobDetailPage() {
               <>Complete your freelancer profile to apply.</>
             )}
             {eligibility.code === ELIGIBILITY_CODE.SKILL_MISMATCH && (
-              <>You don't currently match all required skills.</>
+              <>You don&apos;t currently match all required skills.</>
             )}
             {eligibility.code === ELIGIBILITY_CODE.VERIFICATION_REQUIRED && (
               <>Sign in as an approved freelancer to apply.</>

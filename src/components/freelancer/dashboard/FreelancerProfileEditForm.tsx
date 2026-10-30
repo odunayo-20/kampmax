@@ -21,6 +21,7 @@ function toFormValues(profile: {
   bio?: string | null;
   city?: string | null;
   hourlyRate?: number | null;
+  availabilityStatus?: string | null;
   skills?: string[];
 } | null): FreelancerProfileEditValues {
   return {
@@ -28,7 +29,7 @@ function toFormValues(profile: {
     bio: profile?.bio ?? "",
     city: profile?.city ?? "",
     hourlyRate: profile?.hourlyRate != null ? String(profile.hourlyRate) : "",
-    availabilityStatus: "AVAILABLE",
+    availabilityStatus: profile?.availabilityStatus ?? "AVAILABLE",
     skills: (profile?.skills ?? []).join(", "),
   };
 }
@@ -49,6 +50,7 @@ export function FreelancerProfileEditForm({
     bio?: string | null;
     city?: string | null;
     hourlyRate?: number | null;
+    availabilityStatus?: string | null;
     skills?: string[];
     photoUrl?: string | null;
   } | null;
@@ -84,10 +86,11 @@ export function FreelancerProfileEditForm({
     const { profile, error: apiError } = await updateMyFreelancerProfile({
       professionalTitle: values.professionalTitle.trim(),
       bio: values.bio.trim(),
-      city: values.city.trim() || undefined,
-      hourlyRate: values.hourlyRate ? Number(values.hourlyRate) : undefined,
+      // Empty fields are sent as null / [] so they can be cleared, not just changed.
+      city: values.city.trim() || null,
+      hourlyRate: values.hourlyRate.trim() ? Number(values.hourlyRate) : null,
       availabilityStatus: values.availabilityStatus as "AVAILABLE" | "BUSY" | "UNAVAILABLE",
-      skills: skills.length ? skills : undefined,
+      skills,
       ...(photo ? { profileMediaId: photo.mediaId } : {}),
     });
 

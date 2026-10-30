@@ -53,6 +53,8 @@ export function FreelancerProfileStatusCard({ profileStatus }: { profileStatus: 
             ? "Identity verified"
             : verification === "pending"
             ? "Verification pending"
+            : verification === "rejected"
+            ? "Verification not approved"
             : "Verification not required yet"}
         </span>
       </div>

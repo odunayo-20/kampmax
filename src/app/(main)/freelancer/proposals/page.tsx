@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getMyProposalsApi } from "@/services/proposals";
 import type { ProposalStatus } from "@/types/opportunity";
@@ -24,7 +24,7 @@ function ProposalsContent() {
   const [loading, setLoading] = useState(true);
   const [proposals, setProposals] = useState<Awaited<ReturnType<typeof getMyProposalsApi>>["proposals"]>([]);
   const [error, setError] = useState<string | null>(null);
-  const isFirstRender = useRef(true);
+  const [attempt, setAttempt] = useState(0);
 
   const statusParam = searchParams.get("status") ?? "all";
   const status: StatusFilter = PROPOSAL_FILTER_TABS.some(
@@ -33,16 +33,7 @@ function ProposalsContent() {
     ? (statusParam as StatusFilter)
     : "all";
 
-  useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
-    setLoading(true);
-    const t = setTimeout(() => setLoading(false), 150);
-    return () => clearTimeout(t);
-  }, [status]);
-
+  // Everything is loaded once; the status tabs filter it here.
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -57,7 +48,7 @@ function ProposalsContent() {
       setProposals(response.proposals);
     }).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [status]);
+  }, [attempt]);
   const filtered = useMemo(
     () => (status === "all" ? proposals : proposals.filter((p) => p.status === status)),
     [proposals, status]
@@ -86,7 +77,7 @@ function ProposalsContent() {
 
   return (
     <div className="space-y-6">
-      {error && <ProposalErrorState message={error} onRetry={() => setError(null)} />}
+      {error && <ProposalErrorState message={error} onRetry={() => setAttempt((n) => n + 1)} />}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <MyProposalsHeader count={proposals.length} />
       </div>

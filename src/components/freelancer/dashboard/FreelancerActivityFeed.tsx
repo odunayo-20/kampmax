@@ -10,7 +10,6 @@ import {
   Star,
   Calendar,
   Megaphone,
-  ArrowRight,
 } from "lucide-react";
 import { timeAgo } from "@/lib/utils";
 import { FREELANCER_ACTIVITY_META } from "@/config/freelancer-dashboard";
@@ -27,8 +26,8 @@ const ICON_MAP = {
   megaphone: Megaphone,
 } as const;
 
-/** Recent activity feed. Only renders events the backend actually knows about —
- * no fabricated proposal/payment/contract events until M23–M25 exist. */
+/** Recent activity feed. Only renders events built from the freelancer's real
+ * proposals and contracts — nothing is fabricated. */
 export function FreelancerActivityFeed({ events }: { events: FreelancerActivityEvent[] }) {
   return (
     <section aria-label="Recent activity" className="rounded-xl border border-kampmax-border bg-white p-5">
@@ -68,14 +67,6 @@ export function FreelancerActivityFeed({ events }: { events: FreelancerActivityE
           })}
         </ul>
       )}
-      <div className="mt-3 border-t border-kampmax-border pt-2">
-        <Link
-          href="/freelancer/dashboard"
-          className="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:underline"
-        >
-          View all activity <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-        </Link>
-      </div>
     </section>
   );
 }

@@ -51,7 +51,7 @@ export function FreelancerSidebar({
 
   const sections: NavSection[] = [
     {
-      items: [{ href: "/freelancer", label: "Dashboard", icon: LayoutDashboard }],
+      items: [{ href: "/freelancer/dashboard", label: "Dashboard", icon: LayoutDashboard }],
     },
     {
       title: "Work",

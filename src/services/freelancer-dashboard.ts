@@ -9,24 +9,24 @@
 // (getCurrentUser().id). We never trust a freelancerId supplied by the client.
 //
 // SECURITY: approval, verification, availability and visibility are all
-// backend-authoritative (here: the freelancer onboarding store). The dashboard
-// only reports the returned state — it never forces a profile active client-side,
-// never fabricates earnings/proposal/contract counts, and never exposes private
-// documents, internal notes or server secrets.
-//
-// Unlike the vendor/service-provider modules this mirrors, M23–M25 (marketplace,
-// proposals, contracts, financials) are NOT implemented yet. Those dashboard
-// sections therefore render true empty states + `—` placeholders so the library
-// is API-ready but never fakes activity.
+// backend-authoritative. The dashboard only reports the returned state — it
+// never forces a profile active client-side, never fabricates earnings,
+// proposal or contract counts (a value we can't read is shown as `—` or hidden),
+// and never exposes private documents, internal notes or server secrets.
 
 import { apiClient } from "@/lib/api-client";
 import { getCurrentUser } from "@/services/users";
 import {
+  getMyFreelancerProfile,
   getPublicFreelancerById,
   loadProfileSections,
+  type FreelancerPrivateProfile,
 } from "@/services/freelancer";
 import { fromBackendPortfolio, type BackendPortfolioItem } from "@/services/freelancer-services";
-import { CONTRACT_STATUS } from "@/types/contract";
+import { getFreelancerContractsApi } from "@/services/contract";
+import { getMyProposalsApi } from "@/services/proposals";
+import { CONTRACT_STATUS, type Contract } from "@/types/contract";
+import type { Proposal } from "@/types/opportunity";
 import type { FreelancerOnboardingDraft, FreelancerOnboardingStatus } from "@/types/freelancer";
 import { FREELANCER_ONBOARDING_STATUS } from "@/types/freelancer";
 import type {
@@ -36,6 +36,7 @@ import type {
   FreelancerProfileStatus,
 } from "@/types/freelancer-dashboard";
 import { FREELANCER_DASHBOARD_SECTIONS } from "@/config/freelancer-dashboard";
+import { formatNaira } from "@/lib/utils";
 
 // ── Access gate ─────────────────────────────────────────────
 
@@ -58,11 +59,6 @@ export interface FreelancerAccess {
   message: string | null;
   displayName?: string;
 }
-
-
-
-// ── Profile status (backend-computed, mirrors future API) ───
-
 
 // ── Public freelancer profile (Module 28) ───────────────────
 // Read-model an EMPLOYER reviewing an application sees. Only fields the
@@ -95,8 +91,6 @@ export interface PublicFreelancerProfile {
   };
   availability: { status: FreelancerDashAvailability | null; label: string };
 }
-
-
 
 /**
  * Public freelancer profile from the real backend, keyed by profile id
@@ -141,16 +135,6 @@ export async function getPublicFreelancerFromBackend(
   };
 }
 
-
-// ── Dashboard overview ──────────────────────────────────────
-
-
-// ── Activity feed (profile lifecycle + contract action pending) ──
-
-
-// ── Notifications summary (reuses the existing notification system) ─
-
-
 // ── Dashboard path helper (mirrors isServiceProviderDashboardPath) ─
 
 /** True when the pathname belongs to the full-screen Freelancer dashboard shell. */
@@ -190,14 +174,6 @@ function availabilityLabel(
 // ASYNC BACKEND API — FREELANCER DASHBOARD
 // ═══════════════════════════════════════════════════════════
 
-import { getMyFreelancerProfile } from "@/services/freelancer";
-import { getFreelancerContractsApi } from "@/services/contract";
-import { formatNaira } from "@/lib/utils";
-import type { Contract } from "@/types/contract";
-import type { Proposal } from "@/types/opportunity";
-import type { FreelancerPrivateProfile } from "@/services/freelancer";
-import { getMyProposalsApi } from "@/services/proposals";
-
 /**
  * Determine dashboard access gate state from the live backend.
  *
@@ -233,12 +209,30 @@ export async function getFreelancerDashboardAccessApi(): Promise<FreelancerAcces
 
   const vs = profile.verificationStatus?.toUpperCase();
   if (vs === "REJECTED") {
-    return { kind: FREELANCER_DASHBOARD_GATE.REJECTED, status: "REJECTED" as any, canUseDashboard: true, message: "Your freelancer verification requires changes.", displayName };
+    return {
+      kind: FREELANCER_DASHBOARD_GATE.REJECTED,
+      status: FREELANCER_ONBOARDING_STATUS.REJECTED,
+      canUseDashboard: true,
+      message: "Your freelancer verification requires changes.",
+      displayName,
+    };
   }
   if (vs === "PENDING") {
-    return { kind: FREELANCER_DASHBOARD_GATE.PENDING_REVIEW, status: "PENDING_REVIEW" as any, canUseDashboard: true, message: "Your freelancer verification is under review.", displayName };
+    return {
+      kind: FREELANCER_DASHBOARD_GATE.PENDING_REVIEW,
+      status: FREELANCER_ONBOARDING_STATUS.PENDING_REVIEW,
+      canUseDashboard: true,
+      message: "Your freelancer verification is under review.",
+      displayName,
+    };
   }
-  return { kind: FREELANCER_DASHBOARD_GATE.APPROVED, status: "APPROVED" as any, canUseDashboard: true, message: null, displayName };
+  return {
+    kind: FREELANCER_DASHBOARD_GATE.APPROVED,
+    status: FREELANCER_ONBOARDING_STATUS.APPROVED,
+    canUseDashboard: true,
+    message: null,
+    displayName,
+  };
 }
 
 /**
@@ -268,14 +262,15 @@ export async function getFreelancerDashboardApi(): Promise<FreelancerDashboard |
   const submittedProposals = countOf("submitted");
   const underReview = countOf("under_review");
 
-  const balance = wallet.data && typeof wallet.data.balance === "number" ? wallet.data.balance : null;
+  const walletData = wallet.error ? null : wallet.data;
+  const balance = walletData && typeof walletData.balance === "number" ? walletData.balance : null;
 
   const metrics: FreelancerDashboardMetric[] = [
     { key: "active_proposals", label: "Active Proposals", valueLabel: String(submittedProposals + underReview), tone: "neutral" },
     { key: "active_contracts", label: "Active Contracts", valueLabel: String(active), tone: "info" },
     { key: "completed_projects", label: "Completed Projects", valueLabel: String(completed), tone: "success" },
     {
-      key: "total_earnings",
+      key: "wallet_balance",
       label: "Wallet balance",
       valueLabel: balance === null ? "—" : formatNaira(balance),
       tone: "neutral",
@@ -302,7 +297,6 @@ export async function getFreelancerDashboardApi(): Promise<FreelancerDashboard |
     profileStatus,
     metrics,
     availability: availabilityLabel(profile.availabilityStatus),
-    opportunities: { total: 0, sample: [] },
     proposals: {
       submitted: submittedProposals,
       underReview,
@@ -311,7 +305,10 @@ export async function getFreelancerDashboardApi(): Promise<FreelancerDashboard |
     },
     contracts: { active, completed },
     deadlines,
-    earnings: { thisMonth: 0, pending: wallet.data?.heldBalance ?? 0, available: balance ?? 0 },
+    earnings:
+      walletData && balance !== null
+        ? { available: balance, pending: Number(walletData.heldBalance ?? 0) }
+        : null,
     activity: buildActivity(proposals, contracts),
   };
 }
@@ -344,7 +341,14 @@ function buildProfileStatus(
     completionPercentage: Math.round((checks.filter((c) => c.ok).length / checks.length) * 100),
     missing: checks.filter((c) => !c.ok).map(({ key, label, description, href }) => ({ key, label, description, href })),
     isPublic: profile.isPublic,
-    verification: vs === "VERIFIED" ? "verified" : vs === "PENDING" ? "pending" : "not_required",
+    verification:
+      vs === "VERIFIED"
+        ? "verified"
+        : vs === "PENDING"
+        ? "pending"
+        : vs === "REJECTED"
+        ? "rejected"
+        : "not_required",
   };
 }
 

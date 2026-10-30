@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { freelancerDashboardKeys } from "@/lib/query-keys";
 import { cn, formatNaira } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/Skeleton";
 import {
@@ -31,6 +33,7 @@ const FILTERS: { key: FilterKey; label: string; match: (c: Contract) => boolean 
 ];
 
 export default function FreelancerContractsPage() {
+  const queryClient = useQueryClient();
   const [activeFilter, setActiveFilter] = useState<FilterKey>("ALL");
   // The freelancer's real engagements from the backend.
   const [engagements, setEngagements] = useState<Engagement[]>([]);
@@ -130,8 +133,8 @@ export default function FreelancerContractsPage() {
         <ContractEmptyState
           title="No contracts here yet"
           body="When a client accepts your proposal, your contract and project workspace will appear here."
-          actionLabel="Browse services"
-          actionHref="/services"
+          actionLabel="Find work"
+          actionHref="/freelancer/find-work"
         />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
@@ -155,7 +158,11 @@ export default function FreelancerContractsPage() {
                   engagementId={engagement.id}
                   status={engagement.status}
                   role="freelancer"
-                  onChanged={() => void loadEngagements()}
+                  onChanged={() => {
+                    void loadEngagements();
+                    void queryClient.invalidateQueries({ queryKey: freelancerDashboardKeys.all });
+                    void queryClient.invalidateQueries({ queryKey: ["freelancer", "contracts"] });
+                  }}
                 />
               </div>
             ) : null;

@@ -8,7 +8,7 @@ const ICON: Record<FreelancerDashboardMetric["key"], typeof Briefcase> = {
   active_proposals: Briefcase,
   active_contracts: Handshake,
   completed_projects: CheckCircle2,
-  total_earnings: Wallet,
+  wallet_balance: Wallet,
 };
 
 const TONE: Record<FreelancerDashboardMetric["tone"], string> = {
@@ -19,7 +19,7 @@ const TONE: Record<FreelancerDashboardMetric["tone"], string> = {
 };
 
 /** Backend-supplied metric card. Never fabricated — only renders what the
- * dashboard service returns (here, `—` until M23–M25 supply real data). */
+ * dashboard service returns (`—` when a value can't be read). */
 export function FreelancerMetricCard({ metric }: { metric: FreelancerDashboardMetric }) {
   const Icon = ICON[metric.key] ?? Briefcase;
   return (

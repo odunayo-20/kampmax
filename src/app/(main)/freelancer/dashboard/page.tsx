@@ -151,7 +151,7 @@ export default function FreelancerDashboardPage() {
             description={`${dashboard.contracts.active} active · ${dashboard.contracts.completed} completed`}
             cta="Manage contracts"
           />
-          <FreelancerFinancialSummary />
+          <FreelancerFinancialSummary earnings={dashboard.earnings} />
         </div>
       </section>
 
@@ -167,14 +167,14 @@ export default function FreelancerDashboardPage() {
               {profileStatus.missing.length > 0 ? (
                 profileStatus.missing.slice(0, 4).map((m) => (
                   <li key={m.key}>
-                    <a
+                    <Link
                       href={m.href}
                       className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-kampmax-text hover:bg-neutral-50"
                     >
                       <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary-600" aria-hidden />
                       <span className="flex-1">{m.label}</span>
                       <ArrowRight className="h-3.5 w-3.5 text-neutral-400" aria-hidden />
-                    </a>
+                    </Link>
                   </li>
                 ))
               ) : (

@@ -14,7 +14,7 @@ export function FreelancerQuickActions({ displayName }: { displayName: string })
   const actions: Action[] = [
     { href: "/freelancer/profile", label: "Edit profile", icon: Pencil },
     { href: "/freelancer/settings", label: "Settings", icon: Settings },
-    { href: "/onboarding/freelancer", label: "Browse work preview", icon: Search },
+    { href: "/freelancer/find-work", label: "Find work", icon: Search },
   ];
 
   return (
@@ -22,7 +22,7 @@ export function FreelancerQuickActions({ displayName }: { displayName: string })
       <div>
         <h1 className="text-xl font-bold text-kampmax-text">Welcome back, {displayName}</h1>
         <p className="mt-0.5 text-sm text-kampmax-text-secondary">
-          Here's what's happening with your freelancer profile.
+          Here&apos;s what&apos;s happening with your freelancer profile.
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
