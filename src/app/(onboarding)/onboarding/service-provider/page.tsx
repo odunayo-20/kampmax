@@ -1,15 +1,31 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Store, Wrench, Briefcase, Users, Shield, Star, ArrowRight, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui";
+import type { Metadata } from "next";
+import { Store, Wrench, Briefcase, Users, Shield, Star, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/lib/auth-context";
+import { RedirectApprovedProvider } from "@/components/service-provider/intro/RedirectApprovedProvider";
 import {
-  getServiceProviderDashboardAccessApi,
-  SERVICE_PROVIDER_DASHBOARD_GATE,
-} from "@/services/service-provider-dashboard";
+  StartApplicationCta,
+  StickyStartApplicationBar,
+} from "@/components/service-provider/intro/StartApplicationCta";
+
+// A server component, so the title, description and share preview are in the HTML
+// that search engines and link previews (WhatsApp, X, ...) read.
+export const metadata: Metadata = {
+  title: "Become a Service Provider | Kampmax",
+  description:
+    "Turn your skills into income on Kampmax. List your services, set your own schedule and prices, and reach students on campus.",
+  openGraph: {
+    title: "Become a Service Provider on Kampmax",
+    description:
+      "List your services, set your own schedule and prices, and reach students on campus.",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Become a Service Provider on Kampmax",
+    description:
+      "List your services, set your own schedule and prices, and reach students on campus.",
+  },
+};
 
 const features = [
   {
@@ -57,43 +73,10 @@ const steps = [
 ];
 
 export default function ServiceProviderIntroPage() {
-  const router = useRouter();
-  const { status } = useAuth();
-  const [checking, setChecking] = useState(true);
-
-  // Someone can land here already having an active Service Provider
-  // profile — e.g. an existing customer sent straight here from /register
-  // instead of re-signing-up. Don't show the marketing/start page again;
-  // take them straight to the dashboard they already have.
-  useEffect(() => {
-    if (status !== "authenticated") {
-      setChecking(false);
-      return;
-    }
-    let cancelled = false;
-    getServiceProviderDashboardAccessApi()
-      .then((access) => {
-        if (cancelled) return;
-        if (access.kind === SERVICE_PROVIDER_DASHBOARD_GATE.APPROVED) {
-          router.replace("/service-provider");
-          return;
-        }
-        setChecking(false);
-      })
-      .catch(() => { if (!cancelled) setChecking(false); });
-    return () => { cancelled = true; };
-  }, [status, router]);
-
-  if (status === "loading" || (status === "authenticated" && checking)) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-4 border-primary-600 border-t-transparent" />
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-white">
+    // Bottom padding keeps the sticky mobile button from covering the last section.
+    <div className="min-h-screen bg-white pb-24 sm:pb-0">
+      <RedirectApprovedProvider />
       <div className="max-w-4xl mx-auto px-6 py-12 lg:py-20">
         {/* Header */}
         <div className="text-center mb-12 lg:mb-16">
@@ -107,6 +90,12 @@ export default function ServiceProviderIntroPage() {
             Turn your skills into income. Join thousands of verified service providers on Kampmax
             and connect with students who need your expertise.
           </p>
+          <div className="mt-8">
+            <StartApplicationCta />
+            <p className="mt-3 text-sm text-kampmax-text-secondary">
+              Your progress saves automatically, so you can finish later.
+            </p>
+          </div>
         </div>
 
         {/* What you can offer */}
@@ -218,19 +207,14 @@ export default function ServiceProviderIntroPage() {
 
         {/* CTA */}
         <div className="text-center pt-8">
-          <Button
-            size="lg"
-            className="w-full sm:w-auto px-12 py-4 text-lg"
-            onClick={() => router.push("/onboarding/service-provider/1")}
-          >
-            Start Your Application
-            <ArrowRight className="h-5 w-5 ml-2" />
-          </Button>
+          <StartApplicationCta />
           <p className="mt-4 text-sm text-kampmax-text-secondary">
             Free to apply • No commitment • Cancel anytime
           </p>
         </div>
       </div>
+
+      <StickyStartApplicationBar />
     </div>
   );
 }

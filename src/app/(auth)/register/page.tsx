@@ -68,9 +68,12 @@ function RegisterForm() {
   const { register, status: authStatus } = useAuth();
   const { campuses, selectedCampus, setSelectedCampus } = useApp();
   const campusParam = searchParams.get("campus");
+  // A link such as /register?role=service_provider (from a role's landing page)
+  // already knows what the visitor wants, so it skips the role picker.
+  const roleParam = ROLE_CHOICES.find((c) => c.id === searchParams.get("role"))?.id;
 
-  const [step, setStep] = useState<"role" | "form">("role");
-  const [choiceId, setChoiceId] = useState<KampmaxRoleId>("customer");
+  const [step, setStep] = useState<"role" | "form">(roleParam ? "form" : "role");
+  const [choiceId, setChoiceId] = useState<KampmaxRoleId>(roleParam ?? "customer");
   const choice = choiceById(choiceId);
 
   // Campus selection state — pre-populated from query param or app state

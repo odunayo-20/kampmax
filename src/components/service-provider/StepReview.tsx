@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle, AlertCircle, XCircle, ChevronRight, Edit, Shield, Clock, MapPin, DollarSign, Image, Settings, User } from "lucide-react";
+import { CheckCircle, AlertCircle, ChevronRight, Edit, Shield, Clock, MapPin, DollarSign, Image, Settings, User } from "lucide-react";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { formatNaira } from "@/lib/utils";
@@ -41,15 +41,33 @@ const BOOKING_LABELS: Record<ServiceProviderBookingPreference, string> = {
   request_approval: "Request Approval",
 };
 
+/** Whether every required part of the application is filled in. */
+export function isApplicationComplete(draft: ServiceProviderOnboardingDraft | null): boolean {
+  if (!draft) return false;
+  if (!draft.provider?.type) return false;
+  if (!draft.provider?.displayName) return false;
+  if (!draft.profile?.displayName) return false;
+  if (!draft.category?.primaryCategoryId) return false;
+  if (!draft.services?.length) return false;
+  if (!draft.location?.primaryCampusId) return false;
+  if (!draft.availability?.days?.some((d) => d.isAvailable)) return false;
+  return true;
+}
+
 interface StepReviewProps {
   draft: ServiceProviderOnboardingDraft | null;
   onEditStep: (step: number) => void;
-  onSubmit: () => void;
-  canSubmit: boolean;
-  isSubmitting: boolean;
+  termsAccepted: boolean;
+  onTermsChange: (accepted: boolean) => void;
 }
 
-export function StepReview({ draft, onEditStep, onSubmit, canSubmit, isSubmitting }: StepReviewProps) {
+/**
+ * The last step. It only reviews and collects the agreement; submitting is done by
+ * the layout's footer button, which the page enables once the application is
+ * complete and the terms are accepted — so there is one submit button, and one place
+ * that decides when it works.
+ */
+export function StepReview({ draft, onEditStep, termsAccepted, onTermsChange }: StepReviewProps) {
   const [openSection, setOpenSection] = useState<string | null>(null);
 
   const toggleSection = (section: string) => {
@@ -298,19 +316,7 @@ export function StepReview({ draft, onEditStep, onSubmit, canSubmit, isSubmittin
     },
   ];
 
-  const allComplete = () => {
-    if (!draft) return false;
-    if (!draft.provider?.type) return false;
-    if (!draft.provider?.displayName) return false;
-    if (!draft.profile?.displayName) return false;
-    if (!draft.category?.primaryCategoryId) return false;
-    if (!draft?.services?.length) return false;
-    if (!draft?.location?.primaryCampusId) return false;
-    if (!draft?.availability?.days?.some((d) => d.isAvailable)) return false;
-    return true;
-  };
-
-  const isComplete = allComplete();
+  const isComplete = isApplicationComplete(draft);
 
   return (
     <div className="space-y-6">
@@ -409,66 +415,24 @@ export function StepReview({ draft, onEditStep, onSubmit, canSubmit, isSubmittin
       {/* Terms & Agreement */}
       <div className="rounded-xl border border-kampmax-border bg-white p-6 space-y-4">
         <h3 className="text-lg font-semibold text-kampmax-text">Terms & Agreement</h3>
-        <p className="text-sm text-kampmax-text-secondary">
-          By submitting this application, you agree to the following:
-        </p>
-        <div className="space-y-3">
-          <label className="flex items-start gap-3 rounded-lg p-3 border border-neutral-200 hover:bg-neutral-50 cursor-pointer">
-            <input type="checkbox" className="mt-1 h-4 w-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-600" required />
-            <div className="text-sm text-kampmax-text">
-              <p className="font-medium">Service Provider Terms of Service</p>
-              <p className="text-sm text-kampmax-text-secondary">I have read and agree to the Kampmax Service Provider Terms of Service.</p>
-            </div>
-          </label>
-          <label className="flex items-start gap-3 rounded-lg p-3 border border-neutral-200 hover:bg-neutral-50 cursor-pointer">
-            <input type="checkbox" className="mt-1 h-4 w-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-600" required />
-            <div className="text-sm text-kampmax-text">
-              <p className="font-medium">Marketplace Policies</p>
-              <p className="text-sm text-kampmax-text-secondary">I agree to follow Kampmax marketplace policies and community guidelines.</p>
-            </div>
-          </label>
-          <label className="flex items-start gap-3 rounded-lg p-3 border border-neutral-200 hover:bg-neutral-50 cursor-pointer">
-            <input type="checkbox" className="mt-1 h-4 w-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-600" required />
-            <div className="text-sm text-kampmax-text">
-              <p className="font-medium">Payment & Payout Policies</p>
-              <p className="text-sm text-kampmax-text-secondary">I understand and accept the payment processing and payout policies.</p>
-            </div>
-          </label>
-          <label className="flex items-start gap-3 rounded-lg p-3 border border-neutral-200 hover:bg-neutral-50 cursor-pointer">
-            <input type="checkbox" className="mt-1 h-4 w-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-600" required />
-            <div className="text-sm text-kampmax-text">
-              <p className="font-medium">Cancellation & Refund Policies</p>
-              <p className="text-sm text-kampmax-text-secondary">I agree to the cancellation and refund policies for service bookings.</p>
-            </div>
-          </label>
-        </div>
-      </div>
-
-      {/* Submit */}
-      <div className="flex flex-col sm:flex-row gap-3 justify-end">
-        <Button variant="outline" onClick={() => onEditStep(8)} disabled={isSubmitting}>
-          <XCircle className="h-4 w-4 mr-2" />
-          Back to Portfolio
-        </Button>
-        <Button
-          variant="primary"
-          size="lg"
-          onClick={onSubmit}
-          disabled={!canSubmit || !isComplete || isSubmitting}
-          className="w-full sm:w-auto"
-        >
-          {isSubmitting ? (
-            <>
-              <div className="h-4 w-4 animate-spin border-2 border-white border-t-transparent rounded-full mr-2" />
-              Submitting...
-            </>
-          ) : (
-            <>
-              <Shield className="h-4 w-4 mr-2" />
-              Submit Application
-            </>
-          )}
-        </Button>
+        <label className="flex items-start gap-3 rounded-lg border border-neutral-200 p-3 hover:bg-neutral-50 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={termsAccepted}
+            onChange={(e) => onTermsChange(e.target.checked)}
+            className="mt-1 h-4 w-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-600"
+          />
+          <span className="text-sm text-kampmax-text">
+            I have read and agree to the Kampmax Service Provider Terms of Service and marketplace
+            policies, including the payment and payout policies and the cancellation and refund
+            policies for service bookings.
+          </span>
+        </label>
+        {!termsAccepted && (
+          <p className="text-sm text-kampmax-text-secondary">
+            Tick the box to enable <span className="font-medium">Submit Application</span>.
+          </p>
+        )}
       </div>
     </div>
   );

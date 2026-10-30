@@ -11,8 +11,9 @@ import { StepLocation } from "@/components/service-provider/StepLocation";
 import { StepAvailability } from "@/components/service-provider/StepAvailability";
 import { StepPricing } from "@/components/service-provider/StepPricing";
 import { StepPortfolio } from "@/components/service-provider/StepPortfolio";
-import { StepReview } from "@/components/service-provider/StepReview";
+import { StepReview, isApplicationComplete } from "@/components/service-provider/StepReview";
 import { useAuth } from "@/lib/auth-context";
+import { useRequireSignIn } from "@/hooks/use-require-sign-in";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
 import { completeSpOnboarding } from "@/services/service-provider";
 import { spDraftFromSaved, spDraftToSaved } from "@/services/service-provider-onboarding";
@@ -63,6 +64,7 @@ export default function ServiceProviderOnboardingStepPage() {
   const router = useRouter();
   const params = useParams();
   const { user } = useAuth();
+  useRequireSignIn();
   const userId = user?.id ?? null;
   const currentStep = parseInt(params.step as string, 10) as ServiceProviderOnboardingStepId;
 
@@ -74,6 +76,8 @@ export default function ServiceProviderOnboardingStepPage() {
   const [error, setError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  // Agreement to the terms is asked on every visit to the review step, not saved in the draft.
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   // The latest values, for the debounced save and the unmount flush.
   const latest = useRef<{ draft: ServiceProviderOnboardingDraft | null; completed: ServiceProviderOnboardingStepId[] }>({
@@ -205,7 +209,9 @@ export default function ServiceProviderOnboardingStepPage() {
   );
 
   const handleSubmit = useCallback(async () => {
-    if (!draft) return;
+    // The footer button is already disabled in these cases; this keeps any other
+    // caller from submitting an incomplete application or skipping the agreement.
+    if (!draft || !termsAccepted || !isApplicationComplete(draft)) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -225,7 +231,7 @@ export default function ServiceProviderOnboardingStepPage() {
     } finally {
       setSubmitting(false);
     }
-  }, [draft, router]);
+  }, [draft, termsAccepted, router]);
 
   const Component = STEP_COMPONENTS[currentStep];
 
@@ -259,9 +265,8 @@ export default function ServiceProviderOnboardingStepPage() {
         <StepReview
           draft={shown}
           onEditStep={(step) => void handleEditStep(step)}
-          onSubmit={handleSubmit}
-          canSubmit
-          isSubmitting={submitting}
+          termsAccepted={termsAccepted}
+          onTermsChange={setTermsAccepted}
         />
       );
     }
@@ -277,7 +282,7 @@ export default function ServiceProviderOnboardingStepPage() {
       onNext={() => void handleNext()}
       onBack={() => void handleBack()}
       onSubmit={handleSubmit}
-      canSubmit
+      canSubmit={termsAccepted && isApplicationComplete(shown)}
       isSaving={saving}
       isSubmitting={submitting}
       nextDisabled={!STEP_VALIDATION[currentStep]?.(draft)}
