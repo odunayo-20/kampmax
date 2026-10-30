@@ -23,6 +23,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { VendorPermissions } from "@/types/vendor-dashboard";
 import { VendorStatusBadge } from "./VendorStatusBadge";
+import { NavLinkIcon } from "./NavLinkIcon";
 import { useUnreadMessageCount } from "@/hooks/use-messages";
 import { LogoIcon } from "@/components/ui/Logo";
 
@@ -130,7 +131,6 @@ export function VendorSidebar({ storeName, permissions, status }: VendorSidebarP
               {section.items.map((item) => {
                 const permitted = item.permission ? permissions[item.permission] : true;
                 const active = isActive(pathname, item.href);
-                const Icon = item.icon;
                 return (
                   <li key={item.href}>
                     <Link
@@ -144,7 +144,7 @@ export function VendorSidebar({ storeName, permissions, status }: VendorSidebarP
                         !permitted && "pointer-events-none opacity-50"
                       )}
                     >
-                      <Icon className="h-4 w-4 shrink-0" aria-hidden />
+                      <NavLinkIcon icon={item.icon} />
                       <span className="flex-1 truncate">{item.label}</span>
                       {item.placeholder && <Lock className="h-3.5 w-3.5 text-white/40" aria-label="Coming soon" />}
                       {item.badge && (

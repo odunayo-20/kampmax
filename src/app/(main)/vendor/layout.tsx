@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -16,12 +16,16 @@ import { VendorTopbar } from "@/components/vendor-dashboard/VendorTopbar";
 import { VerificationStatusBanner } from "@/components/verification/VerificationStatusBanner";
 import { useVendorVerification } from "@/hooks/use-verification";
 
+/** How long vendor access is trusted before a navigation triggers a quiet refresh. */
+const ACCESS_REVALIDATE_MS = 60_000;
+
 export default function VendorLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { status } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [access, setAccess] = useState<VendorAccess | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const lastFetchedAt = useRef(0);
   const permissions = getVendorPermissions();
   const verification = useVendorVerification();
 
@@ -30,15 +34,31 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
     setMobileOpen(false);
   }, [pathname]);
 
+  // Load access once per session, then revalidate quietly on navigation. The
+  // current access is kept while refetching, so the sidebar/topbar never unmount
+  // and the full-screen spinner only appears on the very first load.
   useEffect(() => {
     if (status !== "authenticated") return;
+    const stale = Date.now() - lastFetchedAt.current > ACCESS_REVALIDATE_MS;
+    if (!stale && access) return;
+
     let cancelled = false;
-    setAccess(null);
-    setLoadError(false);
+    lastFetchedAt.current = Date.now();
     getVendorDashboardAccessApi()
-      .then((result) => { if (!cancelled) setAccess(result); })
-      .catch(() => { if (!cancelled) setLoadError(true); });
+      .then((result) => {
+        if (cancelled) return;
+        setAccess(result);
+        setLoadError(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // A failed background refresh shouldn't tear down a working dashboard.
+        setLoadError(true);
+        lastFetchedAt.current = 0;
+      });
     return () => { cancelled = true; };
+    // `access` is intentionally omitted: it is only read to skip a fresh fetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, pathname]);
 
   if (status === "loading" || (status === "authenticated" && !access && !loadError)) {
@@ -49,7 +69,7 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
     );
   }
 
-  if (loadError || !access) {
+  if (!access) {
     return (
       <VendorAccessGate
         access={{
@@ -142,7 +162,7 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
               verificationHref="/vendor/verification"
             />
           )}
-          <div key={pathname}>{children}</div>
+          <div key={pathname} className="page-enter">{children}</div>
         </main>
       </div>
     </div>

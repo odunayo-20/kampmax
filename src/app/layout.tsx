@@ -2,6 +2,7 @@ import "@/lib/storage-polyfill";
 import type { Metadata, Viewport } from "next";
 import "@fontsource-variable/inter";
 import { Providers } from "@/lib/providers";
+import { RouteProgress } from "@/components/ui/RouteProgress";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -27,6 +28,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <RouteProgress />
         <Providers>{children}</Providers>
       </body>
     </html>

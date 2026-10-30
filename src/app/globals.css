@@ -133,6 +133,34 @@ body {
   to { transform: translateX(0); opacity: 1; }
 }
 
+/* Skeleton shimmer — a soft highlight sweeping across the placeholder */
+@keyframes kampmax-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+.skeleton-shimmer {
+  background-color: var(--color-kampmax-muted);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgb(255 255 255 / 0.65) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: kampmax-shimmer 1.6s ease-in-out infinite;
+}
+
+/* Content arriving after a route change */
+.page-enter {
+  animation: kampmax-fade-in 160ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-shimmer { animation: none; }
+  .page-enter { animation: none; }
+}
+
 /* Safe area for mobile */
 @supports (padding: env(safe-area-inset-bottom)) {
   .safe-bottom {

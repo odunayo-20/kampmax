@@ -12,7 +12,7 @@ export function Skeleton({
     <div
       aria-hidden
       style={style}
-      className={cn("animate-pulse rounded-md bg-kampmax-muted", className)}
+      className={cn("skeleton-shimmer rounded-md", className)}
     />
   );
 }

@@ -34,18 +34,7 @@ export default function StatementsPage() {
     URL.revokeObjectURL(url);
   };
 
-  if (statementQuery.isPending) return <FinancialsSkeleton />;
   const statement = statementQuery.data;
-  if (statementQuery.isError || !statement) {
-    return (
-      <div className="rounded-xl border border-error-200 bg-error-50 p-6 text-center">
-        <p className="text-sm font-medium text-error-700">Couldn&apos;t load this statement.</p>
-        <button type="button" onClick={() => statementQuery.refetch()} className="mt-2 text-xs font-semibold text-error-700 underline">
-          Try again
-        </button>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -56,12 +45,23 @@ export default function StatementsPage() {
         </div>
       </header>
 
-      <StatementPanel
-        statement={statement}
-        onExport={handleExport}
-        onPeriodChange={setPeriod}
-        availablePeriods={availablePeriods}
-      />
+      {statementQuery.isPending ? (
+        <FinancialsSkeleton showHeading={false} />
+      ) : statementQuery.isError || !statement ? (
+        <div role="alert" className="rounded-xl border border-error-200 bg-error-50 p-6 text-center">
+          <p className="text-sm font-medium text-error-700">Couldn&apos;t load this statement.</p>
+          <button type="button" onClick={() => statementQuery.refetch()} className="mt-2 text-xs font-semibold text-error-700 underline">
+            Try again
+          </button>
+        </div>
+      ) : (
+        <StatementPanel
+          statement={statement}
+          onExport={handleExport}
+          onPeriodChange={setPeriod}
+          availablePeriods={availablePeriods}
+        />
+      )}
     </div>
   );
 }
