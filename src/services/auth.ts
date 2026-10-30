@@ -33,6 +33,11 @@ function delay(ms: number = 800): Promise<void> {
 export interface AuthResult {
   success: boolean;
   message: string | null;
+  /**
+   * The server couldn't be reached (offline, or a 5xx). Set by `getCurrentSession`
+   * so the caller can tell "the session is invalid" from "we couldn't check".
+   */
+  unreachable?: boolean;
   user?: AuthUser;
   token?: string; // access token (alias for backward compat)
   accessToken?: string;
@@ -353,7 +358,9 @@ export async function getCurrentSession(
   const result = await apiClient.get<unknown>("/auth/me");
 
   if (result.error) {
-    return { success: false, message: result.error.message };
+    const unreachable =
+      result.error.code === "NETWORK_ERROR" || (result.error.status ?? 0) >= 500;
+    return { success: false, message: result.error.message, unreachable };
   }
 
   const user = extractUserFromMeResponse(result.data);

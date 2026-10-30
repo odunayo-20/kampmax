@@ -6,16 +6,18 @@ import { Menu, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import {
   EMPLOYER_DASHBOARD_GATE,
-  getEmployerDashboardAccessApi,
   isEmployerDashboardPath,
   isEmployerGateExemptPath,
-  type EmployerAccess,
 } from "@/services/employer";
+import { useEmployerAccess, usePrefetchEmployerDashboard } from "@/hooks/use-employer-dashboard";
 import { DashboardShellSkeleton } from "@/components/layout/DashboardShellSkeleton";
 import { EmployerAccessGate } from "@/components/employer/EmployerAccessGate";
 import { EmployerSidebar } from "@/components/employer/EmployerSidebar";
 import { EmployerOnboardingStatus } from "@/types/employer";
 import { ProfileSwitcher } from "@/components/vendor-dashboard/ProfileSwitcher";
+
+/** The page that shows the command-center summary (`/employer` redirects to it). */
+const EMPLOYER_OVERVIEW_PATH = "/employer/dashboard";
 
 /**
  * Employer module shell.
@@ -23,32 +25,25 @@ import { ProfileSwitcher } from "@/components/vendor-dashboard/ProfileSwitcher";
  * - The dashboard path is gated. The gate is backend-authoritative (reads
  *   GET /employers/me via getEmployerDashboardAccessApi) — this UI never
  *   grants access on its own.
- * - Mirrors the freelancer dashboard shell pattern (Module 26A/B).
+ * - Access is a shared, cached query (see `useDashboardAccess`), the same as the
+ *   other dashboards.
  */
 export default function EmployerLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { status } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [access, setAccess] = useState<EmployerAccess | null>(null);
-  const [loadError, setLoadError] = useState(false);
 
   const dashboardPath = isEmployerDashboardPath(pathname);
+  const accessQuery = useEmployerAccess({ enabled: dashboardPath });
+  usePrefetchEmployerDashboard({ enabled: pathname === EMPLOYER_OVERVIEW_PATH });
+  // Keep the last known access if a background refresh fails.
+  const access = accessQuery.data ?? null;
+  const loadError = accessQuery.isError && !access;
 
   // Close the mobile drawer once navigation has happened.
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
-
-  useEffect(() => {
-    if (!dashboardPath || status !== "authenticated") return;
-    let cancelled = false;
-    setAccess(null);
-    setLoadError(false);
-    getEmployerDashboardAccessApi()
-      .then((result) => { if (!cancelled) setAccess(result); })
-      .catch(() => { if (!cancelled) setLoadError(true); });
-    return () => { cancelled = true; };
-  }, [dashboardPath, status, pathname]);
 
   if (!dashboardPath) {
     return <>{children}</>;

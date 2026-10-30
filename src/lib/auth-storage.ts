@@ -13,6 +13,8 @@
  *  - Console.log of tokens is intentionally omitted for security.
  */
 
+import type { AuthUser } from "@/types";
+
 export const ACCESS_TOKEN_KEY = "kampmax_auth_token";
 export const REFRESH_TOKEN_KEY = "kampmax_refresh_token";
 
@@ -73,6 +75,50 @@ export function clearAuthTokens(): void {
     const s = store();
     s.removeItem(ACCESS_TOKEN_KEY);
     s.removeItem(REFRESH_TOKEN_KEY);
+    // The remembered user belongs to the tokens, so it never outlives them.
+    s.removeItem(AUTH_USER_KEY);
+  } catch {
+    // private browsing / quota exceeded
+  }
+}
+
+// ── Remembered user ────────────────────────────────────────
+//
+// The last signed-in user, saved so a page refresh can show the signed-in app
+// straight away while the session is confirmed in the background. It is only a
+// display hint: the access token is still what authorises requests, and the
+// session check replaces it with the server's answer.
+
+export const AUTH_USER_KEY = "kampmax_auth_user";
+
+/** The remembered user, or null if there is none or it isn't a usable record. */
+export function getRememberedUser(): AuthUser | null {
+  const raw = readKey(AUTH_USER_KEY);
+  if (!raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      typeof (parsed as AuthUser).id === "string" &&
+      typeof (parsed as AuthUser).role === "string"
+    ) {
+      return parsed as AuthUser;
+    }
+  } catch {
+    // corrupted entry — treat as absent
+  }
+  return null;
+}
+
+export function setRememberedUser(user: AuthUser | null): void {
+  try {
+    const s = store();
+    if (user) {
+      s.setItem(AUTH_USER_KEY, JSON.stringify(user));
+    } else {
+      s.removeItem(AUTH_USER_KEY);
+    }
   } catch {
     // private browsing / quota exceeded
   }

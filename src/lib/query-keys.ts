@@ -888,3 +888,27 @@ export const freelancerDashboardKeys = {
   access: (userId: string | undefined) => ["freelancer-dashboard", "access", userId] as const,
   overview: (userId: string | undefined) => ["freelancer-dashboard", "overview", userId] as const,
 };
+
+/**
+ * Dashboard access checks for the roles that don't have a key factory of their
+ * own (freelancer's lives in `freelancerDashboardKeys`). `*All` is the prefix used
+ * to revalidate on navigation; the per-user key is what the layout reads.
+ */
+export const dashboardAccessKeys = {
+  employerAll: ["dashboard-access", "employer"] as const,
+  employer: (userId: string | undefined) => ["dashboard-access", "employer", userId] as const,
+  vendorAll: ["dashboard-access", "vendor"] as const,
+  vendor: (userId: string | undefined) => ["dashboard-access", "vendor", userId] as const,
+  serviceProviderAll: ["dashboard-access", "service-provider"] as const,
+  serviceProvider: (userId: string | undefined) =>
+    ["dashboard-access", "service-provider", userId] as const,
+};
+
+/** Service provider dashboard overview (owner-scoped; identity comes from the session). */
+export const serviceProviderDashboardKeys = {
+  all: ["service-provider-dashboard"] as const,
+  overview: (userId: string | undefined) =>
+    ["service-provider-dashboard", "overview", userId] as const,
+  reviewsSummary: (userId: string | undefined) =>
+    ["service-provider-dashboard", "reviews-summary", userId] as const,
+};

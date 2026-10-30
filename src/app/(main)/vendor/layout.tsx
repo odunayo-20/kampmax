@@ -1,14 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import {
-  getVendorDashboardAccessApi,
-  getVendorPermissions,
-} from "@/services/vendor-dashboard";
-import { VENDOR_DASHBOARD_GATE, type VendorAccess } from "@/types/vendor-dashboard";
+import { getVendorPermissions } from "@/services/vendor-dashboard";
+import { useVendorAccess, usePrefetchVendorDashboard } from "@/hooks/use-vendor-dashboard";
+import { VENDOR_DASHBOARD_GATE } from "@/types/vendor-dashboard";
 import { DashboardShellSkeleton } from "@/components/layout/DashboardShellSkeleton";
 import { VendorAccessGate } from "@/components/vendor-dashboard/VendorAccessGate";
 import { VendorSidebar } from "@/components/vendor-dashboard/VendorSidebar";
@@ -17,50 +15,28 @@ import { VendorTopbar } from "@/components/vendor-dashboard/VendorTopbar";
 import { VerificationStatusBanner } from "@/components/verification/VerificationStatusBanner";
 import { useVendorVerification } from "@/hooks/use-verification";
 
-/** How long vendor access is trusted before a navigation triggers a quiet refresh. */
-const ACCESS_REVALIDATE_MS = 60_000;
+/** The page that shows the store overview. */
+const VENDOR_OVERVIEW_PATH = "/vendor";
 
 export default function VendorLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { status } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [access, setAccess] = useState<VendorAccess | null>(null);
-  const [loadError, setLoadError] = useState(false);
-  const lastFetchedAt = useRef(0);
   const permissions = getVendorPermissions();
   const verification = useVendorVerification();
+
+  // Access is a shared, cached query: the sidebar/topbar stay mounted while it is
+  // revalidated, and the skeleton only appears on the very first load. A failed
+  // background refresh doesn't tear down a working dashboard (the last access is kept).
+  const accessQuery = useVendorAccess();
+  usePrefetchVendorDashboard({ enabled: pathname === VENDOR_OVERVIEW_PATH });
+  const access = accessQuery.data ?? null;
+  const loadError = accessQuery.isError && !access;
 
   // Close the mobile drawer once navigation has happened.
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
-
-  // Load access once per session, then revalidate quietly on navigation. The
-  // current access is kept while refetching, so the sidebar/topbar never unmount
-  // and the full-screen spinner only appears on the very first load.
-  useEffect(() => {
-    if (status !== "authenticated") return;
-    const stale = Date.now() - lastFetchedAt.current > ACCESS_REVALIDATE_MS;
-    if (!stale && access) return;
-
-    let cancelled = false;
-    lastFetchedAt.current = Date.now();
-    getVendorDashboardAccessApi()
-      .then((result) => {
-        if (cancelled) return;
-        setAccess(result);
-        setLoadError(false);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        // A failed background refresh shouldn't tear down a working dashboard.
-        setLoadError(true);
-        lastFetchedAt.current = 0;
-      });
-    return () => { cancelled = true; };
-    // `access` is intentionally omitted: it is only read to skip a fresh fetch.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, pathname]);
 
   if (status === "loading" || (status === "authenticated" && !access && !loadError)) {
     return <DashboardShellSkeleton />;

@@ -5,13 +5,21 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useState,
   ReactNode,
 } from "react";
-import { AuthUser, AuthStatus, UserRole } from "@/types";
+import { AuthUser, AuthStatus } from "@/types";
 import * as authService from "@/services/auth";
 import { onAuthFailure } from "@/lib/api-client";
-import { clearAuthTokens } from "@/lib/auth-storage";
+import {
+  clearAuthTokens,
+  getAccessToken,
+  getRefreshToken,
+  getRememberedUser,
+  persistAuthTokens,
+  setRememberedUser,
+} from "@/lib/auth-storage";
 import { setCurrentAuthUser } from "@/lib/current-user-store";
 
 interface AuthState {
@@ -44,136 +52,96 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
-const TOKEN_KEY = "kampmax_auth_token";
-const REFRESH_TOKEN_KEY = "kampmax_refresh_token";
-
-function getStoredToken(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return localStorage.getItem(TOKEN_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function getStoredRefreshToken(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return localStorage.getItem(REFRESH_TOKEN_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function setStoredToken(token: string | null) {
-  if (typeof window === "undefined") return;
-  try {
-    if (token) {
-      localStorage.setItem(TOKEN_KEY, token);
-    } else {
-      localStorage.removeItem(TOKEN_KEY);
-    }
-  } catch {
-    // private browsing or quota exceeded
-  }
-}
-
-function setStoredRefreshToken(token: string | null) {
-  if (typeof window === "undefined") return;
-  try {
-    if (token) {
-      localStorage.setItem(REFRESH_TOKEN_KEY, token);
-    } else {
-      localStorage.removeItem(REFRESH_TOKEN_KEY);
-    }
-  } catch {
-    // private browsing or quota exceeded
-  }
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
+  // Always starts as "loading", so the server render and the first client render
+  // match. The session is restored in a layout effect below, before first paint.
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [user, setUser] = useState<AuthUser | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
 
   // Keep the synchronous current-user bridge (read by mock data services
-  // outside React) in lockstep with the real authenticated user.
-  useEffect(() => {
+  // outside React) in lockstep with the real authenticated user. A layout effect
+  // runs before the children's effects, so their first requests see the user.
+  useLayoutEffect(() => {
     setCurrentAuthUser(user);
   }, [user]);
 
-  // Restore session on mount
-  useEffect(() => {
-    const stored = getStoredToken();
-    const storedRefresh = getStoredRefreshToken();
+  /** Marks the user as signed in and remembers them for the next page load. */
+  const applySession = useCallback(
+    (nextUser: AuthUser | null, access: string | null, refresh: string | null) => {
+      setUser(nextUser);
+      setAccessToken(access);
+      setRefreshToken(refresh);
+      setRememberedUser(nextUser);
+      setStatus("authenticated");
+    },
+    []
+  );
 
+  /** Signs the user out locally: tokens and the remembered user are all cleared. */
+  const endSession = useCallback(() => {
+    clearAuthTokens();
+    setAccessToken(null);
+    setRefreshToken(null);
+    setUser(null);
+    setStatus("unauthenticated");
+  }, []);
+
+  // Restore the session on mount.
+  //
+  // If we remember who signed in, show the signed-in app immediately and confirm
+  // the session in the background — a refresh no longer waits on /auth/me. When the
+  // server says the session is invalid, the user is signed out; when it can't be
+  // reached, the session is kept (a network blip must not sign anyone out).
+  // NOTE: /auth/me returns the user object only — no new tokens.
+  useLayoutEffect(() => {
+    const stored = getAccessToken();
     if (!stored) {
       setStatus("unauthenticated");
       return;
     }
 
-    // Try to hydrate the user from the backend.
-    // NOTE: /auth/me returns the user object only — no new tokens.
-    // If we get a valid user back, the session is alive; keep the already-stored token.
+    const remembered = getRememberedUser();
+    if (remembered) applySession(remembered, stored, getRefreshToken());
+
+    let cancelled = false;
     authService
       .getCurrentSession(stored)
       .then((result) => {
+        if (cancelled) return;
         if (result.success && result.user) {
-          setUser(result.user);
-          // Keep the stored access token as state (the API client already uses it from localStorage)
-          setAccessToken(stored);
-          setRefreshToken(storedRefresh);
-          setStatus("authenticated");
+          // Read the tokens again: the check may have refreshed them.
+          applySession(result.user, getAccessToken() ?? stored, getRefreshToken());
+        } else if (result.unreachable) {
+          if (!remembered) setStatus("unauthenticated");
         } else {
-          // Session invalid — clear tokens and fall to login
-          clearAuthTokens();
-          setAccessToken(null);
-          setRefreshToken(null);
-          setStoredToken(null);
-          setStoredRefreshToken(null);
-          setStatus("unauthenticated");
+          endSession();
         }
       })
       .catch(() => {
-        // Session validation failed — clear tokens
-        clearAuthTokens();
-        setAccessToken(null);
-        setRefreshToken(null);
-        setStoredToken(null);
-        setStoredRefreshToken(null);
-        setStatus("unauthenticated");
+        if (!cancelled) endSession();
       });
-  }, []);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [applySession, endSession]);
 
   // Subscribe to auth failure notifications from the API client
-  useEffect(() => {
-    const unsubscribe = onAuthFailure(() => {
-      clearAuthTokens();
-      setAccessToken(null);
-      setRefreshToken(null);
-      setStoredToken(null);
-      setStoredRefreshToken(null);
-      setUser(null);
-      setStatus("unauthenticated");
-    });
-    return unsubscribe;
-  }, []);
+  useEffect(() => onAuthFailure(endSession), [endSession]);
 
   const login = useCallback(
     async (email: string, password: string) => {
       const result = await authService.login({ email, password });
       if (result.success && result.user && result.accessToken) {
-        setUser(result.user);
-        setAccessToken(result.accessToken);
-        setRefreshToken(result.refreshToken ?? getStoredRefreshToken() ?? "");
-        setStoredToken(result.accessToken);
-        setStoredRefreshToken(result.refreshToken ?? getStoredRefreshToken() ?? "");
-        setStatus("authenticated");
+        const refresh = result.refreshToken ?? getRefreshToken() ?? "";
+        persistAuthTokens(result.accessToken, refresh);
+        applySession(result.user, result.accessToken, refresh);
       }
       return result;
     },
-    []
+    [applySession]
   );
 
   const register = useCallback(
@@ -187,29 +155,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }) => {
       const result = await authService.register(data);
       if (result.success && result.accessToken) {
-        setUser(result.user ?? null);
-        setAccessToken(result.accessToken);
-        setRefreshToken(result.refreshToken ?? getStoredRefreshToken() ?? "");
-        setStoredToken(result.accessToken);
-        setStoredRefreshToken(result.refreshToken ?? getStoredRefreshToken() ?? "");
-        setStatus("authenticated");
+        const refresh = result.refreshToken ?? getRefreshToken() ?? "";
+        persistAuthTokens(result.accessToken, refresh);
+        applySession(result.user ?? null, result.accessToken, refresh);
       }
       return result;
     },
-    []
+    [applySession]
   );
 
   const logout = useCallback(async () => {
-    const current = accessToken;
-    await authService.logout(current ?? "");
-    clearAuthTokens();
-    setAccessToken(null);
-    setRefreshToken(null);
-    setStoredToken(null);
-    setStoredRefreshToken(null);
-    setUser(null);
-    setStatus("unauthenticated");
-  }, [accessToken]);
+    await authService.logout(accessToken ?? "");
+    endSession();
+  }, [accessToken, endSession]);
 
   const forgotPassword = useCallback(async (email: string) => {
     return authService.forgotPassword({ email });

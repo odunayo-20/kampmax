@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
 import { Menu, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -14,7 +13,6 @@ import {
   useFreelancerAccess,
   usePrefetchFreelancerDashboard,
 } from "@/hooks/use-freelancer-dashboard";
-import { freelancerDashboardKeys } from "@/lib/query-keys";
 import { FreelancerAccessGate } from "@/components/freelancer/dashboard/FreelancerAccessGate";
 import { FreelancerSidebar } from "@/components/freelancer/dashboard/FreelancerSidebar";
 import { FreelancerTopbar } from "@/components/freelancer/dashboard/FreelancerTopbar";
@@ -41,7 +39,6 @@ export default function FreelancerLayout({ children }: { children: React.ReactNo
   const { status } = useAuth();
   const verification = useFreelancerVerification();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const queryClient = useQueryClient();
 
   const dashboardPath = isFreelancerDashboardPath(pathname);
   const accessQuery = useFreelancerAccess({ enabled: dashboardPath });
@@ -54,15 +51,6 @@ export default function FreelancerLayout({ children }: { children: React.ReactNo
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
-
-  // Navigating re-checks access, but only refetches when the cached copy is stale.
-  useEffect(() => {
-    if (!dashboardPath) return;
-    void queryClient.refetchQueries({
-      queryKey: freelancerDashboardKeys.accessAll,
-      stale: true,
-    });
-  }, [dashboardPath, pathname, queryClient]);
 
   if (!dashboardPath) {
     return <>{children}</>;

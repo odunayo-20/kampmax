@@ -2,7 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
-import { vendorDashboardKeys } from "@/lib/query-keys";
+import { dashboardAccessKeys, vendorDashboardKeys } from "@/lib/query-keys";
+import { getVendorDashboardAccessApi } from "@/services/vendor-dashboard";
 import {
   buildActionRequired,
   buildDashboardOverview,
@@ -15,11 +16,33 @@ import {
   restockProduct,
 } from "@/services/vendor-dashboard-api";
 import type { Product } from "@/types";
+import { useDashboardAccess, usePrefetchDashboardQueries } from "./use-dashboard-access";
 
 const STALE_MS = 30_000;
 
 function useAuthenticated() {
   return useAuth().status === "authenticated";
+}
+
+/** Backend-authoritative dashboard access (vendor profile + approval state). */
+export function useVendorAccess() {
+  const { user } = useAuth();
+  return useDashboardAccess({
+    queryKey: dashboardAccessKeys.vendor(user?.id),
+    revalidateKey: dashboardAccessKeys.vendorAll,
+    queryFn: getVendorDashboardAccessApi,
+  });
+}
+
+// What the overview page reads first (see `useVendorOverview`).
+const vendorOverviewQueries = () => [
+  { queryKey: vendorDashboardKeys.analytics(), queryFn: fetchVendorAnalytics },
+  { queryKey: vendorDashboardKeys.orderStatus(), queryFn: fetchVendorOrderStatusCounts },
+];
+
+/** Warms the overview metrics while the access check runs. */
+export function usePrefetchVendorDashboard({ enabled }: { enabled: boolean }) {
+  usePrefetchDashboardQueries({ enabled, queries: vendorOverviewQueries });
 }
 
 export function useVendorProfile() {

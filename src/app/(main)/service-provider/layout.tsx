@@ -5,15 +5,18 @@ import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { isServiceProviderDashboardPath } from "@/lib/utils";
+import { SERVICE_PROVIDER_DASHBOARD_GATE } from "@/services/service-provider-dashboard";
 import {
-  getServiceProviderDashboardAccessApi,
-  SERVICE_PROVIDER_DASHBOARD_GATE,
-  type ServiceProviderAccess,
-} from "@/services/service-provider-dashboard";
+  useServiceProviderAccess,
+  usePrefetchServiceProviderDashboard,
+} from "@/hooks/use-service-provider-dashboard";
 import { DashboardShellSkeleton } from "@/components/layout/DashboardShellSkeleton";
 import { ServiceProviderAccessGate } from "@/components/service-provider/dashboard/ServiceProviderAccessGate";
 import { ServiceProviderSidebar } from "@/components/service-provider/dashboard/ServiceProviderSidebar";
 import { ServiceProviderTopbar } from "@/components/service-provider/dashboard/ServiceProviderTopbar";
+
+/** The page that shows the provider overview. */
+const SERVICE_PROVIDER_OVERVIEW_PATH = "/service-provider";
 
 /**
  * Service Provider module shell.
@@ -28,27 +31,20 @@ export default function ServiceProviderLayout({ children }: { children: React.Re
   const pathname = usePathname();
   const { status } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [access, setAccess] = useState<ServiceProviderAccess | null>(null);
-  const [loadError, setLoadError] = useState(false);
 
   // Static dashboard sub-routes take precedence over the dynamic [slug] route.
   const isPublicProfile = !isServiceProviderDashboardPath(pathname);
+
+  const accessQuery = useServiceProviderAccess({ enabled: !isPublicProfile });
+  usePrefetchServiceProviderDashboard({ enabled: pathname === SERVICE_PROVIDER_OVERVIEW_PATH });
+  // Keep the last known access if a background refresh fails.
+  const access = accessQuery.data ?? null;
+  const loadError = accessQuery.isError && !access;
 
   // Close the mobile drawer once navigation has happened.
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
-
-  useEffect(() => {
-    if (isPublicProfile || status !== "authenticated") return;
-    let cancelled = false;
-    setAccess(null);
-    setLoadError(false);
-    getServiceProviderDashboardAccessApi()
-      .then((result) => { if (!cancelled) setAccess(result); })
-      .catch(() => { if (!cancelled) setLoadError(true); });
-    return () => { cancelled = true; };
-  }, [isPublicProfile, status, pathname]);
 
   if (isPublicProfile) {
     return <>{children}</>;

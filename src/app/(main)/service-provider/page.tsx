@@ -1,23 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CalendarDays, ExternalLink, Images, Plus, Wrench, X, Lightbulb } from "lucide-react";
 import { cn, timeAgo } from "@/lib/utils";
 import {
-  computeProfileCompletionFromLive,
-  fetchSpDashboardLive,
-  fetchSpReviewsSummaryLive,
-} from "@/services/service-provider-dashboard";
+  useServiceProviderDashboard,
+  useServiceProviderReviewsSummary,
+} from "@/hooks/use-service-provider-dashboard";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { ServiceProviderMetricCard } from "@/components/service-provider/dashboard/ServiceProviderMetricCard";
 import { ServiceProviderVerificationBadge } from "@/components/service-provider/dashboard/ServiceProviderStatusBadge";
-import type {
-  ServiceProviderActivityEvent,
-  ServiceProviderDashboardMetric,
-  ServiceProviderDashboardRecord,
-  ServiceProviderProfileCompletion,
-  ServiceProviderReviewsSummary,
-} from "@/types/service-provider-dashboard";
 import type { ServiceProviderActivityKind } from "@/types/service-provider-dashboard";
 
 const ACTIVITY_ICON: Record<ServiceProviderActivityKind, string> = {
@@ -37,68 +30,30 @@ const ACTIVITY_ICON: Record<ServiceProviderActivityKind, string> = {
 };
 
 export default function ServiceProviderOverviewPage() {
-  const [dashboard, setDashboard] = useState<{
-    record: ServiceProviderDashboardRecord;
-    metrics: ServiceProviderDashboardMetric[];
-    activity: ServiceProviderActivityEvent[];
-  } | null>(null);
-  const [completion, setCompletion] = useState<ServiceProviderProfileCompletion | null>(null);
-  const [reviews, setReviews] = useState<ServiceProviderReviewsSummary | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
-  const [attempt, setAttempt] = useState(0);
+  const overview = useServiceProviderDashboard();
+  // Optional card: left out when the summary can't load.
+  const reviews = useServiceProviderReviewsSummary().data;
   const [showWelcome, setShowWelcome] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setFailed(false);
-    fetchSpDashboardLive()
-      .then((live) => {
-        if (cancelled) return;
-        setDashboard(live);
-        setCompletion(computeProfileCompletionFromLive(live.record));
-        setLoading(false);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setFailed(true);
-        setLoading(false);
-      });
+  if (overview.isPending) return <ServiceProviderOverviewSkeleton />;
 
-    fetchSpReviewsSummaryLive()
-      .then((revs) => {
-        if (!cancelled) setReviews(revs);
-      })
-      .catch(() => {
-        // The rest of the page still works; the ratings card is simply left out.
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [attempt]);
-
-  if (loading && !dashboard) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-primary-600/20 border-t-primary-600" />
-      </div>
-    );
-  }
-
-  if (!dashboard || !completion) {
+  if (!overview.data) {
     return (
       <div role="alert" className="rounded-xl border border-kampmax-border bg-white p-10 text-center text-sm text-kampmax-text-secondary">
-        {failed ? "We couldn't load your dashboard." : "Dashboard isn't available right now."}{" "}
-        <button type="button" onClick={() => setAttempt((n) => n + 1)} className="font-semibold text-primary-600 hover:underline">
-          Try again
+        {overview.isError ? "We couldn't load your dashboard." : "Dashboard isn't available right now."}{" "}
+        <button
+          type="button"
+          onClick={() => void overview.refetch()}
+          disabled={overview.isFetching}
+          className="font-semibold text-primary-600 hover:underline disabled:opacity-60"
+        >
+          {overview.isFetching ? "Retrying…" : "Try again"}
         </button>
       </div>
     );
   }
 
-  const { record, metrics, activity } = dashboard;
+  const { record, metrics, activity, completion } = overview.data;
   const nextStep = completion.missing[0];
 
   return (
@@ -280,6 +235,27 @@ export default function ServiceProviderOverviewPage() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ServiceProviderOverviewSkeleton() {
+  return (
+    <div role="status" aria-busy="true" aria-label="Loading dashboard" className="space-y-6">
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-64 max-w-full" />
+        <Skeleton className="h-4 w-80 max-w-full" />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-24 rounded-xl" />
+        ))}
+      </div>
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Skeleton className="h-56 rounded-xl lg:col-span-2" />
+        <Skeleton className="h-56 rounded-xl" />
+      </div>
+      <span className="sr-only">Loading dashboard</span>
     </div>
   );
 }
