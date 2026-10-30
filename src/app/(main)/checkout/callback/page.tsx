@@ -49,9 +49,11 @@ function CheckoutCallback() {
       } else if (data.status === "PENDING") {
         setPhase({ kind: "pending", orderId: data.orderId });
       } else {
-        // The payment did not go through, so neither does the order.
-        void cancelUnpaidOrders(data.orderIds?.length ? data.orderIds : [data.orderId]);
-        setPhase({ kind: "failed", message: "Payment was not completed. Your order was not placed and you have not been charged." });
+        // The payment did not go through, so neither does the order. The cart
+        // was never emptied (that happens on payment success), so just cancel.
+        void cancelUnpaidOrders(data.orderIds?.length ? data.orderIds : [data.orderId]).then(() =>
+          setPhase({ kind: "failed", message: "Payment was not completed. Your order was not placed and you have not been charged. Your items are still in your cart." })
+        );
       }
     });
   }, [reference, clearCart, router]);
@@ -85,7 +87,7 @@ function CheckoutCallback() {
           <>
             <XCircle className="h-10 w-10 text-kampmax-error" />
             <p className="text-sm font-semibold text-kampmax-text">{phase.message}</p>
-            <button type="button" onClick={() => router.replace("/checkout")} className="text-sm font-medium text-kampmax-blue">
+            <button type="button" onClick={() => window.location.assign("/checkout")} className="text-sm font-medium text-kampmax-blue">
               Back to checkout
             </button>
           </>
