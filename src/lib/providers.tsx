@@ -1,26 +1,30 @@
 "use client";
 
 import { ReactNode, useState } from "react";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { AppProvider } from "@/lib/app-context";
 import { CartProvider } from "@/lib/cart-context";
 import { AuthProvider } from "@/lib/auth-context";
 import { createQueryClient } from "@/lib/query-client";
+import { createQueryPersistOptions } from "@/lib/query-persistence";
+import { QueryCacheOwnerGuard } from "@/components/auth/QueryCacheOwnerGuard";
 import { NotificationSyncBridge } from "@/components/notifications/NotificationSyncBridge";
 import { MessageSyncBridge } from "@/components/messages/MessageSyncBridge";
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(() => createQueryClient());
+  const [persistOptions] = useState(() => createQueryPersistOptions());
 
   return (
     <AuthProvider>
-      <QueryClientProvider client={queryClient}>
+      <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
+        <QueryCacheOwnerGuard />
         <NotificationSyncBridge />
         <MessageSyncBridge />
         <AppProvider>
           <CartProvider>{children}</CartProvider>
         </AppProvider>
-      </QueryClientProvider>
+      </PersistQueryClientProvider>
     </AuthProvider>
   );
 }

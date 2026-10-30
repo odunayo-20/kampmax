@@ -17,6 +17,8 @@ import type { AuthUser } from "@/types";
 
 export const ACCESS_TOKEN_KEY = "kampmax_auth_token";
 export const REFRESH_TOKEN_KEY = "kampmax_refresh_token";
+/** Where the dashboard query cache is saved (see lib/query-persistence.ts). */
+export const QUERY_CACHE_KEY = "kampmax_query_cache";
 
 function store(): Storage {
   // Safe for SSR / window-less environments
@@ -75,8 +77,10 @@ export function clearAuthTokens(): void {
     const s = store();
     s.removeItem(ACCESS_TOKEN_KEY);
     s.removeItem(REFRESH_TOKEN_KEY);
-    // The remembered user belongs to the tokens, so it never outlives them.
+    // The remembered user and the saved dashboard data belong to the tokens, so
+    // neither outlives them.
     s.removeItem(AUTH_USER_KEY);
+    s.removeItem(QUERY_CACHE_KEY);
   } catch {
     // private browsing / quota exceeded
   }

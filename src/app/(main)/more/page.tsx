@@ -10,8 +10,6 @@ import {
   MapPin,
   ArrowUpRight,
   User,
-  ShoppingBag,
-  Heart,
 } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { MORE_MENU_SECTIONS } from "@/config/navigation";
@@ -59,9 +57,11 @@ export default function MorePage() {
                 <h2 className="text-sm font-bold text-neutral-900 group-hover:text-primary-600 transition-colors">
                   {user.name}
                 </h2>
-                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  <ShieldCheck className="h-3 w-3" /> Verified
-                </span>
+                {user.isVerified && (
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <ShieldCheck className="h-3 w-3" /> Verified
+                  </span>
+                )}
               </div>
               <p className="text-xs text-neutral-500 font-medium">{user.email}</p>
               <div className="flex items-center gap-1 text-[11px] text-primary-600 font-semibold pt-0.5">
@@ -114,7 +114,7 @@ export default function MorePage() {
       )}
 
       {/* 2. Kampmax Pay Financial Quick-Access Card */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-tr from-[#0256E0] via-[#0066FF] to-[#0047BA] text-white p-4 sm:p-5 shadow-md">
+      <div className="relative overflow-hidden rounded-2xl bg-linear-to-tr from-[#0256E0] via-[#0066FF] to-[#0047BA] text-white p-4 sm:p-5 shadow-md">
         <div className="flex items-start justify-between">
           <div className="space-y-1">
             <div className="flex items-center gap-1.5">
@@ -124,7 +124,7 @@ export default function MorePage() {
               </span>
             </div>
             <p className="text-xl sm:text-2xl font-black tracking-tight text-white">
-              {user ? "Escrow Protected" : "Zero Fee Campus Pay"}
+              {user ? "Your campus wallet" : "Zero Fee Campus Pay"}
             </p>
           </div>
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/20 backdrop-blur-md text-white border border-white/20">
@@ -237,7 +237,7 @@ export default function MorePage() {
         <div className="flex flex-col items-center justify-center mt-6 gap-1 opacity-70">
           <LogoIcon size={24} />
           <p className="text-center text-[10px] text-neutral-400 font-medium">
-            Kampmax Hub v2.5.0 • Campus Ecosystem
+            Kampmax Hub v{process.env.NEXT_PUBLIC_APP_VERSION} • Campus Ecosystem
           </p>
         </div>
       </div>

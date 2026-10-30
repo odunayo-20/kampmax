@@ -121,9 +121,10 @@ export const MORE_MENU_SECTIONS: NavSectionConfig[] = [
       {
         id: "courses",
         label: "Courses & Skills",
-        href: "/explore?tab=courses",
+        href: "/explore",
         icon: GraduationCap,
         description: "Campus skill programs & certifications",
+        badge: "Coming soon",
       },
       {
         id: "nearby",
@@ -156,14 +157,14 @@ export const MORE_MENU_SECTIONS: NavSectionConfig[] = [
       {
         id: "tickets",
         label: "My Tickets & Passes",
-        href: "/events",
+        href: "/tickets",
         icon: Ticket,
         description: "Access your digital event passes & QR codes",
       },
       {
         id: "saved",
         label: "Saved Items",
-        href: "/customer/saved",
+        href: "/profile/wishlist",
         icon: Bookmark,
         description: "Saved products, services & bookmarks",
       },

@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import pkg from "./package.json";
 
 // Extra hosts uploaded pictures are served from (an S3/R2 bucket or CDN), comma-separated,
 // e.g. NEXT_PUBLIC_MEDIA_HOSTS=cdn.example.com,pub-abc123.r2.dev
@@ -9,6 +10,7 @@ const extraMediaHosts = (process.env.NEXT_PUBLIC_MEDIA_HOSTS ?? "")
   .map((hostname) => ({ protocol: "https" as const, hostname }));
 
 const nextConfig: NextConfig = {
+  env: { NEXT_PUBLIC_APP_VERSION: pkg.version },
   images: {
     remotePatterns: [
       ...extraMediaHosts,
