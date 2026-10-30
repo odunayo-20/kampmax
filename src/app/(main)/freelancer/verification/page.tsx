@@ -1,11 +1,11 @@
 "use client";
 
+import { Skeleton } from "@/components/ui/Skeleton";
 import Link from "next/link";
 import {
   ArrowLeft,
   CheckCircle2,
   Clock,
-  Loader2,
   ShieldAlert,
   ShieldCheck,
   XCircle,
@@ -82,9 +82,10 @@ export default function FreelancerVerificationPage() {
     return (
       <div className="space-y-6 max-w-4xl mx-auto">
         {header}
-        <div className="flex items-center justify-center gap-2 py-16 text-kampmax-text-secondary">
-          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-          <p className="text-sm">Loading your verification…</p>
+        <div role="status" aria-busy="true" aria-label="Loading your verification" className="space-y-4">
+          <Skeleton className="h-28 w-full rounded-xl" />
+          <Skeleton className="h-44 w-full rounded-xl" />
+          <span className="sr-only">Loading your verification…</span>
         </div>
       </div>
     );

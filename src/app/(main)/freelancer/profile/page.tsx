@@ -1,5 +1,6 @@
 "use client";
 
+import { FormPageSkeleton } from "@/components/ui/Skeleton";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { getFreelancerDashboardApi } from "@/services/freelancer-dashboard";
@@ -88,11 +89,7 @@ export default function FreelancerProfilePage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex justify-center rounded-xl border border-kampmax-border bg-white p-10">
-        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-kampmax-blue/20 border-t-kampmax-blue" />
-      </div>
-    );
+    return <FormPageSkeleton />;
   }
 
   if (loadError || !dashboard) {

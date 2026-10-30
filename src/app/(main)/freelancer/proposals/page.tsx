@@ -124,7 +124,7 @@ function ProposalsContent() {
         })}
       </div>
 
-      {loading ? (
+      {loading && proposals.length === 0 ? (
         <ProposalGridSkeleton />
       ) : filtered.length === 0 ? (
         <ProposalEmptyState
@@ -132,7 +132,13 @@ function ProposalsContent() {
           onReset={() => handleStatusChange("all")}
         />
       ) : (
-        <ProposalList proposals={filtered} />
+        // Keep the list on screen (dimmed) while switching tabs, instead of a skeleton flash.
+        <div
+          aria-busy={loading}
+          className={loading ? "pointer-events-none opacity-60 transition-opacity" : "transition-opacity"}
+        >
+          <ProposalList proposals={filtered} />
+        </div>
       )}
     </div>
   );

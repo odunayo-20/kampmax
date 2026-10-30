@@ -2,14 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { Menu, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import {
   FREELANCER_DASHBOARD_GATE,
-  getFreelancerDashboardAccessApi,
   isFreelancerDashboardPath,
-  type FreelancerAccess,
 } from "@/services/freelancer-dashboard";
+import { useFreelancerAccess } from "@/hooks/use-freelancer-dashboard";
+import { freelancerDashboardKeys } from "@/lib/query-keys";
 import { FreelancerAccessGate } from "@/components/freelancer/dashboard/FreelancerAccessGate";
 import { FreelancerSidebar } from "@/components/freelancer/dashboard/FreelancerSidebar";
 import { FreelancerTopbar } from "@/components/freelancer/dashboard/FreelancerTopbar";
@@ -23,6 +24,9 @@ import { useFreelancerVerification } from "@/hooks/use-verification";
  * - The dashboard path is gated. The gate is backend-authoritative (reads
  *   GET /freelancers/me via getFreelancerDashboardAccessApi) — this UI
  *   never grants access on its own.
+ * - Access is a shared, cached query: loaded once, then revalidated quietly when
+ *   stale. The shell (sidebar/topbar) stays mounted across navigations, and the
+ *   full-screen spinner only appears on the very first load.
  * - Multi-role: the affirmed authenticated identity decides the freelancer
  *   record served. ProfileSwitcher in the topbar lets the user move between
  *   their Kampmax roles without breaking out of the authenticated session.
@@ -32,26 +36,27 @@ export default function FreelancerLayout({ children }: { children: React.ReactNo
   const { status } = useAuth();
   const verification = useFreelancerVerification();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [access, setAccess] = useState<FreelancerAccess | null>(null);
-  const [loadError, setLoadError] = useState(false);
+  const queryClient = useQueryClient();
 
   const dashboardPath = isFreelancerDashboardPath(pathname);
+  const accessQuery = useFreelancerAccess({ enabled: dashboardPath });
+  // Keep the last known access if a background refresh fails.
+  const access = accessQuery.data ?? null;
+  const loadError = accessQuery.isError && !access;
 
   // Close the mobile drawer once navigation has happened.
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
 
+  // Navigating re-checks access, but only refetches when the cached copy is stale.
   useEffect(() => {
-    if (!dashboardPath || status !== "authenticated") return;
-    let cancelled = false;
-    setAccess(null);
-    setLoadError(false);
-    getFreelancerDashboardAccessApi()
-      .then((result) => { if (!cancelled) setAccess(result); })
-      .catch(() => { if (!cancelled) setLoadError(true); });
-    return () => { cancelled = true; };
-  }, [dashboardPath, status, pathname]);
+    if (!dashboardPath) return;
+    void queryClient.refetchQueries({
+      queryKey: freelancerDashboardKeys.accessAll,
+      stale: true,
+    });
+  }, [dashboardPath, pathname, queryClient]);
 
   if (!dashboardPath) {
     return <>{children}</>;
@@ -151,7 +156,7 @@ export default function FreelancerLayout({ children }: { children: React.ReactNo
               verificationHref="/freelancer/verification"
             />
           )}
-          <div key={pathname}>{children}</div>
+          <div key={pathname} className="page-enter">{children}</div>
         </main>
       </div>
     </div>

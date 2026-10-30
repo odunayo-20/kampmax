@@ -1,5 +1,6 @@
 "use client";
 
+import { FormPageSkeleton } from "@/components/ui/Skeleton";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, ShieldAlert, ArrowLeft } from "lucide-react";
@@ -85,7 +86,7 @@ function CreateProposalContent() {
   }
 
   if (loading || !opportunity) {
-    return <div className="pt-8 text-center text-sm text-neutral-500">Loading…</div>;
+    return <FormPageSkeleton sections={2} />;
   }
 
   const canApply = eligibility?.eligible ?? false;
@@ -259,7 +260,7 @@ function MissingJob() {
 
 export default function CreateProposalPage() {
   return (
-    <Suspense fallback={<div className="pt-8 text-center text-sm text-neutral-500">Loading…</div>}>
+    <Suspense fallback={<FormPageSkeleton sections={2} />}>
       <CreateProposalContent />
     </Suspense>
   );

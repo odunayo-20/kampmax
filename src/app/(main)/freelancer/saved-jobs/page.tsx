@@ -7,6 +7,7 @@ import type { Opportunity } from "@/types/opportunity";
 import {
   SavedJobsHeader,
   OpportunityList,
+  OpportunityGridSkeleton,
   OpportunityEmptyState,
 } from "@/components/freelancer/opportunities";
 
@@ -39,7 +40,7 @@ export default function SavedJobsPage() {
       )}
 
       {loading ? (
-        <div className="pt-4 text-center text-sm text-neutral-500">Loading…</div>
+        <OpportunityGridSkeleton />
       ) : jobs.length === 0 ? (
         <OpportunityEmptyState hasFilters={false} saved />
       ) : (

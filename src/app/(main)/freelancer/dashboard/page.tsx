@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { X, ArrowRight, Bell, Handshake, Lightbulb } from "lucide-react";
 import { timeAgo } from "@/lib/utils";
-import { getFreelancerDashboardApi, getFreelancerDashboardAccessApi } from "@/services/freelancer-dashboard";
+import { useFreelancerAccess, useFreelancerDashboard } from "@/hooks/use-freelancer-dashboard";
 import { useNotificationSummary } from "@/hooks/use-notifications";
+import { FreelancerSkeleton } from "@/components/freelancer/dashboard/FreelancerSkeleton";
 import { FreelancerMetricCard } from "@/components/freelancer/dashboard/FreelancerMetricCard";
 import { FreelancerQuickActions } from "@/components/freelancer/dashboard/FreelancerQuickActions";
 import { FreelancerProfileStatusCard } from "@/components/freelancer/dashboard/FreelancerProfileStatusCard";
@@ -17,25 +18,29 @@ import { FreelancerNextContractAction } from "@/components/freelancer/dashboard/
 import { FreelancerFinancialSummary } from "@/components/freelancer/dashboard/FreelancerFinancialSummary";
 
 export default function FreelancerDashboardPage() {
-  const [dashboard, setDashboard] = useState<Awaited<ReturnType<typeof getFreelancerDashboardApi>>>(null);
-  const [loading, setLoading] = useState(true);
+  // Access is already cached by the layout, so this is not a second request.
+  const accessQuery = useFreelancerAccess();
+  const overview = useFreelancerDashboard();
   const notif = useNotificationSummary();
   const [showWelcome, setShowWelcome] = useState(true);
-  const [displayName, setDisplayName] = useState("Freelancer");
 
-  useEffect(() => {
-    void Promise.all([getFreelancerDashboardApi(), getFreelancerDashboardAccessApi()]).then(([data, access]) => {
-      setDashboard(data);
-      setDisplayName(access.displayName ?? "Freelancer");
-    }).finally(() => setLoading(false));
-  }, []);
+  const dashboard = overview.data ?? null;
+  const displayName = accessQuery.data?.displayName ?? "Freelancer";
 
-  if (loading) return null;
+  if (overview.isPending) return <FreelancerSkeleton />;
 
   if (!dashboard) {
     return (
       <div className="rounded-xl border border-kampmax-border bg-white p-10 text-center text-sm text-kampmax-text-secondary">
-        Dashboard isn&apos;t available right now. Please refresh and try again.
+        <p>Dashboard isn&apos;t available right now. Please try again.</p>
+        <button
+          type="button"
+          onClick={() => void overview.refetch()}
+          disabled={overview.isFetching}
+          className="mt-3 font-semibold text-primary-600 hover:underline disabled:opacity-60"
+        >
+          {overview.isFetching ? "Retrying…" : "Retry"}
+        </button>
       </div>
     );
   }

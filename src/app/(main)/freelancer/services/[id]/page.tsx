@@ -1,5 +1,6 @@
 "use client";
 
+import { DetailPageSkeleton } from "@/components/ui/Skeleton";
 import { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -74,7 +75,7 @@ function DetailContent() {
   }
 
   if (loading && !service) {
-    return <p className="py-10 text-center text-sm text-neutral-500">Loading…</p>;
+    return <DetailPageSkeleton />;
   }
 
   if (error && !service) {

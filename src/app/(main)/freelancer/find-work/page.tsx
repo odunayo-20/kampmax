@@ -160,12 +160,17 @@ function FindWorkContent() {
         onSortChange={(v) => syncUrl({ sort: v })}
         onReset={handleReset}
       />
-      {loading ? (
+      {loading && result.items.length === 0 ? (
         <OpportunityGridSkeleton />
       ) : result.items.length === 0 ? (
         <OpportunityEmptyState hasFilters={hasFilters} onReset={handleReset} />
       ) : (
-        <>
+        // Keep the previous results on screen (dimmed) while a filter/page change
+        // loads, instead of swapping them for a skeleton.
+        <div
+          aria-busy={loading}
+          className={loading ? "pointer-events-none space-y-6 opacity-60 transition-opacity" : "space-y-6 transition-opacity"}
+        >
           <OpportunityList opportunities={result.items} />
           {result.totalPages > 1 && (
             <nav
@@ -194,7 +199,7 @@ function FindWorkContent() {
               </Button>
             </nav>
           )}
-        </>
+        </div>
       )}
     </div>
   );

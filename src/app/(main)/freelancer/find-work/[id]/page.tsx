@@ -1,5 +1,6 @@
 "use client";
 
+import { DetailPageSkeleton } from "@/components/ui/Skeleton";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -82,7 +83,7 @@ export default function JobDetailPage() {
   };
 
   if (loading) {
-    return <div className="pt-8 text-center text-sm text-neutral-500">Loading…</div>;
+    return <DetailPageSkeleton />;
   }
 
   if (!opportunity) {

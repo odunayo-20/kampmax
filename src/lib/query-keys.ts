@@ -877,3 +877,14 @@ export const organizerKeys = {
   adminApplications: (filters: Record<string, string | number | undefined>) =>
     ["organizer", "admin", "applications", filters] as const,
 };
+
+/**
+ * Freelancer dashboard (owner-scoped). Keys carry the authenticated user id so a
+ * switch of account never serves the previous user's cached access or overview.
+ */
+export const freelancerDashboardKeys = {
+  all: ["freelancer-dashboard"] as const,
+  accessAll: ["freelancer-dashboard", "access"] as const,
+  access: (userId: string | undefined) => ["freelancer-dashboard", "access", userId] as const,
+  overview: (userId: string | undefined) => ["freelancer-dashboard", "overview", userId] as const,
+};

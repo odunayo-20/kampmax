@@ -8,6 +8,9 @@ type Phase = "idle" | "running" | "finishing";
 /** Give up after this long so a cancelled navigation never leaves the bar stuck. */
 const MAX_RUN_MS = 15_000;
 
+/** Navigations that finish faster than this never show the bar (avoids flicker). */
+const SHOW_DELAY_MS = 120;
+
 /**
  * Thin top-of-page progress bar for client-side route changes.
  *
@@ -20,17 +23,23 @@ export function RouteProgress() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState(0);
   const lastPathname = useRef(pathname);
-  const timers = useRef<{ trickle?: number; reset?: number; abort?: number }>({});
+  const visible = useRef(false);
+  const timers = useRef<{ show?: number; trickle?: number; reset?: number; abort?: number }>({});
 
   useEffect(() => {
     const clear = () => {
+      window.clearTimeout(timers.current.show);
       window.clearInterval(timers.current.trickle);
       window.clearTimeout(timers.current.reset);
       window.clearTimeout(timers.current.abort);
     };
 
     const finish = () => {
+      const wasVisible = visible.current;
       clear();
+      visible.current = false;
+      // Navigation beat the show-delay: nothing was drawn, so don't flash a bar.
+      if (!wasVisible) return;
       setProgress(1);
       setPhase("finishing");
       timers.current.reset = window.setTimeout(() => {
@@ -41,12 +50,18 @@ export function RouteProgress() {
 
     const start = () => {
       clear();
-      setPhase("running");
-      setProgress(0.08);
-      // Ease toward 90%: each tick covers a fraction of the remaining distance.
-      timers.current.trickle = window.setInterval(() => {
-        setProgress((p) => Math.min(0.9, p + (0.9 - p) * 0.12));
-      }, 200);
+      visible.current = false;
+      // Only draw the bar if the navigation is still pending after a beat, so
+      // instant (prefetched) transitions don't flicker.
+      timers.current.show = window.setTimeout(() => {
+        visible.current = true;
+        setPhase("running");
+        setProgress(0.08);
+        // Ease toward 90%: each tick covers a fraction of the remaining distance.
+        timers.current.trickle = window.setInterval(() => {
+          setProgress((p) => Math.min(0.9, p + (0.9 - p) * 0.12));
+        }, 200);
+      }, SHOW_DELAY_MS);
       timers.current.abort = window.setTimeout(finish, MAX_RUN_MS);
     };
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { cn, formatNaira } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/Skeleton";
 import {
   engagementToContract,
   getFreelancerEngagementsApi,
@@ -34,6 +35,7 @@ export default function FreelancerContractsPage() {
   // The freelancer's real engagements from the backend.
   const [engagements, setEngagements] = useState<Engagement[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const loadEngagements = useCallback(async () => {
     try {
@@ -41,6 +43,8 @@ export default function FreelancerContractsPage() {
       setLoadError(null);
     } catch (e) {
       setLoadError((e as { message?: string }).message ?? "We couldn't load your contracts.");
+    } finally {
+      setLoading(false);
     }
   }, []);
   useEffect(() => {
@@ -105,7 +109,24 @@ export default function FreelancerContractsPage() {
         })}
       </div>
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div
+          role="status"
+          aria-busy="true"
+          aria-label="Loading contracts"
+          className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+        >
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-kampmax-border bg-white p-4">
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="mt-2 h-3 w-1/2" />
+              <Skeleton className="mt-3 h-5 w-20 rounded-full" />
+              <Skeleton className="mt-3 h-9 w-full rounded-lg" />
+            </div>
+          ))}
+          <span className="sr-only">Loading contracts</span>
+        </div>
+      ) : filtered.length === 0 ? (
         <ContractEmptyState
           title="No contracts here yet"
           body="When a client accepts your proposal, your contract and project workspace will appear here."
