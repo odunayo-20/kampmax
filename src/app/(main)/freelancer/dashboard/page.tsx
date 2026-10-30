@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { X, ArrowRight, Bell, Handshake, Lightbulb } from "lucide-react";
-import { timeAgo } from "@/lib/utils";
+import { X, ArrowRight, Bell, FileText, Handshake, Lightbulb, Search } from "lucide-react";
 import { useFreelancerAccess, useFreelancerDashboard } from "@/hooks/use-freelancer-dashboard";
 import { useNotificationSummary } from "@/hooks/use-notifications";
 import { FreelancerSkeleton } from "@/components/freelancer/dashboard/FreelancerSkeleton";
@@ -13,7 +12,7 @@ import { FreelancerProfileStatusCard } from "@/components/freelancer/dashboard/F
 import { FreelancerProfilePreview } from "@/components/freelancer/dashboard/FreelancerProfilePreview";
 import { FreelancerAvailability } from "@/components/freelancer/dashboard/FreelancerAvailability";
 import { FreelancerActivityFeed } from "@/components/freelancer/dashboard/FreelancerActivityFeed";
-import { FreelancerEmptySection } from "@/components/freelancer/dashboard/FreelancerEmptySection";
+import { FreelancerSectionLink } from "@/components/freelancer/dashboard/FreelancerSectionLink";
 import { FreelancerNextContractAction } from "@/components/freelancer/dashboard/FreelancerNextContractAction";
 import { FreelancerFinancialSummary } from "@/components/freelancer/dashboard/FreelancerFinancialSummary";
 
@@ -69,8 +68,8 @@ export default function FreelancerDashboardPage() {
             <div>
               <h2 className="text-sm font-bold text-kampmax-text">Make the most of your profile</h2>
               <p className="mt-1 text-sm text-kampmax-text-secondary">
-                Keep your profile complete and your availability up to date to get found by clients.
-                Browse-work, proposals and contracts are coming soon.
+                Keep your profile complete and your availability up to date to get found by clients,
+                then browse jobs and send proposals to start winning work.
               </p>
             </div>
           </div>
@@ -118,31 +117,40 @@ export default function FreelancerDashboardPage() {
       {/* Profile preview */}
       <FreelancerProfilePreview profile={profile} displayName={displayName} />
 
-      {/* Future-module empty sections (M23–M25) */}
+      {/* Jump-off tiles into the work modules */}
       <section aria-label="Your work at a glance">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-bold text-kampmax-text">Find work & grow</h2>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <FreelancerEmptySection id="opportunities" href="/freelancer/dashboard" />
-          <FreelancerEmptySection id="proposals" href="/freelancer/dashboard" />
-          <Link
+          <FreelancerSectionLink
+            href="/freelancer/find-work"
+            icon={Search}
+            tone="bg-primary-50 text-primary-600"
+            title="Find work"
+            description="Browse open projects and opportunities matched to your skills."
+            cta="Browse jobs"
+          />
+          <FreelancerSectionLink
+            href="/freelancer/proposals"
+            icon={FileText}
+            tone="bg-info-50 text-info-700"
+            title="Your proposals"
+            description={
+              dashboard.proposals.submitted > 0
+                ? `${dashboard.proposals.submitted} submitted · ${dashboard.proposals.accepted} accepted`
+                : "Track proposals you've sent to clients and their status."
+            }
+            cta="View proposals"
+          />
+          <FreelancerSectionLink
             href="/freelancer/contracts"
-            className="group relative flex flex-col items-start gap-3 rounded-xl border border-kampmax-border bg-white p-5 transition-shadow hover:shadow-md"
-          >
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success-50 text-success-600">
-              <Handshake className="h-5 w-5" aria-hidden />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-kampmax-text">Your contracts</p>
-              <p className="mt-1 text-xs text-kampmax-text-secondary">
-                {dashboard.contracts.active} active · {dashboard.contracts.completed} completed
-              </p>
-            </div>
-            <span className="inline-flex items-center gap-1 text-sm font-semibold text-primary-600 group-hover:underline">
-              Manage contracts <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-            </span>
-          </Link>
+            icon={Handshake}
+            tone="bg-success-50 text-success-600"
+            title="Your contracts"
+            description={`${dashboard.contracts.active} active · ${dashboard.contracts.completed} completed`}
+            cta="Manage contracts"
+          />
           <FreelancerFinancialSummary />
         </div>
       </section>
@@ -171,7 +179,7 @@ export default function FreelancerDashboardPage() {
                 ))
               ) : (
                 <li className="text-sm text-kampmax-text-secondary">
-                  Your profile is complete. {timeAgo(new Date().toISOString())}
+                  Your profile is complete. Browse jobs to find your next project.
                 </li>
               )}
             </ul>
