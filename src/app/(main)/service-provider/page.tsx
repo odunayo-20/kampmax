@@ -9,6 +9,7 @@ import {
   useServiceProviderReviewsSummary,
 } from "@/hooks/use-service-provider-dashboard";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { CampusNames } from "@/components/service-provider/dashboard/CampusNames";
 import { ServiceProviderMetricCard } from "@/components/service-provider/dashboard/ServiceProviderMetricCard";
 import { ServiceProviderVerificationBadge } from "@/components/service-provider/dashboard/ServiceProviderStatusBadge";
 import type { ServiceProviderActivityKind } from "@/types/service-provider-dashboard";
@@ -93,7 +94,7 @@ export default function ServiceProviderOverviewPage() {
             <div>
               <h2 className="text-sm font-bold text-kampmax-text">Make the most of your profile</h2>
               <p className="mt-1 text-sm text-kampmax-text-secondary">
-                Complete your profile and keep your services up to date to get found by students near {record.location.primaryCampusId ?? "your campus"}.
+                Complete your profile and keep your services up to date to get found by students near <CampusNames ids={[record.location.primaryCampusId]} fallback="your campus" />.
               </p>
             </div>
           </div>

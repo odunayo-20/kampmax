@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/api-client";
+import { campusIdOrUndefined, onlyCampusIds } from "@/lib/campus-id";
 import { addSpDashboardServiceLive, updateSpAvailabilityLive } from "@/services/service-provider-dashboard.api";
 import { addMyPortfolioItem, fetchMyPortfolio, setMyProviderImages } from "@/services/service-provider-media";
 import type { ServiceProviderOnboardingDraft } from "@/types/service-provider";
@@ -19,6 +20,9 @@ export interface CreateServiceProviderProfileDto {
   slug: string;
   bio?: string;
   providerType?: string;
+  /** Campuses the provider serves; this is what lists their services on a campus. */
+  primaryCampusId?: string;
+  additionalCampusIds?: string[];
 }
 
 function slugifyLocal(input: string): string {
@@ -47,6 +51,8 @@ export async function createSpProfileApi(
     slug: slugifyLocal(displayName),
     bio: draft.profile?.description?.trim() || draft.provider?.bio?.trim() || undefined,
     providerType: draft.provider?.type || undefined,
+    primaryCampusId: campusIdOrUndefined(draft.location?.primaryCampusId),
+    additionalCampusIds: onlyCampusIds(draft.location?.additionalCampusIds),
   };
   const { error } = await apiClient.post<CreateServiceProviderProfileDto, unknown>(
     "/service-provider/profile",
@@ -96,6 +102,18 @@ export async function completeSpOnboarding(
       ok: false,
       problems: [profile.error.message || "We couldn't create your provider profile."],
     };
+  }
+
+  // An existing profile skips creation, so the campuses chosen now still need saving.
+  if (profile.error) {
+    const primaryCampusId = campusIdOrUndefined(draft.location?.primaryCampusId);
+    if (primaryCampusId) {
+      const res = await apiClient.patch("/service-provider/profile/me", {
+        primaryCampusId,
+        additionalCampusIds: onlyCampusIds(draft.location?.additionalCampusIds),
+      });
+      if (res.error) problems.push("Your campus wasn't saved, so your services may not show on it yet.");
+    }
   }
 
   const existing = await apiClient.get<Array<{ title: string }>>("/service-provider/services/me");

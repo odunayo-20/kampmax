@@ -10,6 +10,7 @@ import {
   CalendarClock,
   Clock,
   Globe,
+  Images,
   Star,
   CheckCircle2,
 } from "lucide-react";
@@ -154,6 +155,15 @@ export function ProviderProfileView({
               <CalendarClock className="h-4 w-4" aria-hidden />
               Check availability
             </a>
+            {provider.portfolio.length > 0 && (
+              <a
+                href="#portfolio"
+                className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg border border-neutral-200 text-neutral-700 text-sm font-semibold hover:bg-neutral-100"
+              >
+                <Images className="h-4 w-4" aria-hidden />
+                View portfolio
+              </a>
+            )}
           </div>
         </div>
       </section>
@@ -181,23 +191,53 @@ export function ProviderProfileView({
       </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* Services */}
-        <section id="services" className="lg:col-span-2 space-y-4 scroll-mt-20">
-          <h2 className="text-lg font-bold text-neutral-900">Services</h2>
-          {services.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-neutral-200 p-8 text-center">
-              <p className="text-sm text-neutral-500">
-                This provider has no available services right now.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-              {services.map((s) => (
-                <ServiceCard key={s.id} service={s} provider={provider} />
-              ))}
-            </div>
+        <div className="lg:col-span-2 space-y-8">
+          {/* Services */}
+          <section id="services" className="space-y-4 scroll-mt-20">
+            <h2 className="text-lg font-bold text-neutral-900">Services</h2>
+            {services.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-neutral-200 p-8 text-center">
+                <p className="text-sm text-neutral-500">
+                  This provider has no available services right now.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                {services.map((s) => (
+                  <ServiceCard key={s.id} service={s} provider={provider} />
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Portfolio */}
+          {provider.portfolio.length > 0 && (
+            <section id="portfolio" className="space-y-4 scroll-mt-20">
+              <h2 className="text-lg font-bold text-neutral-900">Portfolio</h2>
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                {provider.portfolio.map((item) => (
+                  <figure
+                    key={item.id}
+                    className="bg-white rounded-2xl border border-neutral-200 overflow-hidden"
+                  >
+                    <img
+                      src={item.image}
+                      alt={item.title}
+                      loading="lazy"
+                      className="aspect-square w-full object-cover"
+                    />
+                    <figcaption className="p-3">
+                      <p className="text-sm font-semibold text-neutral-900 truncate">{item.title}</p>
+                      {item.description && (
+                        <p className="mt-0.5 text-xs text-neutral-500 line-clamp-2">{item.description}</p>
+                      )}
+                    </figcaption>
+                  </figure>
+                ))}
+              </div>
+            </section>
           )}
-        </section>
+        </div>
 
         {/* Availability */}
         <aside id="availability" className="space-y-4 scroll-mt-20">
@@ -272,23 +312,6 @@ export function ProviderProfileView({
             </section>
           )}
 
-          {/* Portfolio */}
-          {provider.portfolio.length > 0 && (
-            <section className="bg-white rounded-2xl border border-neutral-200 p-5">
-              <h2 className="text-sm font-bold text-neutral-900 mb-3">Portfolio</h2>
-              <div className="grid grid-cols-3 gap-2">
-                {provider.portfolio.slice(0, 6).map((item) => (
-                  <img
-                    key={item.id}
-                    src={item.image}
-                    alt={item.title}
-                    loading="lazy"
-                    className="aspect-square w-full object-cover rounded-lg border border-neutral-100"
-                  />
-                ))}
-              </div>
-            </section>
-          )}
         </aside>
       </div>
 

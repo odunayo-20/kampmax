@@ -108,8 +108,10 @@ export default function AvailabilityPage() {
     const res = await updateSpProfileLive({
       locationCity: l.serviceCities?.[0] || undefined,
       serviceRadius: l.serviceRadiusKm ? String(l.serviceRadiusKm) : undefined,
+      primaryCampusId: l.primaryCampusId || undefined,
+      additionalCampusIds: l.additionalCampusIds ?? [],
     });
-    applyResult(res.ok, res.error, "Saved your service city and radius.");
+    applyResult(res.ok, res.error, "Saved your campuses, service city and radius.");
   }
 
   return (

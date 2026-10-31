@@ -2,11 +2,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const get = vi.fn();
 const post = vi.fn();
+const patch = vi.fn();
 const addService = vi.fn();
 const saveAvailability = vi.fn();
 
 vi.mock("@/lib/api-client", () => ({
-  apiClient: { get: (...a: unknown[]) => get(...a), post: (...a: unknown[]) => post(...a) },
+  apiClient: {
+    get: (...a: unknown[]) => get(...a),
+    post: (...a: unknown[]) => post(...a),
+    patch: (...a: unknown[]) => patch(...a),
+  },
 }));
 vi.mock("@/services/service-provider-dashboard.api", () => ({
   addSpDashboardServiceLive: (...a: unknown[]) => addService(...a),
@@ -44,6 +49,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   post.mockImplementation(() => ok({ id: "profile-1" }));
   get.mockImplementation(() => ok([]));
+  patch.mockImplementation(() => ok({}));
   addService.mockResolvedValue({ ok: true });
   saveAvailability.mockResolvedValue({ ok: true });
 });
@@ -94,6 +100,50 @@ describe("completeSpOnboarding", () => {
 
     expect(result.ok).toBe(true);
     expect(addService.mock.calls.map(([input]) => (input as { name: string }).name)).toEqual(["Wig install"]);
+  });
+
+  describe("campuses", () => {
+    const RUGIPO = "6a332447-af9a-46df-b18e-943cd3e56b9c";
+    const UNILAG = "8239e3fd-a71a-4dba-9e3f-bfe65de33bcc";
+    const location = { primaryCampusId: RUGIPO, additionalCampusIds: [UNILAG, "oau"] };
+
+    it("saves the campuses chosen with the profile, leaving out old non-id values", async () => {
+      await completeSpOnboarding(draft({ location }));
+
+      expect(post).toHaveBeenCalledWith(
+        "/service-provider/profile",
+        expect.objectContaining({ primaryCampusId: RUGIPO, additionalCampusIds: [UNILAG] })
+      );
+    });
+
+    it("sends no campus when the draft only has an old short name like 'rugipo'", async () => {
+      await completeSpOnboarding(draft({ location: { primaryCampusId: "rugipo", additionalCampusIds: [] } }));
+
+      const body = post.mock.calls[0][1] as { primaryCampusId?: string };
+      expect(body.primaryCampusId).toBeUndefined();
+    });
+
+    it("saves them on the existing profile when it was already created", async () => {
+      post.mockImplementation(() => failure("You already have a service provider profile", 409));
+
+      const result = await completeSpOnboarding(draft({ location }));
+
+      expect(result.ok).toBe(true);
+      expect(patch).toHaveBeenCalledWith("/service-provider/profile/me", {
+        primaryCampusId: RUGIPO,
+        additionalCampusIds: [UNILAG],
+      });
+    });
+
+    it("says so when the campus could not be saved on the existing profile", async () => {
+      post.mockImplementation(() => failure("You already have a service provider profile", 409));
+      patch.mockImplementation(() => failure("down", 500));
+
+      const result = await completeSpOnboarding(draft({ location }));
+
+      expect(result.ok).toBe(false);
+      expect(result.problems[0]).toMatch(/campus wasn't saved/);
+    });
   });
 
   it("names each service and the schedule that did not save, so a retry can finish the job", async () => {

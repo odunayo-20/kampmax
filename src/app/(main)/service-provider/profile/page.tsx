@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ExternalLink, MapPin, User } from "lucide-react";
+import { CampusNames } from "@/components/service-provider/dashboard/CampusNames";
 import { PortfolioManager } from "@/components/service-provider/dashboard/PortfolioManager";
 import { ProfileImagesHeader } from "@/components/service-provider/dashboard/ProfileImagesHeader";
 import { ProfessionalDetailsEditor } from "@/components/service-provider/dashboard/ProfessionalDetailsEditor";
@@ -111,7 +112,11 @@ export default function ProfilePage() {
             </Link>
           </div>
           <p className="mt-2 text-sm text-kampmax-text-secondary">
-            {areas.location.primaryCampusId || "No city set yet"} · within {areas.location.serviceRadiusKm ?? 0} km
+            <CampusNames
+              ids={[areas.location.primaryCampusId, ...areas.location.additionalCampusIds]}
+              fallback="No campus set yet"
+            />{" "}
+            · within {areas.location.serviceRadiusKm ?? 0} km
           </p>
         </div>
 

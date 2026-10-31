@@ -11,6 +11,7 @@
 // ============================================================
 
 import { apiClient } from "@/lib/api-client";
+import { campusIdOrUndefined, onlyCampusIds } from "@/lib/campus-id";
 import type {
   ServiceProviderActivityEvent,
   ServiceProviderDashboardMetric,
@@ -52,6 +53,9 @@ export interface BackendSpProfile {
   locationState?: string | null;
   locationCountry?: string | null;
   serviceRadius?: string | null;
+  /** Campuses this provider serves; where their services appear. */
+  primaryCampusId?: string | null;
+  additionalCampusIds?: string[] | null;
   /** How bookings are taken. */
   bookingPreference?: "INSTANT" | "REQUEST_APPROVAL";
   minAdvanceNoticeHours?: number;
@@ -284,8 +288,8 @@ export function buildDashboardRecordFromLive(
     },
     location: {
       type: "both",
-      primaryCampusId: profile.locationCity ?? "",
-      additionalCampusIds: [],
+      primaryCampusId: profile.primaryCampusId ?? "",
+      additionalCampusIds: profile.additionalCampusIds ?? [],
       serviceCities: profile.locationState ? [profile.locationState] : [],
       serviceRadiusKm: Number(profile.serviceRadius) || 10,
     },
@@ -545,6 +549,8 @@ export async function updateSpProfileLive(
     locationCity: string;
     locationState: string;
     serviceRadius: string;
+    primaryCampusId: string;
+    additionalCampusIds: string[];
     bookingPreference: "INSTANT" | "REQUEST_APPROVAL";
     minAdvanceNoticeHours: number;
     maxAdvanceBookingDays: number;
@@ -560,6 +566,8 @@ export async function updateSpProfileLive(
   if (patch.locationCity !== undefined) payload.locationCity = patch.locationCity;
   if (patch.locationState !== undefined) payload.locationState = patch.locationState;
   if (patch.serviceRadius !== undefined) payload.serviceRadius = patch.serviceRadius;
+  if (patch.primaryCampusId !== undefined) payload.primaryCampusId = campusIdOrUndefined(patch.primaryCampusId);
+  if (patch.additionalCampusIds !== undefined) payload.additionalCampusIds = onlyCampusIds(patch.additionalCampusIds);
   if (patch.bookingPreference !== undefined) payload.bookingPreference = patch.bookingPreference;
   if (patch.minAdvanceNoticeHours !== undefined) payload.minAdvanceNoticeHours = patch.minAdvanceNoticeHours;
   if (patch.maxAdvanceBookingDays !== undefined) payload.maxAdvanceBookingDays = patch.maxAdvanceBookingDays;
@@ -718,8 +726,8 @@ export async function fetchSpAvailabilityLive(): Promise<{
     },
     location: {
       type: "both",
-      primaryCampusId: profile?.locationCity ?? "",
-      additionalCampusIds: [],
+      primaryCampusId: profile?.primaryCampusId ?? "",
+      additionalCampusIds: profile?.additionalCampusIds ?? [],
       serviceCities: profile?.locationState ? [profile.locationState] : [],
       serviceRadiusKm: Number(profile?.serviceRadius) || 10,
     },
