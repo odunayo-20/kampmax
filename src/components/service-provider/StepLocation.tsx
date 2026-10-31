@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { MapPin, Globe, Home, Wifi, Settings, Plus, Trash2, Search, ChevronDown } from "lucide-react";
-import { Button, Input, Select } from "@/components/ui";
+import { Plus, Search } from "lucide-react";
+import { Input, Select } from "@/components/ui";
+import { useCampusOptions } from "@/hooks/use-campus-options";
 import { cn } from "@/lib/utils";
 import type { ServiceProviderOnboardingDraft, ServiceProviderLocationType } from "@/types/service-provider";
 
@@ -19,20 +19,9 @@ interface StepLocationProps {
   onUpdate: (data: Partial<ServiceProviderOnboardingDraft>) => void;
 }
 
-const CAMPUSES = [
-  { id: "rugipo", name: "Rufus Giwa Polytechnic, Owo", abbr: "RUGIPO" },
-  { id: "oau", name: "Obafemi Awolowo University, Ile-Ife", abbr: "OAU" },
-  { id: "ui", name: "University of Ibadan", abbr: "UI" },
-  { id: "unilag", name: "University of Lagos", abbr: "UNILAG" },
-  { id: "futminna", name: "Federal University of Technology, Minna", abbr: "FUTMINNA" },
-  { id: "futa", name: "Federal University of Technology, Akure", abbr: "FUTA" },
-  { id: "buk", name: "Bayero University, Kano", abbr: "BUK" },
-  { id: "uniabuja", name: "University of Abuja", abbr: "UNIABUJA" },
-] as const;
-
 export function StepLocation({ draft, onUpdate }: StepLocationProps) {
   const location = draft?.location;
-  const [search, setSearch] = useState("");
+  const { campuses: CAMPUSES, isLoading: campusesLoading } = useCampusOptions();
 
   const handleLocationTypeChange = (value: ServiceProviderLocationType) => {
     onUpdate({ location: { ...location, type: value } });
@@ -109,7 +98,7 @@ export function StepLocation({ draft, onUpdate }: StepLocationProps) {
         <Select
           value={location?.primaryCampusId ?? ""}
           onChange={(e) => handlePrimaryCampusChange(e.target.value)}
-          placeholder="Select your primary campus"
+          placeholder={campusesLoading && CAMPUSES.length === 0 ? "Loading campuses..." : "Select your primary campus"}
         >
           <option value="">Select campus</option>
           {CAMPUSES.map((c) => (
@@ -142,9 +131,9 @@ export function StepLocation({ draft, onUpdate }: StepLocationProps) {
                 ))}
             </Select>
 
-            {location?.additionalCampusIds?.length && (
+            {(location?.additionalCampusIds?.length ?? 0) > 0 && (
               <div className="mt-3 flex flex-wrap gap-2">
-                {CAMPUSES.filter((c) => location.additionalCampusIds?.includes(c.id))
+                {CAMPUSES.filter((c) => location?.additionalCampusIds?.includes(c.id))
                   .map((c) => (
                     <span key={c.id} className="inline-flex items-center gap-1.5 rounded-full bg-primary-50 border border-primary-200 px-3 py-1 text-sm font-medium text-primary-700">
                       {c.name}

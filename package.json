@@ -27,6 +27,7 @@
     "lucide-react": "^0.487.0",
     "maplibre-gl": "^6.11.2",
     "next": "^16.3.2",
+    "posthog-js": "^1.444.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

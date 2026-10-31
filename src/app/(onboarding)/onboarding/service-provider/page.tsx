@@ -1,5 +1,14 @@
 import type { Metadata } from "next";
-import { Wrench, Briefcase, Users, Shield, Star, ChevronDown } from "lucide-react";
+import { Wrench, Briefcase, Users, Shield, Star, ChevronDown, Percent, Lock, LifeBuoy } from "lucide-react";
+import { formatNaira } from "@/lib/utils";
+import {
+  AUTO_CONFIRM_HOURS,
+  FREE_CANCELLATION_HOURS,
+  REQUEST_RESPONSE_HOURS,
+  SERVICE_FEE_PERCENT,
+  splitBookingPrice,
+} from "@/config/service-booking-terms";
+import { IntroPageTracker } from "@/components/service-provider/intro/IntroPageTracker";
 import { RedirectApprovedProvider } from "@/components/service-provider/intro/RedirectApprovedProvider";
 import { ServiceCategoryChips } from "@/components/service-provider/intro/ServiceCategoryChips";
 import {
@@ -56,9 +65,9 @@ const BENEFITS = [
   },
   {
     icon: Shield,
-    title: "Earn trust with a badge",
+    title: "A marketplace customers trust",
     description:
-      "Verify your identity from your dashboard whenever you are ready. Verified providers earn a trust badge.",
+      "Every new provider is reviewed by our team before their services appear to customers.",
     tone: "bg-kampmax-gold/10 text-kampmax-gold",
   },
   {
@@ -78,6 +87,10 @@ const PHASES: { title: string; blurb: string; steps: ServiceProviderOnboardingSt
   { title: "Finishing touches", blurb: "Stand out, then send it in.", steps: [7, 8, 9] },
 ];
 
+// An example the fee line works through, so "8%" becomes a real amount.
+const EXAMPLE_BOOKING_PRICE = 5000;
+const EXAMPLE_SPLIT = splitBookingPrice(EXAMPLE_BOOKING_PRICE);
+
 const OPTIONAL_COUNT = SP_OPTIONAL_ONBOARDING_STEPS.length;
 const REQUIRED_COUNT = SERVICE_PROVIDER_ONBOARDING_STEPS - OPTIONAL_COUNT;
 
@@ -85,7 +98,7 @@ const FAQ = [
   {
     question: "Do I need to upload any documents?",
     answer:
-      "No. You can set up your profile and start taking bookings first. Verification is handled later from your dashboard.",
+      "You don't upload documents to apply. Once you submit, our team reviews your application, and your services appear to customers after you're approved.",
   },
   {
     question: "Can I finish my application later?",
@@ -97,9 +110,18 @@ const FAQ = [
     answer: "Yes. You can update your provider type after you start.",
   },
   {
-    question: "What does verification do?",
+    question: "How do I get my earnings out?",
     answer:
-      "Verified providers earn a trust badge on their profile. You can verify your identity from your dashboard whenever you are ready.",
+      "Your earnings go to your Kampmax wallet, and you withdraw them to your bank account. Withdrawing needs a bank account and an identity check, which you set up in your wallet.",
+  },
+  {
+    question: "What if a customer cancels, or I don't answer a request?",
+    answer: `Customers can cancel for free up to ${FREE_CANCELLATION_HOURS} hours before a booking starts, and they're refunded. If you choose to approve requests yourself, you have ${REQUEST_RESPONSE_HOURS} hours to answer before the request expires and the customer is refunded.`,
+  },
+  {
+    question: "What happens after I submit?",
+    answer:
+      "Our team reviews new providers. Your services appear to customers once you're approved, and you'll be notified.",
   },
 ];
 
@@ -108,6 +130,7 @@ export default function ServiceProviderIntroPage() {
     // Bottom padding keeps the sticky mobile button from covering the last section.
     <div className="min-h-screen bg-white pb-24 sm:pb-0">
       <RedirectApprovedProvider />
+      <IntroPageTracker />
       <div className="max-w-4xl mx-auto px-6 py-12 lg:py-20">
         {/* Hero */}
         <div className="text-center mb-12 lg:mb-16">
@@ -122,9 +145,9 @@ export default function ServiceProviderIntroPage() {
             connect with students who need your expertise.
           </p>
           <div className="mt-8">
-            <StartApplicationCta />
+            <StartApplicationCta placement="hero" />
             <p className="mt-3 text-sm text-kampmax-text-secondary">
-              Free to apply • No documents needed to get started
+              Free to apply • No documents to upload
             </p>
           </div>
         </div>
@@ -193,6 +216,59 @@ export default function ServiceProviderIntroPage() {
           </ol>
         </section>
 
+        {/* What it costs and how you get paid */}
+        <section className="mb-12 lg:mb-16" aria-labelledby="money-heading">
+          <h2 id="money-heading" className="text-2xl font-bold text-kampmax-text text-center mb-2">
+            What it costs and how you get paid
+          </h2>
+          <p className="text-center text-kampmax-text-secondary mb-8 max-w-2xl mx-auto">
+            No surprises: here&apos;s how the money works before you apply.
+          </p>
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div className="rounded-xl border border-kampmax-border bg-white p-5">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-100 text-primary-600">
+                <Percent className="h-6 w-6" aria-hidden />
+              </div>
+              <h3 className="mt-4 text-base font-semibold text-kampmax-text">
+                {SERVICE_FEE_PERCENT}% service fee
+              </h3>
+              <p className="mt-1 text-sm text-kampmax-text-secondary">
+                Applying is free. Kampmax takes {SERVICE_FEE_PERCENT}% of each completed booking, and
+                you keep the rest. On a {formatNaira(EXAMPLE_BOOKING_PRICE)} booking, you earn{" "}
+                <span className="font-semibold text-kampmax-text">
+                  {formatNaira(EXAMPLE_SPLIT.earnings)}
+                </span>
+                .
+              </p>
+            </div>
+            <div className="rounded-xl border border-kampmax-border bg-white p-5">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-100 text-primary-600">
+                <Lock className="h-6 w-6" aria-hidden />
+              </div>
+              <h3 className="mt-4 text-base font-semibold text-kampmax-text">
+                Payment held until it&apos;s done
+              </h3>
+              <p className="mt-1 text-sm text-kampmax-text-secondary">
+                Customers pay when they book, and Kampmax holds the money. It&apos;s released to you
+                when the customer confirms the service is done, or automatically after{" "}
+                {AUTO_CONFIRM_HOURS} hours if they don&apos;t respond.
+              </p>
+            </div>
+            <div className="rounded-xl border border-kampmax-border bg-white p-5">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-100 text-primary-600">
+                <LifeBuoy className="h-6 w-6" aria-hidden />
+              </div>
+              <h3 className="mt-4 text-base font-semibold text-kampmax-text">
+                Kampmax steps in if there&apos;s a problem
+              </h3>
+              <p className="mt-1 text-sm text-kampmax-text-secondary">
+                If a customer reports an issue, Kampmax support reviews it and decides whether the
+                payment goes to you or back to the customer.
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* What can you offer — the live service categories */}
         <ServiceCategoryChips />
 
@@ -243,9 +319,9 @@ export default function ServiceProviderIntroPage() {
 
         {/* Final call to action */}
         <div className="text-center pt-4">
-          <StartApplicationCta />
+          <StartApplicationCta placement="bottom" />
           <p className="mt-4 text-sm text-kampmax-text-secondary">
-            Free to apply • No documents needed to get started
+            Free to apply • No documents to upload
           </p>
         </div>
       </div>

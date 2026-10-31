@@ -13,13 +13,20 @@ import { StepPricing } from "@/components/service-provider/StepPricing";
 import { StepPortfolio } from "@/components/service-provider/StepPortfolio";
 import { StepReview, isApplicationComplete } from "@/components/service-provider/StepReview";
 import { useAuth } from "@/lib/auth-context";
+import { useQueryClient } from "@tanstack/react-query";
+import { track } from "@/lib/analytics";
+import { dashboardAccessKeys } from "@/lib/query-keys";
 import { useRequireSignIn } from "@/hooks/use-require-sign-in";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
 import { completeSpOnboarding } from "@/services/service-provider";
 import { spDraftFromSaved, spDraftToSaved } from "@/services/service-provider-onboarding";
 import type { SpSavedData } from "@/services/service-provider-onboarding";
 import { discardOnboardingDraft, loadOnboardingDraft, saveOnboardingDraft } from "@/services/onboarding-draft";
-import { SERVICE_PROVIDER_ONBOARDING_STEPS } from "@/types/service-provider";
+import {
+  SERVICE_PROVIDER_ONBOARDING_STEPS,
+  SP_ONBOARDING_STEP_LABELS,
+  SP_OPTIONAL_ONBOARDING_STEPS,
+} from "@/types/service-provider";
 import type { ServiceProviderOnboardingDraft, ServiceProviderOnboardingStepId } from "@/types/service-provider";
 
 /** How long to wait after the last keystroke before saving progress. */
@@ -64,6 +71,7 @@ export default function ServiceProviderOnboardingStepPage() {
   const router = useRouter();
   const params = useParams();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   useRequireSignIn();
   const userId = user?.id ?? null;
   const currentStep = parseInt(params.step as string, 10) as ServiceProviderOnboardingStepId;
@@ -119,6 +127,16 @@ export default function ServiceProviderOnboardingStepPage() {
       router.push(`/onboarding/service-provider/${SERVICE_PROVIDER_ONBOARDING_STEPS}`);
     }
   }, [loading, currentStep, router]);
+
+  // Each step reached is one rung of the application funnel.
+  useEffect(() => {
+    if (loading || !(currentStep in SP_ONBOARDING_STEP_LABELS)) return;
+    track("sp_application_step_viewed", {
+      step: currentStep,
+      step_name: SP_ONBOARDING_STEP_LABELS[currentStep],
+      optional: SP_OPTIONAL_ONBOARDING_STEPS.includes(currentStep),
+    });
+  }, [loading, currentStep]);
 
   /** Saves what's on screen now; resolves false (and says so) if the server didn't keep it. */
   const flush = useCallback(async (step?: number): Promise<boolean> => {
@@ -188,6 +206,10 @@ export default function ServiceProviderOnboardingStepPage() {
     markCompleted(currentStep);
     // Stay put if the server didn't keep it: progress is read back from the server.
     if (!(await flush(nextStep))) return;
+    track("sp_application_step_completed", {
+      step: currentStep,
+      step_name: SP_ONBOARDING_STEP_LABELS[currentStep],
+    });
     if (currentStep < SERVICE_PROVIDER_ONBOARDING_STEPS) router.push(`/onboarding/service-provider/${nextStep}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep, draft, router, flush, completedSteps]);
@@ -211,7 +233,11 @@ export default function ServiceProviderOnboardingStepPage() {
   const handleSubmit = useCallback(async () => {
     // The footer button is already disabled in these cases; this keeps any other
     // caller from submitting an incomplete application or skipping the agreement.
-    if (!draft || !termsAccepted || !isApplicationComplete(draft)) return;
+    if (!draft) return;
+    if (!termsAccepted || !isApplicationComplete(draft)) {
+      track("sp_application_submit_failed", { stage: "incomplete" });
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -219,19 +245,30 @@ export default function ServiceProviderOnboardingStepPage() {
       // be run again if something fails, and says exactly what didn't save.
       const result = await completeSpOnboarding(draft);
       if (!result.ok) {
+        track("sp_application_submit_failed", { stage: "request" });
         setError(result.problems.join(" "));
         return;
       }
+      track("sp_application_submitted", {
+        provider_type: draft.provider?.type ?? null,
+        services_count: draft.services?.length ?? 0,
+        portfolio_count: draft.portfolio?.length ?? 0,
+      });
       dirty.current = false;
       if (timer.current) clearTimeout(timer.current);
       await discardOnboardingDraft("service-provider");
-      router.push("/service-provider");
+      // A provider profile now exists, so any "no provider yet" answer cached for the
+      // dashboard or this flow is out of date.
+      await queryClient.invalidateQueries({ queryKey: dashboardAccessKeys.serviceProviderAll });
+      // A profile is created as pending: say so, instead of dropping them on a dashboard.
+      router.push("/onboarding/service-provider/submitted");
     } catch {
+      track("sp_application_submit_failed", { stage: "request" });
       setError("Submission failed. Please try again.");
     } finally {
       setSubmitting(false);
     }
-  }, [draft, termsAccepted, router]);
+  }, [draft, termsAccepted, router, queryClient]);
 
   const Component = STEP_COMPONENTS[currentStep];
 

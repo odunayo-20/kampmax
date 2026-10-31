@@ -48,6 +48,20 @@ describe("service provider start page", () => {
     expect(html).toContain(`${9 - SP_OPTIONAL_ONBOARDING_STEPS.length} short steps`);
   });
 
+  it("explains the money up front: the 8% fee, a worked example, and payment protection", () => {
+    expect(html).toContain("8% service fee");
+    // 5,000 booking -> 400 fee -> 4,600 earned.
+    expect(html).toContain("₦5,000");
+    expect(html).toContain("₦4,600");
+    expect(html).toContain("Payment held until it&#x27;s done");
+    expect(html).toContain("72 hours");
+  });
+
+  it("does not tell providers they can take bookings before they're approved", () => {
+    expect(html).not.toMatch(/start taking bookings/i);
+    expect(html).toContain("once you&#x27;re approved");
+  });
+
   it("describes the provider types from the shared list", () => {
     expect(html).toContain("Individual");
     expect(html).toContain("Business");

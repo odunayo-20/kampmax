@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CheckCircle, AlertCircle, ChevronRight, Edit, Shield, Clock, MapPin, DollarSign, Image, Settings, User } from "lucide-react";
 import { Button } from "@/components/ui";
+import { useCampusOptions } from "@/hooks/use-campus-options";
 import { cn } from "@/lib/utils";
 import { formatNaira } from "@/lib/utils";
 import type { ServiceProviderOnboardingDraft, ServiceProviderServiceStatus, ServiceProviderLocationType, ServiceProviderPricingModel, ServiceProviderBookingPreference } from "@/types/service-provider";
@@ -69,6 +70,8 @@ interface StepReviewProps {
  */
 export function StepReview({ draft, onEditStep, termsAccepted, onTermsChange }: StepReviewProps) {
   const [openSection, setOpenSection] = useState<string | null>(null);
+  const { campuses } = useCampusOptions();
+  const campusName = (id: string) => campuses.find((c) => c.id === id)?.name ?? id;
 
   const toggleSection = (section: string) => {
     setOpenSection(openSection === section ? null : section);
@@ -189,13 +192,15 @@ export function StepReview({ draft, onEditStep, termsAccepted, onTermsChange }: 
           </div>
           <div>
             <p className="text-sm text-kampmax-text-secondary">Primary Campus</p>
-            <p className="font-medium text-kampmax-text">{draft?.location?.primaryCampusId || "Not set"}</p>
+            <p className="font-medium text-kampmax-text">
+              {draft?.location?.primaryCampusId ? campusName(draft.location.primaryCampusId) : "Not set"}
+            </p>
           </div>
-          {draft?.location?.additionalCampusIds?.length && (
+          {(draft?.location?.additionalCampusIds?.length ?? 0) > 0 && (
             <div>
               <p className="text-sm text-kampmax-text-secondary">Additional Campuses</p>
               <p className="font-medium text-kampmax-text">
-                {draft.location.additionalCampusIds.join(", ")}
+                {draft?.location?.additionalCampusIds?.map(campusName).join(", ")}
               </p>
             </div>
           )}

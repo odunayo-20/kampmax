@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
+import { track } from "@/lib/analytics";
 
 const START_HREF = "/onboarding/service-provider/1";
 const REGISTER_HREF = "/register?role=service_provider";
@@ -21,9 +22,12 @@ const BUTTON_CLASS =
  * safe: the application itself sends a guest to sign in (see `useRequireSignIn`).
  */
 export function StartApplicationCta({
+  placement,
   compact = false,
   className,
 }: {
+  /** Where on the page this button sits, so analytics can tell which one converts. */
+  placement: "hero" | "bottom" | "sticky";
   /** Drops the "already have an account" line, for tight spaces like the sticky bar. */
   compact?: boolean;
   className?: string;
@@ -33,7 +37,13 @@ export function StartApplicationCta({
 
   return (
     <div className={cn("flex flex-col items-center gap-2", className)}>
-      <Link href={isGuest ? REGISTER_HREF : START_HREF} className={BUTTON_CLASS}>
+      <Link
+        href={isGuest ? REGISTER_HREF : START_HREF}
+        className={BUTTON_CLASS}
+        onClick={() =>
+          track("sp_intro_cta_clicked", { placement, audience: isGuest ? "guest" : "member" })
+        }
+      >
         {isGuest ? "Create a free account to start" : "Start Your Application"}
         <ArrowRight className="h-5 w-5" aria-hidden />
       </Link>
@@ -53,7 +63,7 @@ export function StartApplicationCta({
 export function StickyStartApplicationBar() {
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 border-t border-kampmax-border bg-white/95 px-4 py-3 backdrop-blur sm:hidden">
-      <StartApplicationCta compact />
+      <StartApplicationCta placement="sticky" compact />
     </div>
   );
 }
