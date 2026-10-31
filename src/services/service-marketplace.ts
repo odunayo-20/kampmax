@@ -300,7 +300,8 @@ export interface ProviderProfile {
 /** A live service and everything shown with it; null when it doesn't exist or isn't public. */
 export async function fetchServiceDetail(serviceId: string): Promise<ServiceDetail | null> {
   const { data, error } = await apiClient.get<ServiceDetail>(`/service-provider/services/public/${serviceId}`);
-  if (data) return data;
+  // On failure apiClient still hands back an empty `data` object, so check the error first.
+  if (!error && data) return data;
   if (error?.status === 404 || error?.status === 400) return null;
   throw error ?? new Error("Could not load this service.");
 }
@@ -308,7 +309,7 @@ export async function fetchServiceDetail(serviceId: string): Promise<ServiceDeta
 /** A provider's public profile by id or slug; null when it doesn't exist or isn't public. */
 export async function fetchProviderProfile(ref: string): Promise<ProviderProfile | null> {
   const { data, error } = await apiClient.get<ProviderProfile>(`/service-provider/providers/${encodeURIComponent(ref)}`);
-  if (data) return data;
+  if (!error && data) return data;
   if (error?.status === 404) return null;
   throw error ?? new Error("Could not load this provider.");
 }
