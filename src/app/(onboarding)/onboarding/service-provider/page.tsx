@@ -1,11 +1,19 @@
 import type { Metadata } from "next";
-import { Store, Wrench, Briefcase, Users, Shield, Star, ChevronRight } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Wrench, Briefcase, Users, Shield, Star, ChevronDown } from "lucide-react";
 import { RedirectApprovedProvider } from "@/components/service-provider/intro/RedirectApprovedProvider";
+import { ServiceCategoryChips } from "@/components/service-provider/intro/ServiceCategoryChips";
 import {
   StartApplicationCta,
   StickyStartApplicationBar,
 } from "@/components/service-provider/intro/StartApplicationCta";
+import { PROVIDER_TYPES } from "@/components/service-provider/provider-types";
+import {
+  SERVICE_PROVIDER_ONBOARDING_STEPS,
+  SP_ONBOARDING_STEP_DESCRIPTIONS,
+  SP_ONBOARDING_STEP_LABELS,
+  SP_OPTIONAL_ONBOARDING_STEPS,
+  type ServiceProviderOnboardingStepId,
+} from "@/types/service-provider";
 
 // A server component, so the title, description and share preview are in the HTML
 // that search engines and link previews (WhatsApp, X, ...) read.
@@ -27,49 +35,72 @@ export const metadata: Metadata = {
   },
 };
 
-const features = [
+const BENEFITS = [
   {
     icon: Wrench,
-    title: "Offer Services, Not Products",
+    title: "Offer services, not products",
     description: "List your skills and services — from phone repair to tutoring, photography to plumbing.",
-    color: "text-kampmax-blue",
+    tone: "bg-kampmax-blue/10 text-kampmax-blue",
   },
   {
     icon: Briefcase,
-    title: "Flexible Provider Types",
-    description: "Operate as an individual, registered business, or team/agency. Each with tailored requirements.",
-    color: "text-kampmax-gold",
+    title: "Work your way",
+    description: "Operate as an individual, a registered business, or a team or agency.",
+    tone: "bg-kampmax-gold/10 text-kampmax-gold",
   },
   {
     icon: Users,
-    title: "Multi-Campus Reach",
-    description: "Serve students across RUGIPO, OAU, UI, UNILAG, and more. Or offer online services nationwide.",
-    color: "text-kampmax-blue",
+    title: "Reach more students",
+    description: "Serve one campus or several, or offer your services online.",
+    tone: "bg-kampmax-blue/10 text-kampmax-blue",
   },
   {
     icon: Shield,
-    title: "Verified & Trusted",
-    description: "Verify your identity from your dashboard whenever you are ready. Verified providers earn a trust badge.",
-    color: "text-kampmax-gold",
+    title: "Earn trust with a badge",
+    description:
+      "Verify your identity from your dashboard whenever you are ready. Verified providers earn a trust badge.",
+    tone: "bg-kampmax-gold/10 text-kampmax-gold",
   },
   {
     icon: Star,
-    title: "Your Schedule, Your Rules",
-    description: "Set your availability, pricing, travel fees, and booking preferences. Full control over your business.",
-    color: "text-kampmax-blue",
+    title: "Your schedule, your rules",
+    description:
+      "Set your availability, pricing, travel fees, and booking preferences. Full control over your business.",
+    tone: "bg-kampmax-blue/10 text-kampmax-blue",
   },
 ];
 
-const steps = [
-  { number: 1, title: "Choose Provider Type", description: "Individual, Business, or Team/Agency" },
-  { number: 2, title: "Build Your Profile", description: "Display name, bio, description, logo" },
-  { number: 3, title: "Select Categories", description: "Primary + additional service categories" },
-  { number: 4, title: "Add Services", description: "Name, description, price, duration, location" },
-  { number: 5, title: "Set Location", description: "Campus, cities, service radius, address" },
-  { number: 6, title: "Configure Availability", description: "Weekly schedule, booking preferences, buffers" },
-  { number: 7, title: "Set Pricing Rules", description: "Travel fee, emergency fee, weekend fee" },
-  { number: 8, title: "Add Portfolio", description: "Showcase your work with photos" },
-  { number: 9, title: "Review & Submit", description: "Final review and submit for approval" },
+// The nine onboarding steps, grouped the way someone thinks about them. Names and
+// descriptions come from the steps themselves, so this can't drift from the flow.
+const PHASES: { title: string; blurb: string; steps: ServiceProviderOnboardingStepId[] }[] = [
+  { title: "About you", blurb: "Who you are and what you do.", steps: [1, 2, 3] },
+  { title: "What you offer", blurb: "Your services, where, and when.", steps: [4, 5, 6] },
+  { title: "Finishing touches", blurb: "Stand out, then send it in.", steps: [7, 8, 9] },
+];
+
+const OPTIONAL_COUNT = SP_OPTIONAL_ONBOARDING_STEPS.length;
+const REQUIRED_COUNT = SERVICE_PROVIDER_ONBOARDING_STEPS - OPTIONAL_COUNT;
+
+const FAQ = [
+  {
+    question: "Do I need to upload any documents?",
+    answer:
+      "No. You can set up your profile and start taking bookings first. Verification is handled later from your dashboard.",
+  },
+  {
+    question: "Can I finish my application later?",
+    answer:
+      "Yes. Your progress saves automatically, so you can leave at any point and pick up where you left off.",
+  },
+  {
+    question: "Can I change how I operate later?",
+    answer: "Yes. You can update your provider type after you start.",
+  },
+  {
+    question: "What does verification do?",
+    answer:
+      "Verified providers earn a trust badge on their profile. You can verify your identity from your dashboard whenever you are ready.",
+  },
 ];
 
 export default function ServiceProviderIntroPage() {
@@ -78,7 +109,7 @@ export default function ServiceProviderIntroPage() {
     <div className="min-h-screen bg-white pb-24 sm:pb-0">
       <RedirectApprovedProvider />
       <div className="max-w-4xl mx-auto px-6 py-12 lg:py-20">
-        {/* Header */}
+        {/* Hero */}
         <div className="text-center mb-12 lg:mb-16">
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-kampmax-blue/10 mb-6">
             <Wrench className="h-10 w-10 text-kampmax-blue" />
@@ -87,129 +118,134 @@ export default function ServiceProviderIntroPage() {
             Become a Service Provider
           </h1>
           <p className="text-lg text-kampmax-text-secondary max-w-2xl mx-auto">
-            Turn your skills into income. Join thousands of verified service providers on Kampmax
-            and connect with students who need your expertise.
+            Turn your skills into income. List your services, set your own schedule and prices, and
+            connect with students who need your expertise.
           </p>
           <div className="mt-8">
             <StartApplicationCta />
             <p className="mt-3 text-sm text-kampmax-text-secondary">
-              Your progress saves automatically, so you can finish later.
+              Free to apply • No documents needed to get started
             </p>
           </div>
         </div>
 
-        {/* What you can offer */}
-        <section className="mb-12 lg:mb-16">
-          <h2 className="text-2xl font-bold text-kampmax-text text-center mb-8">
-            What Services Can You Offer?
+        {/* Why */}
+        <section className="mb-12 lg:mb-16" aria-labelledby="why-heading">
+          <h2 id="why-heading" className="text-2xl font-bold text-kampmax-text text-center mb-8">
+            Why list your services on Kampmax
           </h2>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {[
-              "Beauty & Personal Care",
-              "Education & Tutoring",
-              "Technology & IT",
-              "Repairs & Maintenance",
-              "Creative & Design",
-              "Home Services",
-              "Transportation",
-              "Food & Catering",
-              "Events & Entertainment",
-              "Fitness & Wellness",
-              "Professional Services",
-              "Printing & Stationery",
-            ].map((category) => (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {BENEFITS.map((benefit) => (
               <div
-                key={category}
-                className="rounded-xl border border-kampmax-border bg-white p-5 hover:border-primary-300 hover:shadow-md transition-all"
+                key={benefit.title}
+                className="rounded-xl border border-kampmax-border bg-white p-5 hover:border-primary-200 hover:shadow-md transition-all"
               >
-                <p className="font-medium text-kampmax-text">{category}</p>
+                <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${benefit.tone}`}>
+                  <benefit.icon className="h-6 w-6" aria-hidden />
+                </div>
+                <h3 className="mt-4 text-base font-semibold text-kampmax-text">{benefit.title}</h3>
+                <p className="mt-1 text-sm text-kampmax-text-secondary">{benefit.description}</p>
               </div>
             ))}
           </div>
         </section>
 
         {/* How it works */}
-        <section className="mb-12 lg:mb-16">
-          <h2 className="text-2xl font-bold text-kampmax-text text-center mb-8">
-            How It Works
-          </h2>
-          <div className="space-y-6">
-            {features.map((feature, index) => (
-              <div
-                key={index}
-                className="flex gap-6 p-6 rounded-xl border border-kampmax-border bg-white hover:border-primary-200 hover:shadow-md transition-all"
-              >
-                <div className="flex-shrink-0">
-                  <div className={cn("flex h-14 w-14 items-center justify-center rounded-xl", feature.color + "/10")}>
-                    <feature.icon className="h-7 w-7" />
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-kampmax-text">{feature.title}</h3>
-                  <p className="mt-1 text-kampmax-text-secondary">{feature.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Onboarding steps overview */}
-        <section className="mb-12 lg:mb-16">
-          <h2 className="text-2xl font-bold text-kampmax-text text-center mb-8">
-            {steps.length}-Step Onboarding
+        <section className="mb-12 lg:mb-16" aria-labelledby="how-heading">
+          <h2 id="how-heading" className="text-2xl font-bold text-kampmax-text text-center mb-2">
+            How it works
           </h2>
           <p className="text-center text-kampmax-text-secondary mb-8 max-w-2xl mx-auto">
-            Complete at your own pace. Save drafts and resume anytime.
+            {REQUIRED_COUNT} short steps and {OPTIONAL_COUNT} optional ones. Your progress saves
+            automatically, so you can finish whenever suits you.
           </p>
-          <div className="space-y-3">
-            {steps.map((step, index) => (
-              <div
-                key={step.number}
-                className="flex items-center gap-4 p-4 rounded-xl border border-kampmax-border bg-white"
-              >
-                <div className="flex-shrink-0 flex h-10 w-10 items-center justify-center rounded-full bg-primary-100 text-primary-600 font-bold">
-                  {step.number}
+          <ol className="grid gap-4 lg:grid-cols-3">
+            {PHASES.map((phase, index) => (
+              <li key={phase.title} className="rounded-xl border border-kampmax-border bg-white p-5">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-100 font-bold text-primary-600">
+                    {index + 1}
+                  </span>
+                  <div>
+                    <h3 className="font-semibold text-kampmax-text">{phase.title}</h3>
+                    <p className="text-sm text-kampmax-text-secondary">{phase.blurb}</p>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <p className="font-medium text-kampmax-text">{step.title}</p>
-                  <p className="text-sm text-kampmax-text-secondary">{step.description}</p>
-                </div>
-                <ChevronRight className="h-5 w-5 text-kampmax-text-secondary" />
-              </div>
+                <ul className="mt-4 space-y-2.5">
+                  {phase.steps.map((step) => (
+                    <li key={step} className="text-sm">
+                      <span className="font-medium text-kampmax-text">
+                        {SP_ONBOARDING_STEP_LABELS[step]}
+                      </span>
+                      {SP_OPTIONAL_ONBOARDING_STEPS.includes(step) && (
+                        <span className="ml-2 rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600">
+                          Optional
+                        </span>
+                      )}
+                      <span className="block text-kampmax-text-secondary">
+                        {SP_ONBOARDING_STEP_DESCRIPTIONS[step]}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </li>
             ))}
-          </div>
+          </ol>
         </section>
 
-        {/* Provider types */}
-        <section className="mb-12 lg:mb-16">
-          <h2 className="text-2xl font-bold text-kampmax-text text-center mb-8">
-            Choose How You Operate
+        {/* What can you offer — the live service categories */}
+        <ServiceCategoryChips />
+
+        {/* How you operate */}
+        <section className="mb-12 lg:mb-16" aria-labelledby="operate-heading">
+          <h2 id="operate-heading" className="text-2xl font-bold text-kampmax-text text-center mb-2">
+            Choose how you operate
           </h2>
-          <div className="grid gap-6 lg:grid-cols-3">
-            {[
-              { label: "Individual", desc: "One person provides the service. Perfect for freelancers and solo professionals.", icon: Store },
-              { label: "Business", desc: "A registered/local business provides the service. May require CAC registration.", icon: Briefcase },
-              { label: "Team / Agency", desc: "Multiple people provide services under one provider profile. Good for agencies.", icon: Users },
-            ].map((type, index) => (
-              <div
-                key={index}
-                className="rounded-xl border-2 border-neutral-200 bg-white p-6 hover:border-primary-300 hover:bg-primary-50 transition-all"
-              >
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-100 text-primary-600 mb-4">
-                  <type.icon className="h-6 w-6" />
+          <p className="text-center text-kampmax-text-secondary mb-8 max-w-2xl mx-auto">
+            Not sure? Start as an individual — you can update this later.
+          </p>
+          <div className="grid gap-4 lg:grid-cols-3">
+            {PROVIDER_TYPES.map((type) => (
+              <div key={type.value} className="rounded-xl border border-kampmax-border bg-white p-5">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-100 text-primary-600">
+                  <type.icon className="h-6 w-6" aria-hidden />
                 </div>
-                <h3 className="text-lg font-semibold text-kampmax-text mb-2">{type.label}</h3>
-                <p className="text-sm text-kampmax-text-secondary">{type.desc}</p>
+                <h3 className="mt-4 text-base font-semibold text-kampmax-text">{type.label}</h3>
+                <p className="mt-1 text-sm text-kampmax-text-secondary">{type.description}</p>
               </div>
             ))}
           </div>
         </section>
 
-        {/* CTA */}
-        <div className="text-center pt-8">
+        {/* Questions */}
+        <section className="mb-12 lg:mb-16" aria-labelledby="faq-heading">
+          <h2 id="faq-heading" className="text-2xl font-bold text-kampmax-text text-center mb-8">
+            Common questions
+          </h2>
+          <div className="space-y-3">
+            {FAQ.map((item) => (
+              <details
+                key={item.question}
+                className="group rounded-xl border border-kampmax-border bg-white px-5 py-4"
+              >
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-medium text-kampmax-text [&::-webkit-details-marker]:hidden">
+                  {item.question}
+                  <ChevronDown
+                    className="h-5 w-5 shrink-0 text-kampmax-text-secondary transition-transform group-open:rotate-180"
+                    aria-hidden
+                  />
+                </summary>
+                <p className="mt-3 text-sm text-kampmax-text-secondary">{item.answer}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+
+        {/* Final call to action */}
+        <div className="text-center pt-4">
           <StartApplicationCta />
           <p className="mt-4 text-sm text-kampmax-text-secondary">
-            Free to apply • No commitment • Cancel anytime
+            Free to apply • No documents needed to get started
           </p>
         </div>
       </div>

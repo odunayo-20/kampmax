@@ -1,29 +1,8 @@
 "use client";
 
-import { User, Building2, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ServiceProviderOnboardingDraft, ServiceProviderType } from "@/types/service-provider";
-
-const PROVIDER_TYPES: { value: ServiceProviderType; label: string; description: string; icon: typeof User }[] = [
-  {
-    value: "individual",
-    label: "Individual",
-    description: "One person provides the service. Perfect for freelancers and solo professionals.",
-    icon: User,
-  },
-  {
-    value: "business",
-    label: "Business",
-    description: "A registered/local business provides the service. May require CAC registration.",
-    icon: Building2,
-  },
-  {
-    value: "team_agency",
-    label: "Team / Agency",
-    description: "Multiple people provide services under one provider profile. Good for agencies.",
-    icon: Users,
-  },
-];
+import type { ServiceProviderOnboardingDraft } from "@/types/service-provider";
+import { PROVIDER_TYPES } from "./provider-types";
 
 interface StepProviderTypeProps {
   draft: ServiceProviderOnboardingDraft | null;

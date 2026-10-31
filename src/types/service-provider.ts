@@ -386,6 +386,12 @@ export interface ServiceProviderPortfolioItem {
 
 // ── Helpers ──────────────────────────────────────────────────
 
+/**
+ * Steps a provider can skip: the application can be submitted without them (see
+ * `isApplicationComplete`). Shown as "Optional" so people don't read them as hurdles.
+ */
+export const SP_OPTIONAL_ONBOARDING_STEPS: readonly ServiceProviderOnboardingStepId[] = [7, 8];
+
 export const SP_ONBOARDING_STEP_LABELS: Record<ServiceProviderOnboardingStepId, string> = {
   1: "Provider Type",
   2: "Profile",

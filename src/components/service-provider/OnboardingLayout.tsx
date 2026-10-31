@@ -6,7 +6,7 @@ import { ArrowLeft, Save, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { OnboardingProgress, OnboardingStepIndicator } from "./OnboardingProgress";
-import { SERVICE_PROVIDER_ONBOARDING_STEPS } from "@/types/service-provider";
+import { SERVICE_PROVIDER_ONBOARDING_STEPS, SP_OPTIONAL_ONBOARDING_STEPS } from "@/types/service-provider";
 import type { ServiceProviderOnboardingDraft, ServiceProviderOnboardingStepId, ServiceProviderOnboardingStatus } from "@/types/service-provider";
 
 interface OnboardingLayoutProps {
@@ -93,6 +93,11 @@ export function OnboardingLayout({
             </h1>
             <p className="mt-1 text-sm text-kampmax-text-secondary">
               Step {currentStep} of {SERVICE_PROVIDER_ONBOARDING_STEPS}
+              {SP_OPTIONAL_ONBOARDING_STEPS.includes(currentStep) && (
+                <span className="ml-2 rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600">
+                  Optional — you can skip this
+                </span>
+              )}
             </p>
           </div>
         </div>
