@@ -5,6 +5,7 @@ import { AlertCircle, Save } from "lucide-react";
 import { Button, Input, Select } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { TaxonomySelect } from "@/components/taxonomy";
+import { ServiceImagePicker } from "@/components/service-provider/ServiceImagePicker";
 import type {
   ServiceProviderLocationType,
   ServiceProviderPricingModel,
@@ -63,9 +64,10 @@ export function ServiceForm({
     locationType: initial?.locationType ?? "provider_location",
     status: initial?.status ?? ("draft" as ServiceProviderServiceStatus),
   });
+  const [imageUrl, setImageUrl] = useState<string | null>(initial?.images?.[0] ?? null);
   const [error, setError] = useState<string | null>(null);
 
-  const set = <K extends keyof ServiceProviderServiceInput>(key: K, value: ServiceProviderServiceInput[K]) =>
+  const set =<K extends keyof ServiceProviderServiceInput>(key: K, value: ServiceProviderServiceInput[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
   async function handleSubmit() {
@@ -104,6 +106,15 @@ export function ServiceForm({
           />
         </div>
       </div>
+
+      <ServiceImagePicker
+        imageUrl={imageUrl}
+        onChange={(image) => {
+          setImageUrl(image?.url ?? null);
+          // A new upload replaces the saved picture; null takes it down.
+          set("coverMediaId", image?.mediaId ?? null);
+        }}
+      />
 
       <div>
         <label className="mb-1.5 block text-sm font-medium text-kampmax-text">Description</label>

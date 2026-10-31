@@ -5,6 +5,7 @@ import { Plus, Trash2, ChevronDown, Tag, Clock, DollarSign, MapPin, Globe, Home,
 import { Button, Input, Select } from "@/components/ui";
 import { cn, formatNaira } from "@/lib/utils";
 import { TaxonomySelect } from "@/components/taxonomy";
+import { ServiceImagePicker } from "@/components/service-provider/ServiceImagePicker";
 import type { ServiceProviderOnboardingDraft, ServiceProviderServiceDraft, ServiceProviderPricingModel, ServiceProviderLocationType, ServiceProviderServiceStatus } from "@/types/service-provider";
 
 const PRICING_MODELS = [
@@ -186,6 +187,13 @@ function ServiceCard({
           </div>
         </div>
 
+        <ServiceImagePicker
+          imageUrl={service.images?.[0]}
+          onChange={(image) =>
+            onUpdate({ images: image ? [image.url] : [], coverMediaId: image?.mediaId })
+          }
+        />
+
         <div>
           <label className="block text-sm font-medium text-kampmax-text mb-1.5">
             Description
@@ -329,6 +337,13 @@ function ServiceCard({
   return (
     <div className="rounded-xl border border-kampmax-border bg-white p-6 space-y-4">
       <div className="flex items-start justify-between gap-4">
+        {service.images?.[0] && (
+          <img
+            src={service.images[0]}
+            alt={service.name || "Service photo"}
+            className="h-16 w-20 shrink-0 rounded-lg border border-kampmax-border object-cover"
+          />
+        )}
         <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-kampmax-text">{service.name || "Unnamed Service"}</h3>
           <p className="mt-1 text-sm text-kampmax-text-secondary line-clamp-2">{service.description || "No description"}</p>

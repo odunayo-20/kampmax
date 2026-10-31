@@ -96,6 +96,8 @@ export interface ServiceProviderServiceInput {
   locationType: ServiceProviderLocationType;
   status?: ServiceProviderServiceStatus;
   images?: string[];
+  /** An uploaded picture to show for the service; null takes it down, left out keeps it. */
+  coverMediaId?: string | null;
 }
 
 export interface ServiceProviderPortfolioItemInput {

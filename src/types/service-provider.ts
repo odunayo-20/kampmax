@@ -252,7 +252,10 @@ export interface ServiceProviderServiceDraft {
   durationMinutes: number;
   locationType: ServiceProviderLocationType;
   status: ServiceProviderServiceStatus;
+  /** Addresses of the service's pictures; the first is the one shown. */
   images?: string[];
+  /** The uploaded picture behind `images[0]`, sent when the service is saved. */
+  coverMediaId?: string;
 }
 
 // ── Portfolio item draft ─────────────────────────────────────

@@ -248,6 +248,48 @@ describe("service-provider-dashboard.api (live API implementation)", () => {
       expect(res.service?.name).toBe("Ceiling Fan Repair");
     });
 
+    describe("service picture", () => {
+      const base = {
+        name: "Photo",
+        description: "Shoots",
+        categoryId: "cat-1",
+        pricingModel: "fixed" as const,
+        price: 5000,
+        durationMinutes: 60,
+        locationType: "provider_location" as const,
+      };
+      const created = { ...mockServices[0], id: "srv-3", title: "Photo", status: "DRAFT" };
+
+      it("sends the uploaded picture's id when creating, and leaves it out when there is none", async () => {
+        postMock.mockResolvedValue({ data: created, error: null });
+
+        await addSpDashboardServiceLive({ ...base, coverMediaId: "media-1" });
+        expect(postMock.mock.calls[0][1]).toMatchObject({ coverMediaId: "media-1" });
+
+        await addSpDashboardServiceLive(base);
+        expect(postMock.mock.calls[1][1]).not.toHaveProperty("coverMediaId");
+      });
+
+      it("changes or removes the picture on update, and keeps it when not mentioned", async () => {
+        patchMock.mockResolvedValue({ data: created, error: null });
+
+        await updateSpDashboardServiceLive("srv-3", { coverMediaId: "media-2" });
+        expect(patchMock.mock.calls[0][1]).toEqual({ coverMediaId: "media-2" });
+
+        await updateSpDashboardServiceLive("srv-3", { coverMediaId: null });
+        expect(patchMock.mock.calls[1][1]).toEqual({ coverMediaId: null });
+
+        await updateSpDashboardServiceLive("srv-3", { price: 6000 });
+        expect(patchMock.mock.calls[2][1]).not.toHaveProperty("coverMediaId");
+      });
+
+      it("shows the saved picture's address as the service image", () => {
+        const withPicture = mapBackendService({ ...mockServices[0], coverImageUrl: "https://cdn.example.com/p.jpg" });
+        expect(withPicture.images).toEqual(["https://cdn.example.com/p.jpg"]);
+        expect(mapBackendService({ ...mockServices[0], coverImageUrl: null }).images).toEqual([]);
+      });
+    });
+
     it("updates service status via setSpDashboardServiceStatusLive", async () => {
       patchMock.mockResolvedValue({
         data: { ...mockServices[0], status: "INACTIVE" },

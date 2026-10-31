@@ -133,6 +133,7 @@ export async function completeSpOnboarding(
         durationMinutes: svc.durationMinutes,
         locationType: svc.locationType,
         images: svc.images,
+        coverMediaId: svc.coverMediaId,
       });
       if (!res.ok) problems.push(`"${svc.name}" wasn't saved: ${res.error ?? "unknown error"}`);
     }

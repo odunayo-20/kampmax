@@ -124,6 +124,14 @@ export default function ServicesPage() {
           {services.map((service) => (
             <div key={service.id} className="rounded-xl border border-kampmax-border bg-white p-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                {service.images?.[0] && (
+                  <img
+                    src={service.images[0]}
+                    alt={service.name}
+                    loading="lazy"
+                    className="h-20 w-28 shrink-0 rounded-lg border border-kampmax-border object-cover"
+                  />
+                )}
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="text-base font-bold text-kampmax-text">{service.name}</h2>

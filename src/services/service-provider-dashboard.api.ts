@@ -81,6 +81,8 @@ export interface BackendSpService {
   campusAvailability?: string | null;
   status: "DRAFT" | "ACTIVE" | "INACTIVE";
   profileMediaId?: string | null;
+  /** Public address of the service's picture. */
+  coverImageUrl?: string | null;
   termsNotes?: string | null;
   createdAt: string;
   updatedAt?: string;
@@ -229,7 +231,7 @@ export function mapBackendService(
     durationMinutes: s.durationMinutes ?? 60,
     locationType: mapLocationTypeToFrontend(s.serviceLocationType),
     status: (s.status.toLowerCase() ?? "draft") as ServiceProviderServiceStatus,
-    images: s.profileMediaId ? [s.profileMediaId] : [],
+    images: s.coverImageUrl ? [s.coverImageUrl] : [],
     updatedAt: s.updatedAt || s.createdAt || new Date().toISOString(),
   };
 }
@@ -628,6 +630,7 @@ export async function addSpDashboardServiceLive(
     durationMinutes: input.durationMinutes,
     serviceLocationType: mapLocationTypeToBackend(input.locationType),
     termsNotes: "",
+    ...(input.coverMediaId ? { coverMediaId: input.coverMediaId } : {}),
   };
 
   const { data, error } = await apiClient.post<Record<string, unknown>, BackendSpService>(
@@ -661,6 +664,7 @@ export async function updateSpDashboardServiceLive(
   if (patch.locationType !== undefined) {
     payload.serviceLocationType = mapLocationTypeToBackend(patch.locationType);
   }
+  if (patch.coverMediaId !== undefined) payload.coverMediaId = patch.coverMediaId;
 
   const { data, error } = await apiClient.patch<Record<string, unknown>, BackendSpService>(
     `/service-provider/services/${serviceId}`,

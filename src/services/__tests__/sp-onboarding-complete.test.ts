@@ -102,6 +102,21 @@ describe("completeSpOnboarding", () => {
     expect(addService.mock.calls.map(([input]) => (input as { name: string }).name)).toEqual(["Wig install"]);
   });
 
+  it("sends each service's uploaded picture with it", async () => {
+    await completeSpOnboarding(
+      draft({
+        services: [
+          { ...service("Braiding"), images: ["https://cdn.example.com/b.jpg"], coverMediaId: "media-9" },
+          service("Wig install"),
+        ],
+      })
+    );
+
+    const inputs = addService.mock.calls.map(([input]) => input as { coverMediaId?: string });
+    expect(inputs[0].coverMediaId).toBe("media-9");
+    expect(inputs[1].coverMediaId).toBeUndefined();
+  });
+
   describe("campuses", () => {
     const RUGIPO = "6a332447-af9a-46df-b18e-943cd3e56b9c";
     const UNILAG = "8239e3fd-a71a-4dba-9e3f-bfe65de33bcc";
