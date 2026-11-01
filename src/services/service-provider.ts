@@ -134,6 +134,8 @@ export async function completeSpOnboarding(
         locationType: svc.locationType,
         images: svc.images,
         coverMediaId: svc.coverMediaId,
+        galleryMediaIds: svc.gallery?.map((g) => g.mediaId),
+        status: svc.status,
       });
       if (!res.ok) problems.push(`"${svc.name}" wasn't saved: ${res.error ?? "unknown error"}`);
     }

@@ -19,6 +19,8 @@ import { uploadFileDirect } from "@/services/media";
 export type ProviderImageKind = "avatar" | "logo" | "coverImage" | "portfolio";
 
 export const MAX_PORTFOLIO_ITEMS = 10;
+/** Pictures after a service's main one; a service shows up to 5 in all. */
+export const MAX_SERVICE_GALLERY = 4;
 const MAX_IMAGE_MB: Record<ProviderImageKind, number> = { avatar: 5, logo: 5, coverImage: 5, portfolio: 10 };
 
 export interface UploadedProviderImage {

@@ -13,7 +13,6 @@ import {
   ShieldCheck,
   CalendarClock,
   CheckCircle2,
-  Image as ImageIcon,
 } from "lucide-react";
 import type {
   MarketplaceProvider,
@@ -23,6 +22,7 @@ import type {
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 import { useCategoryTree } from "@/hooks/use-taxonomy";
+import { useCampusLabel } from "@/hooks/use-campus-options";
 import {
   categoryIdsFor,
   getOpenDaysLabel,
@@ -38,6 +38,7 @@ import { ServiceShareButton } from "./ServiceShareButton";
 import { ServiceReportModal } from "./ServiceReportModal";
 import { RequestQuoteModal } from "./RequestQuoteModal";
 import { ServiceCard } from "./ServiceCard";
+import { ServiceGallery } from "./ServiceGallery";
 import { ProviderCard } from "./ProviderCard";
 
 interface ServiceDetailViewProps {
@@ -65,6 +66,7 @@ export function ServiceDetailView({
 
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const campusLabel = useCampusLabel(provider.primaryCampusId);
 
   const isQuoteOnly = service.pricingModel === "quote";
 
@@ -115,15 +117,10 @@ export function ServiceDetailView({
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-start">
         {/* ── Left: gallery + about ── */}
         <div className="space-y-6 min-w-0">
-          <div className="aspect-[16/9] max-h-[420px] w-full overflow-hidden rounded-2xl border border-neutral-200 bg-neutral-100">
-            {service.imageUrl ? (
-              <img src={service.imageUrl} alt={service.name} className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-neutral-400/40">
-                <ImageIcon className="w-16 h-16" aria-hidden />
-              </div>
-            )}
-          </div>
+          <ServiceGallery
+            images={service.images?.length ? service.images : service.imageUrl ? [service.imageUrl] : []}
+            name={service.name}
+          />
 
           {/* Title + meta */}
           <div>
@@ -285,17 +282,19 @@ export function ServiceDetailView({
               <div className="flex justify-between gap-3">
                 <span className="text-neutral-500">Where: {getServiceLocationLabel(service.locationType)}</span>
               </div>
-              <div className="flex justify-between gap-3">
-                <span className="text-neutral-500">Located:</span>
-                <span className="text-neutral-700 font-medium inline-flex items-center gap-1">
-                  {provider.primaryCampusId.toUpperCase()}
-                  {provider.additionalCampusIds.length > 0 && (
-                    <span className="text-neutral-400 font-normal">
-                      +{provider.additionalCampusIds.length} more
-                    </span>
-                  )}
-                </span>
-              </div>
+              {campusLabel && (
+                <div className="flex justify-between gap-3">
+                  <span className="text-neutral-500">Located:</span>
+                  <span className="text-neutral-700 font-medium inline-flex items-center gap-1">
+                    {campusLabel}
+                    {provider.additionalCampusIds.length > 0 && (
+                      <span className="text-neutral-400 font-normal">
+                        +{provider.additionalCampusIds.length} more
+                      </span>
+                    )}
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">

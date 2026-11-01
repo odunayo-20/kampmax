@@ -19,7 +19,11 @@ import {
   providerStatusVariant,
   type ProviderActionKind,
 } from "@/components/admin/service-providers/provider-meta";
-import { useAdminServiceProvider } from "@/hooks/admin/use-admin-service-providers";
+import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import {
+  useAdminServiceProvider,
+  useAdminServiceProviderRemoveServiceImages,
+} from "@/hooks/admin/use-admin-service-providers";
 import { cn, formatDate, formatDateTime, formatNaira } from "@/lib/utils";
 
 interface ToastMessage {
@@ -41,6 +45,8 @@ export default function AdminServiceProviderDetailPage() {
   const query = useAdminServiceProvider(id);
 
   const [target, setTarget] = useState<ProviderActionTarget | null>(null);
+  const [photoTarget, setPhotoTarget] = useState<{ serviceId: string; title: string } | null>(null);
+  const removePhotos = useAdminServiceProviderRemoveServiceImages();
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const toastId = useRef(0);
   const pushToast = useCallback((tone: ToastMessage["tone"], text: string) => {
@@ -171,15 +177,38 @@ export default function AdminServiceProviderDetailPage() {
             ) : (
               <ul role="list" className="divide-y divide-kampmax-border/70">
                 {services.map((s) => (
-                  <li key={s.id} className="flex flex-wrap items-center gap-2 px-4 py-2.5">
-                    <span className="truncate text-sm font-medium text-kampmax-text">{s.title}</span>
-                    <span className="text-xs text-kampmax-text-secondary">
-                      {s.category || "Uncategorised"} · {s.pricingModel.replace(/_/g, " ")} {formatNaira(s.price)}
-                      {s.durationMinutes ? ` · ${s.durationMinutes} min` : ""}
-                    </span>
-                    <span className="ml-auto rounded-full bg-kampmax-muted px-2 py-0.5 text-[11px] font-medium capitalize text-kampmax-text-secondary">
-                      {s.status}
-                    </span>
+                  <li key={s.id} className="px-4 py-2.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="truncate text-sm font-medium text-kampmax-text">{s.title}</span>
+                      <span className="text-xs text-kampmax-text-secondary">
+                        {s.category || "Uncategorised"} · {s.pricingModel.replace(/_/g, " ")} {formatNaira(s.price)}
+                        {s.durationMinutes ? ` · ${s.durationMinutes} min` : ""}
+                      </span>
+                      <span className="ml-auto rounded-full bg-kampmax-muted px-2 py-0.5 text-[11px] font-medium capitalize text-kampmax-text-secondary">
+                        {s.status}
+                      </span>
+                    </div>
+                    {s.images.length > 0 && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {s.images.map((url) => (
+                          <a key={url} href={url} target="_blank" rel="noreferrer" aria-label={`Open a photo of ${s.title}`}>
+                            <img
+                              src={url}
+                              alt=""
+                              loading="lazy"
+                              className="h-12 w-16 rounded border border-kampmax-border object-cover"
+                            />
+                          </a>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setPhotoTarget({ serviceId: s.id, title: s.title })}
+                          className="ml-auto text-xs font-medium text-kampmax-error hover:underline"
+                        >
+                          Remove photos
+                        </button>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -252,6 +281,29 @@ export default function AdminServiceProviderDetailPage() {
       </div>
 
       <ProviderActionDialog target={target} onClose={() => setTarget(null)} onDone={pushToast} />
+
+      <ConfirmDialog
+        open={photoTarget !== null}
+        title={photoTarget ? `Remove photos from "${photoTarget.title}"?` : ""}
+        message="All of this service's photos are taken down from the public page. The service stays, and the provider can upload new photos. The reason is kept in the audit log."
+        confirmLabel="Remove photos"
+        tone="danger"
+        reasonLabel="Why are the photos being removed?"
+        loading={removePhotos.isPending}
+        onConfirm={(reason) => {
+          if (!photoTarget) return;
+          removePhotos.mutate(
+            { providerId: id, serviceId: photoTarget.serviceId, reason },
+            {
+              onSuccess: () => pushToast("success", "Photos removed."),
+              onError: (err) =>
+                pushToast("error", err instanceof Error ? err.message : "Couldn't remove the photos. Try again."),
+              onSettled: () => setPhotoTarget(null),
+            }
+          );
+        }}
+        onCancel={() => setPhotoTarget(null)}
+      />
 
       <div
         aria-live="polite"

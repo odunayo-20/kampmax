@@ -9,6 +9,7 @@ import {
   getServiceLocationLabel,
 } from "@/services/service-marketplace";
 import { cn } from "@/lib/utils";
+import { optimizedImageUrl } from "@/lib/image-url";
 import { ServiceFavoriteButton } from "./ServiceFavoriteButton";
 
 interface ServiceCardProps {
@@ -37,7 +38,7 @@ export function ServiceCard({ service, provider: providerProp, className }: Serv
       >
         {service.imageUrl ? (
           <img
-            src={service.imageUrl}
+            src={optimizedImageUrl(service.imageUrl, { width: 640, aspect: "4:3" })}
             alt={service.name}
             loading="lazy"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"

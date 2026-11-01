@@ -49,6 +49,8 @@ export interface ServiceProviderService {
   locationType: string | null;
   status: string;
   createdAt: string;
+  /** The service's own photos (main first); empty when it has none. */
+  images: string[];
 }
 
 export interface ServiceProviderBooking {
@@ -218,5 +220,15 @@ export const serviceProviderManagementService = {
   suspend(id: string, reason: string) {
     if (!reason.trim()) throw new Error("A suspension reason is required.");
     return patch(id, "suspend", { reason: reason.trim() }, "Couldn't suspend the provider.");
+  },
+
+  /** Takes down all of one service's photos. The service stays; a reason is required and audited. */
+  async removeServiceImages(providerId: string, serviceId: string, reason: string): Promise<void> {
+    if (!reason.trim()) throw new Error("A reason is required.");
+    const { error } = await apiClient.patch<Record<string, string>, unknown>(
+      `/admin/service-providers/${providerId}/services/${serviceId}/remove-images`,
+      { reason: reason.trim() }
+    );
+    if (error) fail(error, "Couldn't remove the photos.");
   },
 };

@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { BadgeCheck, MapPin, User } from "lucide-react";
+import { BadgeCheck, User } from "lucide-react";
 import type { MarketplaceProvider } from "@/types/service-marketplace";
 import { getServiceCategoryName } from "@/services/service-marketplace";
 import { cn } from "@/lib/utils";
+import { ProviderCampus } from "./ProviderCampus";
 import { ServiceRatingStars } from "./ServiceRatingStars";
 
 interface ProviderCardProps {
@@ -61,10 +62,7 @@ export function ProviderCard({ provider, serviceCount, className }: ProviderCard
       )}
 
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-neutral-500">
-        <span className="inline-flex items-center gap-1">
-          <MapPin className="w-3 h-3 text-neutral-400" aria-hidden />
-          {provider.primaryCampusId.toUpperCase()}
-        </span>
+        <ProviderCampus campusId={provider.primaryCampusId} />
         {typeof serviceCount === "number" && (
           <span>{serviceCount} service{serviceCount === 1 ? "" : "s"}</span>
         )}

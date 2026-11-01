@@ -256,6 +256,8 @@ export interface ServiceProviderServiceDraft {
   images?: string[];
   /** The uploaded picture behind `images[0]`, sent when the service is saved. */
   coverMediaId?: string;
+  /** Extra pictures after the main one, sent when the service is saved. */
+  gallery?: { mediaId: string; url: string }[];
 }
 
 // ── Portfolio item draft ─────────────────────────────────────

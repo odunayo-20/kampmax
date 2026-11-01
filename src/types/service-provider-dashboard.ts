@@ -98,6 +98,14 @@ export interface ServiceProviderServiceInput {
   images?: string[];
   /** An uploaded picture to show for the service; null takes it down, left out keeps it. */
   coverMediaId?: string | null;
+  /** The full list of extra pictures, in order; left out keeps the current ones. */
+  galleryMediaIds?: string[];
+}
+
+/** An extra picture of a service: the upload and where it can be seen. */
+export interface ServiceProviderServiceGalleryImage {
+  mediaId: string;
+  url: string;
 }
 
 export interface ServiceProviderPortfolioItemInput {
@@ -263,7 +271,10 @@ export interface ServiceProviderDashboardService {
   durationMinutes: number;
   locationType: ServiceProviderLocationType;
   status: ServiceProviderServiceStatus;
+  /** The main picture's address, if the service has one. */
   images?: string[];
+  /** The extra pictures after the main one. */
+  gallery?: ServiceProviderServiceGalleryImage[];
   updatedAt: string;
 }
 

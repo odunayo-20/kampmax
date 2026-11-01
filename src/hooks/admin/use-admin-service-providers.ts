@@ -62,6 +62,12 @@ export const useAdminServiceProviderReject = () =>
     svc.reject(id, reason)
   );
 
+export const useAdminServiceProviderRemoveServiceImages = () =>
+  useInvalidatingMutation(
+    ({ providerId, serviceId, reason }: { providerId: string; serviceId: string; reason: string }) =>
+      svc.removeServiceImages(providerId, serviceId, reason)
+  );
+
 export const useAdminServiceProviderSuspend = () =>
   useInvalidatingMutation(({ id, reason }: { id: string; reason: string }) =>
     svc.suspend(id, reason)

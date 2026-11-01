@@ -23,6 +23,7 @@ import {
   fetchSpAvailabilityLive,
   updateSpAvailabilityLive,
   fetchSpReviewsSummaryLive,
+  computeProfileCompletionFromLive,
   mapBackendService,
   mapBackendAvailability,
   type BackendSpProfile,
@@ -283,6 +284,41 @@ describe("service-provider-dashboard.api (live API implementation)", () => {
         expect(patchMock.mock.calls[2][1]).not.toHaveProperty("coverMediaId");
       });
 
+      it("sends the chosen status when creating, so a new service doesn't silently become a draft", async () => {
+        postMock.mockResolvedValue({ data: created, error: null });
+
+        await addSpDashboardServiceLive({ ...base, status: "active" });
+        await addSpDashboardServiceLive({ ...base, status: "inactive" });
+        await addSpDashboardServiceLive({ ...base, status: "draft" });
+        await addSpDashboardServiceLive(base);
+
+        const statuses = postMock.mock.calls.slice(-4).map(([, body]) => (body as { status?: string }).status);
+        expect(statuses).toEqual(["ACTIVE", "INACTIVE", "DRAFT", undefined]);
+      });
+
+      it("sends the extra pictures as an ordered list of upload ids", async () => {
+        postMock.mockResolvedValue({ data: created, error: null });
+        patchMock.mockResolvedValue({ data: created, error: null });
+
+        await addSpDashboardServiceLive({ ...base, galleryMediaIds: ["a", "b"] });
+        expect(postMock.mock.calls.at(-1)?.[1]).toMatchObject({ galleryMediaIds: ["a", "b"] });
+
+        await addSpDashboardServiceLive({ ...base, galleryMediaIds: [] });
+        expect(postMock.mock.calls.at(-1)?.[1]).not.toHaveProperty("galleryMediaIds");
+
+        await updateSpDashboardServiceLive("srv-3", { galleryMediaIds: [] });
+        expect(patchMock.mock.calls.at(-1)?.[1]).toEqual({ galleryMediaIds: [] });
+
+        await updateSpDashboardServiceLive("srv-3", { price: 1 });
+        expect(patchMock.mock.calls.at(-1)?.[1]).not.toHaveProperty("galleryMediaIds");
+      });
+
+      it("reads the extra pictures back for editing", () => {
+        const gallery = [{ mediaId: "a", url: "https://cdn.example.com/a.jpg" }];
+        expect(mapBackendService({ ...mockServices[0], galleryImages: gallery }).gallery).toEqual(gallery);
+        expect(mapBackendService({ ...mockServices[0], galleryImages: null }).gallery).toEqual([]);
+      });
+
       it("shows the saved picture's address as the service image", () => {
         const withPicture = mapBackendService({ ...mockServices[0], coverImageUrl: "https://cdn.example.com/p.jpg" });
         expect(withPicture.images).toEqual(["https://cdn.example.com/p.jpg"]);
@@ -357,6 +393,55 @@ describe("service-provider-dashboard.api (live API implementation)", () => {
         isActive: true,
       });
       expect(res.ok).toBe(true);
+    });
+  });
+
+  describe("profile completion: service photos", () => {
+    const svc = (over: Record<string, unknown>) => ({ id: "s1", name: "Braiding", status: "active", images: [], ...over });
+    const record = (services: unknown[]) =>
+      ({
+        profile: { displayName: "Chi", bio: "Braids" },
+        services,
+        availability: { days: [{ isAvailable: true }] },
+        verification: { status: "approved" },
+      }) as never;
+
+    it("asks for a photo on a live service that has none, linking straight to it", () => {
+      const done = computeProfileCompletionFromLive(record([svc({ images: ["https://x/1.jpg"] })]));
+      const nudged = computeProfileCompletionFromLive(record([svc({})]));
+
+      expect(done.missing.some((m) => m.key === "service_photos")).toBe(false);
+      const item = nudged.missing.find((m) => m.key === "service_photos");
+      expect(item?.href).toBe("/service-provider/services/s1/edit");
+      expect(item?.description).toContain("Braiding");
+      expect(nudged.percentage).toBe(done.percentage - 5);
+    });
+
+    it("points to the services list when several need a photo", () => {
+      const result = computeProfileCompletionFromLive(record([svc({}), svc({ id: "s2", name: "Wigs" })]));
+
+      const item = result.missing.find((m) => m.key === "service_photos");
+      expect(item?.href).toBe("/service-provider/services");
+      expect(item?.description).toContain("2 of your services");
+    });
+
+    it("ignores drafts and inactive services, which customers can't see anyway", () => {
+      const result = computeProfileCompletionFromLive(
+        record([svc({ images: ["https://x/1.jpg"] }), svc({ id: "s2", status: "draft" }), svc({ id: "s3", status: "inactive" })])
+      );
+
+      expect(result.missing.some((m) => m.key === "service_photos")).toBe(false);
+    });
+
+    it("never goes below zero", () => {
+      const result = computeProfileCompletionFromLive({
+        profile: {},
+        services: [svc({})],
+        availability: { days: [] },
+        verification: { status: "pending" },
+      } as never);
+
+      expect(result.percentage).toBeGreaterThanOrEqual(0);
     });
   });
 

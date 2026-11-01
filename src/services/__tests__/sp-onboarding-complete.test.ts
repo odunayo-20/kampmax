@@ -117,6 +117,30 @@ describe("completeSpOnboarding", () => {
     expect(inputs[1].coverMediaId).toBeUndefined();
   });
 
+  it("sends each service's extra pictures and the status chosen for it", async () => {
+    await completeSpOnboarding(
+      draft({
+        services: [
+          {
+            ...service("Braiding"),
+            status: "active",
+            gallery: [
+              { mediaId: "g1", url: "https://cdn.example.com/g1.jpg" },
+              { mediaId: "g2", url: "https://cdn.example.com/g2.jpg" },
+            ],
+          },
+          { ...service("Wig install"), status: "draft" },
+        ],
+      })
+    );
+
+    const inputs = addService.mock.calls.map(
+      ([input]) => input as { galleryMediaIds?: string[]; status?: string }
+    );
+    expect(inputs[0]).toMatchObject({ galleryMediaIds: ["g1", "g2"], status: "active" });
+    expect(inputs[1]).toMatchObject({ galleryMediaIds: undefined, status: "draft" });
+  });
+
   describe("campuses", () => {
     const RUGIPO = "6a332447-af9a-46df-b18e-943cd3e56b9c";
     const UNILAG = "8239e3fd-a71a-4dba-9e3f-bfe65de33bcc";

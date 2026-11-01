@@ -6,6 +6,7 @@ import { Button, Input, Select } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { TaxonomySelect } from "@/components/taxonomy";
 import { ServiceImagePicker } from "@/components/service-provider/ServiceImagePicker";
+import { ServiceGalleryPicker, type GalleryImage } from "@/components/service-provider/ServiceGalleryPicker";
 import type {
   ServiceProviderLocationType,
   ServiceProviderPricingModel,
@@ -62,9 +63,11 @@ export function ServiceForm({
     priceMax: initial?.priceMax,
     durationMinutes: initial?.durationMinutes ?? 60,
     locationType: initial?.locationType ?? "provider_location",
-    status: initial?.status ?? ("draft" as ServiceProviderServiceStatus),
+    // New services go live by default: customers only see them once the provider is verified.
+    status: initial?.status ?? ("active" as ServiceProviderServiceStatus),
   });
   const [imageUrl, setImageUrl] = useState<string | null>(initial?.images?.[0] ?? null);
+  const [gallery, setGallery] = useState<GalleryImage[]>(initial?.gallery ?? []);
   const [error, setError] = useState<string | null>(null);
 
   const set =<K extends keyof ServiceProviderServiceInput>(key: K, value: ServiceProviderServiceInput[K]) =>
@@ -113,6 +116,15 @@ export function ServiceForm({
           setImageUrl(image?.url ?? null);
           // A new upload replaces the saved picture; null takes it down.
           set("coverMediaId", image?.mediaId ?? null);
+        }}
+      />
+
+      <ServiceGalleryPicker
+        images={gallery}
+        onChange={(next) => {
+          setGallery(next);
+          // The list sent is the whole gallery, so adding, removing and reordering all work.
+          set("galleryMediaIds", next.map((g) => g.mediaId));
         }}
       />
 

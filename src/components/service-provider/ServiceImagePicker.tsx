@@ -4,6 +4,8 @@ import { useRef } from "react";
 import { ImagePlus, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui";
 import { useProviderImageUpload } from "@/hooks/useProviderImageUpload";
+import { optimizedImageUrl } from "@/lib/image-url";
+import { PortfolioPhotoChooser } from "./PortfolioPhotoChooser";
 import type { UploadedProviderImage } from "@/services/service-provider-media";
 
 /**
@@ -33,7 +35,11 @@ export function ServiceImagePicker({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg border border-kampmax-border bg-neutral-100 sm:w-48">
           {imageUrl ? (
-            <img src={imageUrl} alt="Service photo preview" className="h-full w-full object-cover" />
+            <img
+              src={optimizedImageUrl(imageUrl, { width: 400, aspect: "4:3" })}
+              alt="Service photo preview"
+              className="h-full w-full object-cover"
+            />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-neutral-400">
               <ImagePlus className="h-8 w-8" aria-hidden />
@@ -68,6 +74,10 @@ export function ServiceImagePicker({
             </p>
           )}
         </div>
+      </div>
+
+      <div className="mt-3">
+        <PortfolioPhotoChooser onPick={onChange} disabled={busy} />
       </div>
 
       <input

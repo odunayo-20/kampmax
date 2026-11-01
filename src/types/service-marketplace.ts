@@ -101,7 +101,10 @@ export interface MarketplaceService {
   priceMax?: number;
   durationMinutes: number;
   locationType: ServiceProviderLocationType;
+  /** The main picture; falls back to the provider's cover or logo when the service has none. */
   imageUrl?: string;
+  /** Every picture to show, main one first. */
+  images?: string[];
   isActive: boolean;
   isFeatured: boolean;
   createdAt: string;

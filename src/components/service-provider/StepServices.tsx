@@ -6,6 +6,7 @@ import { Button, Input, Select } from "@/components/ui";
 import { cn, formatNaira } from "@/lib/utils";
 import { TaxonomySelect } from "@/components/taxonomy";
 import { ServiceImagePicker } from "@/components/service-provider/ServiceImagePicker";
+import { ServiceGalleryPicker } from "@/components/service-provider/ServiceGalleryPicker";
 import type { ServiceProviderOnboardingDraft, ServiceProviderServiceDraft, ServiceProviderPricingModel, ServiceProviderLocationType, ServiceProviderServiceStatus } from "@/types/service-provider";
 
 const PRICING_MODELS = [
@@ -48,7 +49,8 @@ export function StepServices({ draft, onUpdate }: StepServicesProps) {
       price: 0,
       durationMinutes: 60,
       locationType: "provider_location",
-      status: "draft",
+      // Customers only see a service once the provider is verified, so it can start live.
+      status: "active",
     };
     setServices((prev) => [...prev, newService]);
     setEditingId(newService.tempId);
@@ -192,6 +194,11 @@ function ServiceCard({
           onChange={(image) =>
             onUpdate({ images: image ? [image.url] : [], coverMediaId: image?.mediaId })
           }
+        />
+
+        <ServiceGalleryPicker
+          images={service.gallery ?? []}
+          onChange={(gallery) => onUpdate({ gallery })}
         />
 
         <div>

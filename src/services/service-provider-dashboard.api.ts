@@ -83,6 +83,8 @@ export interface BackendSpService {
   profileMediaId?: string | null;
   /** Public address of the service's picture. */
   coverImageUrl?: string | null;
+  /** More pictures after the main one, in order. */
+  galleryImages?: { mediaId: string; url: string }[] | null;
   termsNotes?: string | null;
   createdAt: string;
   updatedAt?: string;
@@ -187,6 +189,13 @@ function mapLocationTypeToFrontend(backend?: string | null): ServiceProviderLoca
   }
 }
 
+/** The provider only chooses draft, active or inactive; review states are set by Kampmax. */
+function mapStatusToBackend(frontend: ServiceProviderServiceStatus): "DRAFT" | "ACTIVE" | "INACTIVE" {
+  if (frontend === "active") return "ACTIVE";
+  if (frontend === "inactive") return "INACTIVE";
+  return "DRAFT";
+}
+
 function mapLocationTypeToBackend(
   frontend: ServiceProviderLocationType
 ): "ON_CAMPUS" | "OFF_CAMPUS" | "REMOTE" {
@@ -232,6 +241,7 @@ export function mapBackendService(
     locationType: mapLocationTypeToFrontend(s.serviceLocationType),
     status: (s.status.toLowerCase() ?? "draft") as ServiceProviderServiceStatus,
     images: s.coverImageUrl ? [s.coverImageUrl] : [],
+    gallery: s.galleryImages ?? [],
     updatedAt: s.updatedAt || s.createdAt || new Date().toISOString(),
   };
 }
@@ -375,6 +385,26 @@ export function computeProfileCompletionFromLive(
     });
   }
 
+  // Customers pick by photo, so a live service without one is worth fixing.
+  const activeWithoutPhoto = record.services.filter(
+    (s) => s.status === SERVICE_PROVIDER_SERVICE_STATUS.ACTIVE && !s.images?.length
+  );
+  if (activeWithoutPhoto.length > 0) {
+    percentage -= 5;
+    missing.push({
+      key: "service_photos",
+      label: "Service photos",
+      description:
+        activeWithoutPhoto.length === 1
+          ? `Add a photo to "${activeWithoutPhoto[0].name}" so customers can see what they're booking.`
+          : `Add photos to ${activeWithoutPhoto.length} of your services so customers can see what they're booking.`,
+      href:
+        activeWithoutPhoto.length === 1
+          ? `/service-provider/services/${activeWithoutPhoto[0].id}/edit`
+          : "/service-provider/services",
+    });
+  }
+
   if (record.availability.days.some((d) => d.isAvailable)) {
     percentage += 20;
   } else {
@@ -397,7 +427,7 @@ export function computeProfileCompletionFromLive(
     });
   }
 
-  return { percentage: Math.min(100, percentage), missing };
+  return { percentage: Math.max(0, Math.min(100, percentage)), missing };
 }
 
 // ============================================================
@@ -631,6 +661,9 @@ export async function addSpDashboardServiceLive(
     serviceLocationType: mapLocationTypeToBackend(input.locationType),
     termsNotes: "",
     ...(input.coverMediaId ? { coverMediaId: input.coverMediaId } : {}),
+    ...(input.galleryMediaIds?.length ? { galleryMediaIds: input.galleryMediaIds } : {}),
+    // Without this the server starts every service as a draft, whatever was chosen.
+    ...(input.status ? { status: mapStatusToBackend(input.status) } : {}),
   };
 
   const { data, error } = await apiClient.post<Record<string, unknown>, BackendSpService>(
@@ -665,6 +698,7 @@ export async function updateSpDashboardServiceLive(
     payload.serviceLocationType = mapLocationTypeToBackend(patch.locationType);
   }
   if (patch.coverMediaId !== undefined) payload.coverMediaId = patch.coverMediaId;
+  if (patch.galleryMediaIds !== undefined) payload.galleryMediaIds = patch.galleryMediaIds;
 
   const { data, error } = await apiClient.patch<Record<string, unknown>, BackendSpService>(
     `/service-provider/services/${serviceId}`,
