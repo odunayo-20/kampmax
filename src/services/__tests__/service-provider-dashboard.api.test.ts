@@ -12,6 +12,7 @@ vi.mock("@/lib/api-client", () => ({
   },
 }));
 
+import type { ServiceProviderDashboardMetric } from "@/types/service-provider-dashboard";
 import {
   fetchSpDashboardLive,
   fetchSpProfileRecordLive,
@@ -24,6 +25,8 @@ import {
   updateSpAvailabilityLive,
   fetchSpReviewsSummaryLive,
   computeProfileCompletionFromLive,
+  statusCountsOf,
+  overviewOf,
   mapBackendService,
   mapBackendAvailability,
   type BackendSpProfile,
@@ -94,6 +97,9 @@ describe("service-provider-dashboard.api (live API implementation)", () => {
         if (url.includes("/service-provider/availability/me")) {
           return Promise.resolve({ data: mockSlots, error: null });
         }
+        if (url.includes("/bookings/provider/reviews")) {
+          return Promise.resolve({ data: { averageRating: 4.8, totalCount: 15 }, error: null });
+        }
         if (url.includes("/analytics/service-provider/bookings/status")) {
           return Promise.resolve({
             data: { pending: 2, accepted: 5, in_progress: 1, completed: 18, cancelled: 1 },
@@ -102,7 +108,7 @@ describe("service-provider-dashboard.api (live API implementation)", () => {
         }
         if (url.includes("/analytics/service-provider")) {
           return Promise.resolve({
-            data: { totalBookings: 27, averageRating: 4.8, ratingCount: 15, profileViews: 140 },
+            data: { totalBookings: 27, profileViews: 140 },
             error: null,
           });
         }
@@ -150,6 +156,157 @@ describe("service-provider-dashboard.api (live API implementation)", () => {
       // Verify activity events
       expect(result.activity).toHaveLength(1);
       expect(result.activity[0].kind).toBe("booking_request");
+    });
+  });
+
+  describe("profile views", () => {
+    const withOverview = async (overview: unknown) => {
+      getMock.mockImplementation((url: string) => {
+        const ok = (data: unknown) => Promise.resolve({ data, error: null });
+        if (url.includes("/bookings/provider/reviews")) return ok({ averageRating: null, totalCount: 0 });
+        if (url.includes("/service-provider/profile/me")) return ok(mockProfile);
+        if (url.includes("/service-provider/services/me")) return ok(mockServices);
+        if (url.includes("/service-provider/availability/me")) return ok(mockSlots);
+        if (url.includes("/analytics/service-provider/bookings/status")) return ok([]);
+        if (url.includes("/analytics/service-provider")) return ok(overview);
+        if (url.includes("/service-provider/bookings/me")) return ok([]);
+        return ok(null);
+      });
+      return fetchSpDashboardLive();
+    };
+    const card = (metrics: ServiceProviderDashboardMetric[]) => metrics.find((m) => m.key === "profile_views")!;
+
+    it("shows no number, not a false 0, when the backend doesn't track views", async () => {
+      // This is what the backend sends today: no profileViews at all.
+      const { metrics, record } = await withOverview({ overview: { totalBookings: 4 } });
+
+      expect(card(metrics)).toMatchObject({ valueLabel: "—", sublabel: "Not tracked yet" });
+      expect(record.metrics.profileViews).toBeNull();
+    });
+
+    it("shows the number when the backend does send one, including a real 0", async () => {
+      const some = await withOverview({ overview: { totalBookings: 4, profileViews: 140 } });
+      expect(card(some.metrics)).toMatchObject({ valueLabel: "140", sublabel: "this month" });
+      expect(some.record.metrics.profileViews).toBe(140);
+
+      const none = await withOverview({ overview: { totalBookings: 0, profileViews: 0 } });
+      expect(card(none.metrics)).toMatchObject({ valueLabel: "0", sublabel: "this month" });
+    });
+  });
+
+  describe("average rating", () => {
+    const dashboard = async (reviews: unknown) => {
+      getMock.mockImplementation((url: string) => {
+        const ok = (data: unknown) => Promise.resolve({ data, error: null });
+        if (url.includes("/bookings/provider/reviews")) return reviews === "fail" ? Promise.resolve({ data: null, error: new Error("down") }) : ok(reviews);
+        if (url.includes("/service-provider/profile/me")) return ok(mockProfile);
+        if (url.includes("/service-provider/services/me")) return ok(mockServices);
+        if (url.includes("/service-provider/availability/me")) return ok(mockSlots);
+        if (url.includes("/analytics/service-provider/bookings/status")) return ok([]);
+        if (url.includes("/analytics/service-provider")) return ok({ overview: { totalBookings: 0 } });
+        if (url.includes("/service-provider/bookings/me")) return ok([]);
+        return ok(null);
+      });
+      return fetchSpDashboardLive();
+    };
+    const card = (metrics: ServiceProviderDashboardMetric[]) => metrics.find((m) => m.key === "average_rating")!;
+
+    it("shows the real average and how many reviews it comes from", async () => {
+      const { metrics, record } = await dashboard({ averageRating: 4.7, totalCount: 12 });
+
+      expect(card(metrics)).toMatchObject({ valueLabel: "4.7", sublabel: "From 12 reviews", tone: "gold" });
+      expect(record.metrics.averageRating).toBe(4.7);
+    });
+
+    it("says '1 review' for a single review", async () => {
+      const { metrics } = await dashboard({ averageRating: 5, totalCount: 1 });
+
+      expect(card(metrics).sublabel).toBe("From 1 review");
+    });
+
+    it("shows no rating, not a made-up 5.0, when there are no reviews yet", async () => {
+      const { metrics, record } = await dashboard({ averageRating: null, totalCount: 0 });
+
+      expect(card(metrics)).toMatchObject({ valueLabel: "—", sublabel: "No reviews yet", tone: "neutral" });
+      expect(JSON.stringify(metrics)).not.toContain("5-star");
+      expect(record.metrics.averageRating).toBeNull();
+    });
+
+    it("says so when the ratings can't be loaded, and still loads the rest of the dashboard", async () => {
+      const { metrics } = await dashboard("fail");
+
+      expect(card(metrics)).toMatchObject({ valueLabel: "—", sublabel: "Ratings unavailable" });
+      expect(metrics.find((m) => m.key === "active_services")).toBeTruthy();
+    });
+  });
+
+  describe("booking counts, as the backend really sends them", () => {
+    it("reads the status list into the dashboard's counts, grouped as customers see them", () => {
+      expect(
+        statusCountsOf([
+          { status: "PENDING", count: 2 },
+          { status: "CONFIRMED", count: 3 },
+          { status: "ACCEPTED", count: 1 },
+          { status: "IN_PROGRESS", count: 1 },
+          { status: "COMPLETED", count: 18 },
+          { status: "DISPUTED", count: 1 },
+          { status: "CANCELLED", count: 2 },
+          { status: "EXPIRED", count: 1 },
+          { status: "REJECTED", count: 4 },
+        ])
+      ).toEqual({ pending: 2, accepted: 4, in_progress: 1, completed: 19, cancelled: 3, rejected: 4 });
+    });
+
+    it("ignores rows it can't read, and accepts lower-case statuses", () => {
+      expect(statusCountsOf([{ status: "completed", count: 5 }, { status: "MYSTERY", count: 9 }, { status: "PENDING", count: "x" }, null])).toEqual({
+        completed: 5,
+      });
+    });
+
+    it("passes an already-keyed object through, and treats anything else as no bookings", () => {
+      expect(statusCountsOf({ pending: 2 })).toEqual({ pending: 2 });
+      expect(statusCountsOf(null)).toEqual({});
+      expect(statusCountsOf(undefined)).toEqual({});
+      expect(statusCountsOf([])).toEqual({});
+    });
+
+    it("unwraps the overview the backend nests as { overview: {...} }, and leaves a flat one alone", () => {
+      expect(overviewOf({ overview: { totalBookings: 27 } })?.totalBookings).toBe(27);
+      expect(overviewOf({ totalBookings: 27 })?.totalBookings).toBe(27);
+      expect(overviewOf(null)).toBeUndefined();
+    });
+
+    it("shows the real totals on the dashboard instead of zeros", async () => {
+      getMock.mockImplementation((url: string) => {
+        const ok = (data: unknown) => Promise.resolve({ data, error: null });
+        if (url.includes("/service-provider/profile/me")) return ok(mockProfile);
+        if (url.includes("/service-provider/services/me")) return ok(mockServices);
+        if (url.includes("/service-provider/availability/me")) return ok(mockSlots);
+        if (url.includes("/analytics/service-provider/bookings/status")) {
+          return ok([
+            { status: "PENDING", count: 2 },
+            { status: "CONFIRMED", count: 5 },
+            { status: "IN_PROGRESS", count: 1 },
+            { status: "COMPLETED", count: 18 },
+            { status: "CANCELLED", count: 1 },
+          ]);
+        }
+        if (url.includes("/analytics/service-provider")) {
+          return ok({ overview: { totalServices: 1, totalBookings: 27, completedBookings: 18, cancelledBookings: 1, rejectedBookings: 0, acceptanceRate: 96 } });
+        }
+        if (url.includes("/service-provider/bookings/me")) return ok([]);
+        return ok(null);
+      });
+
+      const { metrics } = await fetchSpDashboardLive();
+      const label = (key: string) => metrics.find((m) => m.key === key)?.valueLabel;
+      const sublabel = (key: string) => metrics.find((m) => m.key === key)?.sublabel;
+
+      expect(label("total_bookings")).toBe("27");
+      expect(label("upcoming_bookings")).toBe("5");
+      expect(sublabel("upcoming_bookings")).toBe("2 awaiting confirmation");
+      expect(label("in_progress_bookings")).toBe("1");
+      expect(sublabel("in_progress_bookings")).toBe("18 completed · 1 cancelled");
     });
   });
 

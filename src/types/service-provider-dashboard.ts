@@ -330,8 +330,10 @@ export interface ServiceProviderDashboardRecord {
   metrics: {
     totalBookings: number;
     upcomingBookings: number;
-    averageRating: number;
-    profileViews: number;
+    /** From customers' reviews; null when there are none yet (or they couldn't be read). */
+    averageRating: number | null;
+    /** null while the backend doesn't track profile views. */
+    profileViews: number | null;
     responseTime?: string;
   };
 }

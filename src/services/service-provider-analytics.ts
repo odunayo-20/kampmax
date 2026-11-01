@@ -160,6 +160,57 @@ function startLabel(b: ServiceBooking): string {
 
 // ── Live Backend API Integrations ──────────────────────────
 
+export interface EarningsSummary {
+  /** What customers paid for completed bookings. */
+  gross: number;
+  /** The Kampmax fee actually charged on those bookings. */
+  fees: number;
+  /** What the provider keeps. */
+  net: number;
+}
+
+const amountOf = (value: unknown): number => {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : 0;
+};
+
+/**
+ * Reads the earnings endpoint's answer. The backend replies
+ * `{ earnings, platformFees, netEarnings }`; reading that object as if it were a
+ * number printed "₦[object Object]". The fee and net are the amounts charged on
+ * each booking, never a rate worked out here. Anything unusable counts as 0, and
+ * a missing net is the gross less the fees.
+ */
+export function earningsSummary(body: unknown): EarningsSummary {
+  const o = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : null;
+  const gross = amountOf(o ? o.earnings : body);
+  const fees = amountOf(o?.platformFees);
+  const net = o && o.netEarnings != null && Number.isFinite(Number(o.netEarnings)) ? Number(o.netEarnings) : gross - fees;
+  return { gross, fees, net };
+}
+
+/** The gross amount alone, from the earnings endpoint's answer (or a bare number). */
+export function earningsAmount(body: unknown): number {
+  return earningsSummary(body).gross;
+}
+
+const NO_EARNINGS: EarningsSummary = { gross: 0, fees: 0, net: 0 };
+
+/** Earnings from completed bookings in the window; all zero when they can't be loaded. */
+function fetchEarningsSummary(w: ReturnType<typeof resolveAnalyticsWindow>): Promise<EarningsSummary> {
+  return apiClient
+    .get<{ earnings: number; platformFees?: number; netEarnings?: number }>(
+      `/analytics/service-provider/earnings?startDate=${w.from}&endDate=${w.to}`
+    )
+    .then((r) => earningsSummary(r.data))
+    .catch(() => NO_EARNINGS);
+}
+
+/** Gross earnings from completed bookings in the window; 0 when they can't be loaded. */
+function fetchEarnings(w: ReturnType<typeof resolveAnalyticsWindow>): Promise<number> {
+  return fetchEarningsSummary(w).then((e) => e.gross);
+}
+
 export async function getSpAnalyticsOverviewLive(period: SpAnalyticsPeriod): Promise<SpAnalyticsOverview> {
   try {
     const now = Date.now();
@@ -177,7 +228,7 @@ export async function getSpAnalyticsOverviewLive(period: SpAnalyticsPeriod): Pro
         };
       }>("/analytics/service-provider").then((r) => r.data).catch(() => null),
       apiClient.get<Array<{ status: string; count: number }>>("/analytics/service-provider/bookings/status").then((r) => r.data).catch(() => null),
-      apiClient.get<number>(`/analytics/service-provider/earnings?startDate=${w.from}&endDate=${w.to}`).then((r) => r.data).catch(() => null),
+      fetchEarnings(w),
       apiClient.get<{
         total: number;
         active: number;
@@ -332,7 +383,7 @@ export async function getSpAnalyticsBookingsLive(period: SpAnalyticsPeriod): Pro
           createdAt: string;
         }>;
       }>(`/analytics/service-provider/bookings/by-date?startDate=${w.from}&endDate=${w.to}`).then((r) => r.data).catch(() => null),
-      apiClient.get<number>(`/analytics/service-provider/earnings?startDate=${w.from}&endDate=${w.to}`).then((r) => r.data).catch(() => null),
+      fetchEarnings(w),
     ]);
 
     if (bookingsRes && Array.isArray(bookingsRes.bookings)) {
@@ -376,7 +427,7 @@ export async function getSpAnalyticsEarningsLive(period: SpAnalyticsPeriod): Pro
     const w = resolveAnalyticsWindow(period, now);
 
     const [earningsRes, servicesRes, overviewRes] = await Promise.all([
-      apiClient.get<number>(`/analytics/service-provider/earnings?startDate=${w.from}&endDate=${w.to}`).then((r) => r.data).catch(() => null),
+      fetchEarningsSummary(w),
       apiClient.get<{
         total: number;
         active: number;
@@ -397,11 +448,9 @@ export async function getSpAnalyticsEarningsLive(period: SpAnalyticsPeriod): Pro
       }>("/analytics/service-provider").then((r) => r.data).catch(() => null),
     ]);
 
-    const gross = earningsRes ?? 0;
+    const { gross, fees, net } = earningsRes;
     const completedCount = overviewRes?.overview?.completedBookings ?? 0;
     const avg = completedCount > 0 ? Math.round(gross / completedCount) : 0;
-    const fees = Math.round(gross * 0.1);
-    const net = gross - fees;
 
     const kpis: SpAnalyticsKpi[] = [
       {
@@ -429,7 +478,7 @@ export async function getSpAnalyticsEarningsLive(period: SpAnalyticsPeriod): Pro
         key: "platform_fees",
         label: "Platform fees",
         value: formatNaira(fees),
-        sublabel: "10% service fee",
+        sublabel: "Kampmax service fee",
         tone: "neutral",
       },
     ];

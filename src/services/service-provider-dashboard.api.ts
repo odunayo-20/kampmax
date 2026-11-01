@@ -107,8 +107,6 @@ export interface BackendSpAnalyticsOverview {
   activeServices?: number;
   totalServices?: number;
   profileViews?: number;
-  averageRating?: number;
-  ratingCount?: number;
   [key: string]: unknown;
 }
 
@@ -120,6 +118,59 @@ export interface BackendSpBookingStatusCounts {
   cancelled?: number;
   rejected?: number;
   [key: string]: number | undefined;
+}
+
+/**
+ * The booking-status endpoint answers a list, `[{ status: "COMPLETED", count: 3 }]`,
+ * but the dashboard counts by key. Read the list into those keys, grouping the
+ * statuses the way customers see them (confirmed covers accepted; expired counts
+ * as cancelled; disputed counts as completed). An already-keyed object passes through.
+ */
+export function statusCountsOf(body: unknown): BackendSpBookingStatusCounts {
+  if (!Array.isArray(body)) {
+    return typeof body === "object" && body !== null ? (body as BackendSpBookingStatusCounts) : {};
+  }
+  const counts: BackendSpBookingStatusCounts = {};
+  const add = (key: string, n: number) => {
+    counts[key] = (counts[key] ?? 0) + n;
+  };
+  for (const row of body as { status?: unknown; count?: unknown }[]) {
+    const n = Number(row?.count);
+    if (!Number.isFinite(n)) continue;
+    switch (String(row?.status ?? "").toUpperCase()) {
+      case "PENDING":
+        add("pending", n);
+        break;
+      case "ACCEPTED":
+      case "CONFIRMED":
+        add("accepted", n);
+        break;
+      case "IN_PROGRESS":
+        add("in_progress", n);
+        break;
+      case "COMPLETED":
+      case "DISPUTED":
+        add("completed", n);
+        break;
+      case "CANCELLED":
+      case "EXPIRED":
+        add("cancelled", n);
+        break;
+      case "REJECTED":
+        add("rejected", n);
+        break;
+    }
+  }
+  return counts;
+}
+
+/** The overview endpoint wraps its numbers as `{ overview: {...} }`; a flat object passes through. */
+export function overviewOf(body: unknown): BackendSpAnalyticsOverview | undefined {
+  if (typeof body !== "object" || body === null) return undefined;
+  const inner = (body as { overview?: unknown }).overview;
+  return typeof inner === "object" && inner !== null
+    ? (inner as BackendSpAnalyticsOverview)
+    : (body as BackendSpAnalyticsOverview);
 }
 
 export interface BackendSpBookingRow {
@@ -268,7 +319,8 @@ export function buildDashboardRecordFromLive(
   profile: BackendSpProfile,
   services: BackendSpService[],
   availabilitySlots: BackendSpAvailabilitySlot[],
-  analytics?: BackendSpAnalyticsOverview | null
+  analytics?: BackendSpAnalyticsOverview | null,
+  ratings?: { average: number | null; count: number } | null
 ): ServiceProviderDashboardRecord {
   const mappedServices = services.map(mapBackendService);
   const mappedDays = mapBackendAvailability(availabilitySlots);
@@ -326,8 +378,10 @@ export function buildDashboardRecordFromLive(
     metrics: {
       totalBookings: analytics?.totalBookings ?? 0,
       upcomingBookings: 0,
-      averageRating: analytics?.averageRating ?? 5.0,
-      profileViews: analytics?.profileViews ?? 0,
+      // Ratings come from the reviews summary, never a placeholder.
+      averageRating: ratings?.average ?? null,
+      // Not tracked by the backend yet, so unknown (null) rather than a false 0.
+      profileViews: typeof analytics?.profileViews === "number" ? analytics.profileViews : null,
     },
   };
 }
@@ -443,7 +497,7 @@ export async function fetchSpDashboardLive(): Promise<{
   metrics: ServiceProviderDashboardMetric[];
   activity: ServiceProviderActivityEvent[];
 }> {
-  const [profileRes, servicesRes, availabilityRes, analyticsRes, bookingStatusRes, bookingsRes] =
+  const [profileRes, servicesRes, availabilityRes, analyticsRes, bookingStatusRes, bookingsRes, reviewsRes] =
     await Promise.all([
       apiClient.get<BackendSpProfile>("/service-provider/profile/me"),
       apiClient.get<BackendSpService[]>("/service-provider/services/me"),
@@ -451,6 +505,7 @@ export async function fetchSpDashboardLive(): Promise<{
       apiClient.get<BackendSpAnalyticsOverview>("/analytics/service-provider"),
       apiClient.get<BackendSpBookingStatusCounts>("/analytics/service-provider/bookings/status"),
       apiClient.get<BackendSpBookingRow[]>("/service-provider/bookings/me"),
+      apiClient.get<{ averageRating: number | null; totalCount: number }>("/bookings/provider/reviews"),
     ]);
 
   if (profileRes.error || !profileRes.data) {
@@ -460,11 +515,17 @@ export async function fetchSpDashboardLive(): Promise<{
   const profile = profileRes.data;
   const services = servicesRes.data || [];
   const availability = availabilityRes.data || [];
-  const analytics = analyticsRes.data;
-  const statusCounts = bookingStatusRes.data || {};
+  const analytics = overviewOf(analyticsRes.data);
+  const statusCounts = statusCountsOf(bookingStatusRes.data);
   const bookings = bookingsRes.data || [];
 
-  const record = buildDashboardRecordFromLive(profile, services, availability, analytics);
+  // null means the ratings couldn't be read; a null average means there are no reviews yet.
+  const ratings =
+    reviewsRes.error || !reviewsRes.data
+      ? null
+      : { average: reviewsRes.data.averageRating, count: reviewsRes.data.totalCount };
+
+  const record = buildDashboardRecordFromLive(profile, services, availability, analytics, ratings);
 
   const activeServicesCount = services.filter((s) => s.status === "ACTIVE").length;
   const pendingBookings = statusCounts.pending ?? 0;
@@ -510,16 +571,20 @@ export async function fetchSpDashboardLive(): Promise<{
     {
       key: "average_rating",
       label: "Average Rating",
-      valueLabel: (analytics?.averageRating ?? 5.0).toFixed(1),
-      tone: "gold",
-      sublabel: "5-star rating",
+      valueLabel: ratings?.average == null ? "—" : ratings.average.toFixed(1),
+      tone: ratings?.average == null ? "neutral" : "gold",
+      sublabel: !ratings
+        ? "Ratings unavailable"
+        : ratings.count > 0
+          ? `From ${ratings.count} review${ratings.count === 1 ? "" : "s"}`
+          : "No reviews yet",
     },
     {
       key: "profile_views",
       label: "Profile Views",
-      valueLabel: String(analytics?.profileViews ?? 0),
+      valueLabel: typeof analytics?.profileViews === "number" ? String(analytics.profileViews) : "—",
       tone: "neutral",
-      sublabel: "this month",
+      sublabel: typeof analytics?.profileViews === "number" ? "this month" : "Not tracked yet",
     },
   ];
 
