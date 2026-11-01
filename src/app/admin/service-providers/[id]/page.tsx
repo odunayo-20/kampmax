@@ -20,6 +20,7 @@ import {
   type ProviderActionKind,
 } from "@/components/admin/service-providers/provider-meta";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import { ImagePreviewDialog } from "@/components/admin/ImagePreviewDialog";
 import {
   useAdminServiceProvider,
   useAdminServiceProviderRemoveServiceImages,
@@ -46,6 +47,7 @@ export default function AdminServiceProviderDetailPage() {
 
   const [target, setTarget] = useState<ProviderActionTarget | null>(null);
   const [photoTarget, setPhotoTarget] = useState<{ serviceId: string; title: string } | null>(null);
+  const [preview, setPreview] = useState<{ url: string; title: string } | null>(null);
   const removePhotos = useAdminServiceProviderRemoveServiceImages();
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const toastId = useRef(0);
@@ -191,14 +193,21 @@ export default function AdminServiceProviderDetailPage() {
                     {s.images.length > 0 && (
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         {s.images.map((url) => (
-                          <a key={url} href={url} target="_blank" rel="noreferrer" aria-label={`Open a photo of ${s.title}`}>
+                          <button
+                            key={url}
+                            type="button"
+                            onClick={() => setPreview({ url, title: s.title })}
+                            aria-label={`View a photo of ${s.title}`}
+                            className="rounded focus-visible:outline-2 focus-visible:outline-kampmax-blue"
+                          >
                             <img
                               src={url}
                               alt=""
                               loading="lazy"
+                              referrerPolicy="no-referrer"
                               className="h-12 w-16 rounded border border-kampmax-border object-cover"
                             />
-                          </a>
+                          </button>
                         ))}
                         <button
                           type="button"
@@ -282,13 +291,15 @@ export default function AdminServiceProviderDetailPage() {
 
       <ProviderActionDialog target={target} onClose={() => setTarget(null)} onDone={pushToast} />
 
+      <ImagePreviewDialog image={preview} onClose={() => setPreview(null)} />
+
       <ConfirmDialog
         open={photoTarget !== null}
         title={photoTarget ? `Remove photos from "${photoTarget.title}"?` : ""}
-        message="All of this service's photos are taken down from the public page. The service stays, and the provider can upload new photos. The reason is kept in the audit log."
+        message="All of this service's photos are taken down from the public page. The service stays, and the provider can upload new photos. The provider is emailed your reason, and it is kept in the audit log."
         confirmLabel="Remove photos"
         tone="danger"
-        reasonLabel="Why are the photos being removed?"
+        reasonLabel="Why are the photos being removed? (the provider will read this)"
         loading={removePhotos.isPending}
         onConfirm={(reason) => {
           if (!photoTarget) return;
