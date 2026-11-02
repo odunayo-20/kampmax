@@ -12,6 +12,8 @@ export { HomeGigCard } from "./HomeGigCard";
 export { FreelanceServicesSection } from "./FreelanceServicesSection";
 export { HomeSearch } from "./HomeSearch";
 export { GuestSignupPrompt } from "./GuestSignupPrompt";
+export { ProductShowcase } from "./ProductShowcase";
+export { YourProfilesStrip } from "./YourProfilesStrip";
 export {
   Skeleton,
   ProductCardSkeleton,

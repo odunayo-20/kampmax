@@ -2,39 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  ChevronDown,
-  User,
-  Store,
-  Briefcase,
-  Wrench,
-  Building2,
-  Check,
-  LogOut,
-} from "lucide-react";
+import { ChevronDown, User, Check, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
-import { getVendorDashboardAccessApi } from "@/services/vendor-dashboard";
-import { getServiceProviderDashboardAccessApi } from "@/services/service-provider-dashboard";
-import { getFreelancerDashboardAccessApi } from "@/services/freelancer-dashboard";
-import { getEmployerDashboardAccessApi } from "@/services/employer";
+import {
+  PROFILE_DEFINITIONS,
+  hasProfile,
+  loadMyProfiles,
+  type ProfileDefinition,
+} from "@/hooks/use-my-profiles";
 
-interface ProfileEntry {
-  id: "vendor" | "freelancer" | "service" | "employer";
-  label: string;
-  icon: typeof User;
-  active: boolean;
-  activeHref: string;
-  onboardHref: string;
-  onboardLabel: string;
-  sub?: string;
-  /** Live backend check: does this account already hold this profile? */
-  check: () => Promise<{ kind?: string } | null>;
-}
-
-/** Access kinds are "no_<vertical>" when the backend has no such profile. */
-const hasProfile = (a: { kind?: string } | null | undefined) =>
-  !!a?.kind && !String(a.kind).startsWith("no_");
+/** A profile definition plus whether this account holds it. */
+type ProfileEntry = ProfileDefinition & { active: boolean; sub?: string };
 
 /**
  * Cross-vertical profile switcher shown in every activated dashboard's
@@ -76,63 +55,19 @@ export function ProfileSwitcher({ onClosed }: { onClosed?: () => void }) {
     if (status !== "authenticated") return;
     let cancelled = false;
 
-    Promise.allSettled([
-      getVendorDashboardAccessApi(),
-      getFreelancerDashboardAccessApi(),
-      getServiceProviderDashboardAccessApi(),
-      getEmployerDashboardAccessApi(),
-    ]).then(([vendor, freelancer, service, employer]) => {
+    // A check that fails is treated as "not held", as before.
+    loadMyProfiles().then((states) => {
       if (cancelled) return;
-      const ok = <T,>(r: PromiseSettledResult<T>) => (r.status === "fulfilled" ? r.value : null);
-      const v = ok(vendor) as Awaited<ReturnType<typeof getVendorDashboardAccessApi>> | null;
-      const f = ok(freelancer) as Awaited<ReturnType<typeof getFreelancerDashboardAccessApi>> | null;
-      const s = ok(service) as Awaited<ReturnType<typeof getServiceProviderDashboardAccessApi>> | null;
-      const e = ok(employer) as Awaited<ReturnType<typeof getEmployerDashboardAccessApi>> | null;
-
-      setProfiles([
-        {
-          id: "vendor",
-          label: "Vendor",
-          icon: Store,
-          active: hasProfile(v),
-          activeHref: "/vendor",
-          onboardHref: "/onboarding/vendor",
-          onboardLabel: "Become a Vendor",
-          check: getVendorDashboardAccessApi,
-          sub: v?.storeName,
-        },
-        {
-          id: "freelancer",
-          label: "Freelancer",
-          icon: Briefcase,
-          active: hasProfile(f),
-          activeHref: "/freelancer/dashboard",
-          onboardHref: "/onboarding/freelancer",
-          onboardLabel: "Become a Freelancer",
-          check: getFreelancerDashboardAccessApi,
-        },
-        {
-          id: "service",
-          label: "Service Provider",
-          icon: Wrench,
-          active: hasProfile(s),
-          activeHref: "/service-provider",
-          onboardHref: "/onboarding/service-provider",
-          onboardLabel: "Offer Services",
-          check: getServiceProviderDashboardAccessApi,
-          sub: s?.displayName,
-        },
-        {
-          id: "employer",
-          label: "Employer",
-          icon: Building2,
-          active: hasProfile(e),
-          activeHref: "/employer/dashboard",
-          onboardHref: "/onboarding/employer",
-          onboardLabel: "Become an Employer",
-          check: getEmployerDashboardAccessApi,
-        },
-      ]);
+      setProfiles(
+        PROFILE_DEFINITIONS.map((definition) => {
+          const state = states[definition.id];
+          return {
+            ...definition,
+            active: state.status === "active",
+            sub: state.status === "active" ? state.sub : undefined,
+          };
+        })
+      );
     });
 
     return () => { cancelled = true; };

@@ -3,9 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  TrendingUp,
-  Star,
-  Clock,
   Wrench,
   MapPin,
   ChevronDown,
@@ -13,14 +10,11 @@ import {
   ArrowRight,
   Calendar,
   Briefcase,
-  Package,
 } from "lucide-react";
-import { ProductCard, CategoryCard } from "@/components/marketplace";
+import { CategoryCard } from "@/components/marketplace";
 import { PageContainer, SectionHeader, HorizontalScroll } from "@/components/layout";
 import {
   VendorCard,
-  ProductCardHorizontal,
-  FeaturedPromotions,
   QuickAccessGrid,
   HeroEventBanner,
   NearbyStoryReel,
@@ -29,7 +23,16 @@ import {
   HomeSearch,
   FreelanceServicesSection,
   GuestSignupPrompt,
+  ProductShowcase,
+  YourProfilesStrip,
 } from "@/components/home";
+import {
+  CardGridSkeleton,
+  CategoryGridSkeleton,
+  GigGridSkeleton,
+  ScrollRowSkeleton,
+  StoryReelSkeleton,
+} from "@/components/home/Skeleton";
 import { CampusSelector } from "@/components/layout/footer/CampusSelector";
 import { ServiceCard } from "@/components/service-marketplace/ServiceCard";
 import { Logo } from "@/components/ui/Logo";
@@ -61,14 +64,6 @@ export default function HomePage() {
   const services = servicesQuery.data ?? [];
   const categories = categoriesQuery.data ?? [];
   const vendors = vendorsQuery.data ?? [];
-
-  const recommended = products.slice(0, 4);
-  const featured = products
-    .filter((p) => p.originalPrice && p.originalPrice > p.price)
-    .slice(0, 4);
-  const recent = [...products]
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 4);
 
   const greeting = getGreeting();
   const firstName = user?.name ? user.name.split(" ")[0] : null;
@@ -124,28 +119,35 @@ export default function HomePage() {
       {/* 3. 8-Icon Quick Access Grid (Marketplace, Services, Jobs, Events, Courses, Communities, Nearby, Pay) */}
       <QuickAccessGrid />
 
+      {/* 3b. Signed-in users: the profiles they hold, and a way to add one */}
+      <YourProfilesStrip />
+
       {/* 4. Popular stores reel (live vendors) */}
-      <NearbyStoryReel vendors={vendors} campusAbbreviation={selectedCampus.abbreviation} />
+      {vendorsQuery.isPending ? (
+        <StoryReelSkeleton />
+      ) : (
+        <NearbyStoryReel vendors={vendors} campusAbbreviation={selectedCampus.abbreviation} />
+      )}
 
       {/* 5. Campus Services & Gigs — High Prominence */}
-      <section aria-label="Campus Services" className="space-y-3">
-        <SectionHeader
-          title="Campus Services & Gigs"
-          subtitle={`Hire trusted student & campus pros at ${selectedCampus.abbreviation}`}
-          icon={<Wrench className="h-4 w-4 text-primary-600" aria-hidden />}
-          action={{ label: "Explore services", href: "/services" }}
-        />
-        {services.length > 0 ? (
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
-            {services.slice(0, 4).map((service) => (
-              <ServiceCard key={service.id} service={service} />
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-dashed border-neutral-200 bg-white p-6 sm:p-8 text-center">
-            {servicesQuery.isPending ? (
-              <p className="text-sm text-neutral-500">Loading campus services…</p>
-            ) : (
+      {servicesQuery.isPending ? (
+        <CardGridSkeleton label="campus services" />
+      ) : (
+        <section aria-label="Campus Services" className="space-y-3">
+          <SectionHeader
+            title="Campus Services & Gigs"
+            subtitle={`Hire trusted student & campus pros at ${selectedCampus.abbreviation}`}
+            icon={<Wrench className="h-4 w-4 text-primary-600" aria-hidden />}
+            action={{ label: "Explore services", href: "/services" }}
+          />
+          {services.length > 0 ? (
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+              {services.slice(0, 4).map((service) => (
+                <ServiceCard key={service.id} service={service} />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-neutral-200 bg-white p-6 sm:p-8 text-center">
               <div className="flex flex-col items-center justify-center space-y-2">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-50 text-primary-600">
                   <Wrench className="h-5 w-5" />
@@ -161,65 +163,44 @@ export default function HomePage() {
                   Browse all services <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </div>
-            )}
-          </div>
-        )}
-      </section>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* 5b. Freelancer services (shows once there are live ones) */}
       <FreelanceServicesSection />
 
       {/* 6. Marketplace Categories */}
-      {categories.length > 0 && (
-        <section aria-label="Categories" className="space-y-2.5">
-          <SectionHeader
-            title="Browse categories"
-            action={{ label: "See all", href: "/categories" }}
-          />
-          <div className="grid grid-cols-4 gap-2.5 sm:gap-3 lg:grid-cols-8">
-            {categories.slice(0, 8).map((cat) => (
-              <CategoryCard key={cat.id} category={cat} />
-            ))}
-          </div>
-        </section>
+      {categoriesQuery.isPending ? (
+        <CategoryGridSkeleton />
+      ) : (
+        categories.length > 0 && (
+          <section aria-label="Categories" className="space-y-2.5">
+            <SectionHeader
+              title="Browse categories"
+              action={{ label: "See all", href: "/categories" }}
+            />
+            <div className="grid grid-cols-4 gap-2.5 sm:gap-3 lg:grid-cols-8">
+              {categories.slice(0, 8).map((cat) => (
+                <CategoryCard key={cat.id} category={cat} />
+              ))}
+            </div>
+          </section>
+        )
       )}
 
-      {/* 7. Recommended for you (Products) */}
-      {recommended.length > 0 ? (
-        <section aria-label="Recommended for you" className="space-y-3">
-          <SectionHeader
-            title="Recommended for you"
-            subtitle={`Picked for ${selectedCampus.abbreviation} students`}
-            icon={<Star className="h-4 w-4 text-amber-500" aria-hidden />}
-            action={{ label: "See all", href: "/marketplace" }}
-          />
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
-            {recommended.slice(0, 8).map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
-        </section>
-      ) : null}
+      {/* 7. Marketplace products: Picks, New and Deals in one section */}
+      <ProductShowcase
+        products={products}
+        loading={productsQuery.isPending}
+        campusAbbreviation={selectedCampus.abbreviation}
+      />
 
-      {/* 8. Fresh Arrivals / Just Listed */}
-      {recent.length > 0 && (
-        <section aria-label="Fresh Arrivals" className="space-y-3">
-          <SectionHeader
-            title="Fresh Arrivals"
-            subtitle="Just listed across campus"
-            icon={<Package className="h-4 w-4 text-primary-600" aria-hidden />}
-            action={{ label: "View all", href: "/marketplace" }}
-          />
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
-            {recent.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* 9. Upcoming Campus Events */}
-      {upcomingEvents.length > 0 && (
+      {/* 8. Upcoming Campus Events */}
+      {eventsQuery.isPending ? (
+        <ScrollRowSkeleton label="events" item="event" />
+      ) : upcomingEvents.length > 0 && (
         <section aria-label="Upcoming Events" className="space-y-3">
           <SectionHeader
             title="Upcoming Campus Events"
@@ -235,8 +216,10 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* 10. Student Gigs & Quick Work */}
-      {opportunities.length > 0 && (
+      {/* 9. Student Gigs & Quick Work */}
+      {gigsQuery.isPending ? (
+        <GigGridSkeleton />
+      ) : opportunities.length > 0 && (
         <section aria-label="Student Gigs and Jobs" className="space-y-3">
           <SectionHeader
             title="Student Gigs & Work"
@@ -252,32 +235,10 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* 11. Deals & Discounts */}
-      {featured.length > 0 && (
-        <section aria-label="Deals and discounts" className="rounded-2xl bg-amber-50/70 border border-amber-100 p-4 sm:p-5 space-y-3">
-          <SectionHeader
-            title="Deals & Discounts"
-            subtitle="Campus-specific offers"
-            icon={<TrendingUp className="h-4 w-4 text-amber-600" aria-hidden />}
-            action={{ label: "View all", href: "/marketplace" }}
-          />
-          <div className="lg:hidden">
-            <HorizontalScroll>
-              {featured.map((product) => (
-                <ProductCardHorizontal key={product.id} product={product} />
-              ))}
-            </HorizontalScroll>
-          </div>
-          <div className="hidden lg:grid lg:grid-cols-4 lg:gap-4">
-            {featured.slice(0, 4).map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* 12. Campus Vendors */}
-      {vendors.length > 0 && (
+      {/* 10. Campus Vendors */}
+      {vendorsQuery.isPending ? (
+        <ScrollRowSkeleton label="campus vendors" item="vendor" />
+      ) : vendors.length > 0 && (
         <section aria-label="Campus vendors" className="space-y-3">
           <SectionHeader
             title="Campus vendors"
@@ -293,7 +254,7 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* 13. For visitors who aren't signed in: what an account unlocks */}
+      {/* 11. For visitors who aren't signed in: what an account unlocks */}
       <GuestSignupPrompt />
     </PageContainer>
   );
