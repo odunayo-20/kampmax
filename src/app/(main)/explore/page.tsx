@@ -24,20 +24,27 @@ import { eventDate, eventTime, priceLabel } from "@/components/events/event-form
 import { fetchProducts } from "@/services/products";
 import { listPublicJobs } from "@/services/jobs";
 import { listPublicServices } from "@/services/service-marketplace";
+import { fetchPublicServices } from "@/services/freelancer-services";
+import { FreelanceServiceRow } from "@/components/explore/FreelanceServiceRow";
 import { useAuth } from "@/lib/auth-context";
 import { useMyLocation } from "@/hooks/use-location";
 import { fetchNearby, formatDistance, roundCoordinate } from "@/services/nearby-api";
 import { cn } from "@/lib/utils";
 
-type ExploreCategory = "all" | "events" | "products" | "services" | "jobs";
+type ExploreCategory = "all" | "events" | "products" | "services" | "freelance" | "jobs";
 
 const CATEGORIES: { id: ExploreCategory; label: string }[] = [
   { id: "all", label: "All" },
   { id: "events", label: "Events" },
   { id: "products", label: "Products" },
   { id: "services", label: "Services" },
+  { id: "freelance", label: "Freelance" },
   { id: "jobs", label: "Jobs" },
 ];
+
+/** A few freelancer services in the mixed view; more once that filter is chosen. */
+const FREELANCE_PREVIEW = 3;
+const FREELANCE_FULL = 10;
 
 type Origin = { latitude: number; longitude: number };
 
@@ -67,6 +74,15 @@ export default function ExplorePage() {
     queryKey: ["explore", "services", search],
     queryFn: () => listPublicServices({ q: search, limit: 3 }),
   });
+  const freelanceLimit = selectedCategory === "freelance" ? FREELANCE_FULL : FREELANCE_PREVIEW;
+  const freelanceQuery = useQuery({
+    queryKey: ["explore", "freelance", search, freelanceLimit],
+    queryFn: async () => {
+      const page = await fetchPublicServices({ q: search, limit: freelanceLimit });
+      if (page.failed) throw new Error("Couldn't load freelancer services.");
+      return page;
+    },
+  });
   const jobsQuery = useQuery({
     queryKey: ["explore", "jobs", search],
     queryFn: async () => {
@@ -78,6 +94,8 @@ export default function ExplorePage() {
 
   const filteredProducts = productsQuery.data ?? [];
   const filteredServices = servicesQuery.data ?? [];
+  const freelanceServices = freelanceQuery.data?.items ?? [];
+  const freelanceTotal = freelanceQuery.data?.total ?? 0;
   const filteredJobs = jobsQuery.data ?? [];
 
   // Distances come from the backend's /nearby (privacy-aware, reduced-precision
@@ -144,17 +162,19 @@ export default function ExplorePage() {
     );
   };
 
-  const failed = [eventsQuery, productsQuery, servicesQuery, jobsQuery].some((q) => q.isError);
-  const loading = [eventsQuery, productsQuery, servicesQuery, jobsQuery].some((q) => q.isLoading);
+  const failed = [eventsQuery, productsQuery, servicesQuery, freelanceQuery, jobsQuery].some((q) => q.isError);
+  const loading = [eventsQuery, productsQuery, servicesQuery, freelanceQuery, jobsQuery].some((q) => q.isLoading);
   const showEvents = selectedCategory === "all" || selectedCategory === "events";
   const showProducts = selectedCategory === "all" || selectedCategory === "products";
   const showServices = selectedCategory === "all" || selectedCategory === "services";
+  const showFreelance = selectedCategory === "all" || selectedCategory === "freelance";
   const showJobs = selectedCategory === "all" || selectedCategory === "jobs";
   const empty =
     !loading &&
     (!showEvents || !filteredEvents.length) &&
     (!showProducts || !filteredProducts.length) &&
     (!showServices || !filteredServices.length) &&
+    (!showFreelance || !freelanceServices.length) &&
     (!showJobs || !filteredJobs.length);
 
   return (
@@ -165,7 +185,7 @@ export default function ExplorePage() {
           <div>
             <h1 className="text-xl font-bold text-neutral-900">Explore</h1>
             <p className="text-xs text-neutral-500">
-              Browse events, products, services, jobs, courses and more
+              Browse events, products, services, freelancers, jobs and more
             </p>
           </div>
         </div>
@@ -375,6 +395,26 @@ export default function ExplorePage() {
               </div>
             </Link>
           ))}
+
+        {/* Freelance Vertical */}
+        {showFreelance && freelanceServices.length > 0 && (
+          <>
+            {freelanceServices.map((service) => (
+              <FreelanceServiceRow
+                key={`freelance-${service.id}`}
+                service={service}
+                distance={service.freelancer ? distanceLabel("FREELANCER", service.freelancer.id) : undefined}
+              />
+            ))}
+            <Link
+              href={`/freelancers/services${search ? `?q=${encodeURIComponent(search)}` : ""}`}
+              className="flex items-center justify-center gap-1 rounded-2xl border border-dashed border-indigo-200 py-2.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-50"
+            >
+              See all {freelanceTotal} freelancer service{freelanceTotal === 1 ? "" : "s"}
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+            </Link>
+          </>
+        )}
 
         {/* Jobs Vertical */}
         {showJobs &&
