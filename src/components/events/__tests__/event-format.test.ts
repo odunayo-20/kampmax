@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isBookable, naira, priceLabel } from "../event-format";
+import { eventDate, eventTime, isBookable, naira, priceLabel } from "../event-format";
 import type { EventItem } from "@/types/event-ticketing";
 
 const future = (ms: number) => new Date(Date.now() + ms).toISOString();
@@ -65,5 +65,18 @@ describe("naira", () => {
   it("formats whole and fractional amounts", () => {
     expect(naira(2100)).toContain("2,100");
     expect(naira(99.5)).toContain("99.5");
+  });
+});
+
+describe("event times", () => {
+  // 10:00 in London/UTC is 11:00 in Lagos (UTC+1, no daylight saving), whatever the
+  // machine's own time zone, so a server and a browser always print the same time.
+  it("are shown in Nigerian time, not the machine's", () => {
+    expect(eventTime("2026-06-01T10:00:00Z")).toMatch(/^11:00/);
+  });
+
+  it("move to the next day when Nigerian time does", () => {
+    // 23:30 UTC on 1 June is 00:30 on 2 June in Lagos.
+    expect(eventDate("2026-06-01T23:30:00Z")).toBe("2 Jun 2026");
   });
 });

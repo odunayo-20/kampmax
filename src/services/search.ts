@@ -38,8 +38,13 @@ import { listArticles } from "@/services/blog";
 import { fetchTaxonomyTree, cachedTaxonomyName } from "@/services/taxonomy";
 import { jobToOpportunity } from "@/lib/job-api-mapping";
 
-const RECENT_KEY = "kampmax_recent_searches";
-const MAX_RECENT = 10;
+// Recent searches are kept in the browser; their code lives in its own small module.
+export {
+  getRecentSearches,
+  addRecentSearch,
+  removeRecentSearch,
+  clearRecentSearches,
+} from "@/lib/recent-searches";
 
 /** How many results each vertical contributes to one search. */
 const PER_TYPE_LIMIT = 30;
@@ -76,50 +81,6 @@ const trendingSearches: TrendingSearch[] = [];
 
 export function getTrendingSearches(): TrendingSearch[] {
   return trendingSearches;
-}
-
-// ── Recent Searches (local-only; not sent anywhere) ──────
-
-export function getRecentSearches(): string[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(RECENT_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function addRecentSearch(query: string): void {
-  if (typeof window === "undefined") return;
-  const trimmed = query.trim();
-  if (!trimmed) return;
-  try {
-    const recent = getRecentSearches().filter((r) => r !== trimmed);
-    recent.unshift(trimmed);
-    localStorage.setItem(RECENT_KEY, JSON.stringify(recent.slice(0, MAX_RECENT)));
-  } catch {
-    // localStorage unavailable
-  }
-}
-
-export function removeRecentSearch(query: string): void {
-  if (typeof window === "undefined") return;
-  try {
-    const recent = getRecentSearches().filter((r) => r !== query);
-    localStorage.setItem(RECENT_KEY, JSON.stringify(recent));
-  } catch {
-    // localStorage unavailable
-  }
-}
-
-export function clearRecentSearches(): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.removeItem(RECENT_KEY);
-  } catch {
-    // localStorage unavailable
-  }
 }
 
 // ── Suggestions ──────────────────────────────────────────

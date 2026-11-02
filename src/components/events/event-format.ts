@@ -1,16 +1,26 @@
 import type { EventItem } from "@/types/event-ticketing";
 
+/**
+ * Events happen on Nigerian campuses, so their times are shown in Nigerian time wherever
+ * the page is rendered. Left to the machine's clock, a server in another time zone and a
+ * browser in Lagos would print different times for the same event.
+ */
+const EVENT_TIME_ZONE = "Africa/Lagos";
+
 const dateFmt = new Intl.DateTimeFormat("en-NG", {
+  timeZone: EVENT_TIME_ZONE,
   month: "short",
   day: "numeric",
   year: "numeric",
 });
 const timeFmt = new Intl.DateTimeFormat("en-NG", {
+  timeZone: EVENT_TIME_ZONE,
   hour: "numeric",
   minute: "2-digit",
   hour12: true,
 });
 const dayFmt = new Intl.DateTimeFormat("en-NG", {
+  timeZone: EVENT_TIME_ZONE,
   weekday: "short",
   month: "short",
   day: "numeric",

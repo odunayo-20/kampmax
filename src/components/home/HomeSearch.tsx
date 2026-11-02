@@ -1,17 +1,36 @@
-import Link from "next/link";
-import { Search } from "lucide-react";
+"use client";
 
-/** Things people commonly look for here; each opens Explore already searching for it. */
+import Link from "next/link";
+import { Clock, Search } from "lucide-react";
+import { useRecentSearches } from "@/hooks/use-recent-searches";
+
+/** Things people commonly look for here, shown until this browser has searches of its own. */
 const SUGGESTIONS = ["Logo design", "Laptop repair", "Hair braiding", "Tutoring", "Textbooks"];
+const RECENT_SHOWN = 5;
+
+const chipClass =
+  "inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-3 py-1 text-xs font-medium text-neutral-600 transition-colors hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600";
 
 /**
  * The home page's search: type, press Enter, and land on Explore with the search filled
- * in and results showing. A plain GET form, so it needs no JavaScript.
+ * in and results showing. A plain GET form, so it still works without JavaScript; with
+ * it, each search is remembered here, and offered back next time in place of the
+ * generic suggestions.
  */
 export function HomeSearch() {
+  const { searches, record, clear } = useRecentSearches();
+  const hasRecent = searches.length > 0;
+  const chips = hasRecent ? searches.slice(0, RECENT_SHOWN) : SUGGESTIONS;
+
   return (
     <div className="space-y-2.5">
-      <form action="/explore" role="search" className="relative">
+      <form
+        action="/explore"
+        role="search"
+        className="relative"
+        // Remember the search, then let the form carry on to Explore as normal.
+        onSubmit={(e) => record(String(new FormData(e.currentTarget).get("q") ?? ""))}
+      >
         <Search
           className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-neutral-400"
           aria-hidden
@@ -33,17 +52,29 @@ export function HomeSearch() {
         </button>
       </form>
 
-      <ul aria-label="Popular searches" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-0.5 sm:mx-0 sm:flex-wrap sm:px-0">
-        {SUGGESTIONS.map((term) => (
+      <ul
+        aria-label={hasRecent ? "Your recent searches" : "Popular searches"}
+        className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-0.5 sm:mx-0 sm:flex-wrap sm:px-0"
+      >
+        {chips.map((term) => (
           <li key={term} className="shrink-0">
-            <Link
-              href={`/explore?q=${encodeURIComponent(term)}`}
-              className="inline-block rounded-full bg-neutral-100 px-3 py-1 text-xs font-medium text-neutral-600 transition-colors hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600"
-            >
+            <Link href={`/explore?q=${encodeURIComponent(term)}`} onClick={() => record(term)} className={chipClass}>
+              {hasRecent && <Clock className="h-3 w-3 text-neutral-400" aria-hidden />}
               {term}
             </Link>
           </li>
         ))}
+        {hasRecent && (
+          <li className="shrink-0">
+            <button
+              type="button"
+              onClick={clear}
+              className="rounded-full px-2 py-1 text-xs font-medium text-neutral-400 hover:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600"
+            >
+              Clear
+            </button>
+          </li>
+        )}
       </ul>
     </div>
   );

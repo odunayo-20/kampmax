@@ -6,18 +6,16 @@ import { ProductCard } from "@/components/marketplace";
 import { SectionHeader } from "@/components/layout";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/types";
+import { usePersonalSignals } from "@/hooks/use-personal-signals";
 import { CardGridSkeleton } from "./Skeleton";
 import { splitProducts, type ProductTabId } from "./product-lists";
-
-const TABS: { id: ProductTabId; label: string }[] = [
-  { id: "picks", label: "Picks" },
-  { id: "new", label: "New" },
-  { id: "deals", label: "Deals" },
-];
 
 /**
  * One marketplace section with a switch between Picks, New and Deals, in place of three
  * separate sections stacked down the page. A tab with nothing in it is left out.
+ *
+ * "Picks" becomes "For you" only when what we know about the person (recent searches,
+ * stores they've saved from) really changed what it shows. Otherwise it's just picks.
  */
 export function ProductShowcase({
   products,
@@ -29,11 +27,16 @@ export function ProductShowcase({
   campusAbbreviation?: string;
 }) {
   const [selected, setSelected] = useState<ProductTabId>("picks");
+  const signals = usePersonalSignals();
 
   if (loading) return <CardGridSkeleton label="marketplace picks" />;
 
-  const lists = splitProducts(products);
-  const tabs = TABS.filter((tab) => lists[tab.id].length > 0);
+  const lists = splitProducts(products, signals);
+  const tabs = [
+    { id: "picks" as const, label: lists.personalised ? "For you" : "Picks" },
+    { id: "new" as const, label: "New" },
+    { id: "deals" as const, label: "Deals" },
+  ].filter((tab) => lists[tab.id].length > 0);
   if (tabs.length === 0) return null;
 
   // If the chosen tab has emptied (new data, another campus), fall back to the first one.

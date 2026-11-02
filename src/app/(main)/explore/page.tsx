@@ -21,6 +21,7 @@ import {
 import { PageContainer } from "@/components/layout/PageContainer";
 import { listEventsApi } from "@/services/event-tickets";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useRecentSearches } from "@/hooks/use-recent-searches";
 import { eventDate, eventTime, priceLabel } from "@/components/events/event-format";
 import { fetchProducts } from "@/services/products";
 import { listPublicJobs } from "@/services/jobs";
@@ -71,6 +72,8 @@ function ExploreContent() {
   const [selectedCategory, setSelectedCategory] = useState<ExploreCategory>("all");
   const urlQuery = useSearchParams().get("q") ?? "";
   const [searchQuery, setSearchQuery] = useState(urlQuery.slice(0, 100));
+  const { record: recordSearch } = useRecentSearches();
+  const rememberSearch = (term: string) => term.trim().length >= 2 && recordSearch(term);
 
   const debouncedQ = useDebounce(searchQuery.trim(), 300);
   const search = debouncedQ || undefined;
@@ -236,6 +239,9 @@ function ExploreContent() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            // A finished search (Enter, or moving away), not every pause while typing.
+            onKeyDown={(e) => e.key === "Enter" && rememberSearch(searchQuery)}
+            onBlur={() => rememberSearch(searchQuery)}
             placeholder="Search in Kampmax Hub..."
             className="w-full h-11 pl-10 pr-4 bg-white border border-neutral-200 rounded-xl text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-xs"
           />

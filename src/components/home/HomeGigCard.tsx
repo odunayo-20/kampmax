@@ -34,7 +34,7 @@ export function HomeGigCard({ opportunity: o, className }: HomeGigCardProps) {
           <span className="text-[10px] font-bold uppercase tracking-wider text-primary-600 bg-primary-50 px-2 py-0.5 rounded-md border border-primary-100">
             {o.categoryName ?? "Campus Gig"}
           </span>
-          <span className="text-[10px] font-semibold text-neutral-400">
+          <span suppressHydrationWarning className="text-[10px] font-semibold text-neutral-400">
             {timeAgo(o.postedAt)}
           </span>
         </div>

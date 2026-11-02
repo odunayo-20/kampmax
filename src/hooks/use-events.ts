@@ -7,6 +7,7 @@ import {
   organizerKeys,
   ticketKeys,
 } from "@/lib/query-keys";
+import { eventsListQuery } from "@/services/event-queries";
 import {
   addTierApi,
   applyOrganizerApi,
@@ -46,14 +47,7 @@ import type {
 
 export function useEvents(params: ListEventsParams = {}) {
   return useQuery({
-    queryKey: eventKeys.list({
-      campusId: params.campusId,
-      q: params.q,
-      when: params.when,
-      categoryId: params.categoryId,
-      limit: params.limit ? String(params.limit) : undefined,
-    }),
-    queryFn: () => listEventsApi(params),
+    ...eventsListQuery(params),
     select: (page) => page.items,
   });
 }
