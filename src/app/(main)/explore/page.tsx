@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import {
   Search,
@@ -18,12 +18,12 @@ import {
   Star,
 } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
-import { useEvents } from "@/hooks/use-events";
+import { listEventsApi } from "@/services/event-tickets";
 import { useDebounce } from "@/hooks/use-debounce";
 import { eventDate, eventTime, priceLabel } from "@/components/events/event-format";
 import { fetchProducts } from "@/services/products";
 import { listPublicJobs } from "@/services/jobs";
-import { listPublicServices } from "@/services/service-marketplace";
+import { fetchServicePage } from "@/services/service-marketplace";
 import { fetchPublicServices } from "@/services/freelancer-services";
 import { FreelanceServiceRow } from "@/components/explore/FreelanceServiceRow";
 import { useAuth } from "@/lib/auth-context";
@@ -42,6 +42,11 @@ const CATEGORIES: { id: ExploreCategory; label: string }[] = [
   { id: "jobs", label: "Jobs" },
 ];
 
+/** 1,284 → "1.3k" past a thousand, so a pill never grows wide. */
+function formatCount(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k` : String(n);
+}
+
 /** A few freelancer services in the mixed view; more once that filter is chosen. */
 const FREELANCE_PREVIEW = 3;
 const FREELANCE_FULL = 10;
@@ -59,20 +64,25 @@ export default function ExplorePage() {
   const debouncedQ = useDebounce(searchQuery.trim(), 300);
   const search = debouncedQ || undefined;
 
-  const eventsQuery = useEvents({ q: search, limit: 20 });
-  const filteredEvents = eventsQuery.data ?? [];
-
+  // Each vertical returns a few rows to show and the real total, which the filter pills display.
+  const eventsQuery = useQuery({
+    queryKey: ["explore", "events", search],
+    queryFn: async () => {
+      const page = await listEventsApi({ q: search, limit: 20 });
+      return { items: page.items, total: page.meta.total };
+    },
+  });
   const productsQuery = useQuery({
     queryKey: ["explore", "products", search],
     queryFn: async () => {
       const res = await fetchProducts({ search, status: "ACTIVE", limit: 4 });
       if (res.error) throw res.error;
-      return res.data;
+      return { items: res.data, total: res.total };
     },
   });
   const servicesQuery = useQuery({
     queryKey: ["explore", "services", search],
-    queryFn: () => listPublicServices({ q: search, limit: 3 }),
+    queryFn: () => fetchServicePage({ q: search, pageSize: 3 }),
   });
   const freelanceLimit = selectedCategory === "freelance" ? FREELANCE_FULL : FREELANCE_PREVIEW;
   const freelanceQuery = useQuery({
@@ -82,21 +92,39 @@ export default function ExplorePage() {
       if (page.failed) throw new Error("Couldn't load freelancer services.");
       return page;
     },
+    // Switching to the Freelance pill loads more rows; keep the count steady meanwhile.
+    placeholderData: keepPreviousData,
   });
   const jobsQuery = useQuery({
     queryKey: ["explore", "jobs", search],
     queryFn: async () => {
       const res = await listPublicJobs({ search, limit: 3 });
       if (res.error) throw res.error;
-      return res.jobs;
+      return { items: res.jobs, total: res.total };
     },
   });
 
-  const filteredProducts = productsQuery.data ?? [];
-  const filteredServices = servicesQuery.data ?? [];
+  const filteredEvents = eventsQuery.data?.items ?? [];
+  const filteredProducts = productsQuery.data?.items ?? [];
+  const filteredServices = servicesQuery.data?.items ?? [];
   const freelanceServices = freelanceQuery.data?.items ?? [];
   const freelanceTotal = freelanceQuery.data?.total ?? 0;
-  const filteredJobs = jobsQuery.data ?? [];
+  const filteredJobs = jobsQuery.data?.items ?? [];
+
+  // Totals for the pills. Undefined while loading or failed, so a pill shows no number
+  // rather than a wrong one; "All" appears only once every total is known.
+  const verticalTotals = {
+    events: eventsQuery.data?.total,
+    products: productsQuery.data?.total,
+    services: servicesQuery.data?.total,
+    freelance: freelanceQuery.data?.total,
+    jobs: jobsQuery.data?.total,
+  };
+  const known = Object.values(verticalTotals);
+  const counts: Record<ExploreCategory, number | undefined> = {
+    ...verticalTotals,
+    all: known.every((n) => n !== undefined) ? known.reduce<number>((sum, n) => sum + (n ?? 0), 0) : undefined,
+  };
 
   // Distances come from the backend's /nearby (privacy-aware, reduced-precision
   // public locations). Origin: saved profile location, else the device. Never fabricated.
@@ -216,6 +244,16 @@ export default function ExplorePage() {
               )}
             >
               {cat.label}
+              {counts[cat.id] !== undefined && (
+                <span
+                  className={cn(
+                    "ml-1.5 tabular-nums",
+                    selectedCategory === cat.id ? "text-white/80" : "text-neutral-400"
+                  )}
+                >
+                  {formatCount(counts[cat.id]!)}
+                </span>
+              )}
             </button>
           ))}
         </div>
