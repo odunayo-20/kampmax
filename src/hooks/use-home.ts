@@ -20,6 +20,7 @@ function live<T>(res: { data: T; error: unknown }): T {
 }
 
 import { listPublicServices } from "@/services/service-marketplace";
+import { fetchPublicServices } from "@/services/freelancer-services";
 import { listPublicJobs } from "@/services/jobs";
 import { jobToOpportunity } from "@/lib/job-api-mapping";
 
@@ -28,6 +29,7 @@ export const homeKeys = {
   products: (campusId?: string) => ["home", "products", campusId ?? "all"] as const,
   services: (campusId?: string) => ["home", "services", campusId ?? "all"] as const,
   gigs: (campusId?: string) => ["home", "gigs", campusId ?? "all"] as const,
+  freelance: ["home", "freelance"] as const,
   categories: ["home", "categories"] as const,
   vendors: (campusId?: string) => ["home", "vendors", campusId ?? "all"] as const,
   featured: (placement: string, campusId?: string, categoryId?: string) =>
@@ -54,6 +56,18 @@ export function useHomeServices(campusId?: string) {
     queryKey: homeKeys.services(apiCampusId),
     // Live catalogue only: an outage is an error, never demo services.
     queryFn: () => listPublicServices({ campusId: apiCampusId, limit: 8 }),
+  });
+}
+
+/** The newest live freelancer services. Not campus-specific: freelancers work remotely. */
+export function useHomeFreelanceServices() {
+  return useQuery({
+    queryKey: homeKeys.freelance,
+    queryFn: async () => {
+      const page = await fetchPublicServices({ limit: 4 });
+      if (page.failed) throw new Error("Couldn't load freelancer services.");
+      return page.items;
+    },
   });
 }
 

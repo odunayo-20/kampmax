@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   Search,
   SlidersHorizontal,
@@ -57,9 +58,19 @@ type Origin = { latitude: number; longitude: number };
 const NEARBY_RADIUS_M = 25_000;
 const NEARBY_LIMIT = 50;
 
+// Reading the URL (?q=, from the home page's search) needs a Suspense boundary.
 export default function ExplorePage() {
+  return (
+    <Suspense>
+      <ExploreContent />
+    </Suspense>
+  );
+}
+
+function ExploreContent() {
   const [selectedCategory, setSelectedCategory] = useState<ExploreCategory>("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  const urlQuery = useSearchParams().get("q") ?? "";
+  const [searchQuery, setSearchQuery] = useState(urlQuery.slice(0, 100));
 
   const debouncedQ = useDebounce(searchQuery.trim(), 300);
   const search = debouncedQ || undefined;

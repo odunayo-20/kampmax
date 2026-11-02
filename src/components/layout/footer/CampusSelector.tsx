@@ -28,9 +28,11 @@ interface CampusSelectorProps {
   /** Forced placement state in the footer CTA (used by tests/dev tooling). */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** Show only the picker dialog, for callers that bring their own trigger (control it with `open`). */
+  hideTrigger?: boolean;
 }
 
-export function CampusSelector({ open, onOpenChange }: CampusSelectorProps) {
+export function CampusSelector({ open, onOpenChange, hideTrigger = false }: CampusSelectorProps) {
   const { selectedCampus, setSelectedCampus, campuses } = useApp();
   const [innerOpen, setInnerOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -86,6 +88,7 @@ export function CampusSelector({ open, onOpenChange }: CampusSelectorProps) {
 
   return (
     <>
+      {!hideTrigger && (
       <Button
         type="button"
         variant="outline"
@@ -104,6 +107,7 @@ export function CampusSelector({ open, onOpenChange }: CampusSelectorProps) {
           {selectedCampus.abbreviation}
         </span>
       </Button>
+      )}
 
       {isOpen && (
         <div

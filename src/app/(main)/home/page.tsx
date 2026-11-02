@@ -1,8 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import {
-  Search,
   TrendingUp,
   Star,
   Clock,
@@ -26,7 +26,11 @@ import {
   NearbyStoryReel,
   EventCard,
   HomeGigCard,
+  HomeSearch,
+  FreelanceServicesSection,
+  GuestSignupPrompt,
 } from "@/components/home";
+import { CampusSelector } from "@/components/layout/footer/CampusSelector";
 import { ServiceCard } from "@/components/service-marketplace/ServiceCard";
 import { Logo } from "@/components/ui/Logo";
 import { useEvents } from "@/hooks/use-events";
@@ -41,6 +45,7 @@ import {
 } from "@/hooks/use-home";
 
 export default function HomePage() {
+  const [campusPickerOpen, setCampusPickerOpen] = useState(false);
   const { selectedCampus } = useApp();
   const { user } = useAuth();
   const campusId = selectedCampus.id;
@@ -93,71 +98,24 @@ export default function HomePage() {
 
           {/* Campus selector pill (shown once the live campus has loaded) */}
           {selectedCampus.id && (
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary-50/80 border border-primary-200/70 text-xs font-bold text-primary-700 shadow-2xs shrink-0">
-            <MapPin className="h-3.5 w-3.5 text-primary-600 shrink-0" />
-            <span className="truncate max-w-[120px] sm:max-w-none">
-              {[selectedCampus.abbreviation, selectedCampus.location.split(",")[0]].filter(Boolean).join(", ")}
-            </span>
-            <ChevronDown className="h-3 w-3 text-primary-500 shrink-0" />
-          </div>
+            <button
+              type="button"
+              onClick={() => setCampusPickerOpen(true)}
+              aria-haspopup="dialog"
+              aria-label={`Campus: ${selectedCampus.name}. Change campus`}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary-50/80 border border-primary-200/70 text-xs font-bold text-primary-700 shadow-2xs shrink-0 transition-colors hover:bg-primary-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600"
+            >
+              <MapPin className="h-3.5 w-3.5 text-primary-600 shrink-0" aria-hidden />
+              <span className="truncate max-w-[120px] sm:max-w-none">
+                {[selectedCampus.abbreviation, selectedCampus.location.split(",")[0]].filter(Boolean).join(", ")}
+              </span>
+              <ChevronDown className="h-3 w-3 text-primary-500 shrink-0" aria-hidden />
+            </button>
           )}
+          <CampusSelector hideTrigger open={campusPickerOpen} onOpenChange={setCampusPickerOpen} />
         </div>
 
-        {/* Universal Search Bar */}
-        <div>
-          <Link
-            href="/explore"
-            aria-label="Search for events, products, services, jobs..."
-            className="group flex items-center gap-3 h-[48px] px-4 bg-white border border-neutral-200/90 rounded-2xl text-neutral-500 text-sm shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:border-primary-500/40 hover:shadow-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600"
-          >
-            <Search className="h-[18px] w-[18px] text-neutral-400 group-hover:text-primary-600 transition-colors shrink-0" />
-            <span className="truncate text-neutral-400 font-normal">
-              Search for events, products, services, jobs...
-            </span>
-            <span className="ml-auto hidden sm:inline-flex text-[11px] font-semibold px-2 py-0.5 rounded-md bg-neutral-100 text-neutral-600 border border-neutral-200">
-              Explore All
-            </span>
-          </Link>
-        </div>
-
-        {/* Guest Exploration Showcase Card */}
-        {!user && (
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary-600 via-primary-700 to-indigo-700 text-white p-4 sm:p-5 shadow-sm mt-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="space-y-1 max-w-xl">
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1 font-bold bg-white/20 px-2 py-0.5 rounded-full text-[10px] tracking-wide uppercase">
-                    Campus Ecosystem
-                  </span>
-                  <span className="text-xs text-blue-100 font-semibold">
-                    Guest Explorer
-                  </span>
-                </div>
-                <h2 className="text-base sm:text-lg font-black tracking-tight text-white">
-                  Buy, sell, hire &amp; connect on {selectedCampus.name}
-                </h2>
-                <p className="text-xs text-blue-100/90 leading-relaxed">
-                  You can freely browse listings, events, and services as a guest. Create an account whenever you&apos;re ready to order or post.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2.5 shrink-0">
-                <Link
-                  href="/login"
-                  className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold transition-colors text-center"
-                >
-                  Sign In
-                </Link>
-                <Link
-                  href="/register"
-                  className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-100 text-primary-700 text-xs font-bold shadow-xs transition-colors text-center"
-                >
-                  Create Free Account
-                </Link>
-              </div>
-            </div>
-          </div>
-        )}
+        <HomeSearch />
       </section>
 
       {/* 2. Hero Event Banner: Kampmax Fest 2025 */}
@@ -207,6 +165,9 @@ export default function HomePage() {
           </div>
         )}
       </section>
+
+      {/* 5b. Freelancer services (shows once there are live ones) */}
+      <FreelanceServicesSection />
 
       {/* 6. Marketplace Categories */}
       {categories.length > 0 && (
@@ -331,6 +292,9 @@ export default function HomePage() {
           </HorizontalScroll>
         </section>
       )}
+
+      {/* 13. For visitors who aren't signed in: what an account unlocks */}
+      <GuestSignupPrompt />
     </PageContainer>
   );
 }

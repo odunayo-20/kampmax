@@ -9,6 +9,9 @@ export { FeaturedPromotions } from "./FeaturedPromotions";
 export { CampusHighlightCard } from "./CampusHighlightCard";
 export { ProductCardHorizontal } from "./ProductCardHorizontal";
 export { HomeGigCard } from "./HomeGigCard";
+export { FreelanceServicesSection } from "./FreelanceServicesSection";
+export { HomeSearch } from "./HomeSearch";
+export { GuestSignupPrompt } from "./GuestSignupPrompt";
 export {
   Skeleton,
   ProductCardSkeleton,
