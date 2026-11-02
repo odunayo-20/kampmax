@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Clock, Eye, Grid2X2, Pencil, MoreHorizontal } from "lucide-react";
+import { Clock, ExternalLink, Eye, Grid2X2, Pencil, MoreHorizontal } from "lucide-react";
 import type { FreelancerService } from "@/types/freelancer-services";
 import { ServiceStatusBadge } from "./ServiceStatusBadge";
 import { categoryLabel, servicePriceLabel } from "./serviceHelpers";
 import { formatDate } from "@/lib/utils";
+import { serviceHref } from "@/components/freelancer/public/service-format";
 import { useCategories } from "@/hooks/use-taxonomy";
 
 export function ServiceCard({
@@ -79,6 +80,18 @@ export function ServiceCard({
       <div className="mt-auto flex items-center justify-between border-t border-neutral-100 px-4 py-2.5">
         <span className="text-[11px] text-neutral-400">Updated {formatDate(service.updatedAt)}</span>
         <div className="flex items-center gap-1">
+          {service.status === "published" && (
+            <a
+              href={serviceHref(service)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+              aria-label={`View ${service.title} as a client sees it`}
+              title="View live page"
+            >
+              <ExternalLink className="h-4 w-4" aria-hidden />
+            </a>
+          )}
           <Link
             href={`/freelancer/services/${service.id}/edit`}
             className="inline-flex items-center gap-1 rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"

@@ -7,6 +7,7 @@ import {
   Menu,
   Store,
   Wrench,
+  Laptop,
   Briefcase,
   GraduationCap,
   MapPin,
@@ -110,6 +111,14 @@ export const MORE_MENU_SECTIONS: NavSectionConfig[] = [
         href: "/services",
         icon: Wrench,
         description: "Hire student and campus service pros",
+      },
+      {
+        id: "freelancer-services",
+        label: "Freelancer Services",
+        href: "/freelancers/services",
+        icon: Laptop,
+        description: "Design, development, writing & more from campus freelancers",
+        activeMatch: (pathname: string) => pathname.startsWith("/freelancers"),
       },
       {
         id: "jobs",

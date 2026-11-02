@@ -60,6 +60,7 @@ export const footerSections: FooterSection[] = [
       { label: "Marketplace", href: "/marketplace" },
       { label: "Jobs", href: "/jobs" },
       { label: "Services", href: "/services" },
+      { label: "Freelancers", href: "/freelancers/services" },
       { label: "Community", href: "/community" },
       { label: "Blog", href: "/blog" },
     ],

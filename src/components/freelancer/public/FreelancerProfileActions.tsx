@@ -17,8 +17,12 @@ import { Button } from "@/components/ui";
  */
 export function FreelancerProfileActions({
   profileId,
+  label = "Message",
+  fullWidth = false,
 }: {
   profileId: string;
+  label?: string;
+  fullWidth?: boolean;
 }) {
   const { status, user } = useAuth();
   const router = useRouter();
@@ -64,10 +68,14 @@ export function FreelancerProfileActions({
   }
 
   return (
-    <div className="flex flex-col items-start gap-2">
-      <Button onClick={handleMessage} disabled={busy || loading}>
-        <MessageSquare className="mr-1 h-4 w-4" aria-hidden />
-        Message
+    <div className={fullWidth ? "flex w-full flex-col gap-2" : "flex flex-col items-start gap-2"}>
+      <Button
+        onClick={handleMessage}
+        disabled={busy || loading}
+        className={fullWidth ? "w-full" : undefined}
+      >
+        <MessageSquare className="mr-1.5 h-4 w-4" aria-hidden />
+        {busy ? "Opening chat…" : label}
       </Button>
       {error && (
         <p role="alert" className="text-xs text-error-600">

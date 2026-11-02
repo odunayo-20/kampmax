@@ -13,6 +13,7 @@ import type {
   FreelancerService,
   FreelancerServiceInput,
   FreelancerServicePage,
+  FreelancerServicePricing,
   FreelancerServiceQuery,
   FreelancerServiceResult,
   FreelancerServiceResultCode,
@@ -92,6 +93,7 @@ function validateServiceInput(input: FreelancerServiceInput): ValidationIssue[] 
 interface BackendService {
   id: string;
   freelancerId: string;
+  freelancer?: { id: string; name: string; avatar: string | null };
   title: string;
   slug: string;
   description: string | null;
@@ -122,9 +124,14 @@ const STATUS_FROM_SERVER: Record<BackendService["status"], FreelancerServiceStat
 export function fromBackendService(b: BackendService): FreelancerService {
   return {
     id: b.id,
+    slug: b.slug,
     userId: b.freelancerId,
+    freelancer: b.freelancer
+      ? { id: b.freelancer.id, name: b.freelancer.name, avatar: b.freelancer.avatar ?? undefined }
+      : undefined,
     title: b.title,
     categoryId: b.category?.id ?? "",
+    categoryName: b.category?.name,
     skills: b.skills ?? [],
     shortDescription: b.shortDescription ?? "",
     description: b.description ?? "",
@@ -240,6 +247,65 @@ export async function fetchPublicFreelancerServices(freelancerId: string): Promi
   );
   if (error || !data) return [];
   return data.items.map(fromBackendService);
+}
+
+export type PublicServiceSort = "newest" | "price_asc" | "price_desc";
+
+export interface PublicServiceQuery {
+  q?: string;
+  /** One category id, or several (a category and its sub-categories). */
+  categoryIds?: string[];
+  /** Only services priced this way, so prices can be compared like with like. */
+  pricing?: FreelancerServicePricing;
+  sort?: PublicServiceSort;
+  page?: number;
+  limit?: number;
+}
+
+export interface PublicServicePage {
+  items: FreelancerService[];
+  total: number;
+  totalPages: number;
+  /** True when the server could not be reached or refused; the lists above are then empty. */
+  failed: boolean;
+}
+
+/** Every live freelancer service, for the public browse page. */
+export async function fetchPublicServices(query: PublicServiceQuery = {}): Promise<PublicServicePage> {
+  const qs = new URLSearchParams();
+  if (query.q) qs.set("search", query.q);
+  if (query.categoryIds?.length) qs.set("categoryId", query.categoryIds.join(","));
+  if (query.pricing) qs.set("pricingModel", query.pricing.toUpperCase());
+  if (query.sort && query.sort !== "newest") qs.set("sort", query.sort);
+  if (query.page && query.page > 1) qs.set("page", String(query.page));
+  if (query.limit) qs.set("limit", String(query.limit));
+
+  const { data, error } = await apiClient.get<{
+    items: BackendService[];
+    meta: { total: number; totalPages: number };
+  }>(`/services/public/?${qs}`);
+  if (error || !data) return { items: [], total: 0, totalPages: 1, failed: true };
+  return {
+    items: data.items.map(fromBackendService),
+    total: data.meta?.total ?? data.items.length,
+    totalPages: data.meta?.totalPages ?? 1,
+    failed: false,
+  };
+}
+
+/** One published service by id; null when it is missing or not live. */
+export async function fetchPublicServiceById(id: string): Promise<FreelancerService | null> {
+  const { data } = await apiClient.get<BackendService>(`/services/public/${encodeURIComponent(id)}`);
+  return data ? fromBackendService(data) : null;
+}
+
+/**
+ * Old links used only the slug, which two freelancers can share, so this is best
+ * effort (the oldest match). Used only to send an old link to the exact address.
+ */
+export async function fetchPublicServiceBySlug(slug: string): Promise<FreelancerService | null> {
+  const { data } = await apiClient.get<BackendService>(`/services/slug/${encodeURIComponent(slug)}`);
+  return data ? fromBackendService(data) : null;
 }
 
 // ── Portfolio API (backend: /portfolio) ─────────────────────

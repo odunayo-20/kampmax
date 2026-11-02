@@ -107,7 +107,7 @@ function ServicesContent() {
 
   return (
     <div className="space-y-6">
-      <ServiceHeader count={total} />
+      <ServiceHeader count={total} publicProfileId={all[0]?.userId} />
       <ServiceFilters
         status={status}
         search={searchInput}

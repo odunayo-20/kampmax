@@ -67,9 +67,15 @@ export type FreelancerServiceVisibility =
 
 export interface FreelancerService {
   id: string;
+  /** Public-page address segment: /freelancers/services/[slug]. */
+  slug?: string;
   userId: string;
+  /** Who offers it; present on public listings only. */
+  freelancer?: { id: string; name: string; avatar?: string };
   title: string;
   categoryId: string;
+  /** Category name as the server returns it, so public pages need no taxonomy lookup. */
+  categoryName?: string;
   skills: string[];
   shortDescription: string;
   description: string;

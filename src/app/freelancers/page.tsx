@@ -4,6 +4,7 @@ import { MapPin, Search } from "lucide-react";
 import { Avatar, Badge } from "@/components/ui";
 import { listPublicFreelancers } from "@/services/freelancer";
 import { formatNaira } from "@/lib/utils";
+import { BrowseTabs } from "@/components/freelancer/public/BrowseTabs";
 
 export const metadata: Metadata = {
   title: "Find freelancers | Kampmax",
@@ -59,8 +60,9 @@ export default async function FreelancersDirectoryPage({
   });
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-      <h1 className="text-2xl font-bold text-kampmax-text">Find freelancers</h1>
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+      <BrowseTabs active="freelancers" />
+      <h1 className="mt-5 text-2xl font-bold text-kampmax-text">Find freelancers</h1>
       <p className="mt-1 text-sm text-kampmax-text-secondary">
         {error ? "" : `${total} freelancer${total === 1 ? "" : "s"} on Kampmax`}
       </p>

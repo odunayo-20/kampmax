@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, SearchX, AlertCircle } from "lucide-react";
+import { ExternalLink, Plus, SearchX, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui";
 import { Skeleton } from "@/components/home/Skeleton";
@@ -94,7 +94,14 @@ export function ServiceFormSkeleton() {
   );
 }
 
-export function ServiceHeader({ count }: { count: number }) {
+export function ServiceHeader({
+  count,
+  publicProfileId,
+}: {
+  count: number;
+  /** When set, offers a way to see the page clients see. */
+  publicProfileId?: string;
+}) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
@@ -105,12 +112,22 @@ export function ServiceHeader({ count }: { count: number }) {
             : "Showcase the services you offer and let clients discover what you can help them with."}
         </p>
       </div>
-      <Link href="/freelancer/services/create">
-        <Button className="w-full sm:w-auto">
-          <Plus className="mr-1.5 h-4 w-4" aria-hidden />
-          Create Service
-        </Button>
-      </Link>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        {publicProfileId && (
+          <Link href={`/freelancers/${publicProfileId}`} target="_blank" rel="noopener noreferrer">
+            <Button variant="outline" className="w-full sm:w-auto">
+              <ExternalLink className="mr-1.5 h-4 w-4" aria-hidden />
+              View public profile
+            </Button>
+          </Link>
+        )}
+        <Link href="/freelancer/services/create">
+          <Button className="w-full sm:w-auto">
+            <Plus className="mr-1.5 h-4 w-4" aria-hidden />
+            Create Service
+          </Button>
+        </Link>
+      </div>
     </div>
   );
 }

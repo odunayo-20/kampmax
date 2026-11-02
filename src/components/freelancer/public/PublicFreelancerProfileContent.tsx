@@ -4,7 +4,6 @@ import Link from "next/link";
 import {
   Award,
   Briefcase,
-  Clock,
   FolderOpen,
   Globe,
   GraduationCap,
@@ -14,18 +13,15 @@ import {
   User,
 } from "lucide-react";
 import { Avatar, Badge } from "@/components/ui";
-import { formatNaira, pluralize } from "@/lib/utils";
+import { formatNaira } from "@/lib/utils";
 import {
-  FREELANCER_CATEGORIES,
   FREELANCER_EMPLOYMENT_TYPES,
   FREELANCER_QUALIFICATIONS,
 } from "@/config/freelancer";
-import { FREELANCER_SERVICE_PRICING_LABEL } from "@/config/freelancer-services";
-import { cachedTaxonomyName } from "@/services/taxonomy";
-import { useCategories } from "@/hooks/use-taxonomy";
 import type { PublicFreelancerProfile } from "@/services/freelancer-dashboard";
 import type { FreelancerService } from "@/types/freelancer-services";
 import { FreelancerProfileActions } from "@/components/freelancer/public/FreelancerProfileActions";
+import { PublicServiceCard } from "@/components/freelancer/public/PublicServiceCard";
 
 // ── Display helpers (presentation only, no business logic) ──
 
@@ -63,44 +59,6 @@ function qualificationLabel(value: string): string {
   return (
     FREELANCER_QUALIFICATIONS.find((q) => q.value === value)?.label ?? value
   );
-}
-
-function serviceCategoryName(categoryId: string): string {
-  return (
-    cachedTaxonomyName(categoryId) ??
-    FREELANCER_CATEGORIES.find((c) => c.id === categoryId)?.name ??
-    categoryId
-  );
-}
-
-function servicePriceLabel(service: FreelancerService): string {
-  const { pricing, price, priceMax } = service;
-  if (pricing === "hourly" && typeof price === "number") {
-    return `${formatNaira(price)}/hr`;
-  }
-  if (pricing === "fixed" && typeof price === "number") {
-    return formatNaira(price);
-  }
-  if (pricing === "project" && typeof price === "number") {
-    return `${formatNaira(price)}/project`;
-  }
-  if (pricing === "starting_at" && typeof price === "number") {
-    return typeof priceMax === "number"
-      ? `From ${formatNaira(price)} – ${formatNaira(priceMax)}`
-      : `From ${formatNaira(price)}`;
-  }
-  return "Price on request";
-}
-
-function serviceDeliveryLabel(service: FreelancerService): string {
-  if (!service.deliveryValue) return "";
-  const unit =
-    service.deliveryUnit === "hours"
-      ? "hour"
-      : service.deliveryUnit === "days"
-      ? "day"
-      : "week";
-  return `${service.deliveryValue} ${pluralize(service.deliveryValue, unit)}`;
 }
 
 const availabilityTone: Record<string, "default" | "success" | "warning" | "info"> = {
@@ -151,7 +109,6 @@ export function PublicFreelancerProfileContent({
   profile: PublicFreelancerProfile;
   services: FreelancerService[];
 }) {
-  useCategories("SERVICE"); // warms id -> name for serviceCategoryName()
   const tone =
     profile.availability.status != null
       ? availabilityTone[profile.availability.status]
@@ -397,33 +354,8 @@ export function PublicFreelancerProfileContent({
           <Section icon={Wrench} title={`Services (${services.length})`}>
             <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {services.map((service) => (
-                <li
-                  key={service.id}
-                  className="flex flex-col rounded-lg border border-kampmax-border p-4"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-sm font-bold text-kampmax-text">
-                      {service.title}
-                    </h3>
-                    <span className="text-xs font-semibold text-primary-700">
-                      {servicePriceLabel(service)}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-xs text-kampmax-text-secondary">
-                    {serviceCategoryName(service.categoryId)}
-                  </p>
-                  <p className="mt-2 line-clamp-2 text-xs text-kampmax-text-secondary">
-                    {service.shortDescription}
-                  </p>
-                  <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-kampmax-text-secondary">
-                    <span className="inline-flex items-center gap-1">
-                      <Clock className="h-3 w-3" aria-hidden />
-                      {serviceDeliveryLabel(service)}
-                    </span>
-                    <span>
-                      {FREELANCER_SERVICE_PRICING_LABEL[service.pricing]}
-                    </span>
-                  </div>
+                <li key={service.id}>
+                  <PublicServiceCard service={service} showFreelancer={false} />
                 </li>
               ))}
             </ul>

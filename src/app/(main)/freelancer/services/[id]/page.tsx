@@ -4,7 +4,7 @@ import { DetailPageSkeleton } from "@/components/ui/Skeleton";
 import { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Pencil, Eye } from "lucide-react";
+import { ArrowLeft, ExternalLink, Pencil, Eye } from "lucide-react";
 import type { FreelancerService } from "@/types/freelancer-services";
 import { ServiceStatusBadge, ServicePreview, ServiceActions } from "@/components/freelancer/services";
 import type { ServiceActionKind } from "@/components/freelancer/services";
@@ -19,6 +19,7 @@ import {
   publishMyService,
 } from "@/services/freelancer-services";
 import { formatDate } from "@/lib/utils";
+import { serviceHref } from "@/components/freelancer/public/service-format";
 import { Button } from "@/components/ui";
 import { ServicesErrorState } from "@/components/freelancer/services";
 
@@ -118,7 +119,18 @@ function DetailContent() {
             {service.visibility === "visible" ? "Visible to clients" : "Hidden"}
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {service.status === "published" && (
+            <a
+              href={serviceHref(service)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-[#1258C7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2"
+            >
+              <ExternalLink className="h-4 w-4" aria-hidden />
+              View live page
+            </a>
+          )}
           <Button variant="outline" size="sm" onClick={() => setPreviewOpen((o) => !o)}>
             <Eye className="mr-1.5 h-4 w-4" aria-hidden />
             {previewOpen ? "Hide preview" : "Preview"}
