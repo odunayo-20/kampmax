@@ -1,7 +1,7 @@
 import Link from "next/link";
-import Image from "next/image";
 import { CheckCircle2, ChevronRight, Clock, Grid2X2, RefreshCw } from "lucide-react";
 import { Avatar } from "@/components/ui";
+import { FallbackImage } from "@/components/ui/FallbackImage";
 import { FREELANCER_SERVICE_PRICING_LABEL } from "@/config/freelancer-services";
 import type { FreelancerService } from "@/types/freelancer-services";
 import { FreelancerProfileActions } from "@/components/freelancer/public/FreelancerProfileActions";
@@ -45,6 +45,11 @@ export function PublicServiceContent({
   freelancer: ServiceFreelancer;
 }) {
   const delivery = deliveryLabel(service);
+  const coverPlaceholder = (
+    <div className="flex h-full w-full items-center justify-center text-neutral-300">
+      <Grid2X2 className="h-12 w-12" aria-hidden />
+    </div>
+  );
   const firstName = freelancer.name.split(" ")[0] || "freelancer";
   const messageLabel = `Message ${firstName}`;
 
@@ -68,18 +73,17 @@ export function PublicServiceContent({
         <article className="space-y-8">
           <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-kampmax-border bg-neutral-100">
             {service.coverImageUrl ? (
-              <Image
+              <FallbackImage
                 src={service.coverImageUrl}
                 alt={service.title}
                 fill
                 priority
                 sizes="(max-width: 1024px) 100vw, 640px"
                 className="object-cover"
+                fallback={coverPlaceholder}
               />
             ) : (
-              <div className="flex h-full w-full items-center justify-center text-neutral-300">
-                <Grid2X2 className="h-12 w-12" aria-hidden />
-              </div>
+              coverPlaceholder
             )}
           </div>
 

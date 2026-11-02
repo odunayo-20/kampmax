@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Search, X } from "lucide-react";
+import { Loader2, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSearchSuggestions } from "@/hooks/use-search";
 import type { SearchSuggestion } from "@/types";
@@ -129,6 +129,11 @@ export function SearchInput({
             className="w-full min-w-0 bg-transparent px-3 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none"
           />
         </form>
+        {isFetching && (
+          <span className="flex items-center pr-2" role="status" aria-label="Looking for suggestions">
+            <Loader2 className="h-4 w-4 animate-spin text-primary-500" aria-hidden />
+          </span>
+        )}
         {value && (
           <button
             onClick={() => {
@@ -181,9 +186,6 @@ export function SearchInput({
             ))}
           </ul>
         </div>
-      )}
-      {isFetching && (
-        <p className="mt-1 text-[11px] text-neutral-400">Searching…</p>
       )}
     </div>
   );

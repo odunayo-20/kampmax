@@ -917,7 +917,11 @@ export type SearchEntityType =
   | "event"
   | "job"
   | "service"
-  | "provider";
+  | "provider"
+  /** A freelancer's service (hired by message), as opposed to a booked provider "service". */
+  | "freelance"
+  /** A freelancer's profile. */
+  | "freelancer";
 
 export type SearchFilterType = "all" | SearchEntityType;
 

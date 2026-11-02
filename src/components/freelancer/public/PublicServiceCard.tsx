@@ -1,7 +1,7 @@
 import Link from "next/link";
-import Image from "next/image";
 import { Clock, Grid2X2 } from "lucide-react";
 import { Avatar } from "@/components/ui";
+import { FallbackImage } from "@/components/ui/FallbackImage";
 import type { FreelancerService } from "@/types/freelancer-services";
 import { deliveryLabel, priceParts, serviceHref } from "./service-format";
 
@@ -21,6 +21,11 @@ export function PublicServiceCard({
   const delivery = deliveryLabel(service);
   const seller = showFreelancer ? service.freelancer : undefined;
   const { prefix, amount, suffix } = priceParts(service);
+  const placeholder = (
+    <div className="flex h-full w-full items-center justify-center text-primary-200">
+      <Grid2X2 className="h-10 w-10" aria-hidden />
+    </div>
+  );
 
   return (
     <Link
@@ -29,17 +34,16 @@ export function PublicServiceCard({
     >
       <div className="relative aspect-video w-full overflow-hidden bg-gradient-to-br from-primary-50 to-neutral-100">
         {service.coverImageUrl ? (
-          <Image
+          <FallbackImage
             src={service.coverImageUrl}
             alt=""
             fill
             sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 320px"
             className="object-cover transition-transform duration-300 motion-safe:group-hover:scale-105"
+            fallback={placeholder}
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-primary-200">
-            <Grid2X2 className="h-10 w-10" aria-hidden />
-          </div>
+          placeholder
         )}
         {delivery && (
           <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-black/65 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">

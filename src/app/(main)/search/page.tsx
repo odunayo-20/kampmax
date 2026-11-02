@@ -15,6 +15,7 @@ import {
   SearchResultsSkeleton,
   TrendingSearches,
 } from "@/components/search";
+import { SEARCH_TYPE_FILTERS } from "@/components/search/SearchFilters";
 import { Pagination } from "@/components/marketplace/listing/Pagination";
 import { useGlobalSearch } from "@/hooks/use-search";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
@@ -29,6 +30,7 @@ import {
   SEARCH_PAGE_SIZE,
   SEARCH_DEBOUNCE_MS,
 } from "@/config/search";
+import { cn } from "@/lib/utils";
 import type { SearchFilterType, SearchSortOption } from "@/types";
 
 const VALID_TYPES: SearchFilterType[] = [
@@ -41,6 +43,8 @@ const VALID_TYPES: SearchFilterType[] = [
   "job",
   "service",
   "provider",
+  "freelance",
+  "freelancer",
 ];
 const VALID_SORTS: SearchSortOption[] = [
   "relevance",
@@ -89,6 +93,9 @@ function SearchPageInner() {
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [trending] = useState(getTrendingSearches());
 
+  // The search term this page last put in the address (or read from it).
+  const lastWrittenQ = useRef(urlQuery);
+
   const latestParamsRef = useRef(searchParams.toString());
   useEffect(() => {
     latestParamsRef.current = searchParams.toString();
@@ -117,6 +124,7 @@ function SearchPageInner() {
       if (trimmed) params.set("q", trimmed);
       else params.delete("q");
       const qs = params.toString();
+      lastWrittenQ.current = trimmed;
       router.replace(qs ? `/search?${qs}` : "/search", { scroll: false });
     }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
@@ -124,15 +132,20 @@ function SearchPageInner() {
   }, [query]);
 
   /**
-   * Browser back/forward: URL changed externally — restore the input and let
-   * the derived states re-render from the new params.
+   * Browser back/forward, or a link to another search: the address's search term changed
+   * from outside, so restore the input to match.
+   *
+   * It runs only when the search TERM changes. Running on any address change (a filter
+   * chip, a sort) wiped text that had been typed but not yet reached the address, and
+   * cancelled the search with it. And it skips the term this page wrote itself: that comes
+   * back as an address change too, by which time the person may have typed more.
    */
   useEffect(() => {
-    if (urlQuery !== query.trim()) {
-      setQuery(urlQuery);
-    }
+    if (urlQuery === lastWrittenQ.current) return;
+    lastWrittenQ.current = urlQuery;
+    setQuery(urlQuery);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [urlQuery]);
 
   function buildParams(patch: {
     q?: string | null;
@@ -144,7 +157,9 @@ function SearchPageInner() {
     priceMax?: number | undefined;
   }): string {
     const params = new URLSearchParams();
-    const q = patch.q ?? urlQuery;
+    // What is in the box, not what has reached the address: a filter clicked while a search
+    // is still being typed must keep that search, not drop it.
+    const q = patch.q ?? query.trim();
     const type = patch.type ?? typeFilter;
     const sort = patch.sort ?? sortBy;
     const page = patch.page ?? urlPage;
@@ -246,11 +261,32 @@ function SearchPageInner() {
         autoFocus={!hasQuery}
       />
 
-      {!hasQuery && !isPending ? (
+      {/* With nothing to search for there is nothing to load, so this must not wait on the
+          results query: it never runs without a term, and would report "pending" forever. */}
+      {!hasQuery ? (
         <div className="space-y-6">
-          <p className="text-sm text-neutral-500 -mt-2">
-            Search across products, services, providers, jobs, events, vendors and more.
-          </p>
+          {typeFilter !== "all" ? (
+            <p
+              role="status"
+              className="-mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-primary-50 px-3 py-2 text-sm text-primary-800"
+            >
+              <span>
+                Searching in <strong>{SEARCH_TYPE_FILTERS.find((f) => f.value === typeFilter)?.label}</strong> only. Type
+                what you&apos;re looking for.
+              </span>
+              <button
+                type="button"
+                onClick={() => handleTypeChange("all")}
+                className="text-xs font-semibold underline hover:text-primary-950"
+              >
+                Search everything
+              </button>
+            </p>
+          ) : (
+            <p className="text-sm text-neutral-500 -mt-2">
+              Search across products, services, providers, jobs, events, vendors and more.
+            </p>
+          )}
           <RecentSearches
             searches={recentSearches}
             onSelect={handleRecentSelect}
@@ -302,20 +338,23 @@ function SearchPageInner() {
                       Some results couldn&apos;t be loaded ({data.unavailable.join(", ")}). Try again in a moment.
                     </p>
                   )}
-                  <SearchResults
-                    items={data.items}
-                    query={data.query}
-                  />
-                  {isFetching && (
-                    <p className="text-center text-xs text-neutral-400">
-                      Updating results…
-                    </p>
-                  )}
-                  <Pagination
-                    currentPage={page}
-                    totalPages={totalPages}
-                    onPageChange={(p) => replaceParams({ page: p })}
-                  />
+                  {/* New results are on their way while the old ones still show: dim them, so
+                      the page doesn't look as if the search did nothing. */}
+                  <div
+                    aria-busy={isFetching}
+                    className={cn("space-y-6 transition-opacity duration-150", isFetching && "opacity-60")}
+                  >
+                    <SearchResults
+                      items={data.items}
+                      query={data.query}
+                      onSeeAll={typeFilter === "all" ? handleTypeChange : undefined}
+                    />
+                    <Pagination
+                      currentPage={page}
+                      totalPages={totalPages}
+                      onPageChange={(p) => replaceParams({ page: p })}
+                    />
+                  </div>
                 </>
               ) : (
                 <SearchEmptyState

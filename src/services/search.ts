@@ -34,6 +34,9 @@ import { fetchCampuses } from "@/services/campus";
 import { listPublicJobs } from "@/services/jobs";
 import { listPublicServices, searchProviders } from "@/services/service-marketplace";
 import { listEventsApi } from "@/services/event-tickets";
+import { fetchPublicServices } from "@/services/freelancer-services";
+import { listPublicFreelancers } from "@/services/freelancer";
+import { serviceHref } from "@/components/freelancer/public/service-format";
 import { listArticles } from "@/services/blog";
 import { fetchTaxonomyTree, cachedTaxonomyName } from "@/services/taxonomy";
 import { jobToOpportunity } from "@/lib/job-api-mapping";
@@ -345,6 +348,64 @@ export async function search(query: string, filters: SearchFiltersInput = {}): P
             url: `/services/providers/${p.id}`,
           },
           score: scoreMatch(p.displayName, q) + scoreMatch(p.bio ?? "", q),
+          date: 0,
+        }));
+      },
+    });
+  }
+
+  if (wants("freelance")) {
+    verticals.push({
+      type: "freelance",
+      run: async () => {
+        const page = await fetchPublicServices({ q, limit: PER_TYPE_LIMIT });
+        if (page.failed) throw new Error("Freelancer services are unavailable.");
+        return page.items.map((s) => ({
+          item: {
+            id: s.id,
+            type: "freelance" as const,
+            title: s.title,
+            subtitle: join(s.freelancer?.name, s.categoryName),
+            description: s.shortDescription.slice(0, 120),
+            image: s.coverImageUrl,
+            url: serviceHref(s),
+            price: s.price,
+            tags: s.skills,
+          },
+          score:
+            scoreMatch(s.title, q) +
+            scoreMatch(s.shortDescription, q) +
+            s.skills.reduce((sum, skill) => sum + scoreMatch(skill, q), 0),
+          date: toTimestamp(s.createdAt),
+          price: s.price,
+        }));
+      },
+    });
+  }
+
+  if (wants("freelancer")) {
+    verticals.push({
+      type: "freelancer",
+      run: async () => {
+        const res = await listPublicFreelancers({ q, limit: 20 });
+        if (res.error) throw res.error;
+        return res.profiles.map((p) => ({
+          item: {
+            id: p.id,
+            type: "freelancer" as const,
+            title: p.fullName,
+            subtitle: join(p.professionalTitle ?? "Freelancer", p.city ?? p.location),
+            description: p.bio?.slice(0, 120),
+            image: p.avatar ?? undefined,
+            url: `/freelancers/${p.id}`,
+            tags: p.skills.slice(0, 6).map((s) => s.name),
+          },
+          score:
+            scoreMatch(p.fullName, q) +
+            scoreMatch(p.username, q) +
+            scoreMatch(p.professionalTitle ?? "", q) +
+            scoreMatch(p.bio ?? "", q) +
+            p.skills.reduce((sum, s) => sum + scoreMatch(s.name, q), 0),
           date: 0,
         }));
       },

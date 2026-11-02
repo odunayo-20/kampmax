@@ -1,7 +1,6 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/lib/auth-context";
 import { searchKeys } from "@/lib/query-keys";
 import { getSuggestions, search } from "@/services/search";
 import type { GlobalSearchQuery, SearchPage, SearchSuggestion } from "@/types";
@@ -19,9 +18,10 @@ import {
  * `staleTime` avoids refetching identical searches on quick filter changes.
  */
 export function useGlobalSearch(query: GlobalSearchQuery) {
-  const { status } = useAuth();
   const trimmedQuery = (query.q ?? "").trim();
-  const enabled = status === "authenticated" && trimmedQuery.length > 0;
+  // Every source is public (guests browse them on the home page and in Explore), so
+  // search needs no account. Gating it on sign-in left a guest on a loading screen forever.
+  const enabled = trimmedQuery.length > 0;
 
   return useQuery({
     queryKey: searchKeys.results(query),
@@ -48,11 +48,8 @@ export function useGlobalSearch(query: GlobalSearchQuery) {
  * `GET /search/suggestions` will plug in.
  */
 export function useSearchSuggestions(q: string) {
-  const { status } = useAuth();
   const trimmed = q.trim();
-  const enabled =
-    status === "authenticated" &&
-    trimmed.length >= SEARCH_SUGGESTIONS_MIN_CHARS;
+  const enabled = trimmed.length >= SEARCH_SUGGESTIONS_MIN_CHARS;
 
   return useQuery({
     queryKey: searchKeys.suggestions(trimmed),

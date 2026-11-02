@@ -19,13 +19,15 @@ interface SearchFiltersProps extends SearchFilterPanelProps {
   className?: string;
 }
 
-const typeFilters: { value: SearchFilterType; label: string }[] = [
+export const SEARCH_TYPE_FILTERS: { value: SearchFilterType; label: string }[] = [
   { value: "all", label: "All" },
   { value: "product", label: "Products" },
   { value: "vendor", label: "Vendors" },
   { value: "job", label: "Jobs" },
   { value: "service", label: "Services" },
+  { value: "freelance", label: "Freelance" },
   { value: "provider", label: "Providers" },
+  { value: "freelancer", label: "Freelancers" },
   { value: "category", label: "Categories" },
   { value: "post", label: "Posts" },
   { value: "event", label: "Events" },
@@ -93,7 +95,7 @@ export function SearchFilters({
         aria-label="Search results type"
         className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1"
       >
-        {typeFilters.map((f) => (
+        {SEARCH_TYPE_FILTERS.map((f) => (
           <button
             key={f.value}
             role="tab"
