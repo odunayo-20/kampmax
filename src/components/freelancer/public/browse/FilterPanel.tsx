@@ -2,21 +2,41 @@ import Link from "next/link";
 import { SlidersHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TaxonomyNode } from "@/services/taxonomy";
-import { PRICING_FILTERS, browseHref, type BrowseFilters } from "./filters";
+import {
+  PRICING_FILTERS,
+  browseHref,
+  showCategory,
+  subtreeCount,
+  type BrowseFilters,
+  type CategoryCounts,
+} from "./filters";
 
-function Option({ href, active, children }: { href: string; active: boolean; children: React.ReactNode }) {
+function Option({
+  href,
+  active,
+  count,
+  children,
+}: {
+  href: string;
+  active: boolean;
+  count?: number;
+  children: React.ReactNode;
+}) {
   return (
     <Link
       href={href}
       aria-current={active ? "true" : undefined}
       className={cn(
-        "block rounded-md px-3 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600",
-        active
-          ? "bg-primary-50 font-semibold text-primary-700"
-          : "text-kampmax-text hover:bg-neutral-100"
+        "flex items-center justify-between gap-2 rounded-md px-3 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600",
+        active ? "bg-primary-50 font-semibold text-primary-700" : "text-kampmax-text hover:bg-neutral-100"
       )}
     >
-      {children}
+      <span className="truncate">{children}</span>
+      {count !== undefined && (
+        <span className={cn("shrink-0 text-xs tabular-nums", active ? "text-primary-600" : "text-kampmax-text-secondary")}>
+          {count}
+        </span>
+      )}
     </Link>
   );
 }
@@ -30,49 +50,62 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
   );
 }
 
-/** The filter choices themselves: a category list that opens the chosen category, and pricing types. */
-function FilterOptions({
-  tree,
-  filters,
-  selected,
-  activeRoot,
-}: {
+interface OptionsProps {
   tree: TaxonomyNode[];
+  /** Live services per category; null if unavailable (numbers are then left out). */
+  counts: CategoryCounts | null;
   filters: BrowseFilters;
   selected?: TaxonomyNode;
   activeRoot?: TaxonomyNode;
-}) {
+}
+
+/** The filter choices themselves: a category list that opens the chosen category, and pricing types. */
+function FilterOptions({ tree, counts, filters, selected, activeRoot }: OptionsProps) {
+  // The category you're in stays listed even if a search left it empty.
+  const keep = [selected?.id, activeRoot?.id].filter((id): id is string => !!id);
+  const countOf = (node: TaxonomyNode) => (counts ? subtreeCount(node, counts) : undefined);
+  const allCount = counts ? Object.values(counts).reduce((a, b) => a + b, 0) : undefined;
+
   return (
     <div className="space-y-6">
       {tree.length > 0 && (
         <Group title="Category">
           <ul>
             <li>
-              <Option href={browseHref(filters, { category: "" })} active={!selected}>
+              <Option href={browseHref(filters, { category: "" })} active={!selected} count={allCount}>
                 All categories
               </Option>
             </li>
-            {tree.map((root) => {
-              const open = activeRoot?.id === root.id;
-              return (
+            {tree
+              .filter((root) => showCategory(root, counts, keep))
+              .map((root) => (
                 <li key={root.id}>
-                  <Option href={browseHref(filters, { category: root.slug })} active={selected?.id === root.id}>
+                  <Option
+                    href={browseHref(filters, { category: root.slug })}
+                    active={selected?.id === root.id}
+                    count={countOf(root)}
+                  >
                     {root.name}
                   </Option>
-                  {open && root.children.length > 0 && (
+                  {activeRoot?.id === root.id && (
                     <ul className="my-1 ml-4 border-l border-kampmax-border pl-2">
-                      {root.children.map((child) => (
-                        <li key={child.id}>
-                          <Option href={browseHref(filters, { category: child.slug })} active={selected?.id === child.id}>
-                            {child.name}
-                          </Option>
-                        </li>
-                      ))}
+                      {root.children
+                        .filter((child) => showCategory(child, counts, keep))
+                        .map((child) => (
+                          <li key={child.id}>
+                            <Option
+                              href={browseHref(filters, { category: child.slug })}
+                              active={selected?.id === child.id}
+                              count={countOf(child)}
+                            >
+                              {child.name}
+                            </Option>
+                          </li>
+                        ))}
                     </ul>
                   )}
                 </li>
-              );
-            })}
+              ))}
           </ul>
         </Group>
       )}
@@ -97,8 +130,7 @@ function FilterOptions({
  * results; on phones the same options fold into a "Filters" panel so results stay
  * at the top. (A <details> element, so it needs no JavaScript.)
  */
-export function FilterPanel(props: React.ComponentProps<typeof FilterOptions> & { activeCount: number }) {
-  const { activeCount, ...options } = props;
+export function FilterPanel({ activeCount, ...options }: OptionsProps & { activeCount: number }) {
   return (
     <>
       <aside aria-label="Filters" className="hidden lg:sticky lg:top-6 lg:block lg:self-start">

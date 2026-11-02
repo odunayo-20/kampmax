@@ -1,5 +1,32 @@
 import { describe, expect, it } from "vitest";
-import { browseHref, parseFilters } from "../filters";
+import { browseHref, parseFilters, showCategory, subtreeCount } from "../filters";
+
+const tree = {
+  id: "design",
+  children: [
+    { id: "logo", children: [] },
+    { id: "ui", children: [] },
+  ],
+};
+
+describe("category counts", () => {
+  const counts = { design: 1, logo: 2 };
+
+  it("adds a category's own services to those of its sub-categories", () => {
+    expect(subtreeCount(tree, counts)).toBe(3);
+    expect(subtreeCount(tree.children[1], counts)).toBe(0);
+  });
+
+  it("hides empty categories, but never the one you're in", () => {
+    expect(showCategory(tree.children[0], counts, [])).toBe(true);
+    expect(showCategory(tree.children[1], counts, [])).toBe(false);
+    expect(showCategory(tree.children[1], counts, ["ui"])).toBe(true);
+  });
+
+  it("lists everything when counts are unavailable", () => {
+    expect(showCategory(tree.children[1], null, [])).toBe(true);
+  });
+});
 
 describe("parseFilters", () => {
   it("defaults to everything, newest first, page 1", () => {

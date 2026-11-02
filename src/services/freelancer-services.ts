@@ -293,6 +293,21 @@ export async function fetchPublicServices(query: PublicServiceQuery = {}): Promi
   };
 }
 
+/**
+ * How many live services each category has ({ categoryId: count }), under the same
+ * search and pricing filters as the listing. Null when it can't be loaded, so the
+ * page can simply leave the numbers out.
+ */
+export async function fetchPublicCategoryCounts(
+  query: Pick<PublicServiceQuery, "q" | "pricing"> = {}
+): Promise<Record<string, number> | null> {
+  const qs = new URLSearchParams();
+  if (query.q) qs.set("search", query.q);
+  if (query.pricing) qs.set("pricingModel", query.pricing.toUpperCase());
+  const { data, error } = await apiClient.get<Record<string, number>>(`/services/public/category-counts?${qs}`);
+  return error || !data ? null : data;
+}
+
 /** One published service by id; null when it is missing or not live. */
 export async function fetchPublicServiceById(id: string): Promise<FreelancerService | null> {
   const { data } = await apiClient.get<BackendService>(`/services/public/${encodeURIComponent(id)}`);

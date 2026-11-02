@@ -7,7 +7,7 @@ import { ActiveFilters } from "@/components/freelancer/public/browse/ActiveFilte
 import { FilterPanel } from "@/components/freelancer/public/browse/FilterPanel";
 import { SortSelect } from "@/components/freelancer/public/browse/SortSelect";
 import { SORTS, browseHref, parseFilters } from "@/components/freelancer/public/browse/filters";
-import { fetchPublicServices } from "@/services/freelancer-services";
+import { fetchPublicCategoryCounts, fetchPublicServices } from "@/services/freelancer-services";
 import { fetchTaxonomyTree, findTaxonomyNode, subtreeNodes, type TaxonomyNode } from "@/services/taxonomy";
 
 export const metadata: Metadata = {
@@ -24,8 +24,11 @@ export default async function FreelancerServicesBrowsePage({
 }) {
   const filters = parseFilters(await searchParams);
 
-  // Categories are optional decoration: if they fail to load, the listing still works.
-  const tree: TaxonomyNode[] = await fetchTaxonomyTree("SERVICE").catch(() => []);
+  // Categories and their counts are optional decoration: if they fail to load, the listing still works.
+  const [tree, counts]: [TaxonomyNode[], Record<string, number> | null] = await Promise.all([
+    fetchTaxonomyTree("SERVICE").catch((): TaxonomyNode[] => []),
+    fetchPublicCategoryCounts({ q: filters.q || undefined, pricing: filters.pricing || undefined }),
+  ]);
   const selected = filters.category ? findTaxonomyNode(tree, filters.category) : undefined;
   const activeRoot = selected
     ? tree.find((root) => subtreeNodes(root).some((n) => n.id === selected.id))
@@ -75,7 +78,14 @@ export default async function FreelancerServicesBrowsePage({
       </form>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-8">
-        <FilterPanel tree={tree} filters={filters} selected={selected} activeRoot={activeRoot} activeCount={activeCount} />
+        <FilterPanel
+          tree={tree}
+          counts={counts}
+          filters={filters}
+          selected={selected}
+          activeRoot={activeRoot}
+          activeCount={activeCount}
+        />
 
         <section aria-label="Results" className="min-w-0 space-y-4">
           {!failed && (

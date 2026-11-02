@@ -42,6 +42,24 @@ export function parseFilters(sp: SearchParams): BrowseFilters {
   };
 }
 
+type CategoryNode = { id: string; children: CategoryNode[] };
+export type CategoryCounts = Record<string, number>;
+
+/** Services in a category, including everything inside its sub-categories. */
+export function subtreeCount(node: CategoryNode, counts: CategoryCounts): number {
+  return (counts[node.id] ?? 0) + node.children.reduce((sum, child) => sum + subtreeCount(child, counts), 0);
+}
+
+/**
+ * Whether a category is worth listing. With counts, empty ones are hidden so the list
+ * shows only what leads somewhere — except the one you're in, so it never vanishes
+ * under you. Without counts (they failed to load), everything is listed.
+ */
+export function showCategory(node: CategoryNode, counts: CategoryCounts | null, keepIds: string[]): boolean {
+  if (!counts) return true;
+  return subtreeCount(node, counts) > 0 || keepIds.includes(node.id);
+}
+
 /** A link to the browse page with some filters changed. Changing a filter goes back to page 1. */
 export function browseHref(current: BrowseFilters, change: Partial<BrowseFilters> = {}): string {
   const next = { ...current, page: 1, ...change };
