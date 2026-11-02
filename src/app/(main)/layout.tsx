@@ -26,6 +26,7 @@ const PROTECTED_PREFIXES = [
   "/scan",
   "/organizer",
   "/hub",
+  "/account/profiles",
   "/community/create",
 ];
 

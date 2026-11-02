@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Input, Select, Button } from "@/components/ui";
+import { uploadFileDirect } from "@/services/media";
 import { TaxonomySelect, TaxonomyMultiSelect } from "@/components/taxonomy";
 import {
   FREELANCER_SERVICE_DELIVERY_OPTIONS,
@@ -12,7 +13,9 @@ import type {
   FreelancerServiceInput,
 } from "@/types/freelancer-services";
 import { FREELANCER_SERVICE_PRICING } from "@/types/freelancer-services";
-import { X } from "lucide-react";
+import { ImagePlus, Loader2, Trash2, X } from "lucide-react";
+
+const MAX_COVER_BYTES = 10 * 1024 * 1024;
 
 export interface ServiceFormValues extends FreelancerServiceInput {}
 
@@ -60,6 +63,8 @@ export function ServiceForm({ initial, onSubmit, onCancel, isSubmitting }: Servi
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [newDeliverable, setNewDeliverable] = useState("");
   const [coverUrl, setCoverUrl] = useState(values.coverImageUrl ?? "");
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const coverInput = useRef<HTMLInputElement>(null);
 
   const set = <K extends keyof ServiceFormValues>(key: K, value: ServiceFormValues[K]) => {
     setValues((v) => ({ ...v, [key]: value }));
@@ -86,11 +91,33 @@ export function ServiceForm({ initial, onSubmit, onCancel, isSubmitting }: Servi
     ) {
       e.priceMax = "Maximum price must be at least the base price.";
     }
-    if (coverUrl && coverUrl.trim() && !/^https?:\/\//i.test(coverUrl.trim())) {
-      e.coverImageUrl = "Cover image must be a valid http(s) URL.";
-    }
+    if (uploadingCover) e.coverImageUrl = "Wait for the cover image to finish uploading.";
     setErrors(e);
     return Object.keys(e).length === 0;
+  }
+
+  async function chooseCover(file: File | undefined) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setErrors((prev) => ({ ...prev, coverImageUrl: "Please choose an image file." }));
+      return;
+    }
+    if (file.size > MAX_COVER_BYTES) {
+      setErrors((prev) => ({ ...prev, coverImageUrl: "Image must be 10MB or smaller." }));
+      return;
+    }
+    setErrors(({ coverImageUrl: _cleared, ...rest }) => rest);
+    setUploadingCover(true);
+    const { data, error } = await uploadFileDirect(file, "coverImage");
+    setUploadingCover(false);
+    if (error || !data?.url) {
+      setErrors((prev) => ({
+        ...prev,
+        coverImageUrl: error?.message ?? "Upload failed. Please try again.",
+      }));
+      return;
+    }
+    setCoverUrl(data.url);
   }
 
   function handleSubmit(ev: React.FormEvent) {
@@ -296,17 +323,70 @@ export function ServiceForm({ initial, onSubmit, onCancel, isSubmitting }: Servi
       <section className="rounded-xl border border-neutral-200 bg-white p-5">
         <h2 className="text-sm font-semibold text-neutral-900">Cover image</h2>
         <p className="mt-1 text-xs text-neutral-500">
-          Provide a public image URL. Only http(s) URLs are accepted.
+          Shown on your service card and page. JPG, PNG or WebP, up to 10MB. Optional.
         </p>
-        <Input
-          className="mt-3"
-          label="Cover image URL (optional)"
-          placeholder="https://…"
-          value={coverUrl}
+        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg border border-neutral-200 bg-neutral-100 sm:w-48">
+            {coverUrl ? (
+              <img
+                src={coverUrl}
+                alt="Cover image preview"
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-neutral-400">
+                <ImagePlus className="h-8 w-8" aria-hidden />
+              </div>
+            )}
+            {uploadingCover && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white/70">
+                <Loader2
+                  className="h-5 w-5 animate-spin text-primary-600"
+                  aria-label="Uploading cover image"
+                />
+              </div>
+            )}
+          </div>
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => coverInput.current?.click()}
+                disabled={uploadingCover}
+              >
+                <ImagePlus className="mr-1.5 h-4 w-4" aria-hidden />
+                {coverUrl ? "Replace image" : "Upload image"}
+              </Button>
+              {coverUrl && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setCoverUrl("")}
+                  disabled={uploadingCover}
+                >
+                  <Trash2 className="mr-1.5 h-4 w-4" aria-hidden />
+                  Remove
+                </Button>
+              )}
+            </div>
+            {errors.coverImageUrl && (
+              <p role="alert" className="text-xs text-kampmax-error">
+                {errors.coverImageUrl}
+              </p>
+            )}
+          </div>
+        </div>
+        <input
+          ref={coverInput}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          aria-label="Choose a cover image"
           onChange={(e) => {
-            setCoverUrl(e.target.value);
+            void chooseCover(e.target.files?.[0]);
+            e.target.value = "";
           }}
-          error={errors.coverImageUrl}
         />
       </section>
 
