@@ -197,8 +197,8 @@ export function PublicServiceContent({
         </aside>
       </div>
 
-      {/* Phones: price and the one action stay in reach while reading. */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-kampmax-border bg-white px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] lg:hidden">
+      {/* Phones: price and the one action stay in reach while reading, just above the bottom navigation. */}
+      <div className="fixed inset-x-0 bottom-[calc(62px+env(safe-area-inset-bottom))] z-30 border-t border-kampmax-border bg-white px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] lg:hidden">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
           <div className="min-w-0">
             <p className="truncate text-base font-bold text-kampmax-text">

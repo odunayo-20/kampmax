@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Search, SearchX } from "lucide-react";
+import { SearchX } from "lucide-react";
 import { BrowseTabs } from "@/components/freelancer/public/BrowseTabs";
 import { PublicServiceCard } from "@/components/freelancer/public/PublicServiceCard";
 import { ActiveFilters } from "@/components/freelancer/public/browse/ActiveFilters";
 import { FilterPanel } from "@/components/freelancer/public/browse/FilterPanel";
+import { SearchBox } from "@/components/freelancer/public/SearchBox";
 import { SortSelect } from "@/components/freelancer/public/browse/SortSelect";
 import { SORTS, browseHref, parseFilters } from "@/components/freelancer/public/browse/filters";
 import { fetchPublicCategoryCounts, fetchPublicServices } from "@/services/freelancer-services";
@@ -54,28 +55,19 @@ export default async function FreelancerServicesBrowsePage({
         Ready-made services from campus freelancers. Open one to see what&apos;s included, then message them.
       </p>
 
-      <form method="get" action="/freelancers/services" role="search" className="mt-5 flex gap-2">
-        {filters.category && <input type="hidden" name="category" value={filters.category} />}
-        {filters.pricing && <input type="hidden" name="pricing" value={filters.pricing} />}
-        {filters.sort !== "newest" && <input type="hidden" name="sort" value={filters.sort} />}
-        <div className="relative flex-1">
-          <Search
-            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
-            aria-hidden
-          />
-          <input
-            type="search"
-            name="q"
-            defaultValue={filters.q}
-            placeholder="What do you need? e.g. logo design, website"
-            aria-label="Search services"
-            className="h-11 w-full rounded-md border border-neutral-200 bg-white pl-9 pr-3 text-sm shadow-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
-          />
-        </div>
-        <button type="submit" className="h-11 rounded-md bg-primary-600 px-5 text-sm font-semibold text-white hover:bg-primary-700">
-          Search
-        </button>
-      </form>
+      <div className="mt-5">
+        <SearchBox
+          action="/freelancers/services"
+          value={filters.q}
+          params={{
+            category: filters.category,
+            pricing: filters.pricing,
+            sort: filters.sort === "newest" ? "" : filters.sort,
+          }}
+          placeholder="What do you need? e.g. logo design, website"
+          label="Search services"
+        />
+      </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-8">
         <FilterPanel

@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { MapPin, Search } from "lucide-react";
+import { MapPin } from "lucide-react";
 import { Avatar, Badge } from "@/components/ui";
 import { listPublicFreelancers } from "@/services/freelancer";
-import { formatNaira } from "@/lib/utils";
+import { cn, formatNaira } from "@/lib/utils";
 import { BrowseTabs } from "@/components/freelancer/public/BrowseTabs";
+import { SearchBox } from "@/components/freelancer/public/SearchBox";
 
 export const metadata: Metadata = {
   title: "Find freelancers | Kampmax",
@@ -12,7 +13,7 @@ export const metadata: Metadata = {
 };
 
 const AVAILABILITY_FILTERS = [
-  { value: "", label: "Any availability" },
+  { value: "", label: "Anyone" },
   { value: "AVAILABLE", label: "Available" },
   { value: "BUSY", label: "Busy" },
 ];
@@ -67,40 +68,36 @@ export default async function FreelancersDirectoryPage({
         {error ? "" : `${total} freelancer${total === 1 ? "" : "s"} on Kampmax`}
       </p>
 
-      <form method="get" action="/freelancers" className="mt-5 flex flex-col gap-2 sm:flex-row">
-        <div className="relative flex-1">
-          <Search
-            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
-            aria-hidden
-          />
-          <input
-            type="search"
-            name="q"
-            defaultValue={q}
-            placeholder="Search by title, bio or location"
-            aria-label="Search freelancers"
-            className="h-11 w-full rounded-md border border-neutral-200 bg-white pl-9 pr-3 text-sm shadow-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
-          />
-        </div>
-        <select
-          name="availability"
-          defaultValue={availability}
-          aria-label="Availability"
-          className="h-11 rounded-md border border-neutral-200 bg-white px-3 text-sm shadow-sm"
-        >
-          {AVAILABILITY_FILTERS.map((f) => (
-            <option key={f.value} value={f.value}>
+      <div className="mt-5">
+        <SearchBox
+          action="/freelancers"
+          value={q}
+          params={{ availability }}
+          placeholder="Search by name, title, bio or location"
+          label="Search freelancers"
+        />
+      </div>
+
+      <nav aria-label="Availability" className="mt-3 flex flex-wrap items-center gap-2">
+        {AVAILABILITY_FILTERS.map((f) => {
+          const active = availability === f.value;
+          return (
+            <Link
+              key={f.value || "any"}
+              href={pageHref(q, f.value, 1)}
+              aria-current={active ? "true" : undefined}
+              className={cn(
+                "rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600",
+                active
+                  ? "border-primary-600 bg-primary-600 text-white"
+                  : "border-kampmax-border bg-white text-kampmax-text hover:border-primary-300 hover:bg-primary-50"
+              )}
+            >
               {f.label}
-            </option>
-          ))}
-        </select>
-        <button
-          type="submit"
-          className="h-11 rounded-md bg-primary-600 px-5 text-sm font-semibold text-white hover:bg-primary-700"
-        >
-          Search
-        </button>
-      </form>
+            </Link>
+          );
+        })}
+      </nav>
 
       {error ? (
         <div role="alert" className="mt-8 rounded-xl border border-kampmax-border bg-white p-8 text-center text-sm text-kampmax-text-secondary">
