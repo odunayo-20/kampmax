@@ -5,7 +5,7 @@
 //   profile          → GET/PATCH /service-provider/profile/me
 //   services         → GET/POST/PATCH /service-provider/services
 //   availability     → GET/POST/PATCH /service-provider/availability
-//   bookings         → GET /service-provider/bookings/me
+//   bookings         → GET /bookings/provider
 //   analytics        → GET /analytics/service-provider
 //   booking status   → GET /analytics/service-provider/bookings/status
 // ============================================================
@@ -173,18 +173,24 @@ export function overviewOf(body: unknown): BackendSpAnalyticsOverview | undefine
     : (body as BackendSpAnalyticsOverview);
 }
 
+/** A booking on the provider's services, as GET /bookings/provider lists it (only what the overview reads). */
 export interface BackendSpBookingRow {
   id: string;
-  serviceId: string;
-  customerId: string;
   status: string;
-  scheduledDate: string;
-  scheduledTime: string;
-  durationMinutes?: number;
-  customerNotes?: string;
-  createdAt: string;
-  customer?: { id: string; name?: string; email?: string };
-  service?: { id: string; title?: string };
+  serviceName?: string;
+  startAt?: string;
+  createdAt?: string;
+}
+
+/**
+ * The rows of a list response. A failed request comes back as `data: {}`, which is
+ * truthy, so `data || []` would let an object through and crash `.map`/`.slice`.
+ */
+function rowsOf<T>(res: { data: unknown; error: unknown }): T[] {
+  if (res.error) return [];
+  if (Array.isArray(res.data)) return res.data as T[];
+  const items = (res.data as { items?: unknown } | null)?.items;
+  return Array.isArray(items) ? (items as T[]) : [];
 }
 
 // ---- Mapping helpers ---------------------------------------------------------
@@ -504,7 +510,7 @@ export async function fetchSpDashboardLive(): Promise<{
       apiClient.get<BackendSpAvailabilitySlot[]>("/service-provider/availability/me"),
       apiClient.get<BackendSpAnalyticsOverview>("/analytics/service-provider"),
       apiClient.get<BackendSpBookingStatusCounts>("/analytics/service-provider/bookings/status"),
-      apiClient.get<BackendSpBookingRow[]>("/service-provider/bookings/me"),
+      apiClient.get<{ items: BackendSpBookingRow[] }>("/bookings/provider?limit=10"),
       apiClient.get<{ averageRating: number | null; totalCount: number }>("/bookings/provider/reviews"),
     ]);
 
@@ -513,11 +519,11 @@ export async function fetchSpDashboardLive(): Promise<{
   }
 
   const profile = profileRes.data;
-  const services = servicesRes.data || [];
-  const availability = availabilityRes.data || [];
-  const analytics = overviewOf(analyticsRes.data);
-  const statusCounts = statusCountsOf(bookingStatusRes.data);
-  const bookings = bookingsRes.data || [];
+  const services = rowsOf<BackendSpService>(servicesRes);
+  const availability = rowsOf<BackendSpAvailabilitySlot>(availabilityRes);
+  const analytics = overviewOf(analyticsRes.error ? undefined : analyticsRes.data);
+  const statusCounts = statusCountsOf(bookingStatusRes.error ? undefined : bookingStatusRes.data);
+  const bookings = rowsOf<BackendSpBookingRow>(bookingsRes);
 
   // null means the ratings couldn't be read; a null average means there are no reviews yet.
   const ratings =
@@ -593,8 +599,8 @@ export async function fetchSpDashboardLive(): Promise<{
     id: `spa_b_${b.id}`,
     kind: "booking_request",
     title: b.status === "pending" ? "New booking request" : `Booking ${b.status}`,
-    message: `${b.service?.title || "Service"} on ${b.scheduledDate} (${b.scheduledTime})`,
-    createdAt: b.createdAt || new Date().toISOString(),
+    message: `${b.serviceName || "Service"}${b.startAt ? ` on ${new Date(b.startAt).toLocaleDateString()}` : ""}`,
+    createdAt: b.createdAt || b.startAt || new Date().toISOString(),
     href: `/service-provider/bookings`,
   }));
 

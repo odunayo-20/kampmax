@@ -20,6 +20,7 @@ import type {
   MarketplaceServiceReview,
 } from "@/types/service-marketplace";
 import { cn } from "@/lib/utils";
+import { useOpenToday } from "@/hooks/use-open-today";
 import {
   getServiceCategoryName,
   getOpenDaysLabel,
@@ -48,9 +49,7 @@ export function ProviderProfileView({
   relatedProviders,
 }: ProviderProfileViewProps) {
   const openDaysLabel = useMemo(() => getOpenDaysLabel(provider), [provider]);
-  const todayIndex = (new Date().getDay() + 6) % 7; // Monday-first, matches backend dayIndex
-  const today = provider.availability.days[todayIndex];
-  const openToday = Boolean(today?.isAvailable);
+  const openToday = useOpenToday(provider);
 
   const maxDist = useMemo(
     () => Math.max(...reviewSummary.distribution.map((d) => d.count), 1),
@@ -244,21 +243,23 @@ export function ProviderProfileView({
           <section className="bg-white rounded-2xl border border-neutral-200 p-5">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-bold text-neutral-900">Availability</h2>
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
-                  openToday ? "bg-success-50 text-success-700" : "bg-neutral-100 text-neutral-500"
-                )}
-              >
+              {openToday !== null && (
                 <span
                   className={cn(
-                    "w-1.5 h-1.5 rounded-full",
-                    openToday ? "bg-success-500" : "bg-neutral-300"
+                    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
+                    openToday ? "bg-success-50 text-success-700" : "bg-neutral-100 text-neutral-500"
                   )}
-                  aria-hidden
-                />
-                {openToday ? "Open today" : "Closed today"}
-              </span>
+                >
+                  <span
+                    className={cn(
+                      "w-1.5 h-1.5 rounded-full",
+                      openToday ? "bg-success-500" : "bg-neutral-300"
+                    )}
+                    aria-hidden
+                  />
+                  {openToday ? "Open today" : "Closed today"}
+                </span>
+              )}
             </div>
             <p className="text-xs text-neutral-500 mb-3">{openDaysLabel}</p>
             <div className="flex gap-1.5 flex-wrap">

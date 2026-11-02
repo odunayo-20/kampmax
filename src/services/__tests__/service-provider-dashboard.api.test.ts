@@ -112,20 +112,20 @@ describe("service-provider-dashboard.api (live API implementation)", () => {
             error: null,
           });
         }
-        if (url.includes("/service-provider/bookings/me")) {
+        if (url.includes("/bookings/provider?")) {
           return Promise.resolve({
-            data: [
-              {
-                id: "b-1",
-                serviceId: "srv-1",
-                customerId: "c-1",
-                status: "pending",
-                scheduledDate: "2026-10-02",
-                scheduledTime: "14:00",
-                createdAt: "2026-09-29T10:00:00Z",
-                service: { id: "srv-1", title: "Socket Replacement" },
-              },
-            ],
+            data: {
+              items: [
+                {
+                  id: "b-1",
+                  status: "pending",
+                  serviceName: "Socket Replacement",
+                  startAt: "2026-10-02T14:00:00Z",
+                  createdAt: "2026-09-29T10:00:00Z",
+                },
+              ],
+              meta: { total: 1, page: 1, limit: 10, totalPages: 1 },
+            },
             error: null,
           });
         }
@@ -159,6 +159,30 @@ describe("service-provider-dashboard.api (live API implementation)", () => {
     });
   });
 
+  describe("a failed list request", () => {
+    // The API client answers a failure with `data: {}` (truthy), not undefined.
+    it("still loads the dashboard, with that list left empty", async () => {
+      getMock.mockImplementation((url: string) => {
+        const ok = (data: unknown) => Promise.resolve({ data, error: null });
+        const failed = Promise.resolve({ data: {}, error: new Error("Not Found") });
+        if (url.includes("/bookings/provider/reviews")) return ok({ averageRating: null, totalCount: 0 });
+        if (url.includes("/bookings/provider?")) return failed;
+        if (url.includes("/service-provider/services/me")) return failed;
+        if (url.includes("/service-provider/profile/me")) return ok(mockProfile);
+        if (url.includes("/service-provider/availability/me")) return ok(mockSlots);
+        if (url.includes("/analytics/service-provider/bookings/status")) return ok([]);
+        if (url.includes("/analytics/service-provider")) return ok({ overview: { totalBookings: 0 } });
+        return ok(null);
+      });
+
+      const { record, activity } = await fetchSpDashboardLive();
+
+      expect(record.services).toEqual([]);
+      expect(activity).toHaveLength(1);
+      expect(activity[0].kind).toBe("profile_approved");
+    });
+  });
+
   describe("profile views", () => {
     const withOverview = async (overview: unknown) => {
       getMock.mockImplementation((url: string) => {
@@ -169,7 +193,7 @@ describe("service-provider-dashboard.api (live API implementation)", () => {
         if (url.includes("/service-provider/availability/me")) return ok(mockSlots);
         if (url.includes("/analytics/service-provider/bookings/status")) return ok([]);
         if (url.includes("/analytics/service-provider")) return ok(overview);
-        if (url.includes("/service-provider/bookings/me")) return ok([]);
+        if (url.includes("/bookings/provider?")) return ok({ items: [] });
         return ok(null);
       });
       return fetchSpDashboardLive();
@@ -204,7 +228,7 @@ describe("service-provider-dashboard.api (live API implementation)", () => {
         if (url.includes("/service-provider/availability/me")) return ok(mockSlots);
         if (url.includes("/analytics/service-provider/bookings/status")) return ok([]);
         if (url.includes("/analytics/service-provider")) return ok({ overview: { totalBookings: 0 } });
-        if (url.includes("/service-provider/bookings/me")) return ok([]);
+        if (url.includes("/bookings/provider?")) return ok({ items: [] });
         return ok(null);
       });
       return fetchSpDashboardLive();
@@ -294,7 +318,7 @@ describe("service-provider-dashboard.api (live API implementation)", () => {
         if (url.includes("/analytics/service-provider")) {
           return ok({ overview: { totalServices: 1, totalBookings: 27, completedBookings: 18, cancelledBookings: 1, rejectedBookings: 0, acceptanceRate: 96 } });
         }
-        if (url.includes("/service-provider/bookings/me")) return ok([]);
+        if (url.includes("/bookings/provider?")) return ok({ items: [] });
         return ok(null);
       });
 
