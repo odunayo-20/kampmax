@@ -1,26 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { MarketplaceFilters, ProductCondition, SortOption } from "@/types";
 import { fetchProducts, ProductQueryParams } from "@/services/products";
 import { fetchCategories } from "@/services/categories";
 import { toApiCampusId } from "@/hooks/use-home";
+import { DEFAULT_FILTERS, filtersFromParams, paramsFromFilters, sameFilters } from "@/lib/marketplace-url";
 
 const PAGE_SIZE = 12;
-const SEARCH_DEBOUNCE_MS = 300;
-
-const defaultFilters: MarketplaceFilters = {
-  search: "",
-  categoryId: "",
-  campusId: "",
-  vendorId: "",
-  condition: "",
-  minPrice: "",
-  maxPrice: "",
-  sort: "recent",
-};
+/** How long typing (a search, a price) pauses before it searches and updates the address. */
+const SETTLE_MS = 350;
 
 /** The backend orders by newest or by price; other sorts have no data behind them. */
 const SERVER_SORTS: Record<SortOption, NonNullable<ProductQueryParams["sort"]>> = {
@@ -46,7 +37,7 @@ function useDebounced<T>(value: T, delayMs: number): T {
   return debounced;
 }
 
-function toQuery(filters: MarketplaceFilters, search: string): ProductQueryParams {
+function toQuery(filters: MarketplaceFilters): ProductQueryParams {
   // Public browse only ever shows purchasable listings; drafts, pending review,
   // suspended and archived products belong to the vendor's own dashboard.
   const query: ProductQueryParams = {
@@ -54,6 +45,7 @@ function toQuery(filters: MarketplaceFilters, search: string): ProductQueryParam
     sort: SERVER_SORTS[filters.sort],
     limit: PAGE_SIZE,
   };
+  const search = filters.search.trim();
   if (search) query.search = search;
   const campusId = toApiCampusId(filters.campusId);
   if (campusId) query.campusId = campusId;
@@ -72,42 +64,62 @@ function toQuery(filters: MarketplaceFilters, search: string): ProductQueryParam
  * Marketplace browsing. Filtering, sorting and paging all happen on the server,
  * so the result count and "Load more" reflect the whole catalogue — never just
  * the first page that happened to be loaded.
+ *
+ * The filters live in the address too (`/marketplace?category=…&minPrice=…`), so a
+ * filtered view can be shared, bookmarked and survives a refresh.
  */
 export function useMarketplace(initialCampusId?: string) {
-  // Links such as /marketplace?category=<id> or ?vendor=<id> open pre-filtered.
+  const defaultCampus = initialCampusId || "";
   const searchParams = useSearchParams();
-  const [filters, setFilters] = useState<MarketplaceFilters>(() => ({
-    ...defaultFilters,
-    campusId: initialCampusId || "",
-    categoryId: searchParams.get("category") ?? "",
-    vendorId: searchParams.get("vendor") ?? "",
-    search: searchParams.get("q") ?? searchParams.get("search") ?? "",
-    minPrice: searchParams.get("minPrice") ?? "",
-    maxPrice: searchParams.get("maxPrice") ?? "",
-    condition: (["New", "Used"] as const).find((c) => c.toLowerCase() === searchParams.get("condition")?.toLowerCase()) ?? "",
-    sort: (["recent", "price_low", "price_high"] as const).find((o) => o === searchParams.get("sort")) ?? "recent",
-  }));
+  const router = useRouter();
+  const pathname = usePathname();
+  const [isNavigating, startTransition] = useTransition();
+
+  const [filters, setFilters] = useState<MarketplaceFilters>(() => filtersFromParams(searchParams, defaultCampus));
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
-  // Following a link while already on the page (e.g. another category) re-applies it.
-  const urlCategory = searchParams.get("category") ?? "";
-  const urlVendor = searchParams.get("vendor") ?? "";
-  useEffect(() => {
-    setFilters((prev) =>
-      prev.categoryId === urlCategory && prev.vendorId === urlVendor
-        ? prev
-        : { ...prev, categoryId: urlCategory, vendorId: urlVendor }
-    );
-  }, [urlCategory, urlVendor]);
+  // The address we last wrote (or read). Tells our own changes to the address, which come
+  // back to us as an "address changed" event, apart from a link followed from elsewhere.
+  const urlString = searchParams.toString();
+  const lastSeen = useRef(urlString);
 
-  // Follow the selected campus once it is known.
+  // Address -> filters: a link followed from elsewhere (another category, a store's page),
+  // or back/forward. Ignored while our own change is still on its way, so a slow reply
+  // can't overwrite what has been typed since.
   useEffect(() => {
-    if (initialCampusId) {
-      setFilters((prev) => ({ ...prev, campusId: initialCampusId }));
+    if (isNavigating || urlString === lastSeen.current) return;
+    lastSeen.current = urlString;
+    const fromUrl = filtersFromParams(new URLSearchParams(urlString), defaultCampus);
+    setFilters((prev) => (sameFilters(prev, fromUrl) ? prev : fromUrl));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- react to the address changing, nothing else
+  }, [urlString]);
+
+  // Follow the selected campus once it is known, unless the address picked a campus itself.
+  const addressPicksCampus = searchParams.get("campus") !== null;
+  useEffect(() => {
+    if (initialCampusId && !addressPicksCampus) {
+      setFilters((prev) => (prev.campusId === initialCampusId ? prev : { ...prev, campusId: initialCampusId }));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the selected campus changes
   }, [initialCampusId]);
 
-  const debouncedSearch = useDebounced(filters.search.trim(), SEARCH_DEBOUNCE_MS);
+  // Typing (a search, a price) waits for a pause before it searches; choices (a category,
+  // a sort) take effect straight away.
+  const settled = useDebounced(filters, SETTLE_MS);
+  const queryFilters = useMemo(
+    () => ({ ...filters, search: settled.search, minPrice: settled.minPrice, maxPrice: settled.maxPrice }),
+    [filters, settled.search, settled.minPrice, settled.maxPrice]
+  );
+
+  // Filters -> address, once everything has settled. While a change is still being typed,
+  // `settled` is behind `filters`, and writing then would put the old values back.
+  const toWrite = sameFilters(settled, filters) ? paramsFromFilters(filters, defaultCampus).toString() : null;
+  useEffect(() => {
+    if (toWrite === null || toWrite === lastSeen.current) return;
+    lastSeen.current = toWrite;
+    startTransition(() => router.replace(toWrite ? `${pathname}?${toWrite}` : pathname, { scroll: false }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when what we'd write changes
+  }, [toWrite]);
 
   const categoriesQuery = useQuery({
     queryKey: ["marketplace", "categories"],
@@ -120,11 +132,11 @@ export function useMarketplace(initialCampusId?: string) {
   });
 
   const productsQuery = useInfiniteQuery({
-    queryKey: ["marketplace", "products", toQuery(filters, debouncedSearch)],
+    queryKey: ["marketplace", "products", toQuery(queryFilters)],
     initialPageParam: 1,
     placeholderData: keepPreviousData,
     queryFn: async ({ pageParam }) => {
-      const res = await fetchProducts({ ...toQuery(filters, debouncedSearch), page: pageParam });
+      const res = await fetchProducts({ ...toQuery(queryFilters), page: pageParam });
       if (res.error) throw res.error;
       return res;
     },
@@ -140,16 +152,18 @@ export function useMarketplace(initialCampusId?: string) {
   );
   const totalCount = productsQuery.data?.pages[0]?.total ?? 0;
 
+  // What the visitor has narrowed things down by. Their own campus is applied for them, so
+  // it only counts when they've picked a different one.
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (filters.categoryId) count++;
-    if (filters.campusId) count++;
+    if (filters.campusId && filters.campusId !== defaultCampus) count++;
     if (filters.vendorId) count++;
     if (filters.condition) count++;
     if (filters.minPrice) count++;
     if (filters.maxPrice) count++;
     return count;
-  }, [filters]);
+  }, [filters, defaultCampus]);
 
   const updateFilter = useCallback(
     <K extends keyof MarketplaceFilters>(key: K, value: MarketplaceFilters[K]) => {
@@ -159,7 +173,7 @@ export function useMarketplace(initialCampusId?: string) {
   );
 
   const clearFilters = useCallback(() => {
-    setFilters((prev) => ({ ...defaultFilters, campusId: prev.campusId }));
+    setFilters((prev) => ({ ...DEFAULT_FILTERS, campusId: prev.campusId }));
   }, []);
 
   const setCategoryId = useCallback((categoryId: string) => {

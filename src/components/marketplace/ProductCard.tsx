@@ -135,6 +135,17 @@ export function ProductCard({
               )}
             />
           </button>
+          {/* Quick view: a peek without leaving the list. Hover/focus only, and not on touch
+              screens, where tapping the card already opens the product. */}
+          {onQuickView && (
+            <button
+              onClick={handleQuickView}
+              aria-label={`Quick view: ${product.title}`}
+              className="hidden sm:flex p-1.5 rounded-full bg-white/80 backdrop-blur-md border border-neutral-200/80 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-white hover:scale-110 active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 shadow-2xs"
+            >
+              <Eye className="w-3.5 h-3.5 text-neutral-600" aria-hidden />
+            </button>
+          )}
         </div>
 
         {/* Bottom Condition Badge */}
