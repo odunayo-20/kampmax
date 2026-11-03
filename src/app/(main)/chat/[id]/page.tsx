@@ -12,6 +12,7 @@ import { ConversationInfoPanel } from "@/components/messages/ConversationInfoPan
 import { ConversationList } from "@/components/messages/ConversationList";
 import { MessageComposer } from "@/components/messages/MessageComposer";
 import { MessageThread } from "@/components/messages/MessageThread";
+import { OfferBar } from "@/components/messages/OfferBar";
 
 /**
  * Direct-message thread. Desktop = left conversation list + thread (+optional
@@ -87,6 +88,7 @@ export default function ChatScreenPage({ params }: { params: Promise<{ id: strin
                 onToggleInfo={() => setInfoOpen((open) => !open)}
               />
               <MessageThread conversation={conversation} isParticipant={isParticipant} />
+              <OfferBar conversation={conversation} />
               <MessageComposer conversationId={conversation.id} />
             </div>
             {infoOpen && <ConversationInfoPanel conversation={conversation} />}

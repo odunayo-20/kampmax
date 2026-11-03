@@ -49,6 +49,12 @@ export const messageKeys = {
     ["messages", "thread", conversationId, userId] as const,
 };
 
+/** Offers sent inside chats; scoped per user like the messages around them. */
+export const offerKeys = {
+  all: ["offers"] as const,
+  detail: (offerId: string, userId: string) => ["offers", "detail", offerId, userId] as const,
+};
+
 /**
  * Customer support portal key factory (Module 26A, customer side of Module
  * 56). Keys are scoped per user so one customer's cases can never leak into

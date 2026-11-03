@@ -1,8 +1,10 @@
 import { Package } from "lucide-react";
 import { Message } from "@/types";
 import { cn, formatNaira } from "@/lib/utils";
+import { parseOfferId } from "@/services/offers-api";
 import { MessageText } from "./MessageText";
 import { MessageStatus } from "./MessageStatus";
+import { OfferCard } from "./OfferCard";
 import { formatMessageTime, getOrderStatusLabel } from "./message-utils";
 
 interface MessageItemProps {
@@ -21,14 +23,17 @@ interface MessageItemProps {
  * client-side upload path today.
  */
 export function MessageItem({ message, isMine, showTail }: MessageItemProps) {
-  const hasCard = !!message.sharedProduct || !!message.sharedOrder;
+  const offerId = parseOfferId(message.text);
+  const hasCard = !!message.sharedProduct || !!message.sharedOrder || !!offerId;
+  // Offer cards keep their own light panel on both sides of the thread.
+  const onLight = !isMine || !!offerId;
   const bubbleBase = "relative max-w-[78%] px-3.5 py-2 text-sm shadow-sm";
   const bubbleShape = isMine
     ? cn("rounded-2xl", showTail ? "rounded-br-md" : "rounded-br-sm")
     : cn("rounded-2xl", showTail ? "rounded-bl-md" : "rounded-bl-sm");
-  const bubbleColor = isMine
-    ? "bg-kampmax-blue text-white"
-    : "bg-white text-kampmax-text border border-kampmax-border";
+  const bubbleColor = onLight
+    ? "bg-white text-kampmax-text border border-kampmax-border"
+    : "bg-kampmax-blue text-white";
 
   return (
     <div className={cn("flex", isMine ? "justify-end" : "justify-start")}>
@@ -63,6 +68,8 @@ export function MessageItem({ message, isMine, showTail }: MessageItemProps) {
               </p>
             </div>
           </div>
+        ) : offerId ? (
+          <OfferCard offerId={offerId} />
         ) : (
           <>
             {message.text && <MessageText text={message.text} />}
@@ -80,11 +87,11 @@ export function MessageItem({ message, isMine, showTail }: MessageItemProps) {
         <div
           className={cn(
             "mt-1 flex items-center justify-end gap-1 text-[10px] leading-none",
-            isMine ? "text-white/70" : "text-kampmax-text-secondary/70"
+            onLight ? "text-kampmax-text-secondary/70" : "text-white/70"
           )}
         >
           <time dateTime={message.createdAt}>{formatMessageTime(message.createdAt)}</time>
-          <MessageStatus read={message.read} isMine={isMine} />
+          <MessageStatus read={message.read} isMine={isMine && !offerId} />
         </div>
       </div>
     </div>
