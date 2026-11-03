@@ -5,7 +5,8 @@
 // describes where a contract is so the wording can say which milestone is
 // being funded or approved, and how much that is.
 
-import type { Engagement } from "@/services/jobs";
+import type { Engagement, MilestoneStatus } from "@/services/jobs";
+import { todayISO } from "@/lib/milestone-plan";
 
 export interface CurrentMilestoneInfo {
   /** 1-based. */
@@ -16,6 +17,41 @@ export interface CurrentMilestoneInfo {
   amount: number;
   /** How many milestones were already paid out. */
   paidCount: number;
+}
+
+/**
+ * A due date (YYYY-MM-DD) as "12 Nov", with the year only when it is not this
+ * one. Built from the parts, not parsed as a Date, so the day never shifts
+ * with the viewer's timezone.
+ */
+export function formatDueDate(dueDate: string, today: string = todayISO()): string {
+  const [year, month, day] = dueDate.split("-").map(Number);
+  const sameYear = year === Number(today.slice(0, 4));
+  return new Date(year, month - 1, day).toLocaleDateString("en-NG", {
+    day: "numeric",
+    month: "short",
+    ...(sameYear ? {} : { year: "numeric" }),
+  });
+}
+
+export interface DueInfo {
+  label: string;
+  overdue: boolean;
+}
+
+/**
+ * What to say about a milestone's due date, or null when there is nothing to
+ * say: no date, or the milestone is finished either way. Display only — nothing
+ * happens to a contract when a date passes.
+ */
+export function describeDue(
+  dueDate: string | null | undefined,
+  status: MilestoneStatus,
+  today: string = todayISO()
+): DueInfo | null {
+  if (!dueDate || status === "COMPLETED" || status === "CANCELLED") return null;
+  const when = formatDueDate(dueDate, today);
+  return dueDate < today ? { label: `Overdue · due ${when}`, overdue: true } : { label: `Due ${when}`, overdue: false };
 }
 
 export interface MilestoneAtStake {

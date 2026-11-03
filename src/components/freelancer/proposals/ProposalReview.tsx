@@ -4,6 +4,7 @@ import { Pencil, Send } from "lucide-react";
 import { Button } from "@/components/ui";
 import type { Opportunity, Proposal } from "@/types/opportunity";
 import { formatNaira } from "@/lib/utils";
+import { formatDueDate } from "@/lib/engagement-milestones";
 import { DURATION_LABEL, WORK_ARRANGEMENT_LABEL } from "@/config/opportunity";
 import { ProposalFormValues } from "./proposal-form-values";
 
@@ -94,6 +95,7 @@ export function ProposalReview({
                   {m.description.trim() && (
                     <p className="mt-0.5 text-xs text-neutral-500">{m.description.trim()}</p>
                   )}
+                  {m.dueDate && <p className="mt-0.5 text-xs text-neutral-500">Due {formatDueDate(m.dueDate)}</p>}
                 </div>
                 <span className="shrink-0 font-semibold text-neutral-900">{formatNaira(Number(m.amount))}</span>
               </li>

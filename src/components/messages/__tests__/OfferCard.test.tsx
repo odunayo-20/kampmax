@@ -26,6 +26,7 @@ const baseOffer = (overrides: Partial<Offer> = {}): Offer => ({
   amount: 50000,
   currency: "NGN",
   deliveryDays: 7,
+  milestones: [],
   status: "PENDING",
   expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
   respondedAt: null,
@@ -64,6 +65,28 @@ describe("OfferCard", () => {
     expect(screen.getByRole("alert").textContent).toContain("employer profile");
     expect(screen.getByRole("link", { name: "Set it up" }).getAttribute("href")).toBe("/onboarding/employer");
     expect(push).not.toHaveBeenCalled();
+  });
+
+  it("shows the payment plan, with dates, so the recipient sees it before accepting", () => {
+    offer = baseOffer({
+      milestones: [
+        { title: "Design", description: null, amount: 20000, dueDate: "2099-01-10" },
+        { title: "Build", description: null, amount: 30000, dueDate: null },
+      ],
+    });
+    render(<OfferCard offerId="o1" />);
+
+    expect(screen.getByText("2 milestones · paid one at a time")).toBeTruthy();
+    expect(screen.getByText(/1\. Design/)).toBeTruthy();
+    expect(screen.getByText(/Due .*2099/)).toBeTruthy();
+    expect(screen.getByText("₦30,000")).toBeTruthy();
+    // The one-click action is still right there.
+    expect(screen.getByRole("button", { name: "Accept offer" })).toBeTruthy();
+  });
+
+  it("shows no plan for an offer that is one payment", () => {
+    render(<OfferCard offerId="o1" />);
+    expect(screen.queryByText(/milestones/)).toBeNull();
   });
 
   it("gives the freelancer only a withdraw action", () => {

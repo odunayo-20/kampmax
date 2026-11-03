@@ -252,6 +252,8 @@ export interface ProposalMilestone {
   title: string;
   description?: string;
   amount: number;
+  /** When this step is expected, as a date (YYYY-MM-DD). Optional. */
+  dueDate?: string;
 }
 
 // ── Proposal (owned by the freelancer) ──────────────────────

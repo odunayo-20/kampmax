@@ -1,4 +1,5 @@
 import { apiClient, type ApiError } from "@/lib/api-client";
+import type { ProposalMilestone } from "@/types/opportunity";
 
 // ============================================================
 // OFFERS — LIVE API LAYER
@@ -22,6 +23,8 @@ export interface Offer {
   amount: number;
   currency: string;
   deliveryDays: number | null;
+  /** The payment plan, paid one milestone at a time; empty means one payment for the whole price. */
+  milestones: { title: string; description: string | null; amount: number; dueDate: string | null }[];
   /** A pending offer past its expiry already reads as EXPIRED. */
   status: OfferStatus;
   expiresAt: string;
@@ -38,6 +41,8 @@ export interface CreateOfferInput {
   description: string;
   amount: number;
   deliveryDays?: number;
+  /** Optional payment plan; it must add up to `amount` (the backend checks). */
+  milestones?: ProposalMilestone[];
   expiresInDays?: number;
 }
 

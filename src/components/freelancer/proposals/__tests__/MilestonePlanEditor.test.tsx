@@ -20,7 +20,7 @@ function Harness({ total = 250000, initial = [] as MilestoneRow[], showErrors = 
   );
 }
 
-const row = (title: string, amount: string): MilestoneRow => ({ title, description: "", amount });
+const row = (title: string, amount: string): MilestoneRow => ({ title, description: "", amount, dueDate: "" });
 const toggle = () => screen.getByRole("checkbox", { name: "Use milestones" }) as HTMLInputElement;
 
 describe("MilestonePlanEditor", () => {
@@ -97,6 +97,27 @@ describe("MilestonePlanEditor", () => {
     // Clicking a label reaches its own row's input, not the first row's.
     const secondTitle = screen.getAllByLabelText("Title")[1] as HTMLInputElement;
     expect(secondTitle.value).toBe("Build");
+  });
+
+  it("has a date field per milestone that cannot be set in the past", () => {
+    render(<Harness initial={[row("Design", "100000"), row("Build", "150000")]} />);
+    const dates = screen.getAllByLabelText("Due date (optional)") as HTMLInputElement[];
+    expect(dates).toHaveLength(2);
+    expect(dates[0].type).toBe("date");
+    expect(dates[0].min).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+
+    fireEvent.change(dates[1], { target: { value: "2099-05-20" } });
+    expect((screen.getAllByLabelText("Due date (optional)")[1] as HTMLInputElement).value).toBe("2099-05-20");
+  });
+
+  it("explains a date that is in the past", () => {
+    render(
+      <Harness
+        showErrors
+        initial={[{ ...row("Design", "100000"), dueDate: "2020-01-01" }, row("Build", "150000")]}
+      />
+    );
+    expect(screen.getByText("Pick today or a later date.")).not.toBeNull();
   });
 
   it("explains that milestones are paid one at a time", () => {

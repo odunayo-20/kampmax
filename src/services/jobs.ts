@@ -250,6 +250,8 @@ export interface EngagementMilestone {
   description: string | null;
   /** DISPLAY ONLY — the backend moves the money; the frontend never computes totals. */
   amount: number;
+  /** When this step is expected (YYYY-MM-DD). Display only: nothing happens when it passes. */
+  dueDate: string | null;
   status: MilestoneStatus;
   completedAt: string | null;
   /** True when it was paid because the client never reviewed it. */

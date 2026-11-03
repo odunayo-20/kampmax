@@ -118,6 +118,44 @@ describe("proposals API", () => {
     );
   });
 
+  it("sends and reads back a due date on each milestone", async () => {
+    mocks.post.mockResolvedValue({
+      data: {
+        ...backendProposal,
+        milestones: [
+          { title: "Design", description: null, amount: 100000, dueDate: "2099-01-10" },
+          { title: "Build", description: null, amount: 150000, dueDate: null },
+        ],
+      },
+      error: null,
+    });
+
+    const { proposal } = await submitProposalApi({
+      opportunityId: "j1",
+      coverLetter: "I can build this quickly and well.",
+      proposedAmount: 250000,
+      delivery: { value: 2, unit: "weeks" },
+      screeningAnswers: [],
+      milestones: [
+        { title: "Design", amount: 100000, dueDate: "2099-01-10" },
+        { title: "Build", amount: 150000, dueDate: "" },
+      ],
+      attachments: [],
+    });
+
+    expect(mocks.post).toHaveBeenCalledWith(
+      "/proposals",
+      expect.objectContaining({
+        milestones: [
+          { title: "Design", description: undefined, amount: 100000, dueDate: "2099-01-10" },
+          // an empty date is left out rather than sent as ""
+          { title: "Build", description: undefined, amount: 150000, dueDate: undefined },
+        ],
+      })
+    );
+    expect(proposal?.milestones?.map((m) => m.dueDate)).toEqual(["2099-01-10", undefined]);
+  });
+
   it("reads the payment plan back from the backend", async () => {
     mocks.post.mockResolvedValue({
       data: {

@@ -1,5 +1,6 @@
 import { CheckCircle2, Circle, CircleDot, XCircle, type LucideIcon } from "lucide-react";
 import { cn, formatNaira } from "@/lib/utils";
+import { describeDue } from "@/lib/engagement-milestones";
 import type { EngagementMilestone, MilestoneStatus } from "@/services/jobs";
 
 const STATUS: Record<MilestoneStatus, { label: string; icon: LucideIcon; tone: string }> = {
@@ -38,6 +39,7 @@ export function EngagementMilestones({ milestones }: { milestones: EngagementMil
         {milestones.map((m) => {
           const { label, icon: Icon, tone } = STATUS[m.status];
           const note = settlement(m);
+          const due = describeDue(m.dueDate, m.status);
           return (
             <li key={m.id} className="flex items-start gap-2.5 px-3 py-2">
               <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", tone)} aria-hidden />
@@ -49,6 +51,16 @@ export function EngagementMilestones({ milestones }: { milestones: EngagementMil
                   {label}
                   {m.autoReleased && " · released automatically"}
                 </p>
+                {due && (
+                  <p
+                    className={cn(
+                      "mt-0.5 text-[11px]",
+                      due.overdue ? "font-medium text-error-600" : "text-kampmax-text-secondary"
+                    )}
+                  >
+                    {due.label}
+                  </p>
+                )}
                 {note && <p className="mt-0.5 text-[11px] text-kampmax-text-secondary">{note}</p>}
               </div>
               <span className="shrink-0 text-xs font-semibold text-kampmax-text">{formatNaira(m.amount)}</span>

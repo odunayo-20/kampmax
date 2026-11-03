@@ -7,6 +7,7 @@ import { Clock, FileText } from "lucide-react";
 import { cn, formatNaira } from "@/lib/utils";
 import { useOffer, useOfferAction } from "@/hooks/use-offers";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
+import { formatDueDate } from "@/lib/engagement-milestones";
 import type { Offer, OfferStatus } from "@/services/offers-api";
 
 const STATUS_LABEL: Record<OfferStatus, string> = {
@@ -141,6 +142,28 @@ export function OfferCard({ offerId }: { offerId: string }) {
       <p className="mt-1 line-clamp-4 whitespace-pre-line text-xs text-kampmax-text-secondary">{offer.description}</p>
 
       <p className="mt-3 text-lg font-bold">{formatNaira(offer.amount)}</p>
+      {offer.milestones.length > 0 && (
+        <details className="mt-2 rounded-lg border border-kampmax-border px-2.5 py-1.5 text-xs">
+          <summary className="cursor-pointer font-medium">
+            {offer.milestones.length} milestones · paid one at a time
+          </summary>
+          <ol className="mt-1.5 space-y-1.5">
+            {offer.milestones.map((m, index) => (
+              <li key={index} className="flex items-start justify-between gap-2">
+                <span className="min-w-0 break-words">
+                  {index + 1}. {m.title}
+                  {m.dueDate && (
+                    <span className="block text-[11px] text-kampmax-text-secondary">
+                      Due {formatDueDate(m.dueDate)}
+                    </span>
+                  )}
+                </span>
+                <span className="shrink-0 font-semibold">{formatNaira(m.amount)}</span>
+              </li>
+            ))}
+          </ol>
+        </details>
+      )}
       <p className="mt-0.5 flex items-center gap-1 text-[11px] text-kampmax-text-secondary">
         <Clock className="h-3 w-3" aria-hidden />
         {offer.deliveryDays ? `${offer.deliveryDays} days delivery · ` : ""}

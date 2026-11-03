@@ -62,7 +62,7 @@ export interface ProposalResponse {
   currency: string;
   estimatedDeliveryDays: number | null;
   screeningAnswers?: { questionId: string; answer: string }[];
-  milestones?: { title: string; description: string | null; amount: number }[];
+  milestones?: { title: string; description: string | null; amount: number; dueDate?: string | null }[];
   attachments?: { id: string; filename: string; sizeBytes: number; mimeType: string; url: string | null }[];
   /** Backend enum: DRAFT | SUBMITTED | VIEWED | SHORTLISTED | ACCEPTED | REJECTED | WITHDRAWN | EXPIRED */
   status: string;
@@ -169,6 +169,7 @@ export function mapBackendProposal(p: ProposalResponse): Proposal {
       title: m.title,
       description: m.description ?? undefined,
       amount: Number(m.amount),
+      dueDate: m.dueDate ?? undefined,
     })),
     attachments: (p.attachments ?? []).map((a) => ({
       id: a.id,
@@ -204,6 +205,7 @@ function proposalBody(input: ProposalInput) {
       title: m.title,
       description: m.description || undefined,
       amount: m.amount,
+      dueDate: m.dueDate || undefined,
     })),
   };
 }
@@ -368,6 +370,7 @@ export async function updateProposalApi(
         title: m.title,
         description: m.description || undefined,
         amount: m.amount,
+        dueDate: m.dueDate || undefined,
       })),
     }
   );

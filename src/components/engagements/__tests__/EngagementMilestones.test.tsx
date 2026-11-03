@@ -17,6 +17,7 @@ const m = (
   title: ["", "Design", "Build", "Launch"][position],
   description: null,
   amount,
+  dueDate: null,
   status,
   completedAt: null,
   autoReleased: false,
@@ -60,6 +61,30 @@ describe("EngagementMilestones", () => {
   it("marks milestones that were cancelled when the contract ended", () => {
     render(<EngagementMilestones milestones={[m(1, "CANCELLED", 100000), m(2, "CANCELLED", 150000)]} />);
     expect(screen.getAllByText("Cancelled")).toHaveLength(2);
+  });
+
+  it("shows when a milestone is due, and flags one that is overdue", () => {
+    render(
+      <EngagementMilestones
+        milestones={[m(1, "ACTIVE", 100000, { dueDate: "2020-01-01" }), m(2, "UPCOMING", 150000, { dueDate: "2099-01-10" })]}
+      />
+    );
+    const overdue = screen.getByText(/Overdue · due/);
+    expect(overdue.textContent).toMatch(/2020/);
+    expect(overdue.className).toContain("text-error-600");
+
+    const upcoming = screen.getByText(/^Due .*2099/);
+    expect(upcoming.className).not.toContain("text-error-600");
+  });
+
+  it("says nothing about the date of a milestone that is already paid", () => {
+    render(
+      <EngagementMilestones
+        milestones={[m(1, "COMPLETED", 100000, { dueDate: "2020-01-01" }), m(2, "ACTIVE", 150000)]}
+      />
+    );
+    expect(screen.queryByText(/Overdue/)).toBeNull();
+    expect(screen.queryByText(/2020/)).toBeNull();
   });
 
   it("renders nothing for a contract with a single payment", () => {

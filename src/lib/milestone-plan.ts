@@ -20,9 +20,19 @@ export interface MilestoneRow {
   title: string;
   description: string;
   amount: string;
+  /** A date (YYYY-MM-DD) from a date input, or "" for none. */
+  dueDate: string;
 }
 
-export const emptyMilestoneRow = (): MilestoneRow => ({ title: "", description: "", amount: "" });
+export const emptyMilestoneRow = (): MilestoneRow => ({ title: "", description: "", amount: "", dueDate: "" });
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Today as YYYY-MM-DD on this device, for "not in the past" (the backend checks in Lagos time). */
+export function todayISO(now: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
 
 /** Whole kobo, so decimal rounding can never make a plan look right or wrong. */
 const toKobo = (value: string | number): number => Math.round(Number(value) * 100);
@@ -44,15 +54,19 @@ export interface PlanErrors {
   /** About the plan as a whole (count, or it not adding up). */
   plan?: string;
   /** About a single milestone, by its index. */
-  rows: Record<number, { title?: string; amount?: string }>;
+  rows: Record<number, { title?: string; amount?: string; dueDate?: string }>;
 }
 
 /** Returns what is wrong with the plan, or null when it is ready to send. No rows means "one payment". */
-export function validatePlan(rows: MilestoneRow[], total: number | undefined): PlanErrors | null {
+export function validatePlan(
+  rows: MilestoneRow[],
+  total: number | undefined,
+  today: string = todayISO()
+): PlanErrors | null {
   if (rows.length === 0) return null;
 
   const errors: PlanErrors = { rows: {} };
-  const flag = (index: number, field: "title" | "amount", message: string) => {
+  const flag = (index: number, field: "title" | "amount" | "dueDate", message: string) => {
     errors.rows[index] = { ...errors.rows[index], [field]: message };
   };
 
@@ -61,6 +75,9 @@ export function validatePlan(rows: MilestoneRow[], total: number | undefined): P
   } else if (rows.length > MAX_MILESTONES) {
     errors.plan = `Use at most ${MAX_MILESTONES} milestones.`;
   }
+
+  // Due dates are optional; where given they can't be past or go backwards.
+  let earlier: { due: string; position: number } | null = null;
 
   rows.forEach((row, index) => {
     const title = row.title.trim();
@@ -71,6 +88,15 @@ export function validatePlan(rows: MilestoneRow[], total: number | undefined): P
     if (!hasAmount(row)) flag(index, "amount", "Enter an amount.");
     else if (toKobo(row.amount) < MIN_MILESTONE_AMOUNT * 100) {
       flag(index, "amount", `At least ${formatNaira(MIN_MILESTONE_AMOUNT)}.`);
+    }
+
+    const due = row.dueDate.trim();
+    if (due) {
+      if (!DATE_RE.test(due)) flag(index, "dueDate", "Pick a valid date.");
+      else if (due < today) flag(index, "dueDate", "Pick today or a later date.");
+      else if (earlier && due < earlier.due) {
+        flag(index, "dueDate", `Can't be before milestone ${earlier.position}'s date.`);
+      } else earlier = { due, position: index + 1 };
     }
   });
 
@@ -89,6 +115,7 @@ export function toProposalMilestones(rows: MilestoneRow[]): ProposalMilestone[] 
     title: row.title.trim(),
     description: row.description.trim() || undefined,
     amount: Number(row.amount),
+    dueDate: row.dueDate.trim() || undefined,
   }));
 }
 
@@ -98,15 +125,15 @@ export function toProposalMilestones(rows: MilestoneRow[]): ProposalMilestone[] 
  * unfinished row would make the whole draft fail to save.
  */
 export function finishedMilestones(rows: MilestoneRow[]): ProposalMilestone[] {
-  return toProposalMilestones(
-    rows.filter(
-      (row) =>
-        row.title.trim().length >= MILESTONE_TITLE_MIN &&
-        row.title.trim().length <= MILESTONE_TITLE_MAX &&
-        hasAmount(row) &&
-        toKobo(row.amount) >= MIN_MILESTONE_AMOUNT * 100
-    )
+  const finished = rows.filter(
+    (row) =>
+      row.title.trim().length >= MILESTONE_TITLE_MIN &&
+      row.title.trim().length <= MILESTONE_TITLE_MAX &&
+      hasAmount(row) &&
+      toKobo(row.amount) >= MIN_MILESTONE_AMOUNT * 100
   );
+  // A date the backend could not parse would fail the whole draft, so leave it out.
+  return toProposalMilestones(finished.map((row) => (DATE_RE.test(row.dueDate.trim()) ? row : { ...row, dueDate: "" })));
 }
 
 /** A saved plan back into editable form rows. */
@@ -115,5 +142,6 @@ export function rowsFromMilestones(milestones: ProposalMilestone[] | undefined):
     title: m.title,
     description: m.description ?? "",
     amount: String(m.amount),
+    dueDate: m.dueDate ?? "",
   }));
 }

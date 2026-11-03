@@ -4,6 +4,8 @@ import { FormEvent, useEffect, useState } from "react";
 import { AlertCircle, X } from "lucide-react";
 import { useCreateOffer } from "@/hooks/use-offers";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
+import { MilestonePlanEditor } from "@/components/freelancer/proposals/MilestonePlanEditor";
+import { toProposalMilestones, validatePlan, type MilestoneRow, type PlanErrors } from "@/lib/milestone-plan";
 
 interface SendOfferModalProps {
   conversationId: string;
@@ -24,6 +26,8 @@ export function SendOfferModal({ conversationId, onClose }: SendOfferModalProps)
   const [amount, setAmount] = useState("");
   const [deliveryDays, setDeliveryDays] = useState("");
   const [expiresInDays, setExpiresInDays] = useState("7");
+  const [plan, setPlan] = useState<MilestoneRow[]>([]);
+  const [planErrors, setPlanErrors] = useState<PlanErrors | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -33,12 +37,19 @@ export function SendOfferModal({ conversationId, onClose }: SendOfferModalProps)
   }, [onClose]);
 
   const price = Number(amount);
-  const valid = title.trim().length >= 3 && description.trim().length >= 10 && price >= 1;
+  // The delivery estimate is optional, but a whole number of days from 1 to 365 when given.
+  const days = Number(deliveryDays);
+  const daysValid = !deliveryDays || (Number.isInteger(days) && days >= 1 && days <= 365);
+  const valid = title.trim().length >= 3 && description.trim().length >= 10 && price >= 1 && daysValid;
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!valid || createOffer.isPending) return;
     setError(null);
+    // A payment plan has to add up to the price; say what is wrong before sending.
+    const problems = validatePlan(plan, price);
+    setPlanErrors(problems);
+    if (problems) return;
     createOffer.mutate(
       {
         conversationId,
@@ -46,6 +57,7 @@ export function SendOfferModal({ conversationId, onClose }: SendOfferModalProps)
         description: description.trim(),
         amount: price,
         deliveryDays: deliveryDays ? Number(deliveryDays) : undefined,
+        milestones: toProposalMilestones(plan),
         expiresInDays: Number(expiresInDays),
       },
       {
@@ -67,7 +79,8 @@ export function SendOfferModal({ conversationId, onClose }: SendOfferModalProps)
       aria-modal="true"
       aria-labelledby="send-offer-title"
     >
-      <form onSubmit={handleSubmit} className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-xl bg-white">
+      {/* noValidate: the browser's own checks would block the submit before our clearer messages (e.g. on a past due date) show. */}
+      <form onSubmit={handleSubmit} noValidate className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-xl bg-white">
         <div className="flex shrink-0 items-center justify-between border-b border-neutral-100 px-4 py-3">
           <h2 id="send-offer-title" className="text-sm font-bold text-neutral-900">
             Send an offer
@@ -150,8 +163,10 @@ export function SendOfferModal({ conversationId, onClose }: SendOfferModalProps)
                 max={365}
                 value={deliveryDays}
                 onChange={(e) => setDeliveryDays(e.target.value)}
+                aria-invalid={!daysValid}
                 className={inputClass}
               />
+              {!daysValid && <p className="mt-1 text-[11px] text-error-600">Use a whole number from 1 to 365.</p>}
             </div>
             <div>
               <label htmlFor="offer-expiry" className="mb-1.5 block text-xs font-medium text-neutral-600">
@@ -169,6 +184,14 @@ export function SendOfferModal({ conversationId, onClose }: SendOfferModalProps)
               </select>
             </div>
           </div>
+
+          <MilestonePlanEditor
+            rows={plan}
+            total={price >= 1 ? price : undefined}
+            onChange={setPlan}
+            errors={planErrors}
+            disabled={createOffer.isPending}
+          />
 
           <button
             type="submit"

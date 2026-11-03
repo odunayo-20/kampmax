@@ -58,8 +58,8 @@ function toViewMilestone(m: EngagementMilestone, contractId: string, current: bo
     contractId,
     title: m.title,
     description: m.description ?? "",
-    // Milestones carry no due dates yet; the contract's expected date is the only one.
-    dueDate: e.expectedCompletionDate ?? "",
+    // A milestone's own date, else the contract's expected date.
+    dueDate: m.dueDate ?? e.expectedCompletionDate ?? "",
     status,
     progress: m.status === "COMPLETED" ? 100 : 0,
     deliverables: [],

@@ -6,11 +6,17 @@ import {
   planTotal,
   rowsFromMilestones,
   toProposalMilestones,
+  todayISO,
   validatePlan,
   type MilestoneRow,
 } from "../milestone-plan";
 
-const row = (title: string, amount: string, description = ""): MilestoneRow => ({ title, description, amount });
+const row = (title: string, amount: string, description = "", dueDate = ""): MilestoneRow => ({
+  title,
+  description,
+  amount,
+  dueDate,
+});
 
 describe("planTotal / planRemaining", () => {
   it("adds amounts exactly, in whole kobo", () => {
@@ -76,6 +82,59 @@ describe("validatePlan", () => {
   });
 });
 
+describe("due dates", () => {
+  const TODAY = "2026-11-03";
+  const plan = (...dates: string[]) => dates.map((d, i) => row("Step " + (i + 1), "1000", "", d));
+
+  it("is today's date on this device, as YYYY-MM-DD", () => {
+    expect(todayISO(new Date(2026, 10, 3, 23, 59))).toBe("2026-11-03");
+    expect(todayISO(new Date(2026, 0, 5))).toBe("2026-01-05");
+  });
+
+  it("accepts today or later, in order, and steps without a date", () => {
+    expect(validatePlan(plan("2026-11-03", "", "2026-12-01"), 3000, TODAY)).toBeNull();
+    expect(validatePlan(plan("", ""), 2000, TODAY)).toBeNull();
+  });
+
+  it("refuses a date that has already passed", () => {
+    expect(validatePlan(plan("2026-11-02", ""), 2000, TODAY)?.rows[0]).toEqual({
+      dueDate: "Pick today or a later date.",
+    });
+  });
+
+  it("refuses a date before the milestone above it, and says which", () => {
+    expect(validatePlan(plan("2026-12-10", "2026-12-01"), 2000, TODAY)?.rows[1]).toEqual({
+      dueDate: "Can't be before milestone 1's date.",
+    });
+  });
+
+  it("compares with the nearest earlier date even when a step in between has none", () => {
+    expect(validatePlan(plan("2026-12-10", "", "2026-12-01"), 3000, TODAY)?.rows[2]?.dueDate).toMatch(
+      /before milestone 1/
+    );
+  });
+
+  it("refuses a date it cannot read", () => {
+    expect(validatePlan(plan("2026-1-3", ""), 2000, TODAY)?.rows[0]?.dueDate).toBe("Pick a valid date.");
+  });
+
+  it("sends the date with the plan, and restores it into the form", () => {
+    expect(toProposalMilestones([row("Design", "1000", "", "2026-12-01"), row("Build", "1000")])).toEqual([
+      { title: "Design", description: undefined, amount: 1000, dueDate: "2026-12-01" },
+      { title: "Build", description: undefined, amount: 1000, dueDate: undefined },
+    ]);
+    expect(rowsFromMilestones([{ title: "Design", amount: 1000, dueDate: "2026-12-01" }])[0].dueDate).toBe("2026-12-01");
+  });
+
+  it("leaves an unreadable date out of a draft rather than failing the whole save", () => {
+    expect(
+      finishedMilestones([row("Design", "1000", "", "2026-12-01"), row("Build", "1000", "", "2026-1-3")]).map(
+        (m) => m.dueDate
+      )
+    ).toEqual(["2026-12-01", undefined]);
+  });
+});
+
 describe("finishedMilestones (saving a draft)", () => {
   it("sends only the rows that are finished, because the backend validates every one it receives", () => {
     expect(
@@ -109,8 +168,8 @@ describe("converting", () => {
 
   it("restores a saved plan into editable rows", () => {
     expect(rowsFromMilestones([{ title: "Design", amount: 100000 }, { title: "Build", description: "App", amount: 150000.5 }])).toEqual([
-      { title: "Design", description: "", amount: "100000" },
-      { title: "Build", description: "App", amount: "150000.5" },
+      { title: "Design", description: "", amount: "100000", dueDate: "" },
+      { title: "Build", description: "App", amount: "150000.5", dueDate: "" },
     ]);
     expect(rowsFromMilestones(undefined)).toEqual([]);
   });

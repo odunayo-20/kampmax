@@ -12,6 +12,7 @@ import {
   emptyMilestoneRow,
   planRemaining,
   planTotal,
+  todayISO,
   type MilestoneRow,
   type PlanErrors,
 } from "@/lib/milestone-plan";
@@ -33,6 +34,7 @@ export function MilestonePlanEditor({ rows, total, onChange, errors, disabled }:
   // Every row repeats the same labels, and Input derives its id from the label,
   // so each field needs its own id or the labels would all point at the first one.
   const idBase = useId();
+  const today = todayISO();
   const enabled = rows.length > 0;
   const setRow = (index: number, patch: Partial<MilestoneRow>) =>
     onChange(rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
@@ -111,7 +113,7 @@ export function MilestonePlanEditor({ rows, total, onChange, errors, disabled }:
                     disabled={disabled}
                   />
                 </div>
-                <div className="mt-3">
+                <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_11rem]">
                   <Input
                     id={`${idBase}-description-${index}`}
                     label="What's included (optional)"
@@ -119,6 +121,16 @@ export function MilestonePlanEditor({ rows, total, onChange, errors, disabled }:
                     maxLength={MILESTONE_DESCRIPTION_MAX}
                     placeholder="e.g. Home, listing and checkout screens"
                     onChange={(e) => setRow(index, { description: e.target.value })}
+                    disabled={disabled}
+                  />
+                  <Input
+                    id={`${idBase}-due-${index}`}
+                    label="Due date (optional)"
+                    type="date"
+                    min={today}
+                    value={row.dueDate}
+                    onChange={(e) => setRow(index, { dueDate: e.target.value })}
+                    error={errors?.rows[index]?.dueDate}
                     disabled={disabled}
                   />
                 </div>

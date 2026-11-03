@@ -14,6 +14,7 @@ import type { EmployerApplicationSummary } from "@/types/opportunity";
 import { PROPOSAL_STATUS } from "@/types/opportunity";
 import { formatNaira, formatDateTime } from "@/lib/utils";
 import { formatFileSize } from "@/lib/contract-utils";
+import { formatDueDate } from "@/lib/engagement-milestones";
 import { Avatar } from "@/components/ui";
 import { ProposalStatusBadge } from "@/components/freelancer/opportunities/StatusBadges";
 import { useEmployerJob } from "@/hooks/use-jobs";
@@ -128,6 +129,7 @@ export function EmployerApplicationDetail({
                         {index + 1}. {m.title}
                       </p>
                       {m.description && <p className="mt-0.5 text-xs text-neutral-500">{m.description}</p>}
+                      {m.dueDate && <p className="mt-0.5 text-xs text-neutral-500">Due {formatDueDate(m.dueDate)}</p>}
                     </div>
                     <span className="shrink-0 text-sm font-semibold text-neutral-900">{formatNaira(m.amount)}</span>
                   </li>
