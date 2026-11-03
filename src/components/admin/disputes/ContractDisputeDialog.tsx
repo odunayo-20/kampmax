@@ -41,6 +41,9 @@ export function ContractDisputeDialog({
   // Only one milestone is ever held in escrow: that, not the contract total, is what a ruling moves.
   const stake = milestoneAtStake(engagement);
   const amount = formatNaira(stake.amount);
+  // For an hourly week the two rulings move different amounts: releasing pays
+  // only the hours worked, while refunding returns everything held for the week.
+  const releaseAmount = formatNaira(stake.release);
   const resolved = !!dispute?.resolvedAt;
   const trimmed = note.trim();
   const ready = outcome !== null && trimmed.length >= MIN_NOTE;
@@ -67,7 +70,7 @@ export function ContractDisputeDialog({
     dispute.openedBy === "EMPLOYER" ? employer : dispute.openedBy === "FREELANCER" ? freelancer : "Someone";
   const confirmLabel =
     outcome === "RELEASE"
-      ? `Pay ${amount} to ${freelancer}`
+      ? `Pay ${releaseAmount} to ${freelancer}`
       : outcome === "REFUND"
         ? `Refund ${amount} to ${employer}`
         : "Choose a ruling";
@@ -134,7 +137,7 @@ export function ContractDisputeDialog({
             <section aria-label="Ruling" className="rounded-lg border border-kampmax-border p-3">
               <p className="font-medium text-kampmax-text">
                 {dispute.outcome === "RELEASE"
-                  ? `${amount} was paid to ${freelancer}`
+                  ? `${releaseAmount} was paid to ${freelancer}`
                   : `${amount} was refunded to ${employer}`}
               </p>
               <p className="mt-0.5 text-xs text-kampmax-text-secondary">
@@ -153,7 +156,7 @@ export function ContractDisputeDialog({
                     value="RELEASE"
                     checked={outcome === "RELEASE"}
                     onSelect={setOutcome}
-                    title={`Pay the freelancer — ${amount}`}
+                    title={`Pay the freelancer — ${releaseAmount}`}
                     detail={`${freelancer} receives the payment and the contract is marked completed.`}
                   />
                   <RulingOption

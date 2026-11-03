@@ -41,7 +41,7 @@ export function WithdrawModal({ isOpen, onClose, onWithdraw, balance }: Withdraw
   const amountError =
     amount === "" ? null
     : !Number.isFinite(value) || value < MIN_WITHDRAWAL ? `The minimum is ${formatNaira(MIN_WITHDRAWAL)}.`
-    : value > balance ? "That is more than your balance."
+    : value > balance ? "That is more than your available balance."
     : null;
   const canSubmit = !!holder.data?.accountName && amount !== "" && !amountError && !submitting;
 

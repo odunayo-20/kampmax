@@ -20,6 +20,9 @@ const disputed = (dispute: Partial<NonNullable<Engagement["dispute"]>> = {}): En
   employer: party("Acme Ltd"),
   agreedAmount: 75000,
   currency: "NGN",
+  paymentType: "FIXED",
+  hourlyRate: null,
+  weeklyHourLimit: null,
   currentMilestonePosition: 1,
   milestones: [
     {
@@ -29,6 +32,11 @@ const disputed = (dispute: Partial<NonNullable<Engagement["dispute"]>> = {}): En
       description: null,
       amount: 75000,
       dueDate: null,
+      kind: "FIXED" as const,
+      periodStart: null,
+      periodEnd: null,
+      loggedMinutes: 0,
+      billedAmount: null,
       status: "ACTIVE",
       completedAt: null,
       autoReleased: false,
@@ -109,6 +117,11 @@ describe("ruling on an open dispute", () => {
       description: null,
       amount,
       dueDate: null,
+      kind: "FIXED" as const,
+      periodStart: null,
+      periodEnd: null,
+      loggedMinutes: 0,
+      billedAmount: null,
       status,
       completedAt: null,
       autoReleased: false,
@@ -118,6 +131,9 @@ describe("ruling on an open dispute", () => {
     const { onResolve } = renderDialog({
       ...disputed(),
       agreedAmount: 300000,
+      paymentType: "FIXED",
+      hourlyRate: null,
+      weeklyHourLimit: null,
       currentMilestonePosition: 2,
       milestones: [milestone(1, "COMPLETED", 100000), milestone(2, "ACTIVE", 200000)],
     });
@@ -131,6 +147,45 @@ describe("ruling on an open dispute", () => {
     fireEvent.change(screen.getByLabelText(/Explain your ruling/), { target: { value: "Work matched the scope" } });
     fireEvent.click(confirmButton());
     expect(onResolve).toHaveBeenCalledWith("RELEASE", "Work matched the scope");
+  });
+
+  it("shows that for an hourly week a release pays the hours worked, while a refund returns the whole escrow", () => {
+    renderDialog({
+      ...disputed(),
+      paymentType: "HOURLY",
+      hourlyRate: 3000,
+      weeklyHourLimit: 20,
+      agreedAmount: 60000,
+      currentMilestonePosition: 1,
+      milestones: [
+        {
+          id: "w1",
+          position: 1,
+          title: "Week 1",
+          description: null,
+          amount: 60000,
+          dueDate: null,
+          kind: "WEEK" as const,
+          periodStart: "2026-11-04",
+          periodEnd: "2026-11-10",
+          loggedMinutes: 900, // 15 hours
+          billedAmount: null,
+          status: "ACTIVE" as const,
+          completedAt: null,
+          autoReleased: false,
+          disputeOutcome: null,
+          disputeResolution: null,
+        },
+      ],
+    });
+
+    // ₦60,000 is held; 15 hours at ₦3,000 is ₦45,000.
+    expect(screen.getByText(/₦60,000 held in escrow for week 1/)).not.toBeNull();
+    fireEvent.click(screen.getByRole("radio", { name: /Pay the freelancer/ }));
+    expect(confirmButton().textContent).toBe("Pay ₦45,000 to Ada Nwosu");
+
+    fireEvent.click(screen.getByRole("radio", { name: /Refund the employer/ }));
+    expect(confirmButton().textContent).toBe("Refund ₦60,000 to Acme Ltd");
   });
 
   it("can refund the employer instead", () => {

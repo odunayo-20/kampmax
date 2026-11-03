@@ -52,3 +52,21 @@ export function getFriendlyErrorMessage(error: unknown): string {
 
   return FRIENDLY_ERROR_MESSAGES.SERVER;
 }
+/** Statuses whose text is about the user's own session or the service, not about what they asked for. */
+const NOT_A_REFUSAL = new Set([401, 403, 429]);
+
+/**
+ * For a step the backend refuses with a reason written for the person (a 4xx
+ * about what they asked, like "You have 1h 40m left this week"): that reason,
+ * as the backend wrote it. For anything else — a failure, a lost session, a
+ * rate limit — the usual friendly message, so raw server text is still never
+ * shown.
+ */
+export function getRefusalMessage(error: unknown): string {
+  const status = (error as { status?: unknown } | null)?.status;
+  const message = error instanceof Error ? error.message.trim() : "";
+  if (typeof status === "number" && status >= 400 && status < 500 && !NOT_A_REFUSAL.has(status) && message) {
+    return message;
+  }
+  return getFriendlyErrorMessage(error);
+}

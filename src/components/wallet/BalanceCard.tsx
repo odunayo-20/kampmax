@@ -1,6 +1,7 @@
 "use client";
 
 import { cn, formatNaira } from "@/lib/utils";
+import { describeClearing } from "@/lib/wallet-clearing";
 import { Wallet } from "@/types";
 import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
@@ -39,10 +40,10 @@ export function BalanceCard({ wallet, onTopUp, onWithdraw }: BalanceCardProps) {
           {showBalance ? formatNaira(wallet.balance) : "••••••"}
         </p>
 
-        {/* Pending */}
+        {/* Earnings still clearing: in the wallet, but not yet withdrawable */}
         {wallet.pendingAmount > 0 && (
-          <p className="text-xs text-white/50 mt-1">
-            {showBalance ? formatNaira(wallet.pendingAmount) : "••••"} pending
+          <p className="text-xs text-white/60 mt-1">
+            {showBalance ? describeClearing(wallet.pendingAmount, wallet.clearing) : "•••• clearing"}
           </p>
         )}
 

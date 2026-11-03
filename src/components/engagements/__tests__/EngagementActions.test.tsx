@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 
 const jobs = vi.hoisted(() => ({
   cancelEngagement: vi.fn(),
+  endEngagement: vi.fn(),
   completeEngagement: vi.fn(),
   fundEngagement: vi.fn(),
   openEngagementDispute: vi.fn(),
@@ -14,7 +15,7 @@ const jobs = vi.hoisted(() => ({
 }));
 vi.mock("@/services/jobs", () => jobs);
 
-import { EngagementActions } from "../EngagementActions";
+import { EngagementActions, engagementActionsFor } from "../EngagementActions";
 import { EngagementNotices } from "../EngagementNotices";
 
 const ok = { engagement: null, error: null };
@@ -297,3 +298,119 @@ function within_dialog(name: string) {
   if (!button) throw new Error(`No "${name}" button in the dialog`);
   return button;
 }
+
+describe("an hourly contract", () => {
+  // Week 2, after one paid week: 18h 30m logged at 3,000 an hour, funded for up to 60,000.
+  const week = {
+    position: 2,
+    total: 2,
+    title: "Week 2",
+    amount: 60000,
+    paidCount: 1,
+    hourly: { loggedMinutes: 1110, worth: 55500 },
+  };
+
+  it("says what is held, and that only approved hours are paid, before the employer funds a week", async () => {
+    const { onChanged } = renderActions({ status: "PENDING_PAYMENT", milestone: week });
+    fireEvent.click(screen.getByRole("button", { name: "Fund week 2" }));
+
+    const text = screen.getByRole("dialog").textContent ?? "";
+    expect(text).toContain("Up to ₦60,000 is held in escrow");
+    expect(text).toContain("only pay for the hours you approve");
+    expect(text).toContain("returned to your wallet");
+
+    fireEvent.click(within_dialog("Fund week 2"));
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+    expect(jobs.fundEngagement).toHaveBeenCalledWith("e1");
+  });
+
+  it("states the hours and what they are worth before the employer approves a week", () => {
+    renderActions({ status: "SUBMITTED", milestone: week });
+    fireEvent.click(screen.getByRole("button", { name: "Approve & pay week 2" }));
+
+    const text = screen.getByRole("dialog").textContent ?? "";
+    expect(text).toContain("Approve week 2: 18h 30m for ₦55,500?");
+    expect(text).toContain("the rest of the ₦60,000 held for the week is returned to you");
+  });
+
+  it("calls the freelancer's step a timesheet, and states what is being submitted", () => {
+    renderActions({ role: "freelancer", status: "IN_PROGRESS", milestone: week });
+    fireEvent.click(screen.getByRole("button", { name: "Submit timesheet" }));
+    expect(screen.getByRole("dialog").textContent).toContain("Submit 18h 30m (₦55,500)");
+  });
+
+  it("calls a revision a resubmitted timesheet", () => {
+    renderActions({ role: "freelancer", status: "REVISION_REQUESTED", milestone: week });
+    expect(screen.getByRole("button", { name: "Resubmit timesheet" })).not.toBeNull();
+  });
+
+  it("limits a dispute to this week's payment", () => {
+    renderActions({ status: "SUBMITTED", milestone: week });
+    fireEvent.click(screen.getByRole("button", { name: "Report a problem" }));
+    expect(screen.getByRole("dialog").textContent).toContain("this week's payment on hold");
+  });
+
+  describe("between paid weeks", () => {
+    it("lets the employer fund the next week, or end the contract: not cancel it", () => {
+      renderActions({ status: "PENDING_PAYMENT", milestone: week });
+      expect(screen.getByRole("button", { name: "Fund week 2" })).not.toBeNull();
+      expect(screen.getByRole("button", { name: "End contract" })).not.toBeNull();
+      expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
+    });
+
+    it("lets the freelancer end it too", () => {
+      renderActions({ role: "freelancer", status: "PENDING_PAYMENT", milestone: week });
+      expect(screen.getByRole("button", { name: "End contract" })).not.toBeNull();
+      expect(screen.queryByRole("button", { name: "Decline contract" })).toBeNull();
+    });
+
+    it("asks first, explaining that nothing is held, then ends it", async () => {
+      const { onChanged } = renderActions({ status: "PENDING_PAYMENT", milestone: week });
+      fireEvent.click(screen.getByRole("button", { name: "End contract" }));
+      expect(screen.getByRole("dialog").textContent).toContain("nothing is held and nothing is owed");
+      expect(jobs.endEngagement).not.toHaveBeenCalled();
+
+      fireEvent.click(within_dialog("End contract"));
+      await waitFor(() => expect(onChanged).toHaveBeenCalled());
+      expect(jobs.endEngagement).toHaveBeenCalledWith("e1");
+    });
+
+    it("shows why when the backend refuses to end it", async () => {
+      jobs.endEngagement.mockResolvedValue({ engagement: null, error: { message: "A week is under way" } });
+      renderActions({ status: "PENDING_PAYMENT", milestone: week });
+      fireEvent.click(screen.getByRole("button", { name: "End contract" }));
+      fireEvent.click(within_dialog("End contract"));
+      expect((await screen.findByRole("alert")).textContent).toContain("A week is under way");
+    });
+  });
+
+  it("keeps cancelling for the first week, before anything has been paid", () => {
+    renderActions({
+      status: "PENDING_PAYMENT",
+      milestone: { ...week, position: 1, paidCount: 0, title: "Week 1" },
+    });
+    expect(screen.getByRole("button", { name: "Cancel" })).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "End contract" })).toBeNull();
+  });
+
+  it("still lets a freelancer turn down an hourly contract that has not been funded", () => {
+    renderActions({
+      role: "freelancer",
+      status: "PENDING_PAYMENT",
+      milestone: { ...week, position: 1, paidCount: 0, title: "Week 1" },
+    });
+    expect(screen.getByRole("button", { name: "Decline contract" })).not.toBeNull();
+  });
+
+  it("offers no 'end' while a week is funded or under way: it must be settled first", () => {
+    for (const status of ["FUNDED", "IN_PROGRESS", "SUBMITTED"] as const) {
+      expect(engagementActionsFor("employer", status, 0, { endable: false })).not.toContain("end");
+    }
+  });
+
+  it("swaps cancel for end only where the caller says the contract can be ended", () => {
+    expect(engagementActionsFor("employer", "PENDING_PAYMENT", 0, { endable: true })).toEqual(["fund", "end"]);
+    expect(engagementActionsFor("freelancer", "PENDING_PAYMENT", 0, { endable: true })).toEqual(["end"]);
+    expect(engagementActionsFor("employer", "PENDING_PAYMENT", 0)).toEqual(["fund", "cancel"]);
+  });
+});

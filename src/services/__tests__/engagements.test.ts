@@ -19,6 +19,9 @@ const engagement = (status: EngagementStatus): Engagement => ({
   employer: { ...party, fullName: "Acme Ltd" },
   agreedAmount: "75000" as unknown as number,
   currency: "NGN",
+  paymentType: "FIXED",
+  hourlyRate: null,
+  weeklyHourLimit: null,
   currentMilestonePosition: 1,
   milestones: [
     {
@@ -28,6 +31,11 @@ const engagement = (status: EngagementStatus): Engagement => ({
       description: null,
       amount: 75000,
       dueDate: null,
+      kind: "FIXED" as const,
+      periodStart: null,
+      periodEnd: null,
+      loggedMinutes: 0,
+      billedAmount: null,
       status: "ACTIVE",
       completedAt: null,
       autoReleased: false,
@@ -84,6 +92,11 @@ describe("engagement -> contract mapping", () => {
       description: null,
       amount,
       dueDate: null,
+      kind: "FIXED" as const,
+      periodStart: null,
+      periodEnd: null,
+      loggedMinutes: 0,
+      billedAmount: null,
       status,
       completedAt: status === "COMPLETED" ? "2026-09-10T00:00:00.000Z" : null,
       autoReleased: false,
@@ -93,6 +106,9 @@ describe("engagement -> contract mapping", () => {
     const threeMilestones = (backend: EngagementStatus): Engagement => ({
       ...engagement(backend),
       agreedAmount: 300000,
+      paymentType: "FIXED",
+      hourlyRate: null,
+      weeklyHourLimit: null,
       currentMilestonePosition: 2,
       milestones: [milestone(1, "COMPLETED", 100000), milestone(2, "ACTIVE", 150000), milestone(3, "UPCOMING", 50000)],
     });
@@ -167,5 +183,61 @@ describe("which next steps each party is offered", () => {
       expect(engagementActionsFor("employer", status)).toEqual([]);
       expect(engagementActionsFor("freelancer", status)).toEqual([]);
     }
+  });
+});
+
+describe("an hourly contract in the freelancer's contract view", () => {
+  const week = (position: number, status: "ACTIVE" | "COMPLETED") => ({
+    id: `w${position}`,
+    position,
+    title: `Week ${position}`,
+    description: null,
+    amount: 60000,
+    dueDate: null,
+    kind: "WEEK" as const,
+    periodStart: "2026-11-04",
+    periodEnd: "2026-11-10",
+    loggedMinutes: 0,
+    billedAmount: null,
+    status,
+    completedAt: null,
+    autoReleased: false,
+    disputeOutcome: null,
+    disputeResolution: null,
+  });
+  const hourly = (backend: EngagementStatus): Engagement => ({
+    ...engagement(backend),
+    paymentType: "HOURLY",
+    hourlyRate: 3000,
+    weeklyHourLimit: 20,
+    agreedAmount: 60000,
+    currentMilestonePosition: 3,
+    milestones: [week(1, "COMPLETED"), week(2, "COMPLETED"), week(3, "ACTIVE")],
+  });
+
+  it("is never partway complete: it runs until it is ended, however many weeks are paid", () => {
+    expect(engagementToContract(hourly("IN_PROGRESS")).progress).toBe(0);
+  });
+
+  it("is complete only once the contract has ended", () => {
+    expect(engagementToContract(hourly("COMPLETED")).progress).toBe(100);
+  });
+
+  it("still counts the paid weeks", () => {
+    const c = engagementToContract(hourly("IN_PROGRESS"));
+    expect(c.totalMilestones).toBe(3);
+    expect(c.completedMilestones).toBe(2);
+  });
+
+  it("does not change how a fixed-price contract's progress is worked out", () => {
+    const fixed: Engagement = {
+      ...engagement("IN_PROGRESS"),
+      currentMilestonePosition: 2,
+      milestones: [
+        { ...week(1, "COMPLETED"), kind: "FIXED" },
+        { ...week(2, "ACTIVE"), kind: "FIXED" },
+      ],
+    };
+    expect(engagementToContract(fixed).progress).toBe(50);
   });
 });

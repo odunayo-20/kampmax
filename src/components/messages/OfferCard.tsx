@@ -8,6 +8,7 @@ import { cn, formatNaira } from "@/lib/utils";
 import { useOffer, useOfferAction } from "@/hooks/use-offers";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
 import { formatDueDate } from "@/lib/engagement-milestones";
+import { hourlyTerms } from "@/lib/hourly";
 import type { Offer, OfferStatus } from "@/services/offers-api";
 
 const STATUS_LABEL: Record<OfferStatus, string> = {
@@ -141,7 +142,17 @@ export function OfferCard({ offerId }: { offerId: string }) {
       <p className="mt-2 font-semibold leading-snug">{offer.title}</p>
       <p className="mt-1 line-clamp-4 whitespace-pre-line text-xs text-kampmax-text-secondary">{offer.description}</p>
 
-      <p className="mt-3 text-lg font-bold">{formatNaira(offer.amount)}</p>
+      {offer.paymentType === "HOURLY" && offer.hourlyRate != null && offer.weeklyHourLimit != null ? (
+        <>
+          <p className="mt-3 text-lg font-bold">{hourlyTerms(offer.hourlyRate, offer.weeklyHourLimit)}</p>
+          <p className="mt-0.5 text-[11px] text-kampmax-text-secondary">
+            Paid by the week for the hours logged: up to {formatNaira(offer.amount)} a week, funded in advance. Unused
+            money is returned.
+          </p>
+        </>
+      ) : (
+        <p className="mt-3 text-lg font-bold">{formatNaira(offer.amount)}</p>
+      )}
       {offer.milestones.length > 0 && (
         <details className="mt-2 rounded-lg border border-kampmax-border px-2.5 py-1.5 text-xs">
           <summary className="cursor-pointer font-medium">

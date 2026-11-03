@@ -12,8 +12,13 @@ export interface BackendWalletResponse {
   userId: string | null;
   vendorId: string | null;
   currency: string;
+  /** Everything in the wallet, including earnings still clearing. */
   balance: number;
+  /** The part still clearing: it cannot be withdrawn or spent yet. */
   heldBalance: number;
+  /** What can be withdrawn or spent now. Older backends omit it; then balance minus held. */
+  availableBalance?: number;
+  clearing?: { amount: number; releaseAt: string | Date }[];
   status: "ACTIVE" | "FROZEN" | "SUSPENDED" | "CLOSED";
   createdAt: string | Date;
   updatedAt: string | Date;
@@ -133,6 +138,12 @@ export function mapBackendWalletTransactionToFrontend(
 /**
  * Maps backend wallet response to frontend Wallet model.
  */
+/** What can be withdrawn or spent now: the backend's figure, else balance minus what is clearing. */
+export function availableOf(raw: Pick<BackendWalletResponse, "balance" | "heldBalance" | "availableBalance">): number {
+  if (typeof raw.availableBalance === "number") return raw.availableBalance;
+  return Math.max(0, Number(raw.balance || 0) - Number(raw.heldBalance || 0));
+}
+
 export function mapBackendWalletToFrontend(
   raw: BackendWalletResponse,
   transactions: WalletTransaction[] = []
@@ -140,8 +151,13 @@ export function mapBackendWalletToFrontend(
   return {
     id: raw.id,
     userId: raw.userId || "",
-    balance: Number(raw.balance || 0),
+    // "Balance" in the app means what can be used now; clearing earnings are shown apart.
+    balance: availableOf(raw),
     pendingAmount: Number(raw.heldBalance || 0),
+    clearing: (raw.clearing ?? []).map((c) => ({
+      amount: Number(c.amount),
+      releaseAt: typeof c.releaseAt === "string" ? c.releaseAt : new Date(c.releaseAt).toISOString(),
+    })),
     currency: raw.currency || "NGN",
     isActive: raw.status === "ACTIVE",
     createdAt: typeof raw.createdAt === "string" ? raw.createdAt : new Date(raw.createdAt).toISOString(),
@@ -221,7 +237,8 @@ export async function fetchMyWalletTransactions(
 export async function fetchMyWalletBalance(): Promise<{ balance: number; currency: string }> {
   const { data, error } = await apiClient.get<BackendWalletResponse>("/wallet");
   if (error || !data) throw toFailure(error, "Could not load your wallet.");
-  return { balance: Number(data.balance || 0), currency: data.currency || "NGN" };
+  // What can be used now, so a "balance too low" check never counts clearing earnings.
+  return { balance: availableOf(data), currency: data.currency || "NGN" };
 }
 
 /** Starts a Paystack charge; the caller redirects to `authorizationUrl`. */

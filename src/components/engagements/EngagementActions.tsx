@@ -6,10 +6,12 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EngagementReasonDialog } from "./EngagementReasonDialog";
 import { MAX_REVISIONS } from "@/config/contract";
 import { formatNaira } from "@/lib/utils";
+import { formatMinutes } from "@/lib/hourly";
 import type { CurrentMilestoneInfo } from "@/lib/engagement-milestones";
 import {
   cancelEngagement,
   completeEngagement,
+  endEngagement,
   fundEngagement,
   openEngagementDispute,
   requestEngagementRevision,
@@ -21,7 +23,7 @@ import {
 import type { ApiError } from "@/lib/api-client";
 
 type Role = "employer" | "freelancer";
-type Kind = "fund" | "start" | "submit" | "withdraw" | "complete" | "revise" | "dispute" | "cancel";
+type Kind = "fund" | "start" | "submit" | "withdraw" | "complete" | "revise" | "dispute" | "cancel" | "end";
 
 /** Collects a written reason in a dialog before the step runs. */
 interface ReasonPrompt {
@@ -117,6 +119,15 @@ const ACTIONS: Record<Kind, ActionDef> = {
     },
     run: (id, text) => openEngagementDispute(id, text),
   },
+  end: {
+    kind: "end",
+    label: "End contract",
+    busyLabel: "Ending…",
+    variant: "outline",
+    confirm:
+      "End this contract? The next week has not been funded, so nothing is held and nothing is owed. This can't be undone.",
+    run: (id) => endEngagement(id),
+  },
   cancel: {
     kind: "cancel",
     label: "Cancel",
@@ -161,6 +172,45 @@ function actionFor(
         confirmLabel: "Decline contract",
       },
     };
+  }
+  if (milestone?.hourly) {
+    // A week of an hourly contract: say what is held, what is worth paying, and what comes back.
+    const week = milestone.title.toLowerCase();
+    const cap = formatNaira(milestone.amount);
+    const hours = formatMinutes(milestone.hourly.loggedMinutes);
+    const worth = formatNaira(milestone.hourly.worth);
+    if (kind === "fund") {
+      return {
+        ...base,
+        label: `Fund ${week}`,
+        confirm: `Fund ${week}? Up to ${cap} is held in escrow from your wallet. You only pay for the hours you approve; whatever isn't used is returned to your wallet.`,
+      };
+    }
+    if (kind === "complete") {
+      return {
+        ...base,
+        label: `Approve & pay ${week}`,
+        confirm: `Approve ${week}: ${hours} for ${worth}? That is paid to the freelancer, and the rest of the ${cap} held for the week is returned to you. This can't be undone.`,
+      };
+    }
+    if (kind === "submit") {
+      const again = status === "REVISION_REQUESTED";
+      return {
+        ...base,
+        label: again ? "Resubmit timesheet" : "Submit timesheet",
+        busyLabel: again ? "Resubmitting…" : "Submitting…",
+        confirm: `Submit ${hours} (${worth}) for the client to review? You can't add time while it is being reviewed.`,
+      };
+    }
+    if (kind === "dispute" && base.ask) {
+      return {
+        ...base,
+        ask: {
+          ...base.ask,
+          body: "This puts this week's payment on hold. Our team reviews the timesheet, then either pays the freelancer for the hours logged or refunds the employer. You can't undo it, so try talking to them first.",
+        },
+      };
+    }
   }
   if (kind === "submit" && status === "REVISION_REQUESTED") {
     return {
@@ -228,10 +278,17 @@ const ALLOWED: Record<Role, Partial<Record<EngagementStatus, Kind[]>>> = {
   },
 };
 
-export function engagementActionsFor(role: Role, status: EngagementStatus, revisionCount = 0): Kind[] {
+export function engagementActionsFor(
+  role: Role,
+  status: EngagementStatus,
+  revisionCount = 0,
+  /** `endable`: an hourly contract between paid weeks, which is ended rather than cancelled. */
+  opts: { endable?: boolean } = {}
+): Kind[] {
   const kinds = ALLOWED[role][status] ?? [];
   // Out of change requests: the employer must approve or dispute.
-  return revisionCount >= MAX_REVISIONS ? kinds.filter((k) => k !== "revise") : kinds;
+  const allowed = revisionCount >= MAX_REVISIONS ? kinds.filter((k) => k !== "revise") : kinds;
+  return opts.endable ? allowed.map((k) => (k === "cancel" ? "end" : k)) : allowed;
 }
 
 /**
@@ -259,7 +316,9 @@ export function EngagementActions({
   const [asking, setAsking] = useState<Kind | null>(null);
   const [busy, setBusy] = useState<Kind | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const kinds = engagementActionsFor(role, status, revisionCount);
+  // Between the weeks of an hourly contract that has been paid, "cancel" is "end".
+  const endable = !!milestone?.hourly && status === "PENDING_PAYMENT" && milestone.paidCount > 0;
+  const kinds = engagementActionsFor(role, status, revisionCount, { endable });
   if (kinds.length === 0) return null;
 
   const askingDef = asking ? actionFor(asking, role, status, milestone) : null;

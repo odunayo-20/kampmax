@@ -5,11 +5,12 @@ import { ContractStatusBadge } from "@/components/contracts/ContractStatusBadge"
 import { EmployerWalletCard } from "./EmployerWalletCard";
 import { EngagementActions } from "@/components/engagements/EngagementActions";
 import { EngagementMilestones } from "@/components/engagements/EngagementMilestones";
+import { HourlyTimesheet } from "@/components/engagements/HourlyTimesheet";
 import { EngagementNotices } from "@/components/engagements/EngagementNotices";
-import { describeCurrentMilestone } from "@/lib/engagement-milestones";
+import { contractPriceLabel, describeCurrentMilestone } from "@/lib/engagement-milestones";
 import { dashboardKeys } from "@/lib/query-keys";
 import { useEmployerContracts } from "@/hooks/use-employer-dashboard";
-import { formatDate, formatNaira } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
 import {
   EmployerDashboardEmpty,
@@ -62,7 +63,8 @@ export function EmployerContracts() {
                     <h2 className="text-sm font-bold text-kampmax-text">{contract.projectTitle}</h2>
                     <p className="mt-0.5 text-xs text-kampmax-text-secondary">
                       {contract.freelancerName}
-                      {contract.amount ? ` · ${formatNaira(contract.amount)}` : ""} · Due{" "}
+                      {" · "}
+                      {contractPriceLabel(contract.engagement)} · Due{" "}
                       {formatDate(contract.deadline)}
                     </p>
                   </div>
@@ -77,6 +79,14 @@ export function EmployerContracts() {
 
                 <EngagementMilestones milestones={contract.engagement.milestones} />
                 <EngagementNotices engagement={contract.engagement} role="employer" />
+                {contract.engagement.paymentType === "HOURLY" && (
+                  <HourlyTimesheet
+                    engagementId={contract.id}
+                    role="employer"
+                    status={contract.engagementStatus}
+                    onChanged={refresh}
+                  />
+                )}
                 <EngagementActions
                   engagementId={contract.id}
                   status={contract.engagementStatus}

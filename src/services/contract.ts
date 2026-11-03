@@ -97,7 +97,7 @@ export function engagementToContract(e: Engagement): Contract {
     progress:
       status === CONTRACT_STATUS.COMPLETED
         ? 100
-        : milestones.length > 1
+        : milestones.length > 1 && e.paymentType !== "HOURLY"
           ? Math.round((completedMilestones / milestones.length) * 100)
           : 0,
     currentMilestone: milestones.find((m) => m.status !== "COMPLETED" && m.status !== "CANCELLED")?.title,

@@ -6,6 +6,7 @@ import { TransactionItem } from "@/components/wallet/TransactionItem";
 import { WithdrawModal } from "@/components/wallet/WithdrawModal";
 import { Button } from "@/components/ui";
 import { formatNaira } from "@/lib/utils";
+import { describeClearing } from "@/lib/wallet-clearing";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
 import {
   fetchMyWallet,
@@ -48,7 +49,7 @@ export function WalletWithdrawals() {
             <p className="text-2xl font-bold text-kampmax-text">{wallet.data ? formatNaira(wallet.data.balance) : "…"}</p>
             {!!wallet.data?.pendingAmount && (
               <p className="mt-0.5 text-xs text-kampmax-text-secondary">
-                {formatNaira(wallet.data.pendingAmount)} pending
+                {describeClearing(wallet.data.pendingAmount, wallet.data.clearing)}
               </p>
             )}
           </div>

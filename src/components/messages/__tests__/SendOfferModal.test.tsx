@@ -10,7 +10,9 @@ vi.mock("@/hooks/use-offers", () => ({
 import { SendOfferModal } from "../SendOfferModal";
 
 afterEach(cleanup);
-beforeEach(() => mutate.mockReset());
+beforeEach(() => {
+  mutate.mockReset();
+});
 
 function renderModal() {
   const onClose = vi.fn();
@@ -127,5 +129,133 @@ describe("SendOfferModal", () => {
       expect(mutate).not.toHaveBeenCalled();
       expect(screen.getByRole("alert").textContent).toMatch(/₦10,000 of ₦60,000 is not assigned/);
     });
+  });
+});
+
+describe("an hourly offer", () => {
+  const chooseHourly = () => fireEvent.click(screen.getByRole("radio", { name: "By the hour" }));
+  const rate = () => screen.getByLabelText("Rate (₦ per hour)") as HTMLInputElement;
+  const weekly = () => screen.getByLabelText("Most hours per week") as HTMLInputElement;
+  const fillText = () => {
+    fireEvent.change(screen.getByLabelText("What will you deliver?"), { target: { value: "Ongoing web work" } });
+    fireEvent.change(screen.getByLabelText("Scope and terms"), { target: { value: "Fixes and features, billed hourly." } });
+  };
+  const button = () => screen.getByRole("button", { name: "Send offer" }) as HTMLButtonElement;
+
+  it("starts as a fixed price, and offers to be paid by the hour instead", () => {
+    renderModal();
+    expect((screen.getByRole("radio", { name: "Fixed price" }) as HTMLInputElement).checked).toBe(true);
+    expect(screen.queryByLabelText("Rate (₦ per hour)")).toBeNull();
+    expect(screen.getByLabelText("Price (₦)")).toBeTruthy();
+  });
+
+  it("swaps the price for a rate and a weekly limit, and drops the milestone plan", () => {
+    renderModal();
+    chooseHourly();
+
+    expect(rate()).toBeTruthy();
+    expect(weekly()).toBeTruthy();
+    expect(screen.queryByLabelText("Price (₦)")).toBeNull();
+    expect(screen.queryByRole("checkbox", { name: "Use milestones" })).toBeNull();
+  });
+
+  it("says how the money moves, and the most a week can cost, once the terms are valid", () => {
+    renderModal();
+    chooseHourly();
+    fireEvent.change(rate(), { target: { value: "3000" } });
+    fireEvent.change(weekly(), { target: { value: "20" } });
+
+    expect(screen.getByText(/A week can cost up to ₦60,000/)).toBeTruthy();
+    expect(screen.getByText(/paid for the hours they\s+approve; whatever is not used goes back to them/)).toBeTruthy();
+  });
+
+  it("sends the rate and the weekly limit, and no price or milestones", () => {
+    renderModal();
+    fillText();
+    chooseHourly();
+    fireEvent.change(rate(), { target: { value: "3000" } });
+    fireEvent.change(weekly(), { target: { value: "20" } });
+    fireEvent.click(button());
+
+    expect(mutate).toHaveBeenCalledTimes(1);
+    expect(sent()).toMatchObject({
+      conversationId: "c1",
+      title: "Ongoing web work",
+      paymentType: "HOURLY",
+      hourlyRate: 3000,
+      weeklyHourLimit: 20,
+    });
+    // The week's maximum is the backend's to work out, from the rate and the limit.
+    expect("amount" in sent()).toBe(false);
+    expect("milestones" in sent()).toBe(false);
+  });
+
+  it("cannot be sent until the rate and the weekly limit are valid", () => {
+    renderModal();
+    fillText();
+    chooseHourly();
+    expect(button().disabled).toBe(true);
+
+    fireEvent.change(rate(), { target: { value: "3000" } });
+    expect(button().disabled).toBe(true);
+    fireEvent.change(weekly(), { target: { value: "20" } });
+    expect(button().disabled).toBe(false);
+  });
+
+  it("explains a rate that is too low or a limit that is too high, once they are typed", () => {
+    renderModal();
+    chooseHourly();
+    expect(screen.queryByText(/Enter a rate from/)).toBeNull();
+
+    fireEvent.change(rate(), { target: { value: "50" } });
+    fireEvent.change(weekly(), { target: { value: "100" } });
+
+    expect(screen.getByText(/Enter a rate from ₦100 to ₦1,000,000 an hour/)).toBeTruthy();
+    expect(screen.getByText(/whole number of hours from 1 to 60/)).toBeTruthy();
+  });
+
+  it("does not claim a weekly maximum until the terms make sense", () => {
+    renderModal();
+    chooseHourly();
+    fireEvent.change(rate(), { target: { value: "50" } });
+    fireEvent.change(weekly(), { target: { value: "20" } });
+    expect(screen.queryByText(/A week can cost up to/)).toBeNull();
+  });
+
+  it("goes back to a fixed price, with its plan editor, if the freelancer changes their mind", () => {
+    renderModal();
+    chooseHourly();
+    fireEvent.click(screen.getByRole("radio", { name: "Fixed price" }));
+
+    expect(screen.getByLabelText("Price (₦)")).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: "Use milestones" })).toBeTruthy();
+    expect(screen.queryByLabelText("Rate (₦ per hour)")).toBeNull();
+  });
+
+  it("does not send a milestone plan that was started before switching to hourly", () => {
+    renderModal();
+    fillText();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Use milestones" }));
+    chooseHourly();
+    fireEvent.change(rate(), { target: { value: "3000" } });
+    fireEvent.change(weekly(), { target: { value: "10" } });
+    fireEvent.click(button());
+
+    expect(mutate).toHaveBeenCalledTimes(1);
+    expect("milestones" in sent()).toBe(false);
+  });
+
+  it("does not send hourly terms that were typed before switching back to a fixed price", () => {
+    renderModal();
+    fillBasics();
+    chooseHourly();
+    fireEvent.change(rate(), { target: { value: "3000" } });
+    fireEvent.change(weekly(), { target: { value: "20" } });
+    fireEvent.click(screen.getByRole("radio", { name: "Fixed price" }));
+    send();
+
+    expect(sent()).toMatchObject({ amount: 50000 });
+    expect("paymentType" in sent()).toBe(false);
+    expect("hourlyRate" in sent()).toBe(false);
   });
 });

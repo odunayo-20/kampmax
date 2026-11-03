@@ -6,6 +6,8 @@ import { useCreateOffer } from "@/hooks/use-offers";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
 import { MilestonePlanEditor } from "@/components/freelancer/proposals/MilestonePlanEditor";
 import { toProposalMilestones, validatePlan, type MilestoneRow, type PlanErrors } from "@/lib/milestone-plan";
+import { validateHourlyTerms, weeklyCap } from "@/lib/hourly";
+import { cn, formatNaira } from "@/lib/utils";
 
 interface SendOfferModalProps {
   conversationId: string;
@@ -24,6 +26,9 @@ export function SendOfferModal({ conversationId, onClose }: SendOfferModalProps)
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
+  const [payment, setPayment] = useState<"FIXED" | "HOURLY">("FIXED");
+  const [rate, setRate] = useState("");
+  const [weeklyHours, setWeeklyHours] = useState("");
   const [deliveryDays, setDeliveryDays] = useState("");
   const [expiresInDays, setExpiresInDays] = useState("7");
   const [plan, setPlan] = useState<MilestoneRow[]>([]);
@@ -40,14 +45,19 @@ export function SendOfferModal({ conversationId, onClose }: SendOfferModalProps)
   // The delivery estimate is optional, but a whole number of days from 1 to 365 when given.
   const days = Number(deliveryDays);
   const daysValid = !deliveryDays || (Number.isInteger(days) && days >= 1 && days <= 365);
-  const valid = title.trim().length >= 3 && description.trim().length >= 10 && price >= 1 && daysValid;
+  const hourly = payment === "HOURLY";
+  // An hourly offer is priced by a rate and a weekly limit instead of a price.
+  const termsErrors = hourly ? validateHourlyTerms(rate, weeklyHours) : null;
+  const termsValid = hourly ? termsErrors === null : price >= 1;
+  const valid = title.trim().length >= 3 && description.trim().length >= 10 && termsValid && daysValid;
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!valid || createOffer.isPending) return;
     setError(null);
     // A payment plan has to add up to the price; say what is wrong before sending.
-    const problems = validatePlan(plan, price);
+    // (An hourly offer is paid by the week and has no milestones.)
+    const problems = hourly ? null : validatePlan(plan, price);
     setPlanErrors(problems);
     if (problems) return;
     createOffer.mutate(
@@ -55,9 +65,10 @@ export function SendOfferModal({ conversationId, onClose }: SendOfferModalProps)
         conversationId,
         title: title.trim(),
         description: description.trim(),
-        amount: price,
+        ...(hourly
+          ? { paymentType: "HOURLY" as const, hourlyRate: Number(rate), weeklyHourLimit: Number(weeklyHours) }
+          : { amount: price, milestones: toProposalMilestones(plan) }),
         deliveryDays: deliveryDays ? Number(deliveryDays) : undefined,
-        milestones: toProposalMilestones(plan),
         expiresInDays: Number(expiresInDays),
       },
       {
@@ -136,21 +147,95 @@ export function SendOfferModal({ conversationId, onClose }: SendOfferModalProps)
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div>
-              <label htmlFor="offer-amount" className="mb-1.5 block text-xs font-medium text-neutral-600">
-                Price (₦)
-              </label>
-              <input
-                id="offer-amount"
-                type="number"
-                inputMode="decimal"
-                min={1}
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className={inputClass}
-              />
+          <fieldset>
+            <legend className="mb-1.5 text-xs font-medium text-neutral-600">How do you want to be paid?</legend>
+            <div className="grid grid-cols-2 gap-2">
+              {(["FIXED", "HOURLY"] as const).map((kind) => (
+                <label
+                  key={kind}
+                  className={cn(
+                    "flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm",
+                    payment === kind ? "border-primary-500 bg-primary-50 font-semibold text-neutral-900" : "border-neutral-200 text-neutral-700"
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="offer-payment"
+                    checked={payment === kind}
+                    onChange={() => setPayment(kind)}
+                    className="h-4 w-4"
+                  />
+                  {kind === "FIXED" ? "Fixed price" : "By the hour"}
+                </label>
+              ))}
             </div>
+          </fieldset>
+
+          {hourly && (
+            <div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="offer-rate" className="mb-1.5 block text-xs font-medium text-neutral-600">
+                    Rate (₦ per hour)
+                  </label>
+                  <input
+                    id="offer-rate"
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    value={rate}
+                    onChange={(e) => setRate(e.target.value)}
+                    aria-invalid={rate !== "" && !!termsErrors?.rate}
+                    className={inputClass}
+                  />
+                  {rate !== "" && termsErrors?.rate && <p className="mt-1 text-[11px] text-error-600">{termsErrors.rate}</p>}
+                </div>
+                <div>
+                  <label htmlFor="offer-hours" className="mb-1.5 block text-xs font-medium text-neutral-600">
+                    Most hours per week
+                  </label>
+                  <input
+                    id="offer-hours"
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    value={weeklyHours}
+                    onChange={(e) => setWeeklyHours(e.target.value)}
+                    aria-invalid={weeklyHours !== "" && !!termsErrors?.hours}
+                    className={inputClass}
+                  />
+                  {weeklyHours !== "" && termsErrors?.hours && (
+                    <p className="mt-1 text-[11px] text-error-600">{termsErrors.hours}</p>
+                  )}
+                </div>
+              </div>
+              <p className="mt-2 text-[11px] text-neutral-500">
+                {termsErrors === null
+                  ? `A week can cost up to ${formatNaira(weeklyCap(Number(rate), Number(weeklyHours)))}. `
+                  : ""}
+                The client funds each week before you start it. You log your hours, and are paid for the hours they
+                approve; whatever is not used goes back to them.
+              </p>
+            </div>
+          )}
+
+          <div className={cn("grid grid-cols-1 gap-3", hourly ? "sm:grid-cols-2" : "sm:grid-cols-3")}>
+            {!hourly && (
+              <div>
+                <label htmlFor="offer-amount" className="mb-1.5 block text-xs font-medium text-neutral-600">
+                  Price (₦)
+                </label>
+                <input
+                  id="offer-amount"
+                  type="number"
+                  inputMode="decimal"
+                  min={1}
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+            )}
             <div>
               <label htmlFor="offer-days" className="mb-1.5 block text-xs font-medium text-neutral-600">
                 Delivery (days)
@@ -185,13 +270,15 @@ export function SendOfferModal({ conversationId, onClose }: SendOfferModalProps)
             </div>
           </div>
 
-          <MilestonePlanEditor
-            rows={plan}
-            total={price >= 1 ? price : undefined}
-            onChange={setPlan}
-            errors={planErrors}
-            disabled={createOffer.isPending}
-          />
+          {!hourly && (
+            <MilestonePlanEditor
+              rows={plan}
+              total={price >= 1 ? price : undefined}
+              onChange={setPlan}
+              errors={planErrors}
+              disabled={createOffer.isPending}
+            />
+          )}
 
           <button
             type="submit"

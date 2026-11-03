@@ -26,6 +26,9 @@ const baseOffer = (overrides: Partial<Offer> = {}): Offer => ({
   amount: 50000,
   currency: "NGN",
   deliveryDays: 7,
+  paymentType: "FIXED",
+  hourlyRate: null,
+  weeklyHourLimit: null,
   milestones: [],
   status: "PENDING",
   expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
@@ -87,6 +90,17 @@ describe("OfferCard", () => {
   it("shows no plan for an offer that is one payment", () => {
     render(<OfferCard offerId="o1" />);
     expect(screen.queryByText(/milestones/)).toBeNull();
+  });
+
+  it("shows an hourly offer by its rate and weekly limit, and how the money moves", () => {
+    offer = baseOffer({ paymentType: "HOURLY", hourlyRate: 3000, weeklyHourLimit: 20, amount: 60000 });
+    render(<OfferCard offerId="o1" />);
+
+    expect(screen.getByText("₦3,000/hr · up to 20 h/week")).toBeTruthy();
+    expect(screen.getByText(/up to ₦60,000 a week, funded in advance. Unused money is returned/)).toBeTruthy();
+    // Not presented as a ₦60,000 price.
+    expect(screen.queryByText("₦60,000")).toBeNull();
+    expect(screen.getByRole("button", { name: "Accept offer" })).toBeTruthy();
   });
 
   it("gives the freelancer only a withdraw action", () => {

@@ -23,6 +23,10 @@ export interface Offer {
   amount: number;
   currency: string;
   deliveryDays: number | null;
+  /** FIXED: `amount` is the price. HOURLY: `amount` is the most one week can cost. */
+  paymentType: "FIXED" | "HOURLY";
+  hourlyRate: number | null;
+  weeklyHourLimit: number | null;
   /** The payment plan, paid one milestone at a time; empty means one payment for the whole price. */
   milestones: { title: string; description: string | null; amount: number; dueDate: string | null }[];
   /** A pending offer past its expiry already reads as EXPIRED. */
@@ -39,7 +43,11 @@ export interface CreateOfferInput {
   conversationId: string;
   title: string;
   description: string;
-  amount: number;
+  /** Fixed-price offers. Leave out for an hourly offer: its weekly maximum is worked out from the rate and limit. */
+  amount?: number;
+  paymentType?: "FIXED" | "HOURLY";
+  hourlyRate?: number;
+  weeklyHourLimit?: number;
   deliveryDays?: number;
   /** Optional payment plan; it must add up to `amount` (the backend checks). */
   milestones?: ProposalMilestone[];

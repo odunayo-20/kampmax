@@ -7,6 +7,7 @@ import { CreditCard, Send, Download, X, Copy, Check } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Logo } from "@/components/ui/Logo";
 import { FundingModal } from "@/components/wallet/FundingModal";
+import { describeClearing } from "@/lib/wallet-clearing";
 import { useAuth } from "@/lib/auth-context";
 import { useWalletTopup } from "@/hooks/use-wallet-topup";
 import { fetchMyWallet, fetchMyWalletTransactions } from "@/services/wallet";
@@ -120,7 +121,7 @@ export default function KampmaxPayPage() {
             </h2>
             {wallet.data && wallet.data.pendingAmount > 0 && (
               <p className="text-[11px] text-blue-100">
-                {formatNaira(wallet.data.pendingAmount)} held in escrow
+                {describeClearing(wallet.data.pendingAmount, wallet.data.clearing)}
               </p>
             )}
           </div>

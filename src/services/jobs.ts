@@ -242,6 +242,9 @@ export interface EngagementDispute {
 /** Backend MilestoneStatus: milestones are worked and paid one at a time, in order. */
 export type MilestoneStatus = "UPCOMING" | "ACTIVE" | "COMPLETED" | "CANCELLED";
 
+/** A milestone is a fixed-price step, or one billing week of an hourly contract. */
+export type MilestoneKind = "FIXED" | "WEEK";
+
 export interface EngagementMilestone {
   id: string;
   /** 1-based order within the contract. */
@@ -252,6 +255,14 @@ export interface EngagementMilestone {
   amount: number;
   /** When this step is expected (YYYY-MM-DD). Display only: nothing happens when it passes. */
   dueDate: string | null;
+  kind: MilestoneKind;
+  /** Weeks only: the seven days time can be logged, from the day the week is funded. */
+  periodStart: string | null;
+  periodEnd: string | null;
+  /** Weeks only: minutes logged so far. */
+  loggedMinutes: number;
+  /** Weeks only: what was paid once the week was settled. `amount` is the most it could be. */
+  billedAmount: number | null;
   status: MilestoneStatus;
   completedAt: string | null;
   /** True when it was paid because the client never reviewed it. */
@@ -277,6 +288,12 @@ export interface Engagement {
    */
   agreedAmount: number;
   currency: string;
+  /** FIXED: a price, paid in milestones. HOURLY: a rate, paid a week at a time for the hours logged. */
+  paymentType: "FIXED" | "HOURLY";
+  /** Hourly only: pay for each hour of logged work. */
+  hourlyRate: number | null;
+  /** Hourly only: the most hours that can be logged, and funded, in a week. */
+  weeklyHourLimit: number | null;
   /** Which milestone is being funded, worked or reviewed now (1-based). */
   currentMilestonePosition: number;
   /** In order. Money is funded, delivered and paid one milestone at a time. */
@@ -725,6 +742,18 @@ export async function openEngagementDispute(
     `/engagements/${id}/dispute`,
     { reason }
   );
+  if (error) return { engagement: null, error };
+  return { engagement: data, error: null };
+}
+
+/**
+ * End an hourly contract between weeks, once the last week is paid (either party).
+ * Endpoint: POST /engagements/:id/end
+ */
+export async function endEngagement(
+  id: string
+): Promise<{ engagement: Engagement | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.post<undefined, Engagement>(`/engagements/${id}/end`);
   if (error) return { engagement: null, error };
   return { engagement: data, error: null };
 }

@@ -258,7 +258,7 @@ export async function getFreelancerDashboardApi(): Promise<FreelancerDashboard |
     getMyProposalsApi({ limit: 100 }),
     loadProfileSections("me"),
     apiClient.get<{ items?: unknown[]; meta?: { total?: number } }>("/portfolio/me?limit=1"),
-    apiClient.get<{ balance: number; heldBalance?: number }>("/wallet"),
+    apiClient.get<{ balance: number; heldBalance?: number; availableBalance?: number }>("/wallet"),
   ]);
 
   const active = contracts.filter(
@@ -271,7 +271,11 @@ export async function getFreelancerDashboardApi(): Promise<FreelancerDashboard |
   const underReview = countOf("under_review");
 
   const walletData = wallet.error ? null : wallet.data;
-  const balance = walletData && typeof walletData.balance === "number" ? walletData.balance : null;
+  // Show what can be used now; earnings still clearing are not spendable yet.
+  const balance =
+    walletData && typeof walletData.balance === "number"
+      ? (walletData.availableBalance ?? Math.max(0, walletData.balance - (walletData.heldBalance ?? 0)))
+      : null;
 
   const metrics: FreelancerDashboardMetric[] = [
     { key: "active_proposals", label: "Active Proposals", valueLabel: String(submittedProposals + underReview), tone: "neutral" },
@@ -279,7 +283,7 @@ export async function getFreelancerDashboardApi(): Promise<FreelancerDashboard |
     { key: "completed_projects", label: "Completed Projects", valueLabel: String(completed), tone: "success" },
     {
       key: "wallet_balance",
-      label: "Wallet balance",
+      label: "Available balance",
       valueLabel: balance === null ? "—" : formatNaira(balance),
       tone: "neutral",
     },

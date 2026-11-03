@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { freelancerDashboardKeys } from "@/lib/query-keys";
-import { cn, formatNaira } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/Skeleton";
 import {
   engagementToContract,
@@ -13,8 +13,9 @@ import type { Engagement } from "@/services/jobs";
 import { ContractStatusBadge } from "@/components/contracts/ContractStatusBadge";
 import { EngagementActions } from "@/components/engagements/EngagementActions";
 import { EngagementMilestones } from "@/components/engagements/EngagementMilestones";
+import { HourlyTimesheet } from "@/components/engagements/HourlyTimesheet";
 import { EngagementNotices } from "@/components/engagements/EngagementNotices";
-import { describeCurrentMilestone } from "@/lib/engagement-milestones";
+import { contractPriceLabel, describeCurrentMilestone } from "@/lib/engagement-milestones";
 import { ContractEmptyState } from "@/components/contracts/ContractEmptyState";
 import type { Contract, ContractStatus } from "@/types/contract";
 import { CONTRACT_STATUS } from "@/types/contract";
@@ -149,7 +150,8 @@ export default function FreelancerContractsPage() {
                 <h2 className="text-sm font-bold text-kampmax-text">{contract.projectTitle}</h2>
                 <p className="mt-0.5 text-xs text-kampmax-text-secondary">
                   {contract.client.displayName}
-                  {contract.agreedAmount ? ` · ${formatNaira(contract.agreedAmount)}` : ""}
+                  {" · "}
+                  {contractPriceLabel(engagement)}
                 </p>
                 <div className="mt-2">
                   <ContractStatusBadge status={contract.status} />
@@ -159,6 +161,17 @@ export default function FreelancerContractsPage() {
                 </p>
                 <EngagementMilestones milestones={engagement.milestones} />
                 <EngagementNotices engagement={engagement} role="freelancer" />
+                {engagement.paymentType === "HOURLY" && (
+                  <HourlyTimesheet
+                    engagementId={engagement.id}
+                    role="freelancer"
+                    status={engagement.status}
+                    onChanged={() => {
+                      void loadEngagements();
+                      void queryClient.invalidateQueries({ queryKey: ["freelancer", "contracts"] });
+                    }}
+                  />
+                )}
                 <EngagementActions
                   engagementId={engagement.id}
                   status={engagement.status}

@@ -18,6 +18,11 @@ const m = (
   description: null,
   amount,
   dueDate: null,
+  kind: "FIXED",
+  periodStart: null,
+  periodEnd: null,
+  loggedMinutes: 0,
+  billedAmount: null,
   status,
   completedAt: null,
   autoReleased: false,
@@ -90,5 +95,68 @@ describe("EngagementMilestones", () => {
   it("renders nothing for a contract with a single payment", () => {
     const { container } = render(<EngagementMilestones milestones={[m(1, "ACTIVE", 250000)]} />);
     expect(container.textContent).toBe("");
+  });
+});
+
+describe("the weeks of an hourly contract", () => {
+  const week = (position: number, status: MilestoneStatus, extra: Partial<EngagementMilestone> = {}) =>
+    m(position, status, 60000, {
+      kind: "WEEK",
+      title: `Week ${position}`,
+      periodStart: "2026-11-04",
+      periodEnd: "2026-11-10",
+      ...extra,
+    });
+
+  it("is headed 'Weeks', and counts weeks paid", () => {
+    render(<EngagementMilestones milestones={[week(1, "COMPLETED"), week(2, "ACTIVE")]} />);
+    expect(screen.getByRole("heading", { name: "Weeks" })).not.toBeNull();
+    expect(screen.getByText("1 week paid")).not.toBeNull();
+  });
+
+  it("shows what a paid week actually paid and the hours worked, not the escrow it was funded with", () => {
+    render(
+      <EngagementMilestones
+        milestones={[week(1, "COMPLETED", { loggedMinutes: 1110, billedAmount: 55500 }), week(2, "ACTIVE")]}
+      />
+    );
+    const [paid, current] = within(screen.getByRole("list")).getAllByRole("listitem");
+
+    expect(paid.textContent).toContain("Week 1");
+    expect(paid.textContent).toContain("18h 30m");
+    expect(paid.textContent).toContain("₦55,500");
+    expect(paid.textContent).not.toContain("60,000");
+    // The week still open can cost at most what was funded.
+    expect(current.textContent).toContain("up to ₦60,000");
+  });
+
+  it("names the days each week covers", () => {
+    render(<EngagementMilestones milestones={[week(1, "COMPLETED", { billedAmount: 1000 }), week(2, "ACTIVE")]} />);
+    expect(screen.getAllByText(/4.*Nov.*–.*10.*Nov/)).toHaveLength(2);
+  });
+
+  it("does not flag a week's own end date as overdue", () => {
+    render(
+      <EngagementMilestones
+        milestones={[week(1, "COMPLETED", { billedAmount: 1000 }), week(2, "ACTIVE", { dueDate: "2020-01-01" })]}
+      />
+    );
+    expect(screen.queryByText(/Overdue/)).toBeNull();
+  });
+
+  it("lists only the latest few weeks of a long contract, and says how many it left out", () => {
+    const many = Array.from({ length: 8 }, (_, i) => week(i + 1, i < 7 ? "COMPLETED" : "ACTIVE", { billedAmount: 1000 }));
+    render(<EngagementMilestones milestones={many} />);
+
+    expect(within(screen.getByRole("list")).getAllByRole("listitem")).toHaveLength(5);
+    expect(screen.getByText("3 earlier weeks not shown")).not.toBeNull();
+    expect(screen.getByText("7 weeks paid")).not.toBeNull();
+    expect(screen.queryByText(/^Week 1\b/)).toBeNull();
+    expect(screen.getByText(/^Week 8\b/)).not.toBeNull();
+  });
+
+  it("says nothing about earlier weeks when there are few", () => {
+    render(<EngagementMilestones milestones={[week(1, "COMPLETED", { billedAmount: 1000 }), week(2, "ACTIVE")]} />);
+    expect(screen.queryByText(/earlier/)).toBeNull();
   });
 });

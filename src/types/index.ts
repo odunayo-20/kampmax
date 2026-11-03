@@ -645,8 +645,12 @@ export interface WalletTransaction {
 export interface Wallet {
   id: string;
   userId: string;
+  /** What can be withdrawn or spent right now (earnings still clearing are not included). */
   balance: number;
+  /** Earnings that have arrived but are still clearing. */
   pendingAmount: number;
+  /** The soonest clearing amounts and when each becomes available. */
+  clearing?: { amount: number; releaseAt: string }[];
   currency: string;
   isActive: boolean;
   createdAt: string;
