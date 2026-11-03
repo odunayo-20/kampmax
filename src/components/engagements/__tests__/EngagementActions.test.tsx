@@ -104,7 +104,15 @@ describe("plain confirmations", () => {
 });
 
 describe("EngagementNotices", () => {
-  const base = { status: "IN_PROGRESS" as const, revisionNote: null, cancellationReason: null, dispute: null };
+  const base = {
+    status: "IN_PROGRESS" as const,
+    revisionNote: null,
+    cancellationReason: null,
+    dispute: null,
+    autoReleaseAt: null,
+    autoReleasedAt: null,
+  };
+  const inDays = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString();
 
   it("shows the client's change request to the freelancer", () => {
     render(
@@ -164,6 +172,53 @@ describe("EngagementNotices", () => {
 
     rerender(<EngagementNotices role="freelancer" engagement={base} />);
     expect(container.textContent).toBe("");
+  });
+
+  describe("automatic release", () => {
+    it("tells the employer how long they have, without alarm while there is time", () => {
+      render(
+        <EngagementNotices role="employer" engagement={{ ...base, status: "SUBMITTED", autoReleaseAt: inDays(6.5) }} />
+      );
+      expect(screen.getByText("Review the submitted work")).not.toBeNull();
+      expect(screen.getByText(/released to the freelancer automatically on/)).not.toBeNull();
+    });
+
+    it("raises the urgency for the employer in the final two days", () => {
+      render(
+        <EngagementNotices role="employer" engagement={{ ...base, status: "SUBMITTED", autoReleaseAt: inDays(1.5) }} />
+      );
+      expect(screen.getByText(/Review needed — payment releases in 1 day/)).not.toBeNull();
+    });
+
+    it("reassures the freelancer that silence will not leave them unpaid", () => {
+      render(
+        <EngagementNotices role="freelancer" engagement={{ ...base, status: "SUBMITTED", autoReleaseAt: inDays(5) }} />
+      );
+      expect(screen.getByText("Waiting for the client's review")).not.toBeNull();
+      expect(screen.getByText(/your payment is released to you automatically/)).not.toBeNull();
+    });
+
+    it("explains an automatic release afterwards, to each side", () => {
+      const released = { ...base, status: "COMPLETED" as const, autoReleasedAt: "2026-11-03T12:00:00.000Z" };
+      const { rerender } = render(<EngagementNotices role="employer" engagement={released} />);
+      expect(screen.getByText("Payment released automatically")).not.toBeNull();
+      expect(screen.getByText(/wasn't reviewed in time/)).not.toBeNull();
+
+      rerender(<EngagementNotices role="freelancer" engagement={released} />);
+      expect(screen.getByText(/released to your wallet/)).not.toBeNull();
+    });
+
+    it("says nothing extra for work approved by the employer, or no longer awaiting review", () => {
+      const { container, rerender } = render(
+        <EngagementNotices role="employer" engagement={{ ...base, status: "COMPLETED" }} />
+      );
+      expect(container.textContent).toBe("");
+
+      rerender(
+        <EngagementNotices role="employer" engagement={{ ...base, status: "REVISION_REQUESTED", autoReleaseAt: inDays(3) }} />
+      );
+      expect(container.textContent).toBe("");
+    });
   });
 });
 

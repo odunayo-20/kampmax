@@ -259,7 +259,14 @@ export interface Engagement {
   startDate: string | null;
   expectedCompletionDate: string | null;
   submittedAt: string | null;
+  /**
+   * While SUBMITTED: when the payment releases on its own if the employer does
+   * nothing. Set by the backend (which owns the review window) — display only.
+   */
+  autoReleaseAt: string | null;
   completedAt: string | null;
+  /** Set when the payment was released automatically because the work was never reviewed. */
+  autoReleasedAt: string | null;
   cancelledAt: string | null;
   cancellationReason: string | null;
   /** The employer's latest change request; set while REVISION_REQUESTED. */

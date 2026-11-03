@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
-import { AlertTriangle, CheckCircle2, RotateCcw, XCircle, type LucideIcon } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, RotateCcw, XCircle, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getReviewWindowInfo } from "@/lib/contract-utils";
 import type { Engagement } from "@/services/jobs";
 
 type Role = "employer" | "freelancer";
@@ -8,7 +9,7 @@ type Role = "employer" | "freelancer";
 /** The parts of an engagement the notices read. */
 export type EngagementNoticeData = Pick<
   Engagement,
-  "status" | "revisionNote" | "cancellationReason" | "dispute"
+  "status" | "revisionNote" | "cancellationReason" | "dispute" | "autoReleaseAt" | "autoReleasedAt"
 >;
 
 const TONES = {
@@ -48,7 +49,7 @@ const PARTY_LABEL = { EMPLOYER: "The client", FREELANCER: "The freelancer" } as 
  * nothing when there is nothing to explain.
  */
 export function EngagementNotices({ engagement, role }: { engagement: EngagementNoticeData; role: Role }) {
-  const { status, revisionNote, cancellationReason, dispute } = engagement;
+  const { status, revisionNote, cancellationReason, dispute, autoReleaseAt, autoReleasedAt } = engagement;
   const me = role === "employer" ? "EMPLOYER" : "FREELANCER";
 
   if (status === "REVISION_REQUESTED" && revisionNote) {
@@ -93,6 +94,37 @@ export function EngagementNotices({ engagement, role }: { engagement: Engagement
     return (
       <Notice tone="neutral" icon={XCircle} title="Cancelled">
         Reason: “{cancellationReason}”
+      </Notice>
+    );
+  }
+
+  if (status === "SUBMITTED" && autoReleaseAt) {
+    const { relative, absolute, urgent } = getReviewWindowInfo(autoReleaseAt);
+    return role === "employer" ? (
+      <Notice
+        tone={urgent ? "warning" : "neutral"}
+        icon={Clock}
+        title={urgent ? `Review needed — payment releases ${relative}` : "Review the submitted work"}
+      >
+        If you don&apos;t approve it, ask for changes or report a problem, the payment is released to the freelancer
+        automatically on {absolute} ({relative}).
+      </Notice>
+    ) : (
+      <Notice tone="neutral" icon={Clock} title="Waiting for the client's review">
+        If the client doesn&apos;t respond, your payment is released to you automatically on {absolute} ({relative}).
+      </Notice>
+    );
+  }
+
+  if (status === "COMPLETED" && autoReleasedAt) {
+    return role === "employer" ? (
+      <Notice tone="neutral" icon={CheckCircle2} title="Payment released automatically">
+        The submitted work wasn&apos;t reviewed in time, so the payment went to the freelancer. If something was wrong,
+        contact support.
+      </Notice>
+    ) : (
+      <Notice tone="success" icon={CheckCircle2} title="Payment released automatically">
+        The client didn&apos;t review your work in time, so your payment was released to your wallet.
       </Notice>
     );
   }

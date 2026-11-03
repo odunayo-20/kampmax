@@ -58,6 +58,42 @@ export function getDeadlineInfo(
   return { intent: "upcoming", label: `Due ${due.toLocaleDateString("en-NG", { month: "short", day: "numeric" })}`, isOverdue: false };
 }
 
+// ── Review window (automatic release) ───────────────────────
+// The backend decides when submitted work releases on its own and sends that
+// moment as `autoReleaseAt`. We only describe it: how far away it is, and
+// whether it is close enough to nudge the employer.
+
+export interface ReviewWindowInfo {
+  /** e.g. "in 6 days", "in 5 hours". */
+  relative: string;
+  /** e.g. "10 Nov, 12:00" in the viewer's timezone. */
+  absolute: string;
+  /** True for the last stretch, when the employer should be pushed to act. */
+  urgent: boolean;
+}
+
+/** Matches the backend's reminder lead time; presentation only. */
+const REVIEW_URGENT_WITHIN_MS = 48 * 3_600_000;
+
+export function getReviewWindowInfo(autoReleaseAt: string, now = Date.now()): ReviewWindowInfo {
+  const due = new Date(autoReleaseAt);
+  const ms = due.getTime() - now;
+  const hours = Math.floor(ms / 3_600_000);
+  const days = Math.floor(hours / 24);
+
+  let relative: string;
+  if (ms <= 0) relative = "shortly";
+  else if (hours < 1) relative = "within the hour";
+  else if (hours < 24) relative = `in ${hours} ${hours === 1 ? "hour" : "hours"}`;
+  else relative = `in ${days} ${days === 1 ? "day" : "days"}`;
+
+  return {
+    relative,
+    absolute: due.toLocaleString("en-NG", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }),
+    urgent: ms <= REVIEW_URGENT_WITHIN_MS,
+  };
+}
+
 // ── File size formatting ────────────────────────────────────
 
 export function formatFileSize(bytes: number): string {
