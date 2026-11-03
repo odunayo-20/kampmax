@@ -149,6 +149,8 @@ export function getContractActionTitle(status: ContractStatus): string {
   switch (status) {
     case CONTRACT_STATUS.PENDING_ACCEPTANCE:
       return "Action required";
+    case CONTRACT_STATUS.AWAITING_FUNDING:
+      return "Waiting for client";
     case CONTRACT_STATUS.AWAITING_CLIENT_REVIEW:
       return "Waiting for client";
     case CONTRACT_STATUS.REVISION_REQUESTED:

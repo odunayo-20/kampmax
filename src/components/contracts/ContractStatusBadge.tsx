@@ -21,6 +21,7 @@ import type { ContractStatus, MilestoneStatus, DeliverableStatus } from "@/types
 // Contract status badge — uses a colour PLUS an icon so it's never colour-only.
 const CONTRACT_STYLES: Record<ContractStatus, string> = {
   PENDING_ACCEPTANCE: "bg-accent-50 text-accent-700 border border-accent-100",
+  AWAITING_FUNDING: "bg-accent-50 text-accent-700 border border-accent-100",
   ACTIVE: "bg-primary-50 text-primary-700 border border-primary-100",
   PAUSED: "bg-neutral-100 text-neutral-600 border border-neutral-200",
   AWAITING_CLIENT_REVIEW: "bg-info-50 text-info-700 border border-info-100",
@@ -32,6 +33,7 @@ const CONTRACT_STYLES: Record<ContractStatus, string> = {
 
 const CONTRACT_ICONS: Record<ContractStatus, LucideIcon> = {
   PENDING_ACCEPTANCE: Clock,
+  AWAITING_FUNDING: Clock,
   ACTIVE: Loader2,
   PAUSED: Clock,
   AWAITING_CLIENT_REVIEW: Eye,

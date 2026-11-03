@@ -232,6 +232,15 @@ import { createApiDisputeManagementService } from "./dispute-management.api";
 export const disputeManagementService: AdminDisputeManagementService =
   createApiDisputeManagementService();
 
+import {
+  createApiContractDisputeService,
+  type ContractDisputeService,
+} from "./contract-dispute.api";
+
+/** /admin/disputes/contracts: freelance-contract disputes, ruled on directly (releases or refunds the escrow). */
+export const contractDisputeService: ContractDisputeService =
+  createApiContractDisputeService();
+
 /** /admin/freelancers console: live directory + moderation API. */
 export const freelancerManagementService: AdminFreelancerManagementService =
   createApiFreelancerManagementService();

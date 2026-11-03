@@ -12,6 +12,7 @@ import {
 import type { Engagement } from "@/services/jobs";
 import { ContractStatusBadge } from "@/components/contracts/ContractStatusBadge";
 import { EngagementActions } from "@/components/engagements/EngagementActions";
+import { EngagementNotices } from "@/components/engagements/EngagementNotices";
 import { ContractEmptyState } from "@/components/contracts/ContractEmptyState";
 import type { Contract, ContractStatus } from "@/types/contract";
 import { CONTRACT_STATUS } from "@/types/contract";
@@ -24,7 +25,7 @@ type FilterKey = "ALL" | ContractStatus;
 const FILTERS: { key: FilterKey; label: string; match: (c: Contract) => boolean }[] = [
   { key: "ALL", label: "All", match: () => true },
   { key: CONTRACT_STATUS.ACTIVE, label: "Active", match: (c) => c.status === CONTRACT_STATUS.ACTIVE },
-  { key: CONTRACT_STATUS.PENDING_ACCEPTANCE, label: "Pending", match: (c) => c.status === CONTRACT_STATUS.PENDING_ACCEPTANCE },
+  { key: CONTRACT_STATUS.AWAITING_FUNDING, label: "Awaiting Funding", match: (c) => c.status === CONTRACT_STATUS.AWAITING_FUNDING },
   { key: CONTRACT_STATUS.AWAITING_CLIENT_REVIEW, label: "Awaiting Review", match: (c) => c.status === CONTRACT_STATUS.AWAITING_CLIENT_REVIEW },
   { key: CONTRACT_STATUS.REVISION_REQUESTED, label: "Revisions", match: (c) => c.status === CONTRACT_STATUS.REVISION_REQUESTED },
   { key: CONTRACT_STATUS.COMPLETED, label: "Completed", match: (c) => c.status === CONTRACT_STATUS.COMPLETED },
@@ -154,10 +155,12 @@ export default function FreelancerContractsPage() {
                 <p className="mt-3 rounded-lg bg-kampmax-bg px-3 py-2 text-xs text-kampmax-text-secondary">
                   {contract.nextAction}
                 </p>
+                <EngagementNotices engagement={engagement} role="freelancer" />
                 <EngagementActions
                   engagementId={engagement.id}
                   status={engagement.status}
                   role="freelancer"
+                  revisionCount={engagement.revisionCount}
                   onChanged={() => {
                     void loadEngagements();
                     void queryClient.invalidateQueries({ queryKey: freelancerDashboardKeys.all });

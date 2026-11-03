@@ -17,7 +17,7 @@ export function FreelancerNextContractAction() {
 
   const next = contracts.find(
     (c) =>
-      c.status === CONTRACT_STATUS.PENDING_ACCEPTANCE ||
+      c.status === CONTRACT_STATUS.AWAITING_FUNDING ||
       c.status === CONTRACT_STATUS.REVISION_REQUESTED ||
       c.status === CONTRACT_STATUS.ACTIVE
   );

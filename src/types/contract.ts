@@ -22,6 +22,8 @@
 
 export const CONTRACT_STATUS = {
   PENDING_ACCEPTANCE: "PENDING_ACCEPTANCE",
+  /** Hired, but the client hasn't put the payment in escrow yet. */
+  AWAITING_FUNDING: "AWAITING_FUNDING",
   ACTIVE: "ACTIVE",
   PAUSED: "PAUSED",
   AWAITING_CLIENT_REVIEW: "AWAITING_CLIENT_REVIEW",

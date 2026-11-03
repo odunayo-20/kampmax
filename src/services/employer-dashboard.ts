@@ -17,6 +17,7 @@ import {
   getMyJobsApi,
 } from "@/services/opportunity";
 import { getReceivedApplicationsApi } from "@/services/proposals";
+import { ENGAGEMENT_TO_CONTRACT_STATUS } from "@/services/contract";
 import { listMyEmployerEngagements, type Engagement, type EngagementStatus } from "@/services/jobs";
 import {
   backendProfileCompletion,
@@ -54,6 +55,8 @@ export interface EmployerDashboardContract {
   amount?: number;
   /** Backend engagement status, so the right next-step actions can be offered. */
   engagementStatus: EngagementStatus;
+  /** The raw engagement, for the revision / dispute / cancellation details. */
+  engagement: Engagement;
 }
 
 export interface EmployerAttentionItem {
@@ -80,7 +83,7 @@ export interface EmployerDashboardSummary {
     total: number;
     active: number;
     awaitingClientReview: number;
-    pendingAcceptance: number;
+    awaitingFunding: number;
     recent: EmployerDashboardContract[];
   };
   pendingActions: number;
@@ -153,26 +156,17 @@ function buildAttentionFrom(
   return items;
 }
 
-// Engagement -> the dashboard's contract vocabulary. An accepted proposal
-// starts as PENDING_PAYMENT; the employer funds it, work runs, the freelancer
-// submits, and the employer reviews.
-const ENGAGEMENT_TO_CONTRACT: Record<EngagementStatus, ContractStatus> = {
-  PENDING_PAYMENT: CONTRACT_STATUS.PENDING_ACCEPTANCE,
-  FUNDED: CONTRACT_STATUS.ACTIVE,
-  IN_PROGRESS: CONTRACT_STATUS.ACTIVE,
-  SUBMITTED: CONTRACT_STATUS.AWAITING_CLIENT_REVIEW,
-  COMPLETED: CONTRACT_STATUS.COMPLETED,
-  DISPUTED: CONTRACT_STATUS.DISPUTED,
-  CANCELLED: CONTRACT_STATUS.CANCELLED,
-};
-
+// An accepted proposal starts as PENDING_PAYMENT; the employer funds it, work
+// runs, the freelancer submits, and the employer reviews. The status mapping is
+// shared with the freelancer's view (services/contract) so the two never drift.
 const ENGAGEMENT_NEXT_ACTION: Record<EngagementStatus, string> = {
   PENDING_PAYMENT: "Fund the engagement to start work",
   FUNDED: "Waiting for the freelancer to start",
   IN_PROGRESS: "Work in progress",
   SUBMITTED: "Review the submitted work",
+  REVISION_REQUESTED: "Waiting for the freelancer to resubmit",
   COMPLETED: "Completed",
-  DISPUTED: "Under dispute",
+  DISPUTED: "Under dispute — the payment is on hold while we review",
   CANCELLED: "Cancelled",
 };
 
@@ -180,13 +174,14 @@ export function engagementToDashboardContract(e: Engagement): EmployerDashboardC
   return {
     id: e.id,
     projectTitle: e.job?.title ?? "Project",
-    status: ENGAGEMENT_TO_CONTRACT[e.status] ?? CONTRACT_STATUS.ACTIVE,
+    status: ENGAGEMENT_TO_CONTRACT_STATUS[e.status] ?? CONTRACT_STATUS.ACTIVE,
     freelancerName: e.freelancer?.fullName || e.freelancer?.username || "Freelancer",
     deadline: e.expectedCompletionDate ?? "",
     nextAction: ENGAGEMENT_NEXT_ACTION[e.status] ?? "",
     outstandingDeliverables: 0,
     amount: Number(e.agreedAmount),
     engagementStatus: e.status,
+    engagement: e,
   };
 }
 
@@ -253,8 +248,8 @@ export async function getEmployerDashboardApi(): Promise<EmployerDashboardSummar
       awaitingClientReview: contracts.filter(
         (c) => c.status === CONTRACT_STATUS.AWAITING_CLIENT_REVIEW
       ).length,
-      pendingAcceptance: contracts.filter(
-        (c) => c.status === CONTRACT_STATUS.PENDING_ACCEPTANCE
+      awaitingFunding: contracts.filter(
+        (c) => c.status === CONTRACT_STATUS.AWAITING_FUNDING
       ).length,
       recent: contracts.slice(0, 5),
     },

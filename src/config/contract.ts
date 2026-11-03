@@ -18,6 +18,7 @@ export const CONTRACT_STATUS_META: Record<
   { label: string; icon: "clock" | "check" | "progress" | "x" | "alert" | "review" | "revision" }
 > = {
   PENDING_ACCEPTANCE: { label: "Pending Acceptance", icon: "clock" },
+  AWAITING_FUNDING: { label: "Awaiting Funding", icon: "clock" },
   ACTIVE: { label: "In Progress", icon: "progress" },
   PAUSED: { label: "Paused", icon: "clock" },
   AWAITING_CLIENT_REVIEW: { label: "Awaiting Client Review", icon: "review" },
@@ -26,6 +27,13 @@ export const CONTRACT_STATUS_META: Record<
   CANCELLED: { label: "Cancelled", icon: "x" },
   DISPUTED: { label: "Disputed", icon: "alert" },
 };
+
+/**
+ * How many times an employer can send submitted work back. Mirrors the
+ * backend's MAX_REVISIONS, which is what actually enforces it — this only
+ * lets the UI stop offering the button.
+ */
+export const MAX_REVISIONS = 3;
 
 // ── Milestone status metadata ───────────────────────────────
 

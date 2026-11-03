@@ -220,9 +220,24 @@ export type EngagementStatus =
   | "FUNDED"
   | "IN_PROGRESS"
   | "SUBMITTED"
+  | "REVISION_REQUESTED"
   | "COMPLETED"
   | "DISPUTED"
   | "CANCELLED";
+
+/** RELEASE pays the freelancer; REFUND returns the money to the employer. */
+export type EngagementDisputeOutcome = "RELEASE" | "REFUND";
+
+export interface EngagementDispute {
+  openedAt: string;
+  openedBy: "EMPLOYER" | "FREELANCER" | null;
+  reason: string;
+  /** Null while the dispute is still open (payment on hold). */
+  resolvedAt: string | null;
+  outcome: EngagementDisputeOutcome | null;
+  /** The admin's note explaining the ruling. */
+  resolution: string | null;
+}
 
 export interface Engagement {
   id: string;
@@ -246,6 +261,12 @@ export interface Engagement {
   submittedAt: string | null;
   completedAt: string | null;
   cancelledAt: string | null;
+  cancellationReason: string | null;
+  /** The employer's latest change request; set while REVISION_REQUESTED. */
+  revisionNote: string | null;
+  revisionCount: number;
+  /** Present once a dispute was opened — still open until `resolvedAt` is set. */
+  dispute: EngagementDispute | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -623,6 +644,53 @@ export async function completeEngagement(id: string): Promise<{
 }> {
   const { data, error } = await apiClient.post<undefined, Engagement>(
     `/engagements/${id}/complete`
+  );
+  if (error) return { engagement: null, error };
+  return { engagement: data, error: null };
+}
+
+/**
+ * Send submitted work back for changes (employer).
+ * Endpoint: POST /engagements/:id/request-revision
+ */
+export async function requestEngagementRevision(
+  id: string,
+  note: string
+): Promise<{ engagement: Engagement | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.post<{ note: string }, Engagement>(
+    `/engagements/${id}/request-revision`,
+    { note }
+  );
+  if (error) return { engagement: null, error };
+  return { engagement: data, error: null };
+}
+
+/**
+ * Take submitted work back before the client has reviewed it (freelancer).
+ * Endpoint: POST /engagements/:id/withdraw-submission
+ */
+export async function withdrawEngagementSubmission(id: string): Promise<{
+  engagement: Engagement | null;
+  error: ApiError | null;
+}> {
+  const { data, error } = await apiClient.post<undefined, Engagement>(
+    `/engagements/${id}/withdraw-submission`
+  );
+  if (error) return { engagement: null, error };
+  return { engagement: data, error: null };
+}
+
+/**
+ * Open a dispute (either party). The escrow is held until an admin rules.
+ * Endpoint: POST /engagements/:id/dispute
+ */
+export async function openEngagementDispute(
+  id: string,
+  reason: string
+): Promise<{ engagement: Engagement | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.post<{ reason: string }, Engagement>(
+    `/engagements/${id}/dispute`,
+    { reason }
   );
   if (error) return { engagement: null, error };
   return { engagement: data, error: null };

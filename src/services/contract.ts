@@ -11,10 +11,11 @@ import { CONTRACT_STATUS } from "@/types/contract";
 
 /** Backend engagement status -> the contract vocabulary the UI shows. */
 export const ENGAGEMENT_TO_CONTRACT_STATUS: Record<EngagementStatus, ContractStatus> = {
-  PENDING_PAYMENT: CONTRACT_STATUS.PENDING_ACCEPTANCE,
+  PENDING_PAYMENT: CONTRACT_STATUS.AWAITING_FUNDING,
   FUNDED: CONTRACT_STATUS.ACTIVE,
   IN_PROGRESS: CONTRACT_STATUS.ACTIVE,
   SUBMITTED: CONTRACT_STATUS.AWAITING_CLIENT_REVIEW,
+  REVISION_REQUESTED: CONTRACT_STATUS.REVISION_REQUESTED,
   COMPLETED: CONTRACT_STATUS.COMPLETED,
   DISPUTED: CONTRACT_STATUS.DISPUTED,
   CANCELLED: CONTRACT_STATUS.CANCELLED,
@@ -25,8 +26,9 @@ const FREELANCER_NEXT_ACTION: Record<EngagementStatus, string> = {
   FUNDED: "Waiting for the client to start the work",
   IN_PROGRESS: "Do the work, then submit it for review",
   SUBMITTED: "Waiting for the client to review your work",
+  REVISION_REQUESTED: "The client asked for changes — update your work and resubmit",
   COMPLETED: "Completed — payment released",
-  DISPUTED: "Under dispute",
+  DISPUTED: "Under dispute — the payment is on hold while we review",
   CANCELLED: "Cancelled",
 };
 

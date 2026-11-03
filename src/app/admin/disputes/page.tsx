@@ -10,6 +10,7 @@ import { Select } from "@/components/ui/Select";
 import { LoadingSkeleton } from "@/components/admin/LoadingSkeleton";
 import { cn } from "@/lib/utils";
 import { useDebounce } from "@/hooks/use-debounce";
+import { DisputeKindTabs } from "@/components/admin/disputes/DisputeKindTabs";
 import { DisputesTable } from "@/components/admin/disputes/DisputesTable";
 import {
   DISPUTE_STATUS_FILTER_ORDER,
@@ -110,6 +111,7 @@ function DisputesConsole() {
 
   return (
     <>
+      <DisputeKindTabs active="orders" />
       <AdminPageHeader
         title="Disputes"
         description="Every order that has ever carried a dispute. A dispute is an order — open one, refund the customer or dismiss it from the order itself."

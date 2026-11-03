@@ -310,8 +310,8 @@ export async function fetchPublicCategoryCounts(
 
 /** One published service by id; null when it is missing or not live. */
 export async function fetchPublicServiceById(id: string): Promise<FreelancerService | null> {
-  const { data } = await apiClient.get<BackendService>(`/services/public/${encodeURIComponent(id)}`);
-  return data ? fromBackendService(data) : null;
+  const { data, error } = await apiClient.get<BackendService>(`/services/public/${encodeURIComponent(id)}`);
+  return error || !data ? null : fromBackendService(data);
 }
 
 /**
@@ -319,8 +319,8 @@ export async function fetchPublicServiceById(id: string): Promise<FreelancerServ
  * effort (the oldest match). Used only to send an old link to the exact address.
  */
 export async function fetchPublicServiceBySlug(slug: string): Promise<FreelancerService | null> {
-  const { data } = await apiClient.get<BackendService>(`/services/slug/${encodeURIComponent(slug)}`);
-  return data ? fromBackendService(data) : null;
+  const { data, error } = await apiClient.get<BackendService>(`/services/slug/${encodeURIComponent(slug)}`);
+  return error || !data ? null : fromBackendService(data);
 }
 
 // ── Portfolio API (backend: /portfolio) ─────────────────────

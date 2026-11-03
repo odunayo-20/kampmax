@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ContractStatusBadge } from "@/components/contracts/ContractStatusBadge";
 import { EmployerWalletCard } from "./EmployerWalletCard";
 import { EngagementActions } from "@/components/engagements/EngagementActions";
+import { EngagementNotices } from "@/components/engagements/EngagementNotices";
 import { dashboardKeys } from "@/lib/query-keys";
 import { useEmployerContracts } from "@/hooks/use-employer-dashboard";
 import { formatDate, formatNaira } from "@/lib/utils";
@@ -72,10 +73,12 @@ export function EmployerContracts() {
                   </p>
                 )}
 
+                <EngagementNotices engagement={contract.engagement} role="employer" />
                 <EngagementActions
                   engagementId={contract.id}
                   status={contract.engagementStatus}
                   role="employer"
+                  revisionCount={contract.engagement.revisionCount}
                   onChanged={refresh}
                 />
 
