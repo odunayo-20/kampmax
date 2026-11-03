@@ -8,7 +8,10 @@ import { FreelancerProfileActions } from "@/components/freelancer/public/Freelan
 import { deliveryLabel, priceParts, priceText } from "./service-format";
 
 export interface ServiceFreelancer {
+  /** Profile id — addresses the public profile page. */
   id: string;
+  /** Account id — addresses messaging. */
+  userId: string;
   name: string;
   avatar?: string;
   headline?: string;
@@ -171,7 +174,7 @@ export function PublicServiceContent({
             )}
 
             <div className="mt-5 hidden lg:block">
-              <FreelancerProfileActions profileId={freelancer.id} label={messageLabel} fullWidth />
+              <FreelancerProfileActions profileId={freelancer.userId} label={messageLabel} fullWidth />
               <p className="mt-2 text-center text-xs text-kampmax-text-secondary">
                 Chat first to agree on the details.
               </p>
@@ -210,7 +213,7 @@ export function PublicServiceContent({
             </p>
             {delivery && <p className="text-xs text-kampmax-text-secondary">{delivery} delivery</p>}
           </div>
-          <FreelancerProfileActions profileId={freelancer.id} label={messageLabel} />
+          <FreelancerProfileActions profileId={freelancer.userId} label={messageLabel} />
         </div>
       </div>
     </div>

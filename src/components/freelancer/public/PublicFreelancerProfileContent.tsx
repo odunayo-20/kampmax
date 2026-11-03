@@ -165,7 +165,7 @@ export function PublicFreelancerProfileContent({
             </div>
           </div>
         </div>
-        <FreelancerProfileActions profileId={profile.id} />
+        <FreelancerProfileActions profileId={profile.userId} />
       </div>
 
       <div className="mt-6 space-y-4">

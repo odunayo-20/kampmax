@@ -70,6 +70,8 @@ export interface FreelancerAccess {
 
 export interface PublicFreelancerProfile {
   id: string;
+  /** Account id of the profile owner — what messaging addresses (id is the profile id). */
+  userId: string;
   name: string;
   avatar?: string;
   approved: boolean;
@@ -116,6 +118,7 @@ export async function getPublicFreelancerFromBackend(
 
   return {
     id: profile.id,
+    userId: profile.userId,
     name: profile.fullName,
     avatar: profile.avatar ?? undefined,
     approved: profile.verificationStatus === "VERIFIED",

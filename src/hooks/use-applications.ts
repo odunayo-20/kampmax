@@ -179,7 +179,17 @@ export function useCandidateConversation() {
       if (!senderId) return null;
       try {
         return await openDirectConversation(candidateId);
-      } catch {
+      } catch (err) {
+        const e = err as { message?: string; status?: number; code?: string | number; data?: unknown };
+        console.error(
+          `openDirectConversation failed: ${JSON.stringify({
+            candidateId,
+            message: e?.message,
+            status: e?.status,
+            code: e?.code,
+            data: e?.data,
+          })}`
+        );
         return null;
       }
     },

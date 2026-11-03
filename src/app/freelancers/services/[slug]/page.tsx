@@ -69,6 +69,7 @@ export default async function FreelancerServicePage({ params }: ServicePageProps
       service={service}
       freelancer={{
         id: profile.id,
+        userId: profile.userId,
         name: profile.fullName,
         avatar: profile.avatar ?? undefined,
         headline: profile.professionalTitle ?? undefined,
