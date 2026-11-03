@@ -16,7 +16,9 @@ import {
   Ticket,
 } from "lucide-react";
 import { Button, Logo } from "@/components/ui";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { useApp } from "@/lib/app-context";
+import { useOnboardingPreview, type PreviewKind } from "@/hooks/use-onboarding-preview";
 import { cn } from "@/lib/utils";
 
 interface TourSlide {
@@ -31,12 +33,10 @@ interface TourSlide {
   accentBorder: string;
   pillColor: string;
   highlights: string[];
-  mockupSnippet: {
-    title: string;
-    detail: string;
-    tag: string;
-    extra: string;
-  };
+  /** Which live record the sample card shows; null when there is no public source for it. */
+  previewKind: PreviewKind | null;
+  /** Shown when the source works but has nothing in it yet. */
+  emptyPreview: string;
 }
 
 const TOUR_SLIDES: TourSlide[] = [
@@ -53,16 +53,12 @@ const TOUR_SLIDES: TourSlide[] = [
     accentBorder: "border-kampmax-blue/20",
     pillColor: "bg-kampmax-blue/10 text-kampmax-blue border-kampmax-blue/20",
     highlights: [
-      "Verified Student Sellers",
+      "Local Campus Sellers",
       "Safe On-Campus Meetups",
       "Zero Hidden Listing Fees",
     ],
-    mockupSnippet: {
-      title: "MacBook Air M1 (Silver, 256GB)",
-      detail: "Listed by Tunde O. • Engineering Hostel",
-      tag: "Verified Student",
-      extra: "₦420,000 • In-Person Inspection",
-    },
+    previewKind: "marketplace",
+    emptyPreview: "No listings yet. Be the first to sell something on campus.",
   },
   {
     id: "services",
@@ -81,12 +77,8 @@ const TOUR_SLIDES: TourSlide[] = [
       "Real Peer Reviews & Ratings",
       "Fast Direct Messaging",
     ],
-    mockupSnippet: {
-      title: "UI/UX & Brand Identity Design",
-      detail: "Chioma A. • Computer Science (400L)",
-      tag: "Top Rated ★ 4.9",
-      extra: "28 Completed Projects",
-    },
+    previewKind: "services",
+    emptyPreview: "No services listed yet. Offer your skills and be the first.",
   },
   {
     id: "community",
@@ -105,12 +97,9 @@ const TOUR_SLIDES: TourSlide[] = [
       "Lost & Found Desk",
       "Departmental Hubs",
     ],
-    mockupSnippet: {
-      title: "Lost: Blue HP Laptop Bag with ID Card",
-      detail: "Left near Lecture Hall B • 22 mins ago",
-      tag: "Help A Peer",
-      extra: "4 Students Replied",
-    },
+    // The campus feed needs a signed-in user, so there is no public sample to show.
+    previewKind: null,
+    emptyPreview: "",
   },
   {
     id: "events",
@@ -129,21 +118,18 @@ const TOUR_SLIDES: TourSlide[] = [
       "Exclusive Student Discounts",
       "Campus Nightlife & Tech Fests",
     ],
-    mockupSnippet: {
-      title: "Campus Innovators Hackathon 2026",
-      detail: "Faculty of Tech Auditorium • Free Entry",
-      tag: "Featured Event",
-      extra: "240+ Registered",
-    },
+    previewKind: "events",
+    emptyPreview: "No upcoming events right now. Check back soon.",
   },
 ];
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { setHasCompletedOnboarding } = useApp();
+  const { setHasCompletedOnboarding, selectedCampus } = useApp();
   const [currentSlide, setCurrentSlide] = useState(0);
 
   const slide = TOUR_SLIDES[currentSlide];
+  const preview = useOnboardingPreview(slide.previewKind, selectedCampus.id);
   const isLast = currentSlide === TOUR_SLIDES.length - 1;
   const isFirst = currentSlide === 0;
 
@@ -259,33 +245,64 @@ export default function OnboardingPage() {
           ))}
         </div>
 
-        {/* Interactive Feature Snippet Card */}
-        <div className="w-full max-w-md bg-white rounded-xl border border-kampmax-border p-4 shadow-sm mb-6 transition-all hover:shadow-md">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider bg-kampmax-blue/10 text-kampmax-blue px-2 py-0.5 rounded">
-              {slide.mockupSnippet.tag}
-            </span>
-            <span className="text-[11px] text-kampmax-text-secondary font-medium flex items-center gap-1">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-              Campus Verified
-            </span>
+        {/* Live sample: a real record, or an honest empty/error state. Never demo data. */}
+        {slide.previewKind && (
+          <div className="w-full max-w-md mb-6 min-h-[116px]" aria-live="polite">
+            {preview.status === "loading" && (
+              <div className="bg-white rounded-xl border border-kampmax-border p-4 shadow-sm space-y-2.5">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+                <Skeleton className="h-3 w-1/3 mt-3" />
+              </div>
+            )}
+
+            {preview.status === "ready" && (
+              <Link
+                href={preview.preview.href}
+                onClick={() => setHasCompletedOnboarding(true)}
+                className="block bg-white rounded-xl border border-kampmax-border p-4 shadow-sm transition-all hover:shadow-md"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider bg-kampmax-blue/10 text-kampmax-blue px-2 py-0.5 rounded">
+                    {preview.preview.tag}
+                  </span>
+                  {preview.preview.verifiedLabel && (
+                    <span className="text-[11px] text-kampmax-text-secondary font-medium flex items-center gap-1">
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                      {preview.preview.verifiedLabel}
+                    </span>
+                  )}
+                </div>
+                <h4 className="text-sm font-semibold text-kampmax-text mb-0.5">
+                  {preview.preview.title}
+                </h4>
+                {preview.preview.detail && (
+                  <p className="text-xs text-kampmax-text-secondary mb-2">{preview.preview.detail}</p>
+                )}
+                <div className="pt-2 border-t border-neutral-100 flex items-center justify-between text-xs">
+                  <span className="font-semibold text-kampmax-text">{preview.preview.extra}</span>
+                  <span className="text-kampmax-blue font-medium inline-flex items-center gap-0.5 text-[11px]">
+                    View
+                    <ChevronRight className="h-3 w-3" />
+                  </span>
+                </div>
+              </Link>
+            )}
+
+            {preview.status === "empty" && (
+              <div className="bg-white rounded-xl border border-dashed border-kampmax-border p-4 text-center text-xs text-kampmax-text-secondary">
+                {slide.emptyPreview}
+              </div>
+            )}
+
+            {preview.status === "error" && (
+              <p className="text-center text-[11px] text-kampmax-text-secondary pt-2">
+                Live preview isn&apos;t available right now.
+              </p>
+            )}
           </div>
-          <h4 className="text-sm font-semibold text-kampmax-text mb-0.5">
-            {slide.mockupSnippet.title}
-          </h4>
-          <p className="text-xs text-kampmax-text-secondary mb-2">
-            {slide.mockupSnippet.detail}
-          </p>
-          <div className="pt-2 border-t border-neutral-100 flex items-center justify-between text-xs">
-            <span className="font-semibold text-kampmax-text">
-              {slide.mockupSnippet.extra}
-            </span>
-            <span className="text-kampmax-blue font-medium inline-flex items-center gap-0.5 text-[11px]">
-              Tap to see more
-              <ChevronRight className="h-3 w-3" />
-            </span>
-          </div>
-        </div>
+        )}
 
         {/* Slide Indicator Dots with Prev/Next Controls */}
         <div className="flex items-center justify-center gap-4 mb-2">
