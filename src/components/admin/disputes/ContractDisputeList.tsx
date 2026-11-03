@@ -6,6 +6,7 @@ import { ErrorState } from "@/components/admin/ErrorState";
 import { LoadingSkeleton } from "@/components/admin/LoadingSkeleton";
 import { previewText } from "@/components/admin/campus-community/campus-community-utils";
 import { formatNaira, timeAgo } from "@/lib/utils";
+import { milestoneAtStake } from "@/lib/engagement-milestones";
 import type { Engagement } from "@/services/jobs";
 
 const nameOf = (p: Engagement["employer"], fallback: string) => p.fullName || p.username || fallback;
@@ -67,7 +68,7 @@ export function ContractDisputeList({
 
             <div className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
               <span className="text-sm font-semibold tabular-nums text-kampmax-text">
-                {formatNaira(Number(e.agreedAmount))}
+                {formatNaira(milestoneAtStake(e).amount)}
               </span>
               <StatusBadge
                 variant={resolved ? "success" : "error"}

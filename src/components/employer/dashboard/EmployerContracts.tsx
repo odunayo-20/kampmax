@@ -4,7 +4,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ContractStatusBadge } from "@/components/contracts/ContractStatusBadge";
 import { EmployerWalletCard } from "./EmployerWalletCard";
 import { EngagementActions } from "@/components/engagements/EngagementActions";
+import { EngagementMilestones } from "@/components/engagements/EngagementMilestones";
 import { EngagementNotices } from "@/components/engagements/EngagementNotices";
+import { describeCurrentMilestone } from "@/lib/engagement-milestones";
 import { dashboardKeys } from "@/lib/query-keys";
 import { useEmployerContracts } from "@/hooks/use-employer-dashboard";
 import { formatDate, formatNaira } from "@/lib/utils";
@@ -73,12 +75,14 @@ export function EmployerContracts() {
                   </p>
                 )}
 
+                <EngagementMilestones milestones={contract.engagement.milestones} />
                 <EngagementNotices engagement={contract.engagement} role="employer" />
                 <EngagementActions
                   engagementId={contract.id}
                   status={contract.engagementStatus}
                   role="employer"
                   revisionCount={contract.engagement.revisionCount}
+                  milestone={describeCurrentMilestone(contract.engagement)}
                   onChanged={refresh}
                 />
 

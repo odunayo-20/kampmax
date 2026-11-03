@@ -4,6 +4,7 @@ import { useEffect, useId, useState } from "react";
 import { AlertCircle, Loader2, X } from "lucide-react";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { cn, formatDateShort, formatNaira } from "@/lib/utils";
+import { milestoneAtStake } from "@/lib/engagement-milestones";
 import type { Engagement, EngagementDisputeOutcome } from "@/services/jobs";
 
 const MIN_NOTE = 5;
@@ -37,7 +38,9 @@ export function ContractDisputeDialog({
   const dispute = engagement.dispute;
   const employer = partyName(engagement.employer, "The employer");
   const freelancer = partyName(engagement.freelancer, "The freelancer");
-  const amount = formatNaira(Number(engagement.agreedAmount));
+  // Only one milestone is ever held in escrow: that, not the contract total, is what a ruling moves.
+  const stake = milestoneAtStake(engagement);
+  const amount = formatNaira(stake.amount);
   const resolved = !!dispute?.resolvedAt;
   const trimmed = note.trim();
   const ready = outcome !== null && trimmed.length >= MIN_NOTE;
@@ -91,7 +94,8 @@ export function ContractDisputeDialog({
               {engagement.job?.title || "Contract"}
             </h2>
             <p className="mt-1 text-xs text-kampmax-text-secondary">
-              {amount} held in escrow · Reported {formatDateShort(dispute.openedAt)}
+              {amount} held in escrow{stake.label ? ` for ${stake.label}` : ""} · Reported{" "}
+              {formatDateShort(dispute.openedAt)}
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">

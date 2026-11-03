@@ -5,6 +5,8 @@ import { Button } from "@/components/ui";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EngagementReasonDialog } from "./EngagementReasonDialog";
 import { MAX_REVISIONS } from "@/config/contract";
+import { formatNaira } from "@/lib/utils";
+import type { CurrentMilestoneInfo } from "@/lib/engagement-milestones";
 import {
   cancelEngagement,
   completeEngagement,
@@ -134,10 +136,18 @@ const ACTIONS: Record<Kind, ActionDef> = {
   },
 };
 
-/** Wording that depends on who is acting and where the engagement is. */
-function actionFor(kind: Kind, role: Role, status: EngagementStatus): ActionDef {
+/**
+ * Wording that depends on who is acting, where the engagement is, and — for a
+ * contract paid in milestones — which milestone the money step is about.
+ */
+function actionFor(
+  kind: Kind,
+  role: Role,
+  status: EngagementStatus,
+  milestone?: CurrentMilestoneInfo
+): ActionDef {
   const base = ACTIONS[kind];
-  if (kind === "cancel" && role === "freelancer" && status === "PENDING_PAYMENT") {
+  if (kind === "cancel" && role === "freelancer" && status === "PENDING_PAYMENT" && !milestone?.paidCount) {
     // Nothing is funded yet, so for the freelancer this is turning the job down.
     return {
       ...base,
@@ -159,6 +169,43 @@ function actionFor(kind: Kind, role: Role, status: EngagementStatus): ActionDef 
       busyLabel: "Resubmitting…",
       confirm: "Resubmit your updated work for the client to review?",
     };
+  }
+  if (milestone) {
+    // Say exactly which milestone and how much moves, before it does.
+    const which = `milestone ${milestone.position} of ${milestone.total}`;
+    const amount = formatNaira(milestone.amount);
+    if (kind === "fund") {
+      return {
+        ...base,
+        label: `Fund milestone ${milestone.position}`,
+        confirm: `Fund ${which}, “${milestone.title}”? ${amount} is held in escrow from your wallet until you approve this milestone's work.`,
+      };
+    }
+    if (kind === "complete") {
+      return {
+        ...base,
+        label: `Approve & pay milestone ${milestone.position}`,
+        confirm: `Approve ${which}, “${milestone.title}”? ${amount} is released to the freelancer and this can't be undone.`,
+      };
+    }
+    if (kind === "dispute" && base.ask) {
+      return {
+        ...base,
+        ask: {
+          ...base.ask,
+          body: "This puts the payment for this milestone on hold. Our team reviews both sides, then either pays the freelancer for it or refunds the employer. You can't undo it, so try talking to them first.",
+        },
+      };
+    }
+    if (kind === "cancel" && base.ask && milestone.paidCount > 0) {
+      return {
+        ...base,
+        ask: {
+          ...base.ask,
+          body: "Milestones that were already paid stay paid. Any money held in escrow for the current milestone is refunded to the employer. This can't be undone.",
+        },
+      };
+    }
   }
   return base;
 }
@@ -197,6 +244,7 @@ export function EngagementActions({
   status,
   role,
   revisionCount = 0,
+  milestone,
   onChanged,
 }: {
   engagementId: string;
@@ -204,6 +252,8 @@ export function EngagementActions({
   role: Role;
   /** Change requests used so far; hides "Request changes" once the limit is hit. */
   revisionCount?: number;
+  /** The milestone this contract is on, when it is paid in several; words the money steps. */
+  milestone?: CurrentMilestoneInfo;
   onChanged: () => void;
 }) {
   const [asking, setAsking] = useState<Kind | null>(null);
@@ -212,7 +262,7 @@ export function EngagementActions({
   const kinds = engagementActionsFor(role, status, revisionCount);
   if (kinds.length === 0) return null;
 
-  const askingDef = asking ? actionFor(asking, role, status) : null;
+  const askingDef = asking ? actionFor(asking, role, status, milestone) : null;
 
   async function perform(def: ActionDef, text = "") {
     if (busy) return;
@@ -240,7 +290,7 @@ export function EngagementActions({
     <div className="mt-3">
       <div className="flex flex-wrap gap-2">
         {kinds.map((kind) => {
-          const def = actionFor(kind, role, status);
+          const def = actionFor(kind, role, status, milestone);
           return (
             <Button
               key={kind}

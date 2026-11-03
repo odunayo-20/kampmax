@@ -12,7 +12,9 @@ import {
 import type { Engagement } from "@/services/jobs";
 import { ContractStatusBadge } from "@/components/contracts/ContractStatusBadge";
 import { EngagementActions } from "@/components/engagements/EngagementActions";
+import { EngagementMilestones } from "@/components/engagements/EngagementMilestones";
 import { EngagementNotices } from "@/components/engagements/EngagementNotices";
+import { describeCurrentMilestone } from "@/lib/engagement-milestones";
 import { ContractEmptyState } from "@/components/contracts/ContractEmptyState";
 import type { Contract, ContractStatus } from "@/types/contract";
 import { CONTRACT_STATUS } from "@/types/contract";
@@ -155,12 +157,14 @@ export default function FreelancerContractsPage() {
                 <p className="mt-3 rounded-lg bg-kampmax-bg px-3 py-2 text-xs text-kampmax-text-secondary">
                   {contract.nextAction}
                 </p>
+                <EngagementMilestones milestones={engagement.milestones} />
                 <EngagementNotices engagement={engagement} role="freelancer" />
                 <EngagementActions
                   engagementId={engagement.id}
                   status={engagement.status}
                   role="freelancer"
                   revisionCount={engagement.revisionCount}
+                  milestone={describeCurrentMilestone(engagement)}
                   onChanged={() => {
                     void loadEngagements();
                     void queryClient.invalidateQueries({ queryKey: freelancerDashboardKeys.all });

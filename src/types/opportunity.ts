@@ -245,6 +245,15 @@ export interface ProposalAttachment {
   mimeType: string;
 }
 
+// ── Proposed payment plan ───────────────────────────────────
+
+/** One step of a payment plan: paid when the client approves that step's work. */
+export interface ProposalMilestone {
+  title: string;
+  description?: string;
+  amount: number;
+}
+
 // ── Proposal (owned by the freelancer) ──────────────────────
 
 export interface Proposal {
@@ -263,6 +272,8 @@ export interface Proposal {
     questionId: string;
     answer: string;
   }[];
+  /** Optional payment plan; empty or missing means one payment for the whole amount. */
+  milestones?: ProposalMilestone[];
   attachments: ProposalAttachment[];
   status: ProposalStatus;
   createdAt: string;
@@ -337,6 +348,7 @@ export interface ProposalInput {
     questionId: string;
     answer: string;
   }[];
+  milestones?: ProposalMilestone[];
   attachments: ProposalAttachment[];
 }
 

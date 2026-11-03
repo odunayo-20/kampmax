@@ -85,7 +85,64 @@ describe("proposals API", () => {
       screeningAnswers: [{ questionId: "q1", answer: "Because I ship." }],
       // attachments are sent as the media ids returned by the upload
       mediaIds: ["m1"],
+      // no payment plan: one payment for the whole amount
+      milestones: [],
     });
+  });
+
+  it("sends a payment plan with the proposal, as the title, optional note and amount of each milestone", async () => {
+    mocks.post.mockResolvedValue({ data: backendProposal, error: null });
+
+    await submitProposalApi({
+      opportunityId: "j1",
+      coverLetter: "I can build this quickly and well.",
+      proposedAmount: 250000,
+      delivery: { value: 2, unit: "weeks" },
+      screeningAnswers: [],
+      milestones: [
+        { title: "Design", description: "Mockups", amount: 100000 },
+        { title: "Build", description: "", amount: 150000 },
+      ],
+      attachments: [],
+    });
+
+    expect(mocks.post).toHaveBeenCalledWith(
+      "/proposals",
+      expect.objectContaining({
+        milestones: [
+          { title: "Design", description: "Mockups", amount: 100000 },
+          // a blank note is left out rather than sent empty
+          { title: "Build", description: undefined, amount: 150000 },
+        ],
+      })
+    );
+  });
+
+  it("reads the payment plan back from the backend", async () => {
+    mocks.post.mockResolvedValue({
+      data: {
+        ...backendProposal,
+        milestones: [
+          { title: "Design", description: null, amount: 100000 },
+          { title: "Build", description: "The app", amount: 150000 },
+        ],
+      },
+      error: null,
+    });
+
+    const { proposal } = await submitProposalApi({
+      opportunityId: "j1",
+      coverLetter: "I can build this quickly and well.",
+      proposedAmount: 250000,
+      delivery: { value: 2, unit: "weeks" },
+      screeningAnswers: [],
+      attachments: [],
+    });
+
+    expect(proposal?.milestones).toEqual([
+      { title: "Design", description: undefined, amount: 100000 },
+      { title: "Build", description: "The app", amount: 150000 },
+    ]);
   });
 
   it("refuses to submit without an amount instead of sending an invalid request", async () => {
@@ -166,6 +223,7 @@ describe("drafts, answers and attachments", () => {
       estimatedDeliveryDays: undefined,
       screeningAnswers: [],
       mediaIds: [],
+      milestones: [],
     });
   });
 

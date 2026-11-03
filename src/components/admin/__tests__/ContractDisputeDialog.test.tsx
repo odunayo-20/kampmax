@@ -20,6 +20,21 @@ const disputed = (dispute: Partial<NonNullable<Engagement["dispute"]>> = {}): En
   employer: party("Acme Ltd"),
   agreedAmount: 75000,
   currency: "NGN",
+  currentMilestonePosition: 1,
+  milestones: [
+    {
+      id: "m1",
+      position: 1,
+      title: "Complete project",
+      description: null,
+      amount: 75000,
+      status: "ACTIVE",
+      completedAt: null,
+      autoReleased: false,
+      disputeOutcome: null,
+      disputeResolution: null,
+    },
+  ],
   status: "DISPUTED",
   startDate: null,
   expectedCompletionDate: null,
@@ -81,6 +96,37 @@ describe("ruling on an open dispute", () => {
     fireEvent.change(screen.getByLabelText(/Explain your ruling/), { target: { value: "  Work matched the scope  " } });
     expect(confirmButton().disabled).toBe(false);
 
+    fireEvent.click(confirmButton());
+    expect(onResolve).toHaveBeenCalledWith("RELEASE", "Work matched the scope");
+  });
+
+  it("rules on the disputed milestone, not the contract total", () => {
+    const milestone = (position: number, status: "COMPLETED" | "ACTIVE", amount: number) => ({
+      id: `m${position}`,
+      position,
+      title: position === 1 ? "Design" : "Build",
+      description: null,
+      amount,
+      status,
+      completedAt: null,
+      autoReleased: false,
+      disputeOutcome: null,
+      disputeResolution: null,
+    });
+    const { onResolve } = renderDialog({
+      ...disputed(),
+      agreedAmount: 300000,
+      currentMilestonePosition: 2,
+      milestones: [milestone(1, "COMPLETED", 100000), milestone(2, "ACTIVE", 200000)],
+    });
+
+    // Only ₦200,000 is held in escrow; the admin must not be shown ₦300,000.
+    expect(screen.getByText(/₦200,000 held in escrow for milestone 2 of 2, “Build”/)).not.toBeNull();
+    fireEvent.click(screen.getByRole("radio", { name: /Pay the freelancer/ }));
+    expect(confirmButton().textContent).toBe("Pay ₦200,000 to Ada Nwosu");
+    expect(screen.queryByText(/300,000/)).toBeNull();
+
+    fireEvent.change(screen.getByLabelText(/Explain your ruling/), { target: { value: "Work matched the scope" } });
     fireEvent.click(confirmButton());
     expect(onResolve).toHaveBeenCalledWith("RELEASE", "Work matched the scope");
   });

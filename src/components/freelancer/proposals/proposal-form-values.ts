@@ -4,6 +4,7 @@ import type {
   ProposalAttachment,
   ProposalDeliveryUnit,
 } from "@/types/opportunity";
+import type { MilestoneRow } from "@/lib/milestone-plan";
 
 export interface ProposalFormValues {
   coverLetter: string;
@@ -11,6 +12,8 @@ export interface ProposalFormValues {
   deliveryValue: string; // raw string
   deliveryUnit: ProposalDeliveryUnit;
   screeningAnswers: Record<string, string>;
+  /** Optional payment plan; none means one payment for the whole amount. */
+  milestones: MilestoneRow[];
   attachments: ProposalAttachment[];
 }
 
@@ -21,6 +24,7 @@ export function emptyProposalFormValues(): ProposalFormValues {
     deliveryValue: "",
     deliveryUnit: "days",
     screeningAnswers: {},
+    milestones: [],
     attachments: [],
   };
 }

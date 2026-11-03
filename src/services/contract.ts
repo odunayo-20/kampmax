@@ -1,6 +1,11 @@
 
-import { listMyEngagements, type Engagement, type EngagementStatus } from "@/services/jobs";
-import type { Contract, ContractStatus } from "@/types/contract";
+import {
+  listMyEngagements,
+  type Engagement,
+  type EngagementMilestone,
+  type EngagementStatus,
+} from "@/services/jobs";
+import type { Contract, ContractStatus, Milestone, MilestoneStatus } from "@/types/contract";
 import { CONTRACT_STATUS } from "@/types/contract";
 
 // ── Async Backend API Calls ──────────────────────────────────
@@ -32,13 +37,48 @@ const FREELANCER_NEXT_ACTION: Record<EngagementStatus, string> = {
   CANCELLED: "Cancelled",
 };
 
+/** Backend milestone status -> the contract vocabulary the UI shows. */
+const MILESTONE_TO_VIEW_STATUS: Record<EngagementMilestone["status"], MilestoneStatus> = {
+  UPCOMING: "PENDING",
+  ACTIVE: "ACTIVE",
+  COMPLETED: "COMPLETED",
+  CANCELLED: "CANCELLED",
+};
+
+function toViewMilestone(m: EngagementMilestone, contractId: string, current: boolean, e: Engagement): Milestone {
+  // Only the current milestone has a live review state; the others are just waiting or done.
+  const status: MilestoneStatus =
+    current && (e.status === "SUBMITTED" || e.status === "REVISION_REQUESTED")
+      ? e.status === "SUBMITTED"
+        ? "SUBMITTED"
+        : "REVISION_REQUESTED"
+      : MILESTONE_TO_VIEW_STATUS[m.status];
+  return {
+    id: m.id,
+    contractId,
+    title: m.title,
+    description: m.description ?? "",
+    // Milestones carry no due dates yet; the contract's expected date is the only one.
+    dueDate: e.expectedCompletionDate ?? "",
+    status,
+    progress: m.status === "COMPLETED" ? 100 : 0,
+    deliverables: [],
+    completedAt: m.completedAt ?? undefined,
+  };
+}
+
 /**
  * Maps a backend engagement into the Contract view model. The backend has no
- * milestones, files or deliverables, so those stay empty rather than invented.
+ * files or deliverables, so those stay empty rather than invented. Milestones
+ * are real: each is paid out separately.
  */
 export function engagementToContract(e: Engagement): Contract {
   const status = ENGAGEMENT_TO_CONTRACT_STATUS[e.status] ?? CONTRACT_STATUS.ACTIVE;
   const title = e.job?.title ?? "Project";
+  const milestones = (e.milestones ?? []).map((m) =>
+    toViewMilestone(m, e.id, m.position === e.currentMilestonePosition, e)
+  );
+  const completedMilestones = milestones.filter((m) => m.status === "COMPLETED").length;
   return {
     id: e.id,
     proposalId: e.proposalId,
@@ -54,15 +94,21 @@ export function engagementToContract(e: Engagement): Contract {
     currency: e.currency,
     startDate: e.startDate ?? e.createdAt,
     deadline: e.expectedCompletionDate ?? "",
-    progress: status === CONTRACT_STATUS.COMPLETED ? 100 : 0,
+    progress:
+      status === CONTRACT_STATUS.COMPLETED
+        ? 100
+        : milestones.length > 1
+          ? Math.round((completedMilestones / milestones.length) * 100)
+          : 0,
+    currentMilestone: milestones.find((m) => m.status !== "COMPLETED" && m.status !== "CANCELLED")?.title,
     nextAction: FREELANCER_NEXT_ACTION[e.status] ?? "",
     lastActivity: e.updatedAt,
-    totalMilestones: 0,
-    completedMilestones: 0,
+    totalMilestones: milestones.length,
+    completedMilestones,
     outstandingDeliverables: 0,
     agreement: { scope: title, terms: "", expectations: "", deliverables: [], conditions: [] },
     projectScope: { included: [], excluded: [], requirements: [] },
-    milestones: [],
+    milestones,
     files: [],
     timeline: [],
     deliverables: [],

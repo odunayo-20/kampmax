@@ -9,6 +9,8 @@ import type {
 } from "@/types/opportunity";
 import { PROPOSAL_COVER_LETTER_MAX } from "@/config/opportunity";
 import { formatNaira } from "@/lib/utils";
+import { validatePlan, type PlanErrors } from "@/lib/milestone-plan";
+import { MilestonePlanEditor } from "./MilestonePlanEditor";
 import {
   ProposalFormValues,
   emptyProposalFormValues,
@@ -37,6 +39,7 @@ export function ProposalForm({
   requireAmount,
 }: ProposalFormProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [planErrors, setPlanErrors] = useState<PlanErrors | null>(null);
 
   const update = <K extends keyof ProposalFormValues>(key: K, value: ProposalFormValues[K]) => {
     onChange({ ...values, [key]: value });
@@ -57,6 +60,15 @@ export function ProposalForm({
     const delivery = Number(values.deliveryValue);
     if (!values.deliveryValue.trim() || !Number.isFinite(delivery) || delivery <= 0)
       e.deliveryValue = "Enter a valid delivery estimate.";
+
+    // A payment plan has to add up to the amount, so it needs the amount first.
+    const total = Number.isFinite(amount) && amount > 0 ? amount : undefined;
+    if (values.milestones.length > 0 && total === undefined && !e.proposedAmount) {
+      e.proposedAmount = "Enter the total amount your milestones add up to.";
+    }
+    const plan = validatePlan(values.milestones, total);
+    setPlanErrors(plan);
+    if (plan) e.milestones = "Fix the payment plan.";
 
     for (const q of opportunity.screeningQuestions) {
       if (!q.optional && !values.screeningAnswers[q.id]?.trim()) {
@@ -169,6 +181,14 @@ export function ProposalForm({
           </p>
         )}
       </section>
+
+      <MilestonePlanEditor
+        rows={values.milestones}
+        total={parsedAmount}
+        onChange={(rows) => update("milestones", rows)}
+        errors={planErrors}
+        disabled={submitting || saving}
+      />
 
       {opportunity.screeningQuestions.length > 0 && (
         <section className="rounded-xl border border-neutral-200 bg-white p-5">

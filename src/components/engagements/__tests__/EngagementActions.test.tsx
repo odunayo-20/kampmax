@@ -103,6 +103,59 @@ describe("plain confirmations", () => {
   });
 });
 
+describe("a contract paid in milestones", () => {
+  const milestone = { position: 2, total: 3, title: "Build", amount: 150000, paidCount: 1 };
+
+  it("names the milestone and the amount before the employer funds it", async () => {
+    const { onChanged } = renderActions({ status: "PENDING_PAYMENT", milestone });
+    fireEvent.click(screen.getByRole("button", { name: "Fund milestone 2" }));
+
+    expect(screen.getByRole("dialog").textContent).toContain(
+      "Fund milestone 2 of 3, “Build”? ₦150,000 is held in escrow"
+    );
+    fireEvent.click(within_dialog("Fund milestone 2"));
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+    expect(jobs.fundEngagement).toHaveBeenCalledWith("e1");
+  });
+
+  it("names the milestone and the amount before the employer approves it", () => {
+    renderActions({ status: "SUBMITTED", milestone });
+    fireEvent.click(screen.getByRole("button", { name: "Approve & pay milestone 2" }));
+
+    expect(screen.getByRole("dialog").textContent).toContain(
+      "Approve milestone 2 of 3, “Build”? ₦150,000 is released to the freelancer and this can't be undone."
+    );
+  });
+
+  it("limits a dispute to the milestone, not the whole contract", () => {
+    renderActions({ status: "SUBMITTED", milestone });
+    fireEvent.click(screen.getByRole("button", { name: "Report a problem" }));
+    expect(screen.getByRole("dialog").textContent).toContain("the payment for this milestone on hold");
+  });
+
+  it("tells whoever cancels that milestones already paid stay paid", () => {
+    renderActions({ status: "PENDING_PAYMENT", milestone });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getByRole("dialog").textContent).toContain("Milestones that were already paid stay paid");
+  });
+
+  it("does not offer the freelancer 'Decline' once the client has paid a milestone", () => {
+    renderActions({ role: "freelancer", status: "PENDING_PAYMENT", milestone });
+    expect(screen.queryByRole("button", { name: "Decline contract" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Cancel" })).not.toBeNull();
+  });
+
+  it("still lets the freelancer decline before anything was paid", () => {
+    renderActions({ role: "freelancer", status: "PENDING_PAYMENT", milestone: { ...milestone, position: 1, paidCount: 0 } });
+    expect(screen.getByRole("button", { name: "Decline contract" })).not.toBeNull();
+  });
+
+  it("keeps the plain wording for a single-payment contract", () => {
+    renderActions({ status: "PENDING_PAYMENT" });
+    expect(screen.getByRole("button", { name: "Fund escrow" })).not.toBeNull();
+  });
+});
+
 describe("EngagementNotices", () => {
   const base = {
     status: "IN_PROGRESS" as const,
@@ -162,6 +215,21 @@ describe("EngagementNotices", () => {
     );
     expect(screen.getByText("Dispute resolved — payment refunded to the employer")).not.toBeNull();
     expect(screen.getByText("No work was submitted.")).not.toBeNull();
+  });
+
+  it("does not keep announcing a settled dispute once the contract has moved on to the next milestone", () => {
+    const settled = {
+      openedAt: "2026-09-03T00:00:00.000Z",
+      openedBy: "EMPLOYER" as const,
+      reason: "Nothing was delivered",
+      resolvedAt: "2026-09-05T00:00:00.000Z",
+      outcome: "RELEASE" as const,
+      resolution: "Work matched the scope.",
+    };
+    const { container } = render(
+      <EngagementNotices role="employer" engagement={{ ...base, status: "PENDING_PAYMENT", dispute: settled }} />
+    );
+    expect(container.textContent).toBe("");
   });
 
   it("shows why a contract was cancelled, and nothing for an ordinary one", () => {

@@ -77,6 +77,31 @@ export function ProposalReview({
         </dl>
       </section>
 
+      {/* Payment plan */}
+      {values.milestones.length > 0 && (
+        <section className="rounded-xl border border-neutral-200 bg-white p-5">
+          <h3 className="text-sm font-semibold text-neutral-900">Payment plan</h3>
+          <p className="mt-1 text-xs text-neutral-500">
+            The client funds and pays one milestone at a time, in this order.
+          </p>
+          <ol className="mt-3 divide-y divide-neutral-100">
+            {values.milestones.map((m, i) => (
+              <li key={i} className="flex items-start justify-between gap-3 py-2 text-sm">
+                <div className="min-w-0">
+                  <p className="font-medium text-neutral-800">
+                    {i + 1}. {m.title.trim()}
+                  </p>
+                  {m.description.trim() && (
+                    <p className="mt-0.5 text-xs text-neutral-500">{m.description.trim()}</p>
+                  )}
+                </div>
+                <span className="shrink-0 font-semibold text-neutral-900">{formatNaira(Number(m.amount))}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+
       {/* Screening answers */}
       {o.screeningQuestions.length > 0 && (
         <section className="rounded-xl border border-neutral-200 bg-white p-5">

@@ -62,6 +62,7 @@ export interface ProposalResponse {
   currency: string;
   estimatedDeliveryDays: number | null;
   screeningAnswers?: { questionId: string; answer: string }[];
+  milestones?: { title: string; description: string | null; amount: number }[];
   attachments?: { id: string; filename: string; sizeBytes: number; mimeType: string; url: string | null }[];
   /** Backend enum: DRAFT | SUBMITTED | VIEWED | SHORTLISTED | ACCEPTED | REJECTED | WITHDRAWN | EXPIRED */
   status: string;
@@ -164,6 +165,11 @@ export function mapBackendProposal(p: ProposalResponse): Proposal {
       questionId: a.questionId,
       answer: a.answer,
     })),
+    milestones: (p.milestones ?? []).map((m) => ({
+      title: m.title,
+      description: m.description ?? undefined,
+      amount: Number(m.amount),
+    })),
     attachments: (p.attachments ?? []).map((a) => ({
       id: a.id,
       filename: a.filename,
@@ -193,6 +199,12 @@ function proposalBody(input: ProposalInput) {
       answer: a.answer,
     })),
     mediaIds: (input.attachments ?? []).map((a) => a.id),
+    // An empty list means "one payment"; the backend checks the plan adds up.
+    milestones: (input.milestones ?? []).map((m) => ({
+      title: m.title,
+      description: m.description || undefined,
+      amount: m.amount,
+    })),
   };
 }
 
@@ -352,6 +364,11 @@ export async function updateProposalApi(
       coverLetter: patch.coverLetter,
       proposedAmount: patch.proposedAmount,
       estimatedDeliveryDays: patch.delivery ? deliveryToDays(patch.delivery) : undefined,
+      milestones: patch.milestones?.map((m) => ({
+        title: m.title,
+        description: m.description || undefined,
+        amount: m.amount,
+      })),
     }
   );
   if (!error && data) return { proposal: mapBackendProposal(data), error: null };

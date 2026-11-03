@@ -73,7 +73,8 @@ export function EngagementNotices({ engagement, role }: { engagement: Engagement
     );
   }
 
-  if (dispute?.resolvedAt) {
+  // Only once the contract has ended: after a ruling on one milestone it goes on.
+  if (dispute?.resolvedAt && (status === "COMPLETED" || status === "CANCELLED")) {
     const released = dispute.outcome === "RELEASE";
     return (
       <Notice

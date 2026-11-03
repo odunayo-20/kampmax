@@ -17,6 +17,7 @@ import {
   submitProposalApi,
 } from "@/services/proposals";
 import { ELIGIBILITY_CODE, OPPORTUNITY_STATUS } from "@/types/opportunity";
+import { finishedMilestones, rowsFromMilestones, toProposalMilestones } from "@/lib/milestone-plan";
 import type { JobEligibility, Opportunity, Proposal, ProposalInput } from "@/types/opportunity";
 import {
   ProposalForm,
@@ -72,6 +73,7 @@ function CreateProposalContent() {
             screeningAnswers: Object.fromEntries(
               draft.screeningAnswers.map((a) => [a.questionId, a.answer])
             ),
+            milestones: rowsFromMilestones(draft.milestones),
             attachments: draft.attachments,
           });
         }
@@ -95,7 +97,8 @@ function CreateProposalContent() {
   const canApply = eligibility?.eligible ?? false;
   const alreadyApplied = eligibility?.code === ELIGIBILITY_CODE.ALREADY_APPLIED;
 
-  function buildInput(v: ProposalFormValues): ProposalInput {
+  /** `forDraft`: a draft may be half-written, so only finished milestones are sent. */
+  function buildInput(v: ProposalFormValues, forDraft = false): ProposalInput {
     const amount = Number(v.proposedAmount);
     const delivery = Number(v.deliveryValue);
     return {
@@ -109,6 +112,7 @@ function CreateProposalContent() {
       screeningAnswers: Object.entries(v.screeningAnswers)
         .filter(([, answer]) => answer.trim().length > 0)
         .map(([questionId, answer]) => ({ questionId, answer: answer.trim() })),
+      milestones: forDraft ? finishedMilestones(v.milestones) : toProposalMilestones(v.milestones),
       attachments: v.attachments,
     };
   }
@@ -116,7 +120,7 @@ function CreateProposalContent() {
   async function handleSaveDraft() {
     setBusy(true);
     setError(null);
-    const res = await saveProposalDraftApi(buildInput(values));
+    const res = await saveProposalDraftApi(buildInput(values, true));
     setBusy(false);
     if (res.error || !res.proposal) {
       setError(res.error?.message ?? "We couldn't save your draft.");

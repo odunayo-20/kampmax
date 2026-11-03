@@ -239,6 +239,26 @@ export interface EngagementDispute {
   resolution: string | null;
 }
 
+/** Backend MilestoneStatus: milestones are worked and paid one at a time, in order. */
+export type MilestoneStatus = "UPCOMING" | "ACTIVE" | "COMPLETED" | "CANCELLED";
+
+export interface EngagementMilestone {
+  id: string;
+  /** 1-based order within the contract. */
+  position: number;
+  title: string;
+  description: string | null;
+  /** DISPLAY ONLY — the backend moves the money; the frontend never computes totals. */
+  amount: number;
+  status: MilestoneStatus;
+  completedAt: string | null;
+  /** True when it was paid because the client never reviewed it. */
+  autoReleased: boolean;
+  /** How an admin settled a dispute on this milestone, if there was one. */
+  disputeOutcome: "RELEASE" | "REFUND" | null;
+  disputeResolution: string | null;
+}
+
 export interface Engagement {
   id: string;
   proposalId: string;
@@ -255,6 +275,10 @@ export interface Engagement {
    */
   agreedAmount: number;
   currency: string;
+  /** Which milestone is being funded, worked or reviewed now (1-based). */
+  currentMilestonePosition: number;
+  /** In order. Money is funded, delivered and paid one milestone at a time. */
+  milestones: EngagementMilestone[];
   status: EngagementStatus;
   startDate: string | null;
   expectedCompletionDate: string | null;

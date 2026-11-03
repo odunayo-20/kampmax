@@ -19,6 +19,21 @@ const engagement = (status: EngagementStatus): Engagement => ({
   employer: { ...party, fullName: "Acme Ltd" },
   agreedAmount: "75000" as unknown as number,
   currency: "NGN",
+  currentMilestonePosition: 1,
+  milestones: [
+    {
+      id: "m1",
+      position: 1,
+      title: "Complete project",
+      description: null,
+      amount: 75000,
+      status: "ACTIVE",
+      completedAt: null,
+      autoReleased: false,
+      disputeOutcome: null,
+      disputeResolution: null,
+    },
+  ],
   status,
   startDate: null,
   expectedCompletionDate: null,
@@ -50,13 +65,63 @@ describe("engagement -> contract mapping", () => {
     expect(engagementToDashboardContract(engagement(backend)).status).toBe(expected);
   });
 
-  it("maps the freelancer view: client, amount as a number, no invented milestones", () => {
+  it("maps the freelancer view: client, amount as a number, and the single payment as one milestone", () => {
     const c = engagementToContract(engagement("IN_PROGRESS"));
     expect(c.client.displayName).toBe("Acme Ltd");
     expect(c.agreedAmount).toBe(75000);
-    expect(c.milestones).toEqual([]);
+    expect(c.totalMilestones).toBe(1);
+    expect(c.milestones.map((m) => [m.title, m.status])).toEqual([["Complete project", "ACTIVE"]]);
     expect(c.canCancel).toBe(false);
     expect(engagementToContract(engagement("FUNDED")).canCancel).toBe(true);
+  });
+
+  describe("with several milestones", () => {
+    const milestone = (position: number, status: "UPCOMING" | "ACTIVE" | "COMPLETED" | "CANCELLED", amount: number) => ({
+      id: `m${position}`,
+      position,
+      title: ["", "Design", "Build", "Launch"][position],
+      description: null,
+      amount,
+      status,
+      completedAt: status === "COMPLETED" ? "2026-09-10T00:00:00.000Z" : null,
+      autoReleased: false,
+      disputeOutcome: null,
+      disputeResolution: null,
+    });
+    const threeMilestones = (backend: EngagementStatus): Engagement => ({
+      ...engagement(backend),
+      agreedAmount: 300000,
+      currentMilestonePosition: 2,
+      milestones: [milestone(1, "COMPLETED", 100000), milestone(2, "ACTIVE", 150000), milestone(3, "UPCOMING", 50000)],
+    });
+
+    it("shows real milestones, how many are paid, and progress", () => {
+      const c = engagementToContract(threeMilestones("IN_PROGRESS"));
+      expect(c.totalMilestones).toBe(3);
+      expect(c.completedMilestones).toBe(1);
+      expect(c.progress).toBe(33);
+      expect(c.currentMilestone).toBe("Build");
+      expect(c.milestones.map((m) => [m.title, m.status])).toEqual([
+        ["Design", "COMPLETED"],
+        ["Build", "ACTIVE"],
+        ["Launch", "PENDING"],
+      ]);
+    });
+
+    it("shows the current milestone as submitted while it awaits the client's review", () => {
+      const c = engagementToContract(threeMilestones("SUBMITTED"));
+      expect(c.milestones.map((m) => m.status)).toEqual(["COMPLETED", "SUBMITTED", "PENDING"]);
+    });
+
+    it("shows a revision request on the current milestone only", () => {
+      const c = engagementToContract(threeMilestones("REVISION_REQUESTED"));
+      expect(c.milestones.map((m) => m.status)).toEqual(["COMPLETED", "REVISION_REQUESTED", "PENDING"]);
+    });
+
+    it("is 100% only once the whole contract is complete", () => {
+      expect(engagementToContract(threeMilestones("COMPLETED")).progress).toBe(100);
+      expect(engagementToContract(threeMilestones("IN_PROGRESS")).progress).toBeLessThan(100);
+    });
   });
 
   it("maps the employer view with the freelancer name and raw status", () => {
