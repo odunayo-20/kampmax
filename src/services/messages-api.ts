@@ -1,5 +1,6 @@
 import { apiClient, type ApiError } from "@/lib/api-client";
 import type { Conversation, Message } from "@/types";
+import { chatPreview } from "@/services/service-share";
 
 // ============================================================
 // MESSAGING — LIVE API LAYER
@@ -83,7 +84,7 @@ export function mapConversation(c: BackendConversation): Conversation {
           id: `${c.id}-preview`,
           conversationId: c.id,
           senderId: "",
-          text: c.lastMessagePreview,
+          text: chatPreview(c.lastMessagePreview),
           createdAt: updatedAt,
           read: c.unreadCount === 0,
         }

@@ -174,7 +174,12 @@ export function PublicServiceContent({
             )}
 
             <div className="mt-5 hidden lg:block">
-              <FreelancerProfileActions profileId={freelancer.userId} label={messageLabel} fullWidth />
+              <FreelancerProfileActions
+                profileId={freelancer.userId}
+                label={messageLabel}
+                serviceId={service.id}
+                fullWidth
+              />
               <p className="mt-2 text-center text-xs text-kampmax-text-secondary">
                 Chat first to agree on the details.
               </p>
@@ -213,7 +218,7 @@ export function PublicServiceContent({
             </p>
             {delivery && <p className="text-xs text-kampmax-text-secondary">{delivery} delivery</p>}
           </div>
-          <FreelancerProfileActions profileId={freelancer.userId} label={messageLabel} />
+          <FreelancerProfileActions profileId={freelancer.userId} label={messageLabel} serviceId={service.id} />
         </div>
       </div>
     </div>

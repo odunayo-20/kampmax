@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { MessageSquare, Pencil } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useCandidateConversation } from "@/hooks";
+import { asServiceId } from "@/services/service-share";
 import { Button } from "@/components/ui";
 
 /**
@@ -19,10 +20,13 @@ export function FreelancerProfileActions({
   profileId,
   label = "Message",
   fullWidth = false,
+  serviceId,
 }: {
   profileId: string;
   label?: string;
   fullWidth?: boolean;
+  /** The service being viewed; it is staged next to the message box in the chat. */
+  serviceId?: string;
 }) {
   const { status, user } = useAuth();
   const router = useRouter();
@@ -47,7 +51,9 @@ export function FreelancerProfileActions({
     openConversation(profileId)
       .then((conversationId) => {
         if (conversationId) {
-          router.push(`/chat/${conversationId}`);
+          // Only a well-formed id ever reaches the address.
+          const staged = asServiceId(serviceId);
+          router.push(`/chat/${conversationId}${staged ? `?service=${staged}` : ""}`);
         } else {
           setError("We couldn't open a conversation with this freelancer.");
         }

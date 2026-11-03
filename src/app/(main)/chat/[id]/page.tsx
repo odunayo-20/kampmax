@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, use } from "react";
 import { MessageCircle } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { useStagedService } from "@/hooks/use-staged-service";
 import {
   useConversation,
   useMarkConversationAsRead,
@@ -23,8 +24,15 @@ import { OfferBar } from "@/components/messages/OfferBar";
  * A missing or non-member conversation renders the same neutral "unavailable"
  * state, so the existence of private conversations is never revealed.
  */
-export default function ChatScreenPage({ params }: { params: Promise<{ id: string }> }) {
+export default function ChatScreenPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const { id } = use(params);
+  const { service: serviceParam } = use(searchParams);
   const { user } = useAuth();
   const [infoOpen, setInfoOpen] = useState(false);
 
@@ -34,6 +42,10 @@ export default function ChatScreenPage({ params }: { params: Promise<{ id: strin
 
   const conversation = conversationQuery.data;
   const isParticipant = !!conversation;
+
+  // The address is untrusted: a service is staged only if it is live and its
+  // owner is in this chat (see useStagedService).
+  const staged = useStagedService(conversation?.participants ?? [], serviceParam);
 
   // Mark-as-read: effect, once per conversation open (never per render), and
   // only after membership is confirmed. The store flips incoming read flags
@@ -89,7 +101,11 @@ export default function ChatScreenPage({ params }: { params: Promise<{ id: strin
               />
               <MessageThread conversation={conversation} isParticipant={isParticipant} />
               <OfferBar conversation={conversation} />
-              <MessageComposer conversationId={conversation.id} />
+              <MessageComposer
+                conversationId={conversation.id}
+                stagedService={staged.service}
+                onClearService={staged.clear}
+              />
             </div>
             {infoOpen && <ConversationInfoPanel conversation={conversation} />}
           </div>

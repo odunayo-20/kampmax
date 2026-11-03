@@ -2,9 +2,11 @@ import { Package } from "lucide-react";
 import { Message } from "@/types";
 import { cn, formatNaira } from "@/lib/utils";
 import { parseOfferId } from "@/services/offers-api";
+import { splitServiceMarker } from "@/services/service-share";
 import { MessageText } from "./MessageText";
 import { MessageStatus } from "./MessageStatus";
 import { OfferCard } from "./OfferCard";
+import { ServiceCard } from "./ServiceCard";
 import { formatMessageTime, getOrderStatusLabel } from "./message-utils";
 
 interface MessageItemProps {
@@ -24,7 +26,11 @@ interface MessageItemProps {
  */
 export function MessageItem({ message, isMine, showTail }: MessageItemProps) {
   const offerId = parseOfferId(message.text);
-  const hasCard = !!message.sharedProduct || !!message.sharedOrder || !!offerId;
+  // A message is an offer card OR text with a shared service, never both.
+  const shared = offerId ? null : splitServiceMarker(message.text);
+  const serviceId = shared?.serviceId ?? null;
+  const bodyText = shared ? shared.body : message.text;
+  const hasCard = !!message.sharedProduct || !!message.sharedOrder || !!offerId || !!serviceId;
   // Offer cards keep their own light panel on both sides of the thread.
   const onLight = !isMine || !!offerId;
   const bubbleBase = "relative max-w-[78%] px-3.5 py-2 text-sm shadow-sm";
@@ -72,7 +78,12 @@ export function MessageItem({ message, isMine, showTail }: MessageItemProps) {
           <OfferCard offerId={offerId} />
         ) : (
           <>
-            {message.text && <MessageText text={message.text} />}
+            {bodyText && <MessageText text={bodyText} />}
+            {serviceId && (
+              <div className={bodyText ? "mt-2" : undefined}>
+                <ServiceCard serviceId={serviceId} />
+              </div>
+            )}
             {message.imageUrl && (
               <img
                 src={message.imageUrl}

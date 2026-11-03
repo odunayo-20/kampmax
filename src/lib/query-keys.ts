@@ -49,6 +49,12 @@ export const messageKeys = {
     ["messages", "thread", conversationId, userId] as const,
 };
 
+/** Public service data shown in chats (a staged service, a service card) and its owner. */
+export const publicServiceKeys = {
+  detail: (serviceId: string) => ["public-service", "detail", serviceId] as const,
+  owner: (freelancerProfileId: string) => ["public-service", "owner", freelancerProfileId] as const,
+};
+
 /** Offers sent inside chats; scoped per user like the messages around them. */
 export const offerKeys = {
   all: ["offers"] as const,

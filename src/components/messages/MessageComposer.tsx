@@ -6,9 +6,15 @@ import { cn } from "@/lib/utils";
 import { useSendMessage } from "@/hooks/use-messages";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
 import { MESSAGE_MAX_LENGTH } from "@/config/messaging";
+import { SERVICE_MARKER_RESERVE, withServiceMarker } from "@/services/service-share";
+import type { FreelancerService } from "@/types/freelancer-services";
+import { ServiceSummary } from "./ServiceCard";
 
 interface MessageComposerProps {
   conversationId: string;
+  /** A service riding along with the next message (see useStagedService). */
+  stagedService?: FreelancerService | null;
+  onClearService?: () => void;
 }
 
 /**
@@ -22,14 +28,16 @@ interface MessageComposerProps {
  *   failure the draft is kept, the error maps to a friendly message, and the
  *   same Send action retries exactly once per tap.
  */
-export function MessageComposer({ conversationId }: MessageComposerProps) {
+export function MessageComposer({ conversationId, stagedService, onClearService }: MessageComposerProps) {
   const sendMutation = useSendMessage();
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const sendingRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const text = draft.slice(0, MESSAGE_MAX_LENGTH);
+  // The service marker travels inside the message, so the text leaves room for it.
+  const maxLength = MESSAGE_MAX_LENGTH - (stagedService ? SERVICE_MARKER_RESERVE : 0);
+  const text = draft.slice(0, maxLength);
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -41,14 +49,17 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
   function handleSend() {
     if (sendingRef.current || sendMutation.isPending) return;
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed && !stagedService) return;
     setError(null);
     sendingRef.current = true;
 
     sendMutation.mutate(
-      { conversationId, text: trimmed },
+      { conversationId, text: stagedService ? withServiceMarker(trimmed, stagedService.id) : trimmed },
       {
-        onSuccess: () => setDraft(""),
+        onSuccess: () => {
+          setDraft("");
+          if (stagedService) onClearService?.();
+        },
         onError: (err) => setError(getFriendlyErrorMessage(err)),
         onSettled: () => {
           sendingRef.current = false;
@@ -74,10 +85,15 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
   }
 
   const pending = sendingRef.current || sendMutation.isPending;
-  const overLimit = text.length >= MESSAGE_MAX_LENGTH;
+  const overLimit = text.length >= maxLength;
 
   return (
     <form onSubmit={handleSubmit} className="border-t border-kampmax-border bg-white px-3 py-2.5 sm:px-4">
+      {stagedService && (
+        <div className="mb-2">
+          <ServiceSummary service={stagedService} onRemove={onClearService} />
+        </div>
+      )}
       {error && (
         <p role="alert" className="mb-2 flex items-start gap-1.5 text-xs font-medium text-kampmax-error">
           <AlertCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" aria-hidden />
@@ -98,8 +114,8 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           rows={1}
-          maxLength={MESSAGE_MAX_LENGTH}
-          placeholder="Type a message..."
+          maxLength={maxLength}
+          placeholder={stagedService ? "Add a message about this service..." : "Type a message..."}
           className={cn(
             "flex-1 resize-none rounded-xl border border-kampmax-border bg-kampmax-bg/40 px-3.5 py-2.5 text-sm",
             "placeholder:text-kampmax-text-secondary/60",
@@ -109,7 +125,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
         />
         <button
           type="submit"
-          disabled={pending || !text.trim()}
+          disabled={pending || (!text.trim() && !stagedService)}
           aria-label={pending ? "Sending message" : "Send message"}
           className={cn(
             "h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors",
@@ -128,7 +144,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
       <div className="mt-1 flex items-center justify-between text-[10px] text-kampmax-text-secondary/70">
         <span>Enter to send &middot; Shift+Enter for a new line</span>
         <span className={cn(overLimit && "font-semibold text-kampmax-error")}>
-          {text.length}/{MESSAGE_MAX_LENGTH}
+          {text.length}/{maxLength}
         </span>
       </div>
     </form>
