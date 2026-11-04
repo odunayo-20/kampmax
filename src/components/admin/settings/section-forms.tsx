@@ -571,6 +571,10 @@ export function FinancialSectionForm({
     const e: Record<string, string> = {};
     const fee = rangeError(num(form.platformFeeRate), "Platform fee rate", 0, 30);
     if (fee) e.platformFeeRate = fee;
+    const contractFee = rangeError(num(form.freelanceFeeRate), "Freelance fee rate", 0, 30);
+    if (contractFee) e.freelanceFeeRate = contractFee;
+    const contractMin = rangeError(num(form.freelanceFeeMinimum), "Freelance fee minimum", 0, 10_000);
+    if (contractMin) e.freelanceFeeMinimum = contractMin;
     const min = rangeError(
       num(form.withdrawalMinimum),
       "Withdrawal minimum",
@@ -608,6 +612,28 @@ export function FinancialSectionForm({
           step={0.5}
           onChange={(v) => setForm((f) => ({ ...f, platformFeeRate: v }))}
           error={errors.platformFeeRate}
+        />
+        <NumberField
+          label="Freelance fee rate"
+          value={num(form.freelanceFeeRate)}
+          suffix="%"
+          min={0}
+          max={30}
+          step={0.5}
+          hint="Taken from the freelancer's payout on contracts made from now on. 0 charges nothing. Contracts already made keep their rate."
+          onChange={(v) => setForm((f) => ({ ...f, freelanceFeeRate: v }))}
+          error={errors.freelanceFeeRate}
+        />
+        <NumberField
+          label="Freelance fee minimum"
+          value={num(form.freelanceFeeMinimum)}
+          prefix="₦"
+          min={0}
+          max={10_000}
+          step={10}
+          hint="The least charged on a payment once a rate is set (never more than the payment)."
+          onChange={(v) => setForm((f) => ({ ...f, freelanceFeeMinimum: v }))}
+          error={errors.freelanceFeeMinimum}
         />
         <NumberField
           label="Withdrawal minimum"

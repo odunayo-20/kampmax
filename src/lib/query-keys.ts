@@ -55,6 +55,12 @@ export const publicServiceKeys = {
   owner: (freelancerProfileId: string) => ["public-service", "owner", freelancerProfileId] as const,
 };
 
+/** The service fee on freelance contracts: what a new contract charges, and what admins have collected. */
+export const feeKeys = {
+  terms: ["engagement-fees", "terms"] as const,
+  report: ["engagement-fees", "report"] as const,
+};
+
 /** Offers sent inside chats; scoped per user like the messages around them. */
 export const offerKeys = {
   all: ["offers"] as const,

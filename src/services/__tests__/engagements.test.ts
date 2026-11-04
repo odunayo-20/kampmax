@@ -22,6 +22,8 @@ const engagement = (status: EngagementStatus): Engagement => ({
   paymentType: "FIXED",
   hourlyRate: null,
   weeklyHourLimit: null,
+  feeRate: null,
+  feeMinimum: null,
   currentMilestonePosition: 1,
   milestones: [
     {
@@ -36,6 +38,7 @@ const engagement = (status: EngagementStatus): Engagement => ({
       periodEnd: null,
       loggedMinutes: 0,
       billedAmount: null,
+      feeAmount: null,
       status: "ACTIVE",
       completedAt: null,
       autoReleased: false,
@@ -97,6 +100,7 @@ describe("engagement -> contract mapping", () => {
       periodEnd: null,
       loggedMinutes: 0,
       billedAmount: null,
+      feeAmount: null,
       status,
       completedAt: status === "COMPLETED" ? "2026-09-10T00:00:00.000Z" : null,
       autoReleased: false,
@@ -199,6 +203,7 @@ describe("an hourly contract in the freelancer's contract view", () => {
     periodEnd: "2026-11-10",
     loggedMinutes: 0,
     billedAmount: null,
+    feeAmount: null,
     status,
     completedAt: null,
     autoReleased: false,

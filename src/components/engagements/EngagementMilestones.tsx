@@ -1,6 +1,7 @@
 import { CheckCircle2, Circle, CircleDot, XCircle, type LucideIcon } from "lucide-react";
 import { cn, formatNaira } from "@/lib/utils";
 import { describeDue } from "@/lib/engagement-milestones";
+import { describeReceived } from "@/lib/service-fee";
 import { formatMinutes, formatWorkDay } from "@/lib/hourly";
 import type { EngagementMilestone, MilestoneStatus } from "@/services/jobs";
 
@@ -30,7 +31,14 @@ function settlement(m: EngagementMilestone): string | null {
  * (never more than the week was funded for). Renders nothing for a contract
  * with a single payment.
  */
-export function EngagementMilestones({ milestones }: { milestones: EngagementMilestone[] }) {
+export function EngagementMilestones({
+  milestones,
+  showFee = false,
+}: {
+  milestones: EngagementMilestone[];
+  /** The freelancer's view: say what each paid milestone came to after the service fee. */
+  showFee?: boolean;
+}) {
   if (milestones.length < 2) return null;
   const weeks = milestones[0]?.kind === "WEEK";
   const paid = milestones.filter((m) => m.status === "COMPLETED").length;
@@ -52,6 +60,8 @@ export function EngagementMilestones({ milestones }: { milestones: EngagementMil
           // A week's own end date is not a deadline worth flagging.
           const due = m.kind === "WEEK" ? null : describeDue(m.dueDate, m.status);
           const settled = m.kind === "WEEK" && m.status === "COMPLETED";
+          const received =
+            showFee && m.status === "COMPLETED" ? describeReceived(m.billedAmount ?? m.amount, m.feeAmount) : null;
           return (
             <li key={m.id} className="flex items-start gap-2.5 px-3 py-2">
               <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", tone)} aria-hidden />
@@ -80,6 +90,7 @@ export function EngagementMilestones({ milestones }: { milestones: EngagementMil
                     {due.label}
                   </p>
                 )}
+                {received && <p className="mt-0.5 text-[11px] text-kampmax-text-secondary">{received}</p>}
                 {note && <p className="mt-0.5 text-[11px] text-kampmax-text-secondary">{note}</p>}
               </div>
               <span className="shrink-0 text-xs font-semibold text-kampmax-text">

@@ -12,6 +12,7 @@ import {
 import type { Engagement } from "@/services/jobs";
 import { ContractStatusBadge } from "@/components/contracts/ContractStatusBadge";
 import { EngagementActions } from "@/components/engagements/EngagementActions";
+import { ContractFeeNote } from "@/components/engagements/ContractFeeNote";
 import { EngagementMilestones } from "@/components/engagements/EngagementMilestones";
 import { HourlyTimesheet } from "@/components/engagements/HourlyTimesheet";
 import { EngagementNotices } from "@/components/engagements/EngagementNotices";
@@ -159,7 +160,8 @@ export default function FreelancerContractsPage() {
                 <p className="mt-3 rounded-lg bg-kampmax-bg px-3 py-2 text-xs text-kampmax-text-secondary">
                   {contract.nextAction}
                 </p>
-                <EngagementMilestones milestones={engagement.milestones} />
+                <EngagementMilestones milestones={engagement.milestones} showFee />
+                <ContractFeeNote engagement={engagement} />
                 <EngagementNotices engagement={engagement} role="freelancer" />
                 {engagement.paymentType === "HOURLY" && (
                   <HourlyTimesheet

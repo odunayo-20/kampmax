@@ -25,6 +25,7 @@ const milestone = (
   periodEnd: null,
   loggedMinutes: 0,
   billedAmount: null,
+  feeAmount: null,
   status,
   completedAt: null,
   autoReleased: false,

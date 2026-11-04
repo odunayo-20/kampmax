@@ -7,11 +7,16 @@ vi.mock("@/hooks/use-offers", () => ({
   useCreateOffer: () => ({ mutate, isPending: false }),
 }));
 
+// What the platform charges the freelancer; no fee unless a test sets one.
+let feeTerms = { rate: 0, minimum: 0 };
+vi.mock("@/hooks/use-fee-terms", () => ({ useFeeTerms: () => feeTerms }));
+
 import { SendOfferModal } from "../SendOfferModal";
 
 afterEach(cleanup);
 beforeEach(() => {
   mutate.mockReset();
+  feeTerms = { rate: 0, minimum: 0 };
 });
 
 function renderModal() {
@@ -257,5 +262,63 @@ describe("an hourly offer", () => {
     expect(sent()).toMatchObject({ amount: 50000 });
     expect("paymentType" in sent()).toBe(false);
     expect("hourlyRate" in sent()).toBe(false);
+  });
+});
+
+describe("the service fee on an offer", () => {
+  const price = () => fireEvent.change(screen.getByLabelText("Price (₦)"), { target: { value: "50000" } });
+
+  it("says nothing while the platform charges no fee", () => {
+    renderModal();
+    price();
+    expect(screen.queryByTestId("service-fee-note")).toBeNull();
+  });
+
+  it("tells the freelancer what they will receive after the fee, before they send", () => {
+    feeTerms = { rate: 10, minimum: 100 };
+    renderModal();
+    price();
+
+    const note = screen.getByTestId("service-fee-note");
+    expect(note.textContent).toContain("You'll receive ₦45,000 after the ₦5,000 service fee");
+    expect(note.textContent).toContain("10% of each payment, at least ₦100 a payment");
+    expect(note.textContent).toContain("The client always pays the price you agree");
+  });
+
+  it("waits for a price before saying anything", () => {
+    feeTerms = { rate: 10, minimum: 100 };
+    renderModal();
+    expect(screen.queryByTestId("service-fee-note")).toBeNull();
+  });
+
+  it("charges the minimum on a small price", () => {
+    feeTerms = { rate: 10, minimum: 500 };
+    renderModal();
+    fireEvent.change(screen.getByLabelText("Price (₦)"), { target: { value: "2000" } });
+
+    expect(screen.getByTestId("service-fee-note").textContent).toContain("₦1,500 after the ₦500 service fee");
+  });
+
+  it("does not change what is sent: the price stays the whole price, the server takes the fee", () => {
+    feeTerms = { rate: 10, minimum: 100 };
+    renderModal();
+    fillBasics();
+    send();
+
+    expect(sent()).toMatchObject({ amount: 50000 });
+    expect(JSON.stringify(sent())).not.toMatch(/fee/i);
+  });
+
+  it("works the fee out on a full week for an hourly offer, once the terms are valid", () => {
+    feeTerms = { rate: 10, minimum: 100 };
+    renderModal();
+    fireEvent.click(screen.getByRole("radio", { name: "By the hour" }));
+    expect(screen.queryByTestId("service-fee-note")).toBeNull();
+
+    fireEvent.change(screen.getByLabelText("Rate (₦ per hour)"), { target: { value: "3000" } });
+    fireEvent.change(screen.getByLabelText("Most hours per week"), { target: { value: "20" } });
+
+    const note = screen.getByTestId("service-fee-note");
+    expect(note.textContent).toContain("For a full week, you'll receive ₦54,000 after the ₦6,000 service fee");
   });
 });

@@ -3531,6 +3531,10 @@ export type PayoutSchedule = "daily" | "twice_daily" | "weekly";
 
 export interface FinancialSettings {
   platformFeeRate: number;
+  /** Freelance contracts: percent of each payment the freelancer pays Kampmax. 0 = no fee. */
+  freelanceFeeRate: number;
+  /** Freelance contracts: the least charged on a payment once the rate is above zero (₦). */
+  freelanceFeeMinimum: number;
   withdrawalMinimum: number;
   withdrawalFee: number;
   payoutSchedule: PayoutSchedule;

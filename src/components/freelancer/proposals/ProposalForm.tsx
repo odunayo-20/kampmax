@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button, Input, Select } from "@/components/ui";
 import { AttachmentPicker } from "@/components/uploads/AttachmentPicker";
+import { ServiceFeeNote } from "@/components/freelancer/ServiceFeeNote";
 import type {
   Opportunity,
   ProposalDeliveryUnit,
@@ -180,6 +181,7 @@ export function ProposalForm({
             <span className="font-semibold text-neutral-800">{formatNaira(parsedAmount)}</span>.
           </p>
         )}
+        <ServiceFeeNote className="mt-1" amount={parsedAmount} />
       </section>
 
       <MilestonePlanEditor

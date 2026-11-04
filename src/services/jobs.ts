@@ -263,6 +263,8 @@ export interface EngagementMilestone {
   loggedMinutes: number;
   /** Weeks only: what was paid once the week was settled. `amount` is the most it could be. */
   billedAmount: number | null;
+  /** What Kampmax's service fee took from this milestone's payment; null until it is paid. */
+  feeAmount: number | null;
   status: MilestoneStatus;
   completedAt: string | null;
   /** True when it was paid because the client never reviewed it. */
@@ -294,6 +296,13 @@ export interface Engagement {
   hourlyRate: number | null;
   /** Hourly only: the most hours that can be logged, and funded, in a week. */
   weeklyHourLimit: number | null;
+  /**
+   * The service fee the freelancer pays on each payment (a percent, and the
+   * least charged), fixed when the contract was made. Null when there is none.
+   * The client never pays more than the agreed price.
+   */
+  feeRate: number | null;
+  feeMinimum: number | null;
   /** Which milestone is being funded, worked or reviewed now (1-based). */
   currentMilestonePosition: number;
   /** In order. Money is funded, delivered and paid one milestone at a time. */

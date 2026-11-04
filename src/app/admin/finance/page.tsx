@@ -14,6 +14,7 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { adminErrorMessage } from "@/lib/admin/error-reporting";
 import { ChartCard, nairaAxis } from "@/components/admin/ChartCard";
 import { StatCard } from "@/components/admin/StatCard";
+import { ContractFeesCard } from "@/components/admin/finance/ContractFeesCard";
 import { FinanceTabs } from "@/components/admin/finance/FinanceTabs";
 import {
   buildCsv,
@@ -148,6 +149,9 @@ function FinanceOverview({ overview }: { overview: ManagedFinanceOverview }) {
           hint="processing + pending"
         />
       </div>
+
+      {/* Freelance contract fees, from the ledger */}
+      <ContractFeesCard />
 
       {/* Flow charts */}
       <div className="mt-4 grid gap-4 lg:grid-cols-3">

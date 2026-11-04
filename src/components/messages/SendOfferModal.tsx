@@ -5,6 +5,7 @@ import { AlertCircle, X } from "lucide-react";
 import { useCreateOffer } from "@/hooks/use-offers";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
 import { MilestonePlanEditor } from "@/components/freelancer/proposals/MilestonePlanEditor";
+import { ServiceFeeNote } from "@/components/freelancer/ServiceFeeNote";
 import { toProposalMilestones, validatePlan, type MilestoneRow, type PlanErrors } from "@/lib/milestone-plan";
 import { validateHourlyTerms, weeklyCap } from "@/lib/hourly";
 import { cn, formatNaira } from "@/lib/utils";
@@ -216,6 +217,11 @@ export function SendOfferModal({ conversationId, onClose }: SendOfferModalProps)
                 The client funds each week before you start it. You log your hours, and are paid for the hours they
                 approve; whatever is not used goes back to them.
               </p>
+              <ServiceFeeNote
+                className="mt-1"
+                per="a full week"
+                amount={termsErrors === null ? weeklyCap(Number(rate), Number(weeklyHours)) : undefined}
+              />
             </div>
           )}
 
@@ -269,6 +275,8 @@ export function SendOfferModal({ conversationId, onClose }: SendOfferModalProps)
               </select>
             </div>
           </div>
+
+          {!hourly && <ServiceFeeNote amount={Number(amount) > 0 ? Number(amount) : undefined} />}
 
           {!hourly && (
             <MilestonePlanEditor

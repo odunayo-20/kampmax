@@ -23,6 +23,7 @@ const m = (
   periodEnd: null,
   loggedMinutes: 0,
   billedAmount: null,
+  feeAmount: null,
   status,
   completedAt: null,
   autoReleased: false,
@@ -158,5 +159,30 @@ describe("the weeks of an hourly contract", () => {
   it("says nothing about earlier weeks when there are few", () => {
     render(<EngagementMilestones milestones={[week(1, "COMPLETED", { billedAmount: 1000 }), week(2, "ACTIVE")]} />);
     expect(screen.queryByText(/earlier/)).toBeNull();
+  });
+});
+
+describe("EngagementMilestones service fee", () => {
+  const paidWithFee = [
+    m(1, "COMPLETED", 100000, { feeAmount: 10000 }),
+    m(2, "ACTIVE", 150000),
+    m(3, "UPCOMING", 50000),
+  ];
+
+  it("tells the freelancer what a paid milestone came to after the fee", () => {
+    render(<EngagementMilestones milestones={paidWithFee} showFee />);
+    const items = within(screen.getByRole("list")).getAllByRole("listitem");
+    expect(items[0].textContent).toContain("₦90,000 received after the ₦10,000 service fee");
+    expect(items[1].textContent).not.toContain("received");
+  });
+
+  it("keeps the fee out of the client's view of the same contract", () => {
+    render(<EngagementMilestones milestones={paidWithFee} />);
+    expect(screen.queryByText(/service fee/)).toBeNull();
+  });
+
+  it("says nothing for a milestone that carried no fee", () => {
+    render(<EngagementMilestones milestones={[m(1, "COMPLETED", 100000, { feeAmount: 0 }), m(2, "ACTIVE", 1000)]} showFee />);
+    expect(screen.queryByText(/service fee/)).toBeNull();
   });
 });

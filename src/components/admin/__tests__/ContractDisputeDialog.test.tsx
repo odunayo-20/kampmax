@@ -23,6 +23,8 @@ const disputed = (dispute: Partial<NonNullable<Engagement["dispute"]>> = {}): En
   paymentType: "FIXED",
   hourlyRate: null,
   weeklyHourLimit: null,
+  feeRate: null,
+  feeMinimum: null,
   currentMilestonePosition: 1,
   milestones: [
     {
@@ -37,6 +39,7 @@ const disputed = (dispute: Partial<NonNullable<Engagement["dispute"]>> = {}): En
       periodEnd: null,
       loggedMinutes: 0,
       billedAmount: null,
+      feeAmount: null,
       status: "ACTIVE",
       completedAt: null,
       autoReleased: false,
@@ -122,6 +125,7 @@ describe("ruling on an open dispute", () => {
       periodEnd: null,
       loggedMinutes: 0,
       billedAmount: null,
+      feeAmount: null,
       status,
       completedAt: null,
       autoReleased: false,
@@ -170,6 +174,7 @@ describe("ruling on an open dispute", () => {
           periodEnd: "2026-11-10",
           loggedMinutes: 900, // 15 hours
           billedAmount: null,
+          feeAmount: null,
           status: "ACTIVE" as const,
           completedAt: null,
           autoReleased: false,
