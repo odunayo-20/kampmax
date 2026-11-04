@@ -37,6 +37,7 @@ export type AdminNavItemKey =
   | "serviceProviders"
   | "employers"
   | "jobs"
+  | "jobReports"
   | "verifications"
   | "security"
   | "support"

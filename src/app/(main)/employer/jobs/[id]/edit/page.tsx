@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import type { OpportunityInput } from "@/types/opportunity";
+import { isHiringType } from "@/types/opportunity";
 import { useEmployerJob, useUpdateJob, usePublishJob } from "@/hooks/use-jobs";
 import { JobForm, opportunityToInput } from "@/components/employer/jobs/JobForm";
+import { PublishJobDialog } from "@/components/employer/jobs/PublishJobDialog";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
 import { Button } from "@/components/ui";
 import { ArrowLeft, ShieldAlert } from "lucide-react";
@@ -17,6 +19,7 @@ export default function EditJobPage() {
   const updateMutation = useUpdateJob();
   const publishMutation = usePublishJob();
   const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   if (jobQuery.isPending) {
     return (
@@ -66,6 +69,11 @@ export default function EditJobPage() {
     setSubmissionError(null);
     try {
       await updateMutation.mutateAsync({ id: jobId, input: values });
+      if (values.opportunityType && isHiringType(values.opportunityType)) {
+        // Paid: show what it costs before anything is charged.
+        setDialogOpen(true);
+        return;
+      }
       await publishMutation.mutateAsync(jobId);
       router.push(`/employer/jobs/${jobId}`);
     } catch (err) {
@@ -74,15 +82,23 @@ export default function EditJobPage() {
   };
 
   return (
-    <JobForm
-      mode="edit"
-      initialValues={opportunityToInput(o)}
-      employerName={o.employer.name}
-      isSaving={updateMutation.isPending}
-      isPublishing={publishMutation.isPending || updateMutation.isPending}
-      error={submissionError}
-      onSaveDraft={handleSave}
-      onPublish={handlePublish}
-    />
+    <>
+      <JobForm
+        mode="edit"
+        initialValues={opportunityToInput(o)}
+        employerName={o.employer.name}
+        isSaving={updateMutation.isPending}
+        isPublishing={publishMutation.isPending || updateMutation.isPending}
+        error={submissionError}
+        onSaveDraft={handleSave}
+        onPublish={handlePublish}
+      />
+      <PublishJobDialog
+        jobId={jobId}
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        onPublished={() => router.push(`/employer/jobs/${jobId}`)}
+      />
+    </>
   );
 }

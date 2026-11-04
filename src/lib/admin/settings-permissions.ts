@@ -27,7 +27,7 @@ import type {
 
 /** Settings sections whose changes can cause financial/security harm. */
 export const HIGH_RISK_SETTINGS_SECTIONS: ReadonlySet<SettingsSectionKey> =
-  new Set<SettingsSectionKey>(["financial", "security"]);
+  new Set<SettingsSectionKey>(["financial", "postings", "security"]);
 
 export function isHighRiskSettingsSection(
   section: SettingsSectionKey

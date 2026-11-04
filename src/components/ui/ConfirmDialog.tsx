@@ -15,6 +15,8 @@ export function ConfirmDialog({
   cancelLabel = "Cancel",
   destructive = false,
   pending = false,
+  confirmDisabled = false,
+  children,
   onConfirm,
   onCancel,
 }: {
@@ -25,6 +27,10 @@ export function ConfirmDialog({
   cancelLabel?: string;
   destructive?: boolean;
   pending?: boolean;
+  /** Keeps the confirm button off while the dialog cannot be acted on yet (e.g. a price is loading). */
+  confirmDisabled?: boolean;
+  /** Extra content under the body, for dialogs that need to show more than a sentence. */
+  children?: React.ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -36,6 +42,7 @@ export function ConfirmDialog({
       <div className="relative w-full max-w-sm rounded-2xl border border-kampmax-border bg-white p-6 shadow-xl">
         <h2 className="text-base font-bold text-kampmax-text">{title}</h2>
         <p className="mt-2 text-sm text-kampmax-text-secondary">{body}</p>
+        {children}
         <div className="mt-5 flex justify-end gap-2">
           <Button variant="outline" size="sm" onClick={onCancel} disabled={pending}>
             {cancelLabel}
@@ -44,7 +51,7 @@ export function ConfirmDialog({
             variant={destructive ? "destructive" : "primary"}
             size="sm"
             onClick={onConfirm}
-            disabled={pending}
+            disabled={pending || confirmDisabled}
           >
             {pending ? "Working…" : confirmLabel}
           </Button>

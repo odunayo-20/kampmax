@@ -9,6 +9,7 @@ import type { ProfileReviewSummary } from "./platform-reviews";
 import type { EmployerApplicationStatus } from "./opportunity";
 import type {
   OpportunityStatus,
+  OpportunityType,
   OpportunityWorkArrangement,
 } from "./opportunity";
 import type { NotificationCategory, NotificationType } from "./index";
@@ -3482,6 +3483,7 @@ export type SettingsSectionKey =
   | "marketplace"
   | "orders"
   | "financial"
+  | "postings"
   | "loyalty"
   | "notifications"
   | "security";
@@ -3541,6 +3543,26 @@ export interface FinancialSettings {
   requireBvnForPayouts: boolean;
 }
 
+/**
+ * What an employer pays to publish a vacancy or internship (gigs are free).
+ * A fee of 0 makes that type free to post: nothing is charged and no free
+ * posting is used.
+ */
+export interface PostingSettings {
+  internshipFee: number;
+  partTimeFee: number;
+  fullTimeFee: number;
+  contractFee: number;
+  /** An unpaid internship pays the internship fee less this percent. */
+  unpaidInternshipDiscountPercent: number;
+  /** Renewing an expired posting pays its fee less this percent. */
+  renewalDiscountPercent: number;
+  /** Free postings each verified employer gets, across all paid types. */
+  freeAllowance: number;
+  /** How long a published posting stays live, in days. */
+  liveDays: number;
+}
+
 export interface LoyaltySettings {
   pointsPerNaira: number;
   maxRedemptionPercent: number;
@@ -3570,6 +3592,7 @@ export interface PlatformSettingsConfig {
   marketplace: MarketplaceSettings;
   orders: OrdersSettings;
   financial: FinancialSettings;
+  postings: PostingSettings;
   loyalty: LoyaltySettings;
   notifications: NotificationPreferences;
   security: SecuritySettings;
@@ -4455,6 +4478,12 @@ export interface ManagedJobRow {
   id: string;
   title: string;
   summary: string;
+  /** Gig, internship, full-time ... Older backends omit it; read a missing one as a gig. */
+  opportunityType?: OpportunityType;
+  /** Vacancies and internships: false for an unpaid role. */
+  isPaid?: boolean;
+  /** Vacancies and internships: when the paid live period ends. */
+  expiresAt?: string | null;
   status: ManagedJobStatus;
   publication: ManagedJobPublication;
   moderation: ManagedJobModeration;
@@ -4478,7 +4507,7 @@ export interface ManagedJobRow {
   postedAt: string;
   deadline: string;
   viewCount: number;
-  /** Visible applications (non-draft, non-withdrawn proposals). */
+  /** Visible applications: proposals on a gig, CV applications on a vacancy or internship (never drafts or withdrawn). */
   applications: number;
   /** Latest of postedAt and any proposal activity on the job. */
   lastActivityAt: string;
@@ -4486,6 +4515,7 @@ export interface ManagedJobRow {
 
 export interface ManagedJobListQuery extends ListQuery {
   status?: ManagedJobStatus | "all";
+  opportunityType?: OpportunityType | "all";
   publication?: ManagedJobPublication | "all";
   categoryId?: string | "all";
   campusId?: string | "all";
@@ -4519,7 +4549,7 @@ export interface ManagedJobStatusCounts {
   withApplications: number;
   /** OPEN jobs whose deadline is within 7 days. */
   expiringSoon: number;
-  /** Honest zero — the platform has no job-reports store. */
+  /** Postings with at least one open user report. */
   reported: number;
 }
 
@@ -4542,6 +4572,26 @@ export type ManagedJobApplicationStatus =
   | "accepted"
   | "rejected"
   | "withdrawn";
+
+/**
+ * One person who applied to a posting, for oversight. A gig has proposals, a
+ * vacancy or internship has CV applications. The CV, the note and the answers
+ * are between the applicant and the employer and are never part of this.
+ */
+export interface ManagedJobApplicantRow {
+  id: string;
+  kind: "proposal" | "application";
+  /** The console's status words; a status it has no word for keeps its own name. */
+  status: ManagedJobApplicationStatus | string;
+  name: string;
+  username: string | null;
+  userId: string | null;
+  appliedAt: string | null;
+  /** Proposals: the amount asked for (₦). */
+  amount: number | null;
+  /** CV applications: what the applicant called the CV they used. */
+  cvLabel: string | null;
+}
 
 export interface ManagedJobApplicationsSummary {
   total: number;
@@ -4573,6 +4623,12 @@ export interface ManagedJobDetailListing {
   id: string;
   title: string;
   summary: string;
+  opportunityType?: OpportunityType;
+  isPaid?: boolean;
+  /** Hiring postings: how often the pay is given (monthly, yearly ...). */
+  payPeriod?: string | null;
+  openings?: number;
+  expiresAt?: string | null;
   description: string;
   requirements: string;
   skills: string[];
@@ -4598,6 +4654,7 @@ export interface ManagedJobDetailListing {
   postedAt: string;
   deadline: string;
   viewCount: number;
+  /** Open user reports on this posting (the field keeps its older name). */
   employersReported: number;
 }
 

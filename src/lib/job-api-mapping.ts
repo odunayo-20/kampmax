@@ -13,16 +13,72 @@
  * employer descriptor/verified flag, view counts) are derived or left empty,
  * never invented.
  */
-import type { Job, JobBrowseQuery, JobStatus, CreateJobDto, UpdateJobDto } from "@/services/jobs";
+import type {
+  Job,
+  JobBrowseQuery,
+  JobOpportunityType,
+  JobPayPeriod,
+  JobStatus,
+  CreateJobDto,
+  UpdateJobDto,
+} from "@/services/jobs";
 import type {
   Opportunity,
   OpportunityBudgetType,
   OpportunityDuration,
+  OpportunityHiring,
   OpportunityInput,
+  OpportunityPayPeriod,
   OpportunityStatus,
+  OpportunityType,
   OpportunityWorkArrangement,
 } from "@/types/opportunity";
+import { isHiringType } from "@/types/opportunity";
 import { DURATION_LABEL } from "@/config/opportunity";
+
+// ── Opportunity type / pay period ───────────────────────────
+
+const TYPE_FROM_BACKEND: Record<JobOpportunityType, OpportunityType> = {
+  GIG: "gig",
+  FULL_TIME: "full_time",
+  PART_TIME: "part_time",
+  INTERNSHIP: "internship",
+  CONTRACT: "contract",
+};
+
+const TYPE_TO_BACKEND: Record<OpportunityType, JobOpportunityType> = {
+  gig: "GIG",
+  full_time: "FULL_TIME",
+  part_time: "PART_TIME",
+  internship: "INTERNSHIP",
+  contract: "CONTRACT",
+};
+
+const PAY_PERIOD_FROM_BACKEND: Record<JobPayPeriod, OpportunityPayPeriod> = {
+  HOURLY: "hourly",
+  WEEKLY: "weekly",
+  MONTHLY: "monthly",
+  YEARLY: "yearly",
+};
+
+const PAY_PERIOD_TO_BACKEND: Record<OpportunityPayPeriod, JobPayPeriod> = {
+  hourly: "HOURLY",
+  weekly: "WEEKLY",
+  monthly: "MONTHLY",
+  yearly: "YEARLY",
+};
+
+/** The hiring fields a gig (or an input that never set them) carries. */
+export function defaultHiring(): OpportunityHiring {
+  return { isPaid: true, openings: 1, eligibility: "", offersCertificate: false };
+}
+
+/** UI type tab -> the backend type to request (undefined = no filter). */
+export function opportunityTypeToBackend(
+  type: OpportunityType | "all" | undefined
+): JobOpportunityType | undefined {
+  return type && type !== "all" ? TYPE_TO_BACKEND[type] : undefined;
+}
 
 // ── Status ──────────────────────────────────────────────────
 
@@ -125,6 +181,17 @@ export function jobToOpportunity(job: Job): Opportunity {
 
   return {
     id: job.id,
+    opportunityType: TYPE_FROM_BACKEND[job.opportunityType ?? "GIG"] ?? "gig",
+    hiring: {
+      isPaid: job.isPaid ?? true,
+      payPeriod: job.payPeriod ? PAY_PERIOD_FROM_BACKEND[job.payPeriod] : undefined,
+      startDate: job.startDate ? job.startDate.slice(0, 10) : undefined,
+      durationMonths: job.durationMonths ?? undefined,
+      openings: job.openings ?? 1,
+      eligibility: job.eligibility ?? "",
+      offersCertificate: job.offersCertificate ?? false,
+    },
+    expiresAt: job.expiresAt ?? "",
     title: job.title,
     categoryId: job.category?.id ?? "",
     categoryName: job.category?.name,
@@ -194,6 +261,11 @@ export function opportunityInputToJobDto(
   input: OpportunityInput,
   mediaIds?: string[]
 ): CreateJobDto {
+  const type = input.opportunityType;
+  const hiringPost = !!type && isHiringType(type);
+  const hiring = hiringPost ? (input.hiring ?? defaultHiring()) : undefined;
+  // An unpaid role carries no pay range; a hiring pay range is not hourly/fixed.
+  const quotesPay = !hiring || hiring.isPaid;
   return {
     title: input.title.trim(),
     description: input.description.trim() || undefined,
@@ -203,12 +275,21 @@ export function opportunityInputToJobDto(
     campusId: input.location.campusId && isBackendId(input.location.campusId)
       ? input.location.campusId
       : undefined,
-    budgetType: input.budget.type === "hourly" ? "HOURLY" : "FIXED",
-    budgetMin: input.budget.min,
-    budgetMax: input.budget.max,
+    opportunityType: type ? TYPE_TO_BACKEND[type] : undefined,
+    isPaid: hiring?.isPaid,
+    payPeriod: hiring?.isPaid && hiring.payPeriod ? PAY_PERIOD_TO_BACKEND[hiring.payPeriod] : undefined,
+    startDate: hiring?.startDate || undefined,
+    durationMonths: hiring?.durationMonths,
+    openings: hiring?.openings,
+    eligibility: hiring?.eligibility.trim() || undefined,
+    offersCertificate: hiring?.offersCertificate,
+    budgetType: hiring ? "FIXED" : input.budget.type === "hourly" ? "HOURLY" : "FIXED",
+    budgetMin: quotesPay ? input.budget.min : undefined,
+    budgetMax: quotesPay ? input.budget.max : undefined,
     currency: input.budget.currency,
     experienceLevel: EXPERIENCE_TO_BACKEND[input.experienceLevel],
-    estimatedDuration: durationToText(input.duration),
+    // A hiring posting states its length in months, not as a bucketed duration.
+    estimatedDuration: hiring ? undefined : durationToText(input.duration),
     locationType: ARRANGEMENT_TO_BACKEND[input.workArrangement] ?? "ONSITE",
     state: input.location.state?.trim() || undefined,
     city: input.location.city?.trim() || undefined,
@@ -240,6 +321,10 @@ export function opportunityInputToUpdateDto(
     categoryId: dto.categoryId ?? null,
     budgetMin: dto.budgetMin ?? null,
     budgetMax: dto.budgetMax ?? null,
+    payPeriod: dto.payPeriod ?? null,
+    startDate: dto.startDate ?? null,
+    durationMonths: dto.durationMonths ?? null,
+    eligibility: dto.eligibility ?? null,
     experienceLevel: dto.experienceLevel ?? null,
     city: dto.city ?? null,
     state: dto.state ?? null,
@@ -257,6 +342,7 @@ export function jobListFiltersToQuery(filters: {
   campusId?: string;
   experience?: string;
   arrangement?: string;
+  type?: OpportunityType;
   sort?: string;
   page?: number;
   size?: number;
@@ -265,6 +351,7 @@ export function jobListFiltersToQuery(filters: {
     page: filters.page,
     limit: filters.size,
     search: filters.search || undefined,
+    opportunityType: filters.type ? TYPE_TO_BACKEND[filters.type] : undefined,
     categoryId: filters.categoryId || undefined,
     campusId: filters.campusId && isBackendId(filters.campusId) ? filters.campusId : undefined,
     experienceLevel: filters.experience

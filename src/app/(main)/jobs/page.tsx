@@ -2,7 +2,12 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import type { OpportunitySortKey, OpportunityWorkArrangement } from "@/types/opportunity";
+import type {
+  OpportunitySortKey,
+  OpportunityType,
+  OpportunityWorkArrangement,
+} from "@/types/opportunity";
+import { OPPORTUNITY_TYPE_ORDER } from "@/config/opportunity";
 import { useDebounce } from "@/hooks";
 import { useJobs, useSavedJobIds } from "@/hooks/use-jobs";
 import {
@@ -34,6 +39,7 @@ function JobsMarketplaceContent() {
   const categoryParam = searchParams.get("category") ?? "";
   const expParam = searchParams.get("exp") ?? "";
   const arrParam = searchParams.get("arr") ?? "";
+  const typeParam = searchParams.get("type") ?? "";
   const sortParam = (searchParams.get("sort") as OpportunitySortKey | null) ?? "newest";
   const pageParam = Math.max(1, Number(searchParams.get("page") ?? "1") || 1);
 
@@ -41,6 +47,10 @@ function JobsMarketplaceContent() {
     arrParam && VALID_ARRANGEMENTS.includes(arrParam as OpportunityWorkArrangement)
       ? (arrParam as OpportunityWorkArrangement)
       : undefined;
+
+  const type: OpportunityType | "" = OPPORTUNITY_TYPE_ORDER.includes(typeParam as OpportunityType)
+    ? (typeParam as OpportunityType)
+    : "";
 
   const [searchInput, setSearchInput] = useState(qParam);
   const debouncedSearch = useDebounce(searchInput, JOB_SEARCH_DEBOUNCE_MS);
@@ -52,6 +62,7 @@ function JobsMarketplaceContent() {
     experience: expParam,
     arrangement: arrParam,
     sort: sortParam,
+    type,
   };
 
   const syncUrl = useCallback(
@@ -66,6 +77,8 @@ function JobsMarketplaceContent() {
       else params.delete("exp");
       if (next.arrangement) params.set("arr", next.arrangement);
       else params.delete("arr");
+      if (next.type) params.set("type", next.type);
+      else params.delete("type");
       if (next.sort !== "newest") params.set("sort", next.sort);
       else params.delete("sort");
       if (next.page && next.page > 1) params.set("page", String(next.page));
@@ -91,11 +104,12 @@ function JobsMarketplaceContent() {
       categoryId: categoryParam || undefined,
       experience: expParam || undefined,
       arrangement: arrangement as string | undefined,
+      type: type || undefined,
       sort: sortParam,
       page: pageParam,
       size: JOBS_PAGE_SIZE,
     }),
-    [debouncedSearch, categoryParam, expParam, arrangement, sortParam, pageParam]
+    [debouncedSearch, categoryParam, expParam, arrangement, type, sortParam, pageParam]
   );
 
   const jobsQuery = useJobs(filters);
@@ -105,11 +119,11 @@ function JobsMarketplaceContent() {
     [savedIdsQuery.data]
   );
 
-  const hasFilters = Boolean(searchInput.trim() || categoryParam || expParam || arrParam);
+  const hasFilters = Boolean(searchInput.trim() || categoryParam || expParam || arrParam || type);
 
   const handleReset = useCallback(() => {
     setSearchInput("");
-    syncUrl({ search: "", categoryId: "", experience: "", arrangement: "", sort: "newest", page: 1 });
+    syncUrl({ search: "", categoryId: "", experience: "", arrangement: "", type: "", sort: "newest", page: 1 });
   }, [syncUrl]);
 
   const goToPage = useCallback((p: number) => syncUrl({ page: p }), [syncUrl]);
@@ -126,6 +140,7 @@ function JobsMarketplaceContent() {
           onExperienceChange={(v) => syncUrl({ experience: v, page: 1 })}
           onArrangementChange={(v) => syncUrl({ arrangement: v, page: 1 })}
           onSortChange={(v) => syncUrl({ sort: v })}
+          onTypeChange={(v) => syncUrl({ type: v, page: 1 })}
           onReset={handleReset}
         />
 

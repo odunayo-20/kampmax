@@ -12,7 +12,12 @@
 //    GET    /jobs/:id                → get published job by id (public)
 //    GET    /jobs/slug/:slug         → get published job by slug (public)
 //    PATCH  /jobs/:id                → update a draft job (owner)
-//    POST   /jobs/:id/publish        → publish a draft job (owner)
+//    POST   /jobs/:id/publish        → publish a draft job (owner); a vacancy or
+//                                      internship is paid for here (402 = top up)
+//    POST   /jobs/:id/renew          → renew an expired vacancy or internship (owner)
+//    GET    /jobs/me/:id/publish-quote   → what publishing this draft costs
+//    GET    /jobs/me/:id/renewal-quote   → what renewing this posting costs
+//    GET    /job-posting/pricing|summary|charges → the Billing & Credits page
 //    POST   /jobs/:id/pause          → pause a published job (owner)
 //    POST   /jobs/:id/close          → close a job (owner)
 //    POST   /jobs/:id/cancel         → cancel a job (owner)
@@ -80,6 +85,11 @@ export interface JobEmployerSummary {
   displayName: string;
 }
 
+/** Backend JobOpportunityType: GIG is a freelance job, the rest are hiring postings. */
+export type JobOpportunityType = "GIG" | "FULL_TIME" | "PART_TIME" | "INTERNSHIP" | "CONTRACT";
+
+export type JobPayPeriod = "HOURLY" | "WEEKLY" | "MONTHLY" | "YEARLY";
+
 /** Backend JobStatus enum (uppercase, as returned by the API). */
 export type JobStatus = "DRAFT" | "PUBLISHED" | "PAUSED" | "CLOSED" | "CANCELLED" | "EXPIRED";
 
@@ -115,6 +125,15 @@ export interface Job {
   currency: string;
   experienceLevel: string | null;
   estimatedDuration: string | null;
+  /** Older backends omit the hiring fields; treat a missing type as a gig. */
+  opportunityType?: JobOpportunityType;
+  isPaid?: boolean;
+  payPeriod?: JobPayPeriod | null;
+  startDate?: string | null;
+  durationMonths?: number | null;
+  openings?: number;
+  eligibility?: string | null;
+  offersCertificate?: boolean;
   locationType: string;
   country: string | null;
   state: string | null;
@@ -123,6 +142,8 @@ export interface Job {
   status: JobStatus;
   visibility: string;
   publishedAt: string | null;
+  /** Hiring postings: when the paid live period ends. */
+  expiresAt?: string | null;
   skills: JobSkillSummary[];
   screeningQuestions: JobScreeningQuestion[];
   attachments: JobAttachment[];
@@ -146,12 +167,20 @@ export interface CreateJobDto {
   currency?: string;
   experienceLevel?: "JUNIOR" | "MIDLEVEL" | "SENIOR" | "EXPERT";
   estimatedDuration?: string;
+  opportunityType?: JobOpportunityType;
+  isPaid?: boolean;
+  payPeriod?: JobPayPeriod;
+  startDate?: string;
+  durationMonths?: number;
+  openings?: number;
+  eligibility?: string;
+  offersCertificate?: boolean;
   locationType?: "REMOTE" | "ONSITE" | "HYBRID";
   country?: string;
   state?: string;
   city?: string;
   applicationDeadline?: string;
-  /** Skill names; the backend resolves (or creates) them. */
+  /** Names of existing SKILL-taxonomy skills; an unknown name is a 400. */
   skills?: string[];
   screeningQuestions?: { id?: string; question: string; optional?: boolean }[];
   /** Uploaded media ids to attach. */
@@ -172,6 +201,14 @@ export interface UpdateJobDto {
   currency?: string;
   experienceLevel?: "JUNIOR" | "MIDLEVEL" | "SENIOR" | "EXPERT" | null;
   estimatedDuration?: string | null;
+  opportunityType?: JobOpportunityType;
+  isPaid?: boolean;
+  payPeriod?: JobPayPeriod | null;
+  startDate?: string | null;
+  durationMonths?: number | null;
+  openings?: number;
+  eligibility?: string | null;
+  offersCertificate?: boolean;
   locationType?: "REMOTE" | "ONSITE" | "HYBRID";
   country?: string | null;
   state?: string | null;
@@ -193,6 +230,7 @@ export interface JobBrowseQuery {
   budgetType?: string;
   experienceLevel?: string;
   locationType?: string;
+  opportunityType?: JobOpportunityType;
   /** newest | oldest | deadline */
   sort?: string;
 }
@@ -359,6 +397,7 @@ export async function listPublicJobs(query: JobBrowseQuery = {}): Promise<{
   if (query.budgetType) params.set("budgetType", query.budgetType);
   if (query.experienceLevel) params.set("experienceLevel", query.experienceLevel);
   if (query.locationType) params.set("locationType", query.locationType);
+  if (query.opportunityType) params.set("opportunityType", query.opportunityType);
   if (query.sort) params.set("sort", query.sort);
   if (query.page) params.set("page", String(query.page));
   if (query.limit) params.set("limit", String(query.limit));
@@ -418,7 +457,12 @@ export async function getJobBySlug(slug: string): Promise<{
  * Endpoint: GET /jobs/me
  */
 export async function listMyJobs(
-  query: { page?: number; limit?: number; statuses?: JobStatus[] } = {}
+  query: {
+    page?: number;
+    limit?: number;
+    statuses?: JobStatus[];
+    opportunityType?: JobOpportunityType;
+  } = {}
 ): Promise<{
   jobs: Job[];
   total: number;
@@ -430,6 +474,7 @@ export async function listMyJobs(
   if (query.page) params.set("page", String(query.page));
   if (query.limit) params.set("limit", String(query.limit));
   if (query.statuses?.length) params.set("status", query.statuses.join(","));
+  if (query.opportunityType) params.set("opportunityType", query.opportunityType);
   const qs = params.toString();
 
   const { data, error } = await apiClient.get<PaginatedResult<Job>>(
@@ -565,6 +610,158 @@ export async function cancelJob(id: string): Promise<{
   const { data, error } = await apiClient.post<undefined, Job>(`/jobs/${id}/cancel`);
   if (error) return { job: null, error };
   return { job: data, error: null };
+}
+
+/**
+ * Renew an expired vacancy or internship for another live period (owner only).
+ * A deadline that has already passed must be replaced.
+ * Endpoint: POST /jobs/:id/renew
+ */
+export async function renewJob(
+  id: string,
+  applicationDeadline?: string
+): Promise<{ job: Job | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.post<{ applicationDeadline?: string }, Job>(
+    `/jobs/${id}/renew`,
+    applicationDeadline ? { applicationDeadline } : {}
+  );
+  if (error) return { job: null, error };
+  return { job: data, error: null };
+}
+
+// ═══════════════════════════════════════════════════════════
+// POSTING FEES (Billing & Credits)
+// ═══════════════════════════════════════════════════════════
+
+export interface FreeAllowance {
+  total: number;
+  used: number;
+  remaining: number;
+}
+
+/** The price list, plus how many of this employer's free postings are left. */
+export interface PostingPricing {
+  currency: string;
+  /**
+   * False until vacancies and internships may be published (drafts are always
+   * allowed). Older backends omit it; only an explicit false closes them.
+   */
+  hiringEnabled?: boolean;
+  internshipFee: number;
+  /** The internship fee after the unpaid discount. */
+  unpaidInternshipFee: number;
+  partTimeFee: number;
+  fullTimeFee: number;
+  contractFee: number;
+  renewalDiscountPercent: number;
+  liveDays: number;
+  freeAllowance: FreeAllowance;
+}
+
+/** What publishing one draft would cost this employer right now. */
+export interface PostingQuote {
+  opportunityType: JobOpportunityType;
+  isPaid: boolean;
+  /** The list price before any free posting is applied. */
+  fee: number;
+  /** NONE: nothing to pay. FREE_ALLOWANCE: uses a free posting. PAID: from the wallet. */
+  chargeKind: "NONE" | "FREE_ALLOWANCE" | "PAID";
+  /** Naira that would leave the wallet (0 unless chargeKind is PAID). */
+  amountDue: number;
+  currency: string;
+  liveDays: number;
+  freeAllowance: FreeAllowance;
+  wallet: { availableBalance: number; canAfford: boolean };
+  /** A vacancy or internship cannot be published until the employer is verified. */
+  needsVerification: boolean;
+}
+
+export interface RenewalQuote {
+  amountDue: number;
+  currency: string;
+  liveDays: number;
+}
+
+export interface PostingCharge {
+  id: string;
+  jobId: string;
+  jobTitle: string | null;
+  opportunityType: JobOpportunityType | null;
+  kind: "FREE_ALLOWANCE" | "PAID" | "RENEWAL";
+  amount: number;
+  currency: string;
+  status: "CHARGED" | "REFUNDED";
+  createdAt: string;
+  refundedAt: string | null;
+  refundReason: string | null;
+}
+
+export interface PostingBillingSummary {
+  allowance: FreeAllowance;
+  wallet: { currency: string; balance: number; availableBalance: number };
+}
+
+/** Endpoint: GET /job-posting/pricing */
+export async function getPostingPricing(): Promise<{
+  pricing: PostingPricing | null;
+  error: ApiError | null;
+}> {
+  const { data, error } = await apiClient.get<PostingPricing>("/job-posting/pricing");
+  return error ? { pricing: null, error } : { pricing: data, error: null };
+}
+
+/** Endpoint: GET /job-posting/summary */
+export async function getPostingBillingSummary(): Promise<{
+  summary: PostingBillingSummary | null;
+  error: ApiError | null;
+}> {
+  const { data, error } = await apiClient.get<PostingBillingSummary>("/job-posting/summary");
+  return error ? { summary: null, error } : { summary: data, error: null };
+}
+
+/** Endpoint: GET /job-posting/charges */
+export async function listPostingCharges(
+  query: { page?: number; limit?: number } = {}
+): Promise<{
+  charges: PostingCharge[];
+  total: number;
+  page: number;
+  totalPages: number;
+  error: ApiError | null;
+}> {
+  const params = new URLSearchParams();
+  if (query.page) params.set("page", String(query.page));
+  if (query.limit) params.set("limit", String(query.limit));
+  const qs = params.toString();
+  const { data, error } = await apiClient.get<PaginatedResult<PostingCharge>>(
+    `/job-posting/charges${qs ? `?${qs}` : ""}`
+  );
+  if (error) return { charges: [], total: 0, page: 1, totalPages: 1, error };
+  return {
+    charges: data?.items ?? [],
+    total: data?.meta?.total ?? 0,
+    page: data?.meta?.page ?? 1,
+    totalPages: data?.meta?.totalPages ?? 1,
+    error: null,
+  };
+}
+
+/** Endpoint: GET /jobs/me/:id/publish-quote */
+export async function getPublishQuote(id: string): Promise<{
+  quote: PostingQuote | null;
+  error: ApiError | null;
+}> {
+  const { data, error } = await apiClient.get<PostingQuote>(`/jobs/me/${id}/publish-quote`);
+  return error ? { quote: null, error } : { quote: data, error: null };
+}
+
+/** Endpoint: GET /jobs/me/:id/renewal-quote */
+export async function getRenewalQuote(id: string): Promise<{
+  quote: RenewalQuote | null;
+  error: ApiError | null;
+}> {
+  const { data, error } = await apiClient.get<RenewalQuote>(`/jobs/me/${id}/renewal-quote`);
+  return error ? { quote: null, error } : { quote: data, error: null };
 }
 
 // ═══════════════════════════════════════════════════════════

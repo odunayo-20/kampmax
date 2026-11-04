@@ -92,6 +92,8 @@ export const supportKeys = {
 export interface JobListQuery {
   search?: string;
   categoryId?: string;
+  /** An opportunity type (gig, internship, ...). Omitted means every kind. */
+  type?: string;
   experience?: string;
   arrangement?: string;
   sort?: string;
@@ -101,6 +103,8 @@ export interface JobListQuery {
 
 export interface EmployerJobListQuery {
   status?: string;
+  /** An opportunity type, or "all". */
+  type?: string;
   sort?: string;
   page?: number;
   size?: number;
@@ -117,6 +121,43 @@ export const jobKeys = {
   employerCounts: (userId: string) =>
     ["jobs", "employer", userId, "counts"] as const,
   saved: (userId: string) => ["jobs", "saved", userId] as const,
+};
+
+/**
+ * CVs and applications to vacancies and internships. Per user, so one
+ * person's CV library or an employer's applicants never show in another
+ * session.
+ */
+export const cvKeys = {
+  all: ["cvs"] as const,
+  list: (userId: string) => ["cvs", userId] as const,
+};
+
+export const jobApplicationKeys = {
+  all: ["job-applications"] as const,
+  mine: (userId: string, page: number) =>
+    ["job-applications", userId, "mine", page] as const,
+  mineForJob: (userId: string, jobId: string) =>
+    ["job-applications", userId, "mine-job", jobId] as const,
+  forJob: (userId: string, jobId: string, status: string, page: number) =>
+    ["job-applications", userId, "job", jobId, status, page] as const,
+};
+
+/**
+ * Posting fees: the price list, the employer's free-posting allowance, what
+ * one draft or renewal would cost, and the charge history. Per user, so one
+ * employer's balance or receipts never show for another session.
+ */
+export const postingKeys = {
+  all: ["posting-billing"] as const,
+  pricing: (userId: string) => ["posting-billing", userId, "pricing"] as const,
+  summary: (userId: string) => ["posting-billing", userId, "summary"] as const,
+  charges: (userId: string, page: number) =>
+    ["posting-billing", userId, "charges", page] as const,
+  publishQuote: (userId: string, jobId: string) =>
+    ["posting-billing", userId, "publish-quote", jobId] as const,
+  renewalQuote: (userId: string, jobId: string) =>
+    ["posting-billing", userId, "renewal-quote", jobId] as const,
 };
 
 /**
@@ -416,6 +457,21 @@ export const adminKeys = {
       ["admin", "jobs", "detail", id, scopeCampusId ?? "platform"] as const,
     activity: (id: string, scopeCampusId?: string | null) =>
       ["admin", "jobs", "activity", id, scopeCampusId ?? "platform"] as const,
+    applicants: (id: string, page: number, scopeCampusId?: string | null) =>
+      ["admin", "jobs", "applicants", id, page, scopeCampusId ?? "platform"] as const,
+  } as const,
+  /** Reports on postings and applicants, and a moderator's look at one application. */
+  jobReports: {
+    all: ["admin", "job-reports"] as const,
+    list: (query: {
+      status?: string;
+      targetType?: string;
+      jobId?: string;
+      page?: number;
+      pageSize?: number;
+    }) => ["admin", "job-reports", "list", query] as const,
+    detail: (id: string) => ["admin", "job-reports", "detail", id] as const,
+    application: (id: string) => ["admin", "job-reports", "application", id] as const,
   } as const,
   /**
    * Review management key factory (Module 41). Read-only oversight console

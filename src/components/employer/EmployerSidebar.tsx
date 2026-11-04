@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Briefcase,
+  CreditCard,
   FilePlus,
   FileText,
   Building2,
@@ -48,7 +49,7 @@ export function EmployerSidebar({
       title: "Jobs",
       items: [
         { label: "My Jobs", href: "/employer/jobs", icon: Briefcase },
-        { label: "Create a Job", href: "/employer/jobs/create", icon: FilePlus },
+        { label: "Post an Opportunity", href: "/employer/jobs/create", icon: FilePlus },
         { label: "Applications", href: "/employer/applications", icon: Users },
         { label: "Contracts", href: "/employer/contracts", icon: FileText },
       ],
@@ -56,6 +57,7 @@ export function EmployerSidebar({
     {
       title: "Account",
       items: [
+        { label: "Billing & Credits", href: "/employer/billing", icon: CreditCard },
         { label: "Employer Profile", href: "/employer/profile", icon: Building2 },
         { label: "Settings", href: "/employer/settings", icon: Settings },
         { href: "/chat", label: "Messages", icon: MessageSquare, badgeCount: unreadMessages },

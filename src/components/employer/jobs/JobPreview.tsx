@@ -6,6 +6,7 @@ import {
   CalendarDays,
   Clock,
   MapPin,
+  Users,
   Wallet,
 } from "lucide-react";
 import type {
@@ -13,12 +14,16 @@ import type {
   OpportunityInput,
   OpportunityWorkArrangement,
 } from "@/types/opportunity";
+import { isHiringType } from "@/types/opportunity";
 import {
   DURATION_LABEL,
   WORK_ARRANGEMENT_LABEL,
 } from "@/config/opportunity";
 import { useCategories } from "@/hooks/use-taxonomy";
 import { formatNairaCompact } from "@/lib/utils";
+import { defaultHiring } from "@/lib/job-api-mapping";
+import { hiringPayText, monthsText, openingsText } from "@/lib/opportunity-display";
+import { OpportunityTypeBadge } from "./OpportunityTypeBadge";
 
 function budgetLabel(input: OpportunityInput["budget"]): string {
   const { type, min, max } = input;
@@ -52,13 +57,19 @@ export function JobPreview({
   const arrangement = WORK_ARRANGEMENT_LABEL[
     values.workArrangement as OpportunityWorkArrangement
   ];
+  const type = values.opportunityType ?? "gig";
+  const hiringPost = isHiringType(type);
+  const hiring = values.hiring ?? defaultHiring();
 
   return (
     <div className="space-y-5">
       <section className="rounded-xl border border-neutral-200 bg-white p-6">
-        <span className="text-xs font-medium uppercase tracking-wider text-primary-600">
-          {category}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium uppercase tracking-wider text-primary-600">
+            {category}
+          </span>
+          <OpportunityTypeBadge type={type} />
+        </div>
         <h2 className="mt-1 text-xl font-bold text-neutral-900">
           {values.title.trim() || "Untitled job"}
         </h2>
@@ -66,7 +77,8 @@ export function JobPreview({
 
         <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm text-neutral-600">
           <span className="inline-flex items-center gap-1.5">
-            <Wallet className="h-4 w-4 text-neutral-400" aria-hidden /> {budgetLabel(values.budget)}
+            <Wallet className="h-4 w-4 text-neutral-400" aria-hidden />{" "}
+            {hiringPost ? hiringPayText({ budget: values.budget, hiring }) : budgetLabel(values.budget)}
           </span>
           <span className="inline-flex items-center gap-1.5">
             <Briefcase className="h-4 w-4 text-neutral-400" aria-hidden /> {arrangement}
@@ -76,9 +88,33 @@ export function JobPreview({
               <MapPin className="h-4 w-4 text-neutral-400" aria-hidden /> {values.location.city}
             </span>
           )}
-          <span className="inline-flex items-center gap-1.5">
-            <Clock className="h-4 w-4 text-neutral-400" aria-hidden /> {durationLabel(values.duration)}
-          </span>
+          {hiringPost ? (
+            <>
+              {hiring.durationMonths !== undefined && (
+                <span className="inline-flex items-center gap-1.5">
+                  <Clock className="h-4 w-4 text-neutral-400" aria-hidden />{" "}
+                  {monthsText(hiring.durationMonths)}
+                </span>
+              )}
+              {hiring.startDate && (
+                <span className="inline-flex items-center gap-1.5">
+                  <CalendarDays className="h-4 w-4 text-neutral-400" aria-hidden /> Starts{" "}
+                  {new Date(`${hiring.startDate}T00:00:00`).toLocaleDateString("en-NG", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1.5">
+                <Users className="h-4 w-4 text-neutral-400" aria-hidden /> {openingsText(hiring.openings)}
+              </span>
+            </>
+          ) : (
+            <span className="inline-flex items-center gap-1.5">
+              <Clock className="h-4 w-4 text-neutral-400" aria-hidden /> {durationLabel(values.duration)}
+            </span>
+          )}
           <span className="inline-flex items-center gap-1.5">
             <CalendarDays className="h-4 w-4 text-neutral-400" aria-hidden />
             Closes{" "}
@@ -98,6 +134,17 @@ export function JobPreview({
         <p className="mt-4 text-sm leading-relaxed text-neutral-700">
           {values.summary.trim() || "No summary yet."}
         </p>
+
+        {hiringPost && (hiring.eligibility.trim() || hiring.offersCertificate) && (
+          <ul className="mt-3 space-y-1 text-sm text-neutral-700">
+            {hiring.eligibility.trim() && (
+              <li>
+                <span className="font-medium">Who can apply:</span> {hiring.eligibility.trim()}
+              </li>
+            )}
+            {hiring.offersCertificate && <li>A completion certificate is offered.</li>}
+          </ul>
+        )}
 
         {values.skills.length > 0 && (
           <div className="mt-5">

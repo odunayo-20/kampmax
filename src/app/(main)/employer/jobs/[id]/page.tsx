@@ -21,8 +21,16 @@ import {
   categoryLabelFor,
   campusNameFor,
 } from "@/services/opportunity";
-import { OPPORTUNITY_STATUS_META, DURATION_LABEL, WORK_ARRANGEMENT_LABEL } from "@/config/opportunity";
+import {
+  OPPORTUNITY_STATUS_META,
+  OPPORTUNITY_TYPE_META,
+  DURATION_LABEL,
+  WORK_ARRANGEMENT_LABEL,
+} from "@/config/opportunity";
+import { isHiringType } from "@/types/opportunity";
 import { formatNaira, formatDate } from "@/lib/utils";
+import { monthsText, openingsText } from "@/lib/opportunity-display";
+import { OpportunityTypeBadge } from "@/components/employer/jobs/OpportunityTypeBadge";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
 import { useEmployerJob } from "@/hooks/use-jobs";
 import { EmployerJobActions } from "@/components/employer/jobs/EmployerJobActions";
@@ -86,6 +94,7 @@ export default function EmployerJobDetailPage() {
   const o = jobQuery.data!;
   const campus = campusNameFor(o.location.campusId);
   const isListed = o.status === "open";
+  const hiring = isHiringType(o.opportunityType);
 
   return (
     <div className="space-y-5">
@@ -100,6 +109,7 @@ export default function EmployerJobDetailPage() {
           <span className="text-xs font-medium uppercase tracking-wider text-primary-600">
             {categoryLabelFor(o)}
           </span>
+          <OpportunityTypeBadge type={o.opportunityType} />
         </div>
         <OpportunityStatusBadge status={o.status} />
       </div>
@@ -125,7 +135,12 @@ export default function EmployerJobDetailPage() {
             </span>
           )}
           <span className="inline-flex items-center gap-1.5">
-            <Clock className="h-4 w-4 text-neutral-400" aria-hidden /> {DURATION_LABEL[o.duration]}
+            <Clock className="h-4 w-4 text-neutral-400" aria-hidden />{" "}
+            {hiring
+              ? o.hiring.durationMonths !== undefined
+                ? monthsText(o.hiring.durationMonths)
+                : "Length not set"
+              : DURATION_LABEL[o.duration]}
           </span>
           <span className="inline-flex items-center gap-1.5">
             <CalendarDays className="h-4 w-4 text-neutral-400" aria-hidden />
@@ -140,7 +155,7 @@ export default function EmployerJobDetailPage() {
           </span>
           <span className="inline-flex items-center gap-1.5">
             <Users className="h-4 w-4 text-neutral-400" aria-hidden />
-            {o.proposalCount} proposals
+            {o.proposalCount} {hiring ? "applications" : "proposals"}
           </span>
           <span className="inline-flex items-center gap-1.5">
             {isListed ? (
@@ -211,15 +226,38 @@ export default function EmployerJobDetailPage() {
         <h2 className="text-sm font-semibold text-neutral-900">Details</h2>
         <dl className="mt-2">
           <DetailRow label="Status">{displayName}</DetailRow>
-          <DetailRow label="Budget type">{o.budget.type}</DetailRow>
-          <DetailRow label="Budget range">
-            {o.budget.min !== undefined || o.budget.max !== undefined
-              ? `${o.budget.min !== undefined ? formatNaira(o.budget.min) : "0"} – ${
-                  o.budget.max !== undefined ? formatNaira(o.budget.max) : "Open"
-                }`
-              : "Negotiable"}
-          </DetailRow>
-          <DetailRow label="Duration">{DURATION_LABEL[o.duration]}</DetailRow>
+          <DetailRow label="Type">{OPPORTUNITY_TYPE_META[o.opportunityType].label}</DetailRow>
+          {hiring ? (
+            <>
+              <DetailRow label="Pay">{budgetText(o)}</DetailRow>
+              <DetailRow label="Start date">
+                {o.hiring.startDate ? formatDate(o.hiring.startDate) : undefined}
+              </DetailRow>
+              <DetailRow label="Length">
+                {o.hiring.durationMonths !== undefined ? monthsText(o.hiring.durationMonths) : undefined}
+              </DetailRow>
+              <DetailRow label="Openings">{openingsText(o.hiring.openings)}</DetailRow>
+              <DetailRow label="Who can apply">{o.hiring.eligibility || undefined}</DetailRow>
+              <DetailRow label="Certificate">
+                {o.hiring.offersCertificate ? "Offered" : "Not offered"}
+              </DetailRow>
+              {o.expiresAt && (
+                <DetailRow label="Live until">{formatDate(o.expiresAt)}</DetailRow>
+              )}
+            </>
+          ) : (
+            <>
+              <DetailRow label="Budget type">{o.budget.type}</DetailRow>
+              <DetailRow label="Budget range">
+                {o.budget.min !== undefined || o.budget.max !== undefined
+                  ? `${o.budget.min !== undefined ? formatNaira(o.budget.min) : "0"} – ${
+                      o.budget.max !== undefined ? formatNaira(o.budget.max) : "Open"
+                    }`
+                  : "Negotiable"}
+              </DetailRow>
+              <DetailRow label="Duration">{DURATION_LABEL[o.duration]}</DetailRow>
+            </>
+          )}
           <DetailRow label="Experience level">{o.experienceLevel.replace(/_/g, " ")}</DetailRow>
           <DetailRow label="Deadline">{formatDate(o.deadline)}</DetailRow>
           <DetailRow label="Posted">{formatDate(o.postedAt)}</DetailRow>

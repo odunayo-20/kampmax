@@ -276,6 +276,13 @@ export const jobManagementService: AdminJobManagementService =
 
 export type { ManagedJobSortField } from "./job-management.service";
 
+import type { AdminJobModerationService } from "./job-moderation.service";
+import { createApiJobModerationService } from "./job-moderation.api";
+
+/** Reports on live postings and applicants, and moderators' audited look at an application. */
+export const jobModerationService: AdminJobModerationService =
+  createApiJobModerationService();
+
 import {
   AdminAnalyticsService,
 } from "./analytics.service";

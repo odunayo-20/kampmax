@@ -24,6 +24,7 @@ import {
   JobStatusBadge,
 } from "./JobBadges";
 import { formatJobBudget } from "./jobs-meta";
+import { OpportunityTypeBadge } from "@/components/employer/jobs/OpportunityTypeBadge";
 
 interface JobsTableProps {
   page: Paginated<ManagedJobRow> | null;
@@ -231,8 +232,9 @@ function Row({ job, onOpen }: { job: ManagedJobRow; onOpen: () => void }) {
             <span className="block max-w-[230px] truncate font-medium text-kampmax-text group-hover:text-kampmax-blue">
               {job.title}
             </span>
-            <span className="block font-mono text-[11px] text-kampmax-text-secondary">
-              {job.id}
+            <span className="mt-0.5 flex items-center gap-1.5">
+              <OpportunityTypeBadge type={job.opportunityType ?? "gig"} />
+              <span className="font-mono text-[11px] text-kampmax-text-secondary">{job.id}</span>
             </span>
           </span>
         </button>

@@ -1,6 +1,7 @@
 import { apiClient, type ApiError } from "@/lib/api-client";
 import type {
   ManagedJobActivityEvent,
+  ManagedJobApplicantRow,
   ManagedJobDetail,
   ManagedJobFacets,
   ManagedJobListQuery,
@@ -8,11 +9,12 @@ import type {
   ManagedJobStatusCounts,
   Paginated,
 } from "@/types/admin";
-import type { AdminJobManagementService } from "./job-management.service";
+import type { AdminJobManagementService, TakeDownJobInput } from "./job-management.service";
 
 /**
  * Live /admin/jobs service backed by AdminJobsController
- * (GET /admin/jobs, /counts, /facets, /:id, /:id/activity). Read-only.
+ * (GET /admin/jobs, /counts, /facets, /:id, /:id/activity) plus the take-down
+ * action (POST /admin/jobs/:id/take-down). Otherwise read-only.
  */
 
 interface BackendPage<T> {
@@ -39,6 +41,7 @@ function queryString(query: ManagedJobListQuery): string {
   set("q", query.search?.trim());
   set("status", query.status);
   set("publication", query.publication);
+  set("opportunityType", query.opportunityType);
   set("categoryId", query.categoryId);
   set("campusId", query.campusId);
   set("employerId", query.employerId);
@@ -99,6 +102,37 @@ export function createApiJobManagementService(): AdminJobManagementService {
       );
       if (error) fail(error, "Couldn't load job activity.");
       return data;
+    },
+
+    async getApplicants(id, query = {}) {
+      const params = new URLSearchParams();
+      if (query.page) params.set("page", String(query.page));
+      if (query.pageSize) params.set("limit", String(query.pageSize));
+      const qs = params.toString();
+      const { data, error } = await apiClient.get<BackendPage<ManagedJobApplicantRow>>(
+        `/admin/jobs/${id}/applicants${qs ? `?${qs}` : ""}`
+      );
+      if (error) fail(error, "Couldn't load the applicants.");
+      const page: Paginated<ManagedJobApplicantRow> = {
+        items: data.items,
+        page: data.meta.page,
+        pageSize: data.meta.limit,
+        total: data.meta.total,
+        totalPages: Math.max(1, data.meta.totalPages),
+      };
+      return page;
+    },
+
+    async takeDown(id, input) {
+      const { data, error } = await apiClient.post<
+        TakeDownJobInput,
+        { refundedAmount: number; restoredFreePostings: number }
+      >(`/admin/jobs/${id}/take-down`, input);
+      if (error) fail(error, "Couldn't take the posting down.");
+      return {
+        refundedAmount: data?.refundedAmount ?? 0,
+        restoredFreePostings: data?.restoredFreePostings ?? 0,
+      };
     },
   };
 }

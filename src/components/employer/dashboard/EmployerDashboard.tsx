@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/lib/auth-context";
 import { useEmployerDashboardSummary } from "@/hooks/use-employer-dashboard";
+import { FreePostingsNotice } from "@/components/employer/billing/FreePostingsNotice";
 import { EmployerActionCenter } from "./EmployerActionCenter";
 import { EmployerApplicationsOverview } from "./EmployerApplicationsOverview";
 import { EmployerContractsOverview } from "./EmployerContractsOverview";
@@ -37,6 +38,8 @@ export function EmployerDashboard() {
         location={company?.location}
         verified={company?.verified}
       />
+
+      <FreePostingsNotice />
 
       <EmployerStatsGrid query={query} />
 

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Building2, FilePlus, FileText, MessageSquare, Search, Users } from "lucide-react";
 
 const ACTIONS = [
-  { href: "/employer/jobs/create", label: "Post a job", icon: FilePlus, hint: "Start hiring" },
+  { href: "/employer/jobs/create", label: "Post an opportunity", icon: FilePlus, hint: "Gigs, internships, vacancies" },
   { href: "/employer/applications", label: "Review applications", icon: Users, hint: "Manage candidates" },
   { href: "/jobs", label: "Find talent", icon: Search, hint: "Browse the marketplace" },
   { href: "/employer/contracts", label: "View contracts", icon: FileText, hint: "Track hired work" },

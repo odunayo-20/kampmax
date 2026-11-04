@@ -1,5 +1,6 @@
 import {
   BellRing,
+  BriefcaseBusiness,
   Coins,
   Settings,
   ShieldCheck,
@@ -40,6 +41,12 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     label: "Financial",
     description: "Fees, withdrawal limits and payout schedule.",
     icon: Coins,
+  },
+  {
+    key: "postings",
+    label: "Posting fees",
+    description: "What employers pay to publish vacancies and internships.",
+    icon: BriefcaseBusiness,
   },
   {
     key: "loyalty",

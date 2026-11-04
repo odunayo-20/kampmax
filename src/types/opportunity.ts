@@ -61,6 +61,53 @@ export const OPPORTUNITY_BUDGET_TYPE = {
 export type OpportunityBudgetType =
   (typeof OPPORTUNITY_BUDGET_TYPE)[keyof typeof OPPORTUNITY_BUDGET_TYPE];
 
+// ── Opportunity type ────────────────────────────────────────
+// A "gig" is the freelance flow (proposals, escrow, contracts) and is free to
+// post. Everything else is a hiring posting (vacancy or internship) that is
+// paid for when it is published.
+
+export const OPPORTUNITY_TYPE = {
+  GIG: "gig",
+  FULL_TIME: "full_time",
+  PART_TIME: "part_time",
+  INTERNSHIP: "internship",
+  CONTRACT: "contract",
+} as const;
+
+export type OpportunityType =
+  (typeof OPPORTUNITY_TYPE)[keyof typeof OPPORTUNITY_TYPE];
+
+/** True for vacancies and internships (everything but a gig). */
+export function isHiringType(type: OpportunityType): boolean {
+  return type !== OPPORTUNITY_TYPE.GIG;
+}
+
+// ── Pay period (hiring postings) ────────────────────────────
+
+export const OPPORTUNITY_PAY_PERIOD = {
+  HOURLY: "hourly",
+  WEEKLY: "weekly",
+  MONTHLY: "monthly",
+  YEARLY: "yearly",
+} as const;
+
+export type OpportunityPayPeriod =
+  (typeof OPPORTUNITY_PAY_PERIOD)[keyof typeof OPPORTUNITY_PAY_PERIOD];
+
+/** The hiring-only fields of a posting; ignored (and cleared) for a gig. */
+export interface OpportunityHiring {
+  /** false = an unpaid role: no pay range, and a discounted posting fee. */
+  isPaid: boolean;
+  payPeriod?: OpportunityPayPeriod;
+  /** YYYY-MM-DD */
+  startDate?: string;
+  durationMonths?: number;
+  openings: number;
+  /** Who may apply, e.g. "300 level and above". */
+  eligibility: string;
+  offersCertificate: boolean;
+}
+
 // ── Screening question ──────────────────────────────────────
 // Rendered dynamically; answered by id so the backend can trust ids.
 
@@ -96,6 +143,11 @@ export interface OpportunityEmployer {
 
 export interface Opportunity {
   id: string;
+  opportunityType: OpportunityType;
+  /** Hiring postings only; for a gig these hold the defaults and are not shown. */
+  hiring: OpportunityHiring;
+  /** Hiring postings: when the paid live period ends (empty for gigs). */
+  expiresAt: string;
   title: string;
   /** JOB-taxonomy category id (from the API). */
   categoryId: string;
@@ -138,6 +190,10 @@ export interface Opportunity {
 // backend/store — they can never be supplied in this shape (no mass assignment).
 
 export interface OpportunityInput {
+  /** Omitted means a gig. Switching an existing draft's type sends it explicitly. */
+  opportunityType?: OpportunityType;
+  /** Hiring-only fields; ignored (and cleared by the backend) for a gig. */
+  hiring?: OpportunityHiring;
   title: string;
   categoryId: string;
   summary: string;
@@ -174,6 +230,8 @@ export interface OpportunityQuery {
   experience?: string;
   arrangement?: OpportunityWorkArrangement;
   budgetType?: OpportunityBudgetType;
+  /** Only this kind of posting. Omitted means every kind. */
+  type?: OpportunityType;
   sort?: OpportunitySortKey;
   page?: number;
   size?: number;

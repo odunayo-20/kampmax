@@ -20,13 +20,18 @@ import {
   UserRound,
   Wallet,
 } from "lucide-react";
-import { cn, formatDate, formatDateTime, timeAgo } from "@/lib/utils";
+import { cn, formatDate, formatDateTime, formatNaira, timeAgo } from "@/lib/utils";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { ErrorState } from "@/components/admin/ErrorState";
 import { LoadingSkeleton } from "@/components/admin/LoadingSkeleton";
 import { StatCard } from "@/components/admin/StatCard";
 import { badgeVariantClasses, type BadgeVariant } from "@/components/admin/StatusBadge";
-import { useAdminJob, useAdminJobActivity } from "@/hooks/admin/use-admin-jobs";
+import { useAdminJob, useAdminJobActivity, useTakeDownJob } from "@/hooks/admin/use-admin-jobs";
+import { useAdminJobReports } from "@/hooks/admin/use-admin-job-reports";
+import { REASON_LABEL, TARGET_LABEL } from "@/config/job-reports";
+import { OpportunityTypeBadge } from "@/components/employer/jobs/OpportunityTypeBadge";
+import { JobApplicantsTable } from "@/components/admin/jobs/JobApplicantsTable";
 import type {
   ManagedJobActivityEvent,
   ManagedJobApplicationStatus,
@@ -87,9 +92,12 @@ export default function AdminJobDetailPage() {
   const jobId = typeof params.id === "string" ? params.id : "";
 
   const [tab, setTab] = useState<DetailTab>("overview");
+  const [takeDownKind, setTakeDownKind] = useState<"remove" | "reject" | "refund" | null>(null);
+  const [takeDownNotice, setTakeDownNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
 
   const { data: detail, isPending, isError, refetch } = useAdminJob(jobId);
   const { data: activity } = useAdminJobActivity(jobId);
+  const takeDown = useTakeDownJob(jobId);
 
   if (!jobId) {
     return <JobNotFound />;
@@ -114,6 +122,39 @@ export default function AdminJobDetailPage() {
   }
 
   const { listing } = detail;
+  // Closed jobs cannot be taken down. A cancelled one can only be refunded.
+  const canTakeDown = ["open", "paused", "draft", "expired", "pending_review"].includes(listing.status);
+  const canRefundOnly = listing.status === "cancelled";
+
+  const runTakeDown = (reason: string) => {
+    const refund = takeDownKind === "reject" || takeDownKind === "refund";
+    setTakeDownNotice(null);
+    takeDown.mutate(
+      { reason, refund },
+      {
+        onSuccess: (result) => {
+          setTakeDownKind(null);
+          setTakeDownNotice({
+            tone: "ok",
+            text: refund
+              ? result.refundedAmount > 0
+                ? `Posting taken down. ${formatNaira(result.refundedAmount)} refunded to the employer's wallet.`
+                : result.restoredFreePostings > 0
+                  ? "Posting taken down. The employer's free posting was restored."
+                  : "Posting taken down. Nothing had been charged for it, so there was nothing to refund."
+              : "Posting taken down.",
+          });
+        },
+        onError: (err) => {
+          setTakeDownKind(null);
+          setTakeDownNotice({
+            tone: "error",
+            text: err instanceof Error ? err.message : "Couldn't take the posting down.",
+          });
+        },
+      }
+    );
+  };
 
   return (
     <>
@@ -130,6 +171,7 @@ export default function AdminJobDetailPage() {
         description={`${listing.categoryName} · ${listing.workArrangement.replaceAll("_", " ")} · posted ${formatDate(listing.postedAt)}`}
         actions={
           <>
+            <OpportunityTypeBadge type={listing.opportunityType ?? "gig"} />
             <JobStatusBadge status={listing.status} />
             <JobPublicationBadge publication={listing.publication} />
             <JobModerationBadge moderation={listing.moderation} />
@@ -142,8 +184,73 @@ export default function AdminJobDetailPage() {
               <ExternalLink className="h-3.5 w-3.5" />
               View public job
             </a>
+            {canTakeDown && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setTakeDownKind("reject")}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-md border border-kampmax-border bg-white px-3 text-sm font-medium text-kampmax-text transition-colors hover:bg-kampmax-muted/60"
+                >
+                  Reject &amp; refund
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTakeDownKind("remove")}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-md bg-kampmax-error px-3 text-sm font-medium text-white transition-colors hover:bg-red-700"
+                >
+                  Take down
+                </button>
+              </>
+            )}
+            {canRefundOnly && (
+              <button
+                type="button"
+                onClick={() => setTakeDownKind("refund")}
+                className="inline-flex h-9 items-center gap-1.5 rounded-md border border-kampmax-border bg-white px-3 text-sm font-medium text-kampmax-text transition-colors hover:bg-kampmax-muted/60"
+              >
+                Refund posting fee
+              </button>
+            )}
           </>
         }
+      />
+
+      {takeDownNotice && (
+        <p
+          role={takeDownNotice.tone === "error" ? "alert" : "status"}
+          className={cn(
+            "mb-4 rounded-lg px-3 py-2 text-sm",
+            takeDownNotice.tone === "error"
+              ? "bg-kampmax-error/10 text-kampmax-error"
+              : "bg-emerald-50 text-emerald-700"
+          )}
+        >
+          {takeDownNotice.text}
+        </p>
+      )}
+
+      <ConfirmDialog
+        open={takeDownKind !== null}
+        tone={takeDownKind === "remove" ? "danger" : "warning"}
+        title={
+          takeDownKind === "remove"
+            ? "Take this posting down?"
+            : takeDownKind === "reject"
+              ? "Reject this posting and refund the employer?"
+              : "Refund this posting's fee?"
+        }
+        message={
+          takeDownKind === "remove"
+            ? "The posting comes off the marketplace and the employer is told. Nothing is refunded: use this for a posting that breaks the rules."
+            : takeDownKind === "reject"
+              ? "The posting comes off the marketplace. The fee the employer paid goes back to their wallet, or their free posting is restored."
+              : "Gives back what the employer was charged for this posting, or restores their free posting. Safe to repeat: a charge is only refunded once."
+        }
+        confirmLabel={takeDownKind === "remove" ? "Take down" : takeDownKind === "reject" ? "Reject & refund" : "Refund"}
+        reasonLabel="Reason (the employer can see this)"
+        loading={takeDown.isPending}
+        onConfirm={runTakeDown}
+        onCancel={() => setTakeDownKind(null)}
       />
 
       {/* ---------- Overview stats ---------- */}
@@ -155,11 +262,11 @@ export default function AdminJobDetailPage() {
           tone="blue"
           hint={budgetTypeLabelOf(listing.budgetType)}
         />
-        <StatCard label="Applications" value={String(detail.applications.visible)} icon={UserRound} tone="gold" hint={`${detail.applications.total} total proposals`} />
+        <StatCard label="Applications" value={String(detail.applications.visible)} icon={UserRound} tone="gold" hint={`${detail.applications.total} total ${listing.opportunityType && listing.opportunityType !== "gig" ? "applications" : "proposals"}`} />
         <StatCard label="Views" value={listing.viewCount.toLocaleString("en-NG")} icon={Eye} tone="blue" hint="Lifetime" />
         <StatCard label="Deadline" value={formatDate(listing.deadline)} icon={CalendarClock} tone="default" hint={timeAgo(listing.deadline)} />
         <StatCard label="Arrangement" value={listing.workArrangement.replaceAll("_", " ")} icon={Briefcase} tone="default" hint={listing.location.city ?? listing.location.state ?? "Location not stated"} />
-        <StatCard label="Employer reports" value={String(listing.employersReported)} icon={FileWarning} tone={listing.employersReported > 0 ? "error" : "default"} hint="No report store" />
+        <StatCard label="Open reports" value={String(listing.employersReported)} icon={FileWarning} tone={listing.employersReported > 0 ? "error" : "default"} hint={listing.employersReported > 0 ? "Waiting for an admin" : "None waiting"} />
       </section>
 
       {/* ---------- Tabs ---------- */}
@@ -199,7 +306,13 @@ export default function AdminJobDetailPage() {
             onOpenEmployer={(id) => router.push(`/admin/employers/${id}`)}
           />
         )}
-        {tab === "applications" && <ApplicationsTab applications={detail.applications} />}
+        {tab === "applications" && (
+          <ApplicationsTab
+            jobId={listing.id}
+            applications={detail.applications}
+            hiring={!!listing.opportunityType && listing.opportunityType !== "gig"}
+          />
+        )}
         {tab === "contracts" && <ContractsTab detail={detail} />}
         {tab === "moderation" && <ModerationTab detail={detail} />}
         {tab === "activity" && <ActivityTab events={activity ?? detail.activity} />}
@@ -393,9 +506,14 @@ function EmployerCard({
 // ------------------------------------------------------------
 
 function ApplicationsTab({
+  jobId,
   applications,
+  hiring,
 }: {
+  jobId: string;
   applications: ManagedJobDetail["applications"];
+  /** A vacancy or internship: CV applications instead of proposals. */
+  hiring: boolean;
 }) {
   const statusKeyOrder: ManagedJobApplicationStatus[] = [
     "under_review",
@@ -413,9 +531,13 @@ function ApplicationsTab({
           <h2 className="text-sm font-semibold text-kampmax-text">Application summary</h2>
         </div>
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 px-4 py-4 sm:grid-cols-4">
-          <MoneyRow label="Total proposals" value={String(applications.total)} strong />
+          <MoneyRow
+            label={hiring ? "Total applications" : "Total proposals"}
+            value={String(applications.total)}
+            strong
+          />
           <MoneyRow label="Visible" value={String(applications.visible)} />
-          <MoneyRow label="Accepted" value={String(applications.byStatus.accepted)} />
+          <MoneyRow label={hiring ? "Hired" : "Accepted"} value={String(applications.byStatus.accepted)} />
           <MoneyRow label="Latest activity" value={applications.latestAt ? timeAgo(applications.latestAt) : "—"} />
         </dl>
 
@@ -446,13 +568,9 @@ function ApplicationsTab({
           </ul>
         </div>
 
-        <p className="border-t border-kampmax-border px-4 py-3 text-[11px] leading-relaxed text-kampmax-text-secondary">
-          Proposals ARE the applications — this store keeps one hiring entity, never a duplicate
-          model. Individual application records (freelancer, cover letter, proposed amount) are
-          surfaced in the freelancer hiring pipeline; a per-job application DTO is a backend gap
-          this console does not fabricate.
-        </p>
       </section>
+
+      <JobApplicantsTable jobId={jobId} />
     </div>
   );
 }
@@ -509,17 +627,18 @@ function ContractsTab({ detail }: { detail: ManagedJobDetail }) {
 
 function ModerationTab({ detail }: { detail: ManagedJobDetail }) {
   const { listing } = detail;
+  const reports = useAdminJobReports({ jobId: listing.id, status: "OPEN", pageSize: 5 });
+
   return (
     <div className="space-y-4">
-      {/* Read-only notice */}
+      {/* How moderation works */}
       <div className="flex items-start gap-2.5 rounded-lg border border-kampmax-info/30 bg-kampmax-info/5 px-4 py-3 text-xs leading-relaxed text-kampmax-text-secondary">
         <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-kampmax-info" />
         <p>
-          This job console is <span className="font-semibold text-kampmax-text">read-only</span>.
-          The prototype store has no admin moderation transitions (no publish/approve/reject,
-          no feature), so no actions are offered. See{" "}
-          <span className="font-mono">MODULE-40-REPORT.md</span> for the API capabilities these
-          controls will ride on.
+          Postings go live without being approved first. When something is wrong, an admin acts
+          afterwards: use <span className="font-semibold text-kampmax-text">Take down</span> or{" "}
+          <span className="font-semibold text-kampmax-text">Reject &amp; refund</span> above, or
+          resolve a user&apos;s report below.
         </p>
       </div>
 
@@ -534,9 +653,9 @@ function ModerationTab({ detail }: { detail: ManagedJobDetail }) {
               {JOB_MODERATION_LABELS[listing.moderation]}
             </p>
             <p className="mt-0.5 text-xs text-kampmax-text-secondary">
-              {listing.moderation === "pending_review"
-                ? "This job was submitted for review and awaits a moderation decision that the current store does not provide."
-                : "No platform moderation flags are recorded against this job in the real dataset."}
+              {listing.status === "cancelled"
+                ? "This posting has been taken down."
+                : "This posting is not held back by any approval step."}
             </p>
           </div>
           <JobModerationBadge moderation={listing.moderation} />
@@ -546,24 +665,55 @@ function ModerationTab({ detail }: { detail: ManagedJobDetail }) {
       {/* Reports */}
       <section aria-label="Reports and flags" className="rounded-lg border border-kampmax-border bg-white">
         <div className="flex items-center justify-between border-b border-kampmax-border px-4 py-3">
-          <h2 className="text-sm font-semibold text-kampmax-text">Reports &amp; flags</h2>
-          <span className="inline-flex items-center gap-1 text-xs text-kampmax-text-secondary">
-            <FileWarning className="h-3.5 w-3.5" />
-            Employer reports
-          </span>
+          <h2 className="text-sm font-semibold text-kampmax-text">Open reports</h2>
+          <Link
+            href={`/admin/job-reports?jobId=${listing.id}`}
+            className="text-xs font-medium text-kampmax-blue hover:underline"
+          >
+            All job reports
+          </Link>
         </div>
-        <div className="px-4 py-6 text-center">
-          <FileWarning className="mx-auto h-6 w-6 text-kampmax-text-secondary/50" />
-          <p className="mt-2 text-sm font-medium text-kampmax-text">
-            {listing.employersReported === 0
-              ? "No reports available."
-              : `${listing.employersReported} reports`}
-          </p>
-          <p className="mx-auto mt-0.5 max-w-sm text-xs text-kampmax-text-secondary">
-            Employers have not reported this job. Report triage will surface here once the
-            reporting API lands; the count is never fabricated.
-          </p>
-        </div>
+        {reports.isPending ? (
+          <div className="p-4">
+            <LoadingSkeleton variant="table" rows={2} />
+          </div>
+        ) : reports.isError ? (
+          <ErrorState onRetry={() => void reports.refetch()} />
+        ) : reports.data.items.length === 0 ? (
+          <div className="px-4 py-6 text-center">
+            <FileWarning className="mx-auto h-6 w-6 text-kampmax-text-secondary/50" />
+            <p className="mt-2 text-sm font-medium text-kampmax-text">No open reports</p>
+            <p className="mx-auto mt-0.5 max-w-sm text-xs text-kampmax-text-secondary">
+              Nobody has reported this posting or its applicants, or every report has been resolved.
+            </p>
+          </div>
+        ) : (
+          <ul className="divide-y divide-kampmax-border">
+            {reports.data.items.map((r) => (
+              <li key={r.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-kampmax-text">
+                    {REASON_LABEL[r.reason]}
+                    <span className="ml-2 text-xs font-normal text-kampmax-text-secondary">
+                      {TARGET_LABEL[r.targetType]}
+                      {r.applicant ? `: ${r.applicant.name}` : ""} · {timeAgo(r.createdAt)}
+                    </span>
+                  </p>
+                  {r.details && (
+                    <p className="mt-0.5 line-clamp-2 text-xs text-kampmax-text-secondary">{r.details}</p>
+                  )}
+                </div>
+                <Link
+                  href={`/admin/job-reports/${r.id}`}
+                  aria-label={`Review the ${REASON_LABEL[r.reason].toLowerCase()} report`}
+                  className="inline-flex h-7 shrink-0 items-center rounded-md border border-kampmax-border bg-white px-2.5 text-xs font-medium text-kampmax-text transition-colors hover:bg-kampmax-muted/60"
+                >
+                  Review
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </div>
   );

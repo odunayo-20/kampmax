@@ -18,7 +18,7 @@ import {
   Wallet,
 } from "lucide-react";
 import type { JobEligibility, Opportunity } from "@/types/opportunity";
-import { ELIGIBILITY_CODE, OPPORTUNITY_STATUS } from "@/types/opportunity";
+import { ELIGIBILITY_CODE, OPPORTUNITY_STATUS, isHiringType } from "@/types/opportunity";
 import { getJobEligibilityApi } from "@/services/proposals";
 import { listSavedJobIds, saveJob, unsaveJob } from "@/services/jobs";
 import {
@@ -59,6 +59,12 @@ export default function JobDetailPage() {
       if (cancelled) return;
       // Only published jobs are discoverable.
       const visible = job && job.status === OPPORTUNITY_STATUS.OPEN ? job : null;
+      if (visible && isHiringType(visible.opportunityType)) {
+        // Vacancies and internships are applied to with a CV, not a proposal:
+        // that lives on the public job page.
+        router.replace(`/jobs/${visible.id}`);
+        return;
+      }
       setOpportunity(visible);
       setLoading(false);
       if (visible) {
@@ -74,7 +80,7 @@ export default function JobDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [backend, jobId]);
+  }, [backend, jobId, router]);
 
   const eligibility: JobEligibility = remoteEligibility ?? {
     code: ELIGIBILITY_CODE.NOT_APPLICABLE,

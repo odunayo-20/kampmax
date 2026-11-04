@@ -12,9 +12,10 @@
 // mutation hooks.
 // ============================================================
 
-import { useQuery } from "@tanstack/react-query";
-import { adminKeys } from "@/lib/query-keys";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { adminKeys, jobKeys } from "@/lib/query-keys";
 import { jobManagementService } from "@/services/admin";
+import type { TakeDownJobInput } from "@/services/admin/job-management.service";
 import type { ManagedJobListQuery } from "@/types/admin";
 import { useAdminSession } from "@/lib/admin/admin-auth-context";
 
@@ -55,6 +56,30 @@ export function useAdminJob(id: string) {
   return useQuery({
     queryKey: adminKeys.jobs.detail(id, admin.campusId),
     queryFn: () => jobManagementService.getById(id),
+  });
+}
+
+/** Who applied to one posting, a page at a time. */
+export function useAdminJobApplicants(id: string, page: number, pageSize = 10) {
+  const admin = useActor();
+  return useQuery({
+    queryKey: adminKeys.jobs.applicants(id, page, admin.campusId),
+    queryFn: () => jobManagementService.getApplicants(id, { page, pageSize }),
+  });
+}
+
+/** Takes a posting down, with or without refunding its posting fee. */
+export function useTakeDownJob(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: TakeDownJobInput) => jobManagementService.takeDown(id, input),
+    onSuccess: () => {
+      // Every admin job view, the public jobs, and the employer's billing change.
+      void queryClient.invalidateQueries({ queryKey: adminKeys.all });
+      void queryClient.invalidateQueries({ queryKey: jobKeys.all });
+      void queryClient.invalidateQueries({ queryKey: ["posting-billing"] });
+      void queryClient.invalidateQueries({ queryKey: ["wallet"] });
+    },
   });
 }
 

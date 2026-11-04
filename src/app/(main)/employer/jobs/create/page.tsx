@@ -3,16 +3,23 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { OpportunityInput } from "@/types/opportunity";
+import { isHiringType } from "@/types/opportunity";
 import { useAuth } from "@/lib/auth-context";
 import { getEmployerProfileApi } from "@/services/employer";
-import { useCreateJob, usePublishJob } from "@/hooks/use-jobs";
+import { useCreateJob, usePublishJob, useUpdateJob } from "@/hooks/use-jobs";
 import { JobForm, emptyJobFormValues } from "@/components/employer/jobs/JobForm";
+import { PublishJobDialog } from "@/components/employer/jobs/PublishJobDialog";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
 
 export default function CreateJobPage() {
   const router = useRouter();
   const { user } = useAuth();
   const [submissionError, setSubmissionError] = useState<string | null>(null);
+  // A vacancy or internship is saved as a draft first, then published from the
+  // cost dialog. The draft's id is kept so a retry updates it instead of
+  // creating a second one.
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   // The backend is the authority: any employer profile may post jobs.
   const [employer, setEmployer] = useState<{ name: string } | null | undefined>(undefined);
@@ -31,9 +38,20 @@ export default function CreateJobPage() {
   const employerName = employer?.name;
 
   const createMutation = useCreateJob();
+  const updateMutation = useUpdateJob();
   const publishMutation = usePublishJob();
 
   const handleSave = (values: OpportunityInput) => {
+    if (draftId) {
+      updateMutation.mutate(
+        { id: draftId, input: values },
+        {
+          onSuccess: () => router.push(`/employer/jobs/${draftId}`),
+          onError: (err) => setSubmissionError(getFriendlyErrorMessage(err)),
+        }
+      );
+      return;
+    }
     createMutation.mutate(values, {
       onSuccess: (job) => router.push(`/employer/jobs/${job.id}`),
       onError: (err) => setSubmissionError(getFriendlyErrorMessage(err)),
@@ -43,6 +61,15 @@ export default function CreateJobPage() {
   const handlePublish = async (values: OpportunityInput) => {
     setSubmissionError(null);
     try {
+      if (values.opportunityType && isHiringType(values.opportunityType)) {
+        // Paid: save the draft, then show what it costs before anything is charged.
+        const saved = draftId
+          ? await updateMutation.mutateAsync({ id: draftId, input: values })
+          : await createMutation.mutateAsync(values);
+        setDraftId(saved.id);
+        setDialogOpen(true);
+        return;
+      }
       const job = await createMutation.mutateAsync(values);
       await publishMutation.mutateAsync(job.id);
       router.push(`/employer/jobs/${job.id}`);
@@ -63,15 +90,27 @@ export default function CreateJobPage() {
   }
 
   return (
-    <JobForm
-      mode="create"
-      initialValues={emptyJobFormValues()}
-      employerName={employerName}
-      isSaving={createMutation.isPending}
-      isPublishing={publishMutation.isPending || createMutation.isPending}
-      error={submissionError}
-      onSaveDraft={handleSave}
-      onPublish={handlePublish}
-    />
+    <>
+      <JobForm
+        mode="create"
+        initialValues={emptyJobFormValues()}
+        employerName={employerName}
+        isSaving={createMutation.isPending || updateMutation.isPending}
+        isPublishing={
+          publishMutation.isPending || createMutation.isPending || updateMutation.isPending
+        }
+        error={submissionError}
+        onSaveDraft={handleSave}
+        onPublish={handlePublish}
+      />
+      {draftId && (
+        <PublishJobDialog
+          jobId={draftId}
+          open={dialogOpen}
+          onClose={() => setDialogOpen(false)}
+          onPublished={() => router.push(`/employer/jobs/${draftId}`)}
+        />
+      )}
+    </>
   );
 }

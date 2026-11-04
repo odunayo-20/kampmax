@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -16,11 +16,12 @@ import {
   ShieldAlert,
   Bookmark,
   BookmarkCheck,
+  Flag,
   Users,
   Wallet,
   Settings2,
 } from "lucide-react";
-import { ELIGIBILITY_CODE, type JobEligibility } from "@/types/opportunity";
+import { ELIGIBILITY_CODE, isHiringType, type JobEligibility } from "@/types/opportunity";
 import { getJobEligibilityApi } from "@/services/proposals";
 import {
   categoryLabelFor,
@@ -31,15 +32,21 @@ import { formatDate } from "@/lib/utils";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
 import { useAuth } from "@/lib/auth-context";
 import { useJob, useSavedJobIds, useSaveJob, useUnsaveJob } from "@/hooks/use-jobs";
+import { useMyApplicationForJob } from "@/hooks/use-job-applications";
 import { OpportunityStatusBadge } from "@/components/freelancer/opportunities/StatusBadges";
 import { Button } from "@/components/ui";
 import { budgetText } from "@/components/freelancer/opportunities/OpportunityCard";
+import { OpportunityTypeBadge } from "@/components/employer/jobs/OpportunityTypeBadge";
+import { HiringApplyPanel } from "@/components/jobs/HiringApplyPanel";
+import { ReportDialog } from "@/components/jobs/ReportDialog";
+import { monthsText, openingsText } from "@/lib/opportunity-display";
 
 export default function JobDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const jobId = String(params.id);
   const { user } = useAuth();
+  const [reportOpen, setReportOpen] = useState(false);
 
   const jobQuery = useJob(jobId);
   const savedIdsQuery = useSavedJobIds();
@@ -56,9 +63,13 @@ export default function JobDetailPage() {
     : null;
 
   const job = jobQuery.data;
+  // A vacancy or internship is applied to with a CV, not a proposal, so the
+  // proposal eligibility check does not apply to it.
+  const hiring = job ? isHiringType(job.opportunityType) : false;
+  const myApplication = useMyApplicationForJob(jobId, hiring);
   const eligibilityQuery = useQuery({
     queryKey: ["jobs", "eligibility", jobId, user?.id],
-    enabled: !!job,
+    enabled: !!job && !hiring,
     queryFn: () => getJobEligibilityApi(job!),
   });
   const eligibility: JobEligibility = eligibilityQuery.data ?? {
@@ -134,6 +145,7 @@ export default function JobDetailPage() {
   const category = categoryLabelFor(o);
   const campus = campusNameFor(o.location.campusId);
   const isOwner = o.employerUserId === user?.id;
+  const isHiring = isHiringType(o.opportunityType);
   const canApply = eligibility.eligible;
   const alreadyApplied = eligibility.code === ELIGIBILITY_CODE.ALREADY_APPLIED;
 
@@ -162,9 +174,12 @@ export default function JobDetailPage() {
         <section className="rounded-xl border border-neutral-200 bg-white p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <span className="text-xs font-medium uppercase tracking-wider text-primary-600">
-                {category}
-              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-medium uppercase tracking-wider text-primary-600">
+                  {category}
+                </span>
+                <OpportunityTypeBadge type={o.opportunityType} />
+              </div>
               <h1 className="mt-1 text-xl font-bold text-neutral-900">{o.title}</h1>
               <p className="mt-1 text-sm text-neutral-500">
                 {o.employer.name} · {o.employer.descriptor}
@@ -206,15 +221,37 @@ export default function JobDetailPage() {
                 {campus ? ` · ${campus}` : ""}
               </span>
             )}
-            <span className="inline-flex items-center gap-1.5">
-              <Clock className="h-4 w-4 text-neutral-400" aria-hidden /> {DURATION_LABEL[o.duration]}
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <Eye className="h-4 w-4 text-neutral-400" aria-hidden /> {o.viewCount} views
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <Users className="h-4 w-4 text-neutral-400" aria-hidden /> {o.proposalCount} proposals
-            </span>
+            {isHiring ? (
+              <>
+                {o.hiring.durationMonths !== undefined && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Clock className="h-4 w-4 text-neutral-400" aria-hidden />{" "}
+                    {monthsText(o.hiring.durationMonths)}
+                  </span>
+                )}
+                {o.hiring.startDate && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <CalendarDays className="h-4 w-4 text-neutral-400" aria-hidden /> Starts{" "}
+                    {formatDate(o.hiring.startDate)}
+                  </span>
+                )}
+                <span className="inline-flex items-center gap-1.5">
+                  <Users className="h-4 w-4 text-neutral-400" aria-hidden /> {openingsText(o.hiring.openings)}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="inline-flex items-center gap-1.5">
+                  <Clock className="h-4 w-4 text-neutral-400" aria-hidden /> {DURATION_LABEL[o.duration]}
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <Eye className="h-4 w-4 text-neutral-400" aria-hidden /> {o.viewCount} views
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <Users className="h-4 w-4 text-neutral-400" aria-hidden /> {o.proposalCount} proposals
+                </span>
+              </>
+            )}
             <span className="inline-flex items-center gap-1.5">
               <CalendarDays className="h-4 w-4 text-neutral-400" aria-hidden />
               Closing {formatDate(o.deadline)}
@@ -222,6 +259,17 @@ export default function JobDetailPage() {
           </div>
 
           <p className="mt-4 text-sm leading-relaxed text-neutral-700">{o.summary}</p>
+
+          {isHiring && (o.hiring.eligibility || o.hiring.offersCertificate) && (
+            <ul className="mt-3 space-y-1 text-sm text-neutral-700">
+              {o.hiring.eligibility && (
+                <li>
+                  <span className="font-medium">Who can apply:</span> {o.hiring.eligibility}
+                </li>
+              )}
+              {o.hiring.offersCertificate && <li>A completion certificate is offered.</li>}
+            </ul>
+          )}
 
           <div className="mt-5">
             <p className="text-sm font-medium capitalize text-neutral-700">
@@ -240,6 +288,14 @@ export default function JobDetailPage() {
           </div>
         </section>
 
+        {isHiring ? (
+          <HiringApplyPanel
+            job={o}
+            isOwner={isOwner}
+            application={myApplication.data}
+            loading={myApplication.isPending}
+          />
+        ) : (
         <section className="rounded-xl border border-neutral-200 bg-white p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -294,6 +350,7 @@ export default function JobDetailPage() {
             </p>
           )}
         </section>
+        )}
 
         <section className="rounded-xl border border-neutral-200 bg-white p-6">
           <h2 className="text-sm font-semibold text-neutral-900">About this job</h2>
@@ -344,7 +401,26 @@ export default function JobDetailPage() {
             </p>
           </div>
         </section>
+
+        {/* Postings are not checked before they go live: a report is how a bad one is found. */}
+        {user && !isOwner && (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={() => setReportOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800"
+            >
+              <Flag className="h-3.5 w-3.5" aria-hidden /> Report this posting
+            </button>
+          </div>
+        )}
       </div>
+
+      <ReportDialog
+        open={reportOpen}
+        target={{ kind: "posting", jobId: o.id, title: o.title }}
+        onClose={() => setReportOpen(false)}
+      />
     </div>
   );
 }

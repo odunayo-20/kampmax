@@ -2,7 +2,13 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
-import { EmployerJobListQuery, JobListQuery, dashboardKeys, jobKeys } from "@/lib/query-keys";
+import {
+  EmployerJobListQuery,
+  JobListQuery,
+  dashboardKeys,
+  jobKeys,
+  postingKeys,
+} from "@/lib/query-keys";
 import {
   closeJobApi,
   createJobApi,
@@ -10,11 +16,18 @@ import {
   getMyJobCountsApi,
   getMyJobsApi,
   publishJobApi,
+  renewJobApi,
   updateJobApi,
 } from "@/services/opportunity";
 import { getJobById, listPublicJobs, listSavedJobIds, saveJob, unsaveJob } from "@/services/jobs";
 import { jobListFiltersToQuery, jobToOpportunity } from "@/lib/job-api-mapping";
-import type { Opportunity, OpportunityInput, OpportunityPage, OpportunityStatus } from "@/types/opportunity";
+import type {
+  Opportunity,
+  OpportunityInput,
+  OpportunityPage,
+  OpportunityStatus,
+  OpportunityType,
+} from "@/types/opportunity";
 import { JOBS_PAGE_SIZE } from "@/config/jobs";
 
 function throwIfJobError<T>(result: { job: T | null; error: { message?: string } | null }): T {
@@ -31,7 +44,11 @@ export function useJobs(filters: JobListQuery) {
     queryKey: jobKeys.list(filters),
     enabled: status === "authenticated",
     queryFn: async (): Promise<OpportunityPage> => {
-      const query = jobListFiltersToQuery({ ...filters, size: filters.size ?? JOBS_PAGE_SIZE });
+      const query = jobListFiltersToQuery({
+        ...filters,
+        type: filters.type as OpportunityType | undefined,
+        size: filters.size ?? JOBS_PAGE_SIZE,
+      });
       const { jobs, total, page, totalPages, error } = await listPublicJobs(query);
       if (error) throw error;
       return {
@@ -114,7 +131,8 @@ export function useEmployerJobs(filters: EmployerJobListQuery) {
       const { page, error } = await getMyJobsApi(
         filters.page,
         filters.size,
-        filters.status as OpportunityStatus | "all" | undefined
+        filters.status as OpportunityStatus | "all" | undefined,
+        filters.type as OpportunityType | "all" | undefined
       );
       if (error) throw error;
       return page;
@@ -149,6 +167,9 @@ export function useEmployerJobsSummary() {
 function invalidateAllJobs(queryClient: ReturnType<typeof useQueryClient>) {
   void queryClient.invalidateQueries({ queryKey: jobKeys.all });
   void queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
+  // Publishing or renewing can spend a free posting or take a fee from the wallet.
+  void queryClient.invalidateQueries({ queryKey: postingKeys.all });
+  void queryClient.invalidateQueries({ queryKey: ["wallet"] });
 }
 
 export function useCreateJob() {
@@ -172,6 +193,16 @@ export function usePublishJob() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => throwIfJobError(await publishJobApi(id)),
+    onSuccess: () => invalidateAllJobs(queryClient),
+  });
+}
+
+/** Renews an expired vacancy or internship; `applicationDeadline` replaces a passed one. */
+export function useRenewJob() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, applicationDeadline }: { id: string; applicationDeadline?: string }) =>
+      throwIfJobError(await renewJobApi(id, applicationDeadline)),
     onSuccess: () => invalidateAllJobs(queryClient),
   });
 }

@@ -9,6 +9,7 @@ import {
   listPublicJobs,
   pauseJob,
   publishJob,
+  renewJob,
   updateJob,
   type Job,
 } from "@/services/jobs";
@@ -19,6 +20,7 @@ import {
   opportunityInputToJobDto,
   opportunityInputToUpdateDto,
   opportunityStatusToBackend,
+  opportunityTypeToBackend,
 } from "@/lib/job-api-mapping";
 import { getCampusById } from "@/services/campus";
 import type {
@@ -27,6 +29,7 @@ import type {
   OpportunityPage,
   OpportunityQuery,
   OpportunityStatus,
+  OpportunityType,
 } from "@/types/opportunity";
 
 // Jobs, straight from the backend (NestJS /jobs). services/jobs.ts is the typed
@@ -63,6 +66,7 @@ export async function getOpportunitiesPageApi(
       campusId: query.campusId,
       experience: query.experience,
       arrangement: query.arrangement,
+      type: query.type,
       sort: query.sort,
       page: query.page,
       size,
@@ -104,12 +108,14 @@ export async function getMyJobByIdApi(id: string): Promise<JobResult> {
 export async function getMyJobsApi(
   page = 1,
   size = 20,
-  status?: OpportunityStatus | "all"
+  status?: OpportunityStatus | "all",
+  type?: OpportunityType | "all"
 ): Promise<{ page: OpportunityPage; error: ApiError | null }> {
   const res = await listMyJobs({
     page,
     limit: size,
     statuses: opportunityStatusToBackend(status),
+    opportunityType: opportunityTypeToBackend(type),
   });
   if (res.error) return { page: emptyJobPage(size), error: res.error };
   return {
@@ -171,6 +177,14 @@ export async function updateJobApi(
 /** Endpoint: POST /api/v1/jobs/:id/publish */
 export async function publishJobApi(id: string): Promise<JobResult> {
   return toJobResult(await publishJob(id));
+}
+
+/**
+ * Renew an expired vacancy or internship for another live period.
+ * Endpoint: POST /api/v1/jobs/:id/renew
+ */
+export async function renewJobApi(id: string, applicationDeadline?: string): Promise<JobResult> {
+  return toJobResult(await renewJob(id, applicationDeadline));
 }
 
 /** Endpoint: POST /api/v1/jobs/:id/pause */

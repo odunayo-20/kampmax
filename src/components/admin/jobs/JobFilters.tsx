@@ -9,7 +9,8 @@ import type {
   ManagedJobStatus,
   ManagedJobStatusCounts,
 } from "@/types/admin";
-import type { OpportunityWorkArrangement } from "@/types/opportunity";
+import type { OpportunityType, OpportunityWorkArrangement } from "@/types/opportunity";
+import { OPPORTUNITY_TYPE_META, OPPORTUNITY_TYPE_ORDER } from "@/config/opportunity";
 import {
   ARRANGEMENT_LABELS,
   ARRANGEMENT_OPTIONS,
@@ -28,6 +29,7 @@ export interface JobFilterState {
   campusId: string | "all";
   employerId: string | "all";
   arrangement: OpportunityWorkArrangement | "all";
+  opportunityType: OpportunityType | "all";
 }
 
 export const DEFAULT_JOB_FILTERS: JobFilterState = {
@@ -38,6 +40,7 @@ export const DEFAULT_JOB_FILTERS: JobFilterState = {
   campusId: "all",
   employerId: "all",
   arrangement: "all",
+  opportunityType: "all",
 };
 
 interface JobFiltersProps {
@@ -55,7 +58,8 @@ export function JobFilters({ filters, counts, facets, onChange }: JobFiltersProp
     filters.categoryId !== "all" ||
     filters.campusId !== "all" ||
     filters.employerId !== "all" ||
-    filters.arrangement !== "all";
+    filters.arrangement !== "all" ||
+    filters.opportunityType !== "all";
 
   return (
     <div className="rounded-lg border border-kampmax-border bg-white">
@@ -91,6 +95,19 @@ export function JobFilters({ filters, counts, facets, onChange }: JobFiltersProp
         </div>
 
         <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
+          <Select
+            label="type"
+            value={filters.opportunityType}
+            onChange={(v) => onChange({ opportunityType: v as OpportunityType | "all" })}
+          >
+            <option value="all">Any type</option>
+            {OPPORTUNITY_TYPE_ORDER.map((t) => (
+              <option key={t} value={t}>
+                {OPPORTUNITY_TYPE_META[t].label}
+              </option>
+            ))}
+          </Select>
+
           <Select
             label="publication"
             value={filters.publication}

@@ -2,14 +2,17 @@
 
 import { CalendarDays, Clock, Eye, Users, Wallet, Briefcase } from "lucide-react";
 import type { Opportunity } from "@/types/opportunity";
+import { isHiringType } from "@/types/opportunity";
 import {
   DURATION_LABEL,
   WORK_ARRANGEMENT_LABEL,
 } from "@/config/opportunity";
 import { formatDate, timeAgo } from "@/lib/utils";
+import { monthsText, openingsText } from "@/lib/opportunity-display";
 import { OpportunityStatusBadge } from "@/components/freelancer/opportunities/StatusBadges";
 import { budgetText } from "@/components/freelancer/opportunities/OpportunityCard";
 import { EmployerJobActions } from "./EmployerJobActions";
+import { OpportunityTypeBadge } from "./OpportunityTypeBadge";
 
 /**
  * Compact, status-aware row for an employer's own jobs. Shows spine status,
@@ -17,14 +20,18 @@ import { EmployerJobActions } from "./EmployerJobActions";
  */
 export function EmployerJobCard({ job }: { job: Opportunity }) {
   const category = job.categoryName ?? "Other";
+  const hiring = isHiringType(job.opportunityType);
 
   return (
     <article className="rounded-xl border border-neutral-200 bg-white p-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <span className="text-xs font-medium uppercase tracking-wider text-primary-600">
-            {category}
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium uppercase tracking-wider text-primary-600">
+              {category}
+            </span>
+            <OpportunityTypeBadge type={job.opportunityType} />
+          </div>
           <h3 className="mt-1 text-base font-semibold text-neutral-900">{job.title}</h3>
         </div>
         <OpportunityStatusBadge status={job.status} />
@@ -43,7 +50,13 @@ export function EmployerJobCard({ job }: { job: Opportunity }) {
         </div>
         <div className="flex items-center gap-1.5">
           <Clock className="h-3.5 w-3.5 text-neutral-400" aria-hidden />
-          <span>{DURATION_LABEL[job.duration]}</span>
+          <span>
+            {hiring
+              ? job.hiring.durationMonths !== undefined
+                ? monthsText(job.hiring.durationMonths)
+                : "Length not set"
+              : DURATION_LABEL[job.duration]}
+          </span>
         </div>
         <div className="flex items-center gap-1.5">
           <CalendarDays className="h-3.5 w-3.5 text-neutral-400" aria-hidden />
@@ -51,16 +64,25 @@ export function EmployerJobCard({ job }: { job: Opportunity }) {
         </div>
         <div className="flex items-center gap-1.5">
           <Eye className="h-3.5 w-3.5 text-neutral-400" aria-hidden />
-          <span>{job.viewCount} views</span>
+          <span>{hiring ? openingsText(job.hiring.openings) : `${job.viewCount} views`}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <Users className="h-3.5 w-3.5 text-neutral-400" aria-hidden />
-          <span>{job.proposalCount} proposals</span>
+          <span>
+            {job.proposalCount} {hiring ? "applications" : "proposals"}
+          </span>
         </div>
       </dl>
 
       <div className="mt-3 flex items-center justify-between border-t border-neutral-100 pt-3">
         <span className="text-[11px] text-neutral-400">Posted {timeAgo(job.postedAt)}</span>
+        {hiring && job.expiresAt && (
+          <span className="text-[11px] text-neutral-400">
+            {job.status === "expired" || new Date(job.expiresAt).getTime() <= Date.now()
+              ? `Expired ${formatDate(job.expiresAt)}`
+              : `Live until ${formatDate(job.expiresAt)}`}
+          </span>
+        )}
       </div>
 
       <EmployerJobActions job={job} />

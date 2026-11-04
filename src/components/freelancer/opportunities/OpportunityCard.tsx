@@ -10,12 +10,14 @@ import {
   Wallet,
 } from "lucide-react";
 import type { Opportunity } from "@/types/opportunity";
-import { OPPORTUNITY_STATUS } from "@/types/opportunity";
+import { OPPORTUNITY_STATUS, isHiringType } from "@/types/opportunity";
 import {
   DURATION_LABEL,
   WORK_ARRANGEMENT_LABEL,
 } from "@/config/opportunity";
 import { formatNairaCompact, timeAgo } from "@/lib/utils";
+import { hiringPayText, monthsText } from "@/lib/opportunity-display";
+import { OpportunityTypeBadge } from "@/components/employer/jobs/OpportunityTypeBadge";
 import { OpportunityStatusBadge } from "./StatusBadges";
 
 export function OpportunityCard({
@@ -28,6 +30,7 @@ export function OpportunityCard({
   href?: string;
 }) {
   const category = o.categoryName ?? "Other";
+  const hiring = isHiringType(o.opportunityType);
   const budgetLabel = budgetText(o);
   const isOpen = o.status === OPPORTUNITY_STATUS.OPEN;
 
@@ -38,9 +41,12 @@ export function OpportunityCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <span className="text-xs font-medium uppercase tracking-wider text-primary-600">
-            {category}
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium uppercase tracking-wider text-primary-600">
+              {category}
+            </span>
+            {hiring && <OpportunityTypeBadge type={o.opportunityType} />}
+          </div>
           <h3 className="mt-1 line-clamp-2 text-base font-semibold text-neutral-900 group-hover:text-primary-700">
             {o.title}
           </h3>
@@ -87,7 +93,13 @@ export function OpportunityCard({
         )}
         <div className="flex items-center gap-1.5">
           <Clock className="h-3.5 w-3.5 text-neutral-400" aria-hidden />
-          <span>{DURATION_LABEL[o.duration]}</span>
+          <span>
+            {hiring
+              ? o.hiring.durationMonths !== undefined
+                ? monthsText(o.hiring.durationMonths)
+                : "Length not set"
+              : DURATION_LABEL[o.duration]}
+          </span>
         </div>
         <div className="flex items-center gap-1.5">
           <CalendarDays className="h-3.5 w-3.5 text-neutral-400" aria-hidden />
@@ -116,6 +128,8 @@ export function OpportunityCard({
 }
 
 export function budgetText(o: Opportunity): string {
+  // A vacancy or internship quotes pay per period, or says it is unpaid.
+  if (o.opportunityType && isHiringType(o.opportunityType)) return hiringPayText(o);
   const { type, min, max } = o.budget;
   const range = (a?: number, b?: number) => {
     if (a !== undefined && b !== undefined) return `${formatNairaCompact(a)}–${formatNairaCompact(b)}`;

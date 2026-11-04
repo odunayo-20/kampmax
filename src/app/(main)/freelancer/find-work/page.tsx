@@ -110,6 +110,9 @@ function FindWorkContent() {
       categoryId: query.categoryId,
       experience: query.experience,
       arrangement: query.arrangement,
+      // Find Work is for sending proposals, which only gigs take. Vacancies and
+      // internships are browsed (and applied to with a CV) on the Jobs page.
+      type: "gig",
       sort: query.sort,
       page: query.page,
       size: query.size,

@@ -20,6 +20,7 @@ import type {
   OrdersSettings,
   OrderCancellationPolicy,
   PayoutSchedule,
+  PostingSettings,
   SecuritySettings,
 } from "@/types/admin";
 
@@ -673,6 +674,169 @@ export function FinancialSectionForm({
         Changing fees affects future orders only - existing balances and
         in-flight payouts settle under the rates they were created with.
       </p>
+    </SectionForm>
+  );
+}
+
+// ============================================================
+// POSTING FEES
+// ============================================================
+
+export function PostingsSectionForm({
+  value,
+  onSave,
+  onReset,
+  disabled,
+  onDirtyChange,
+}: {
+  value: PostingSettings;
+  onSave: (v: PostingSettings) => Promise<boolean>;
+  onReset: () => void;
+  disabled?: boolean;
+  onDirtyChange?: (dirty: boolean) => void;
+}) {
+  const [form, setForm] = useState(value);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+
+  useSectionDirty(value, form, onDirtyChange, disabled);
+
+  useEffect(() => setForm(value), [value]);
+
+  function validate(): boolean {
+    const e: Record<string, string> = {};
+    for (const [key, label] of [
+      ["internshipFee", "Internship fee"],
+      ["partTimeFee", "Part-time fee"],
+      ["fullTimeFee", "Full-time fee"],
+      ["contractFee", "Contract fee"],
+    ] as const) {
+      const err = rangeError(num(form[key]), label, 0, 1_000_000);
+      if (err) e[key] = err;
+    }
+    for (const [key, label] of [
+      ["unpaidInternshipDiscountPercent", "Unpaid internship discount"],
+      ["renewalDiscountPercent", "Renewal discount"],
+    ] as const) {
+      const err = rangeError(num(form[key]), label, 0, 100);
+      if (err) e[key] = err;
+    }
+    const free = rangeError(num(form.freeAllowance), "Free postings", 0, 20);
+    if (free) e.freeAllowance = free;
+    else if (!Number.isInteger(num(form.freeAllowance)))
+      e.freeAllowance = "Free postings must be a whole number.";
+    const days = rangeError(num(form.liveDays), "Live days", 1, 365);
+    if (days) e.liveDays = days;
+    else if (!Number.isInteger(num(form.liveDays)))
+      e.liveDays = "Live days must be a whole number.";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
+  async function handleSave() {
+    if (!validate()) return;
+    setSaving(true);
+    await onSave(form);
+    setSaving(false);
+  }
+
+  return (
+    <SectionForm onSubmit={() => void handleSave()} saving={saving} errorCount={Object.keys(errors).length} disabled={disabled}>
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="text-sm font-semibold text-kampmax-text">Posting fees</h2>
+        <ResetButton onReset={onReset} disabled={disabled} />
+      </div>
+      <p className="text-xs text-kampmax-text-secondary">
+        What an employer pays to publish a vacancy or internship. Gigs are always free. A fee of 0
+        makes that type free to post: nothing is charged and no free posting is used. Employers see
+        the price before anything is taken from their wallet.
+      </p>
+
+      <FieldGrid>
+        <NumberField
+          label="Internship fee"
+          value={num(form.internshipFee)}
+          prefix="₦"
+          min={0}
+          max={1_000_000}
+          step={500}
+          onChange={(v) => setForm((f) => ({ ...f, internshipFee: v }))}
+          error={errors.internshipFee}
+        />
+        <NumberField
+          label="Part-time fee"
+          value={num(form.partTimeFee)}
+          prefix="₦"
+          min={0}
+          max={1_000_000}
+          step={500}
+          onChange={(v) => setForm((f) => ({ ...f, partTimeFee: v }))}
+          error={errors.partTimeFee}
+        />
+        <NumberField
+          label="Full-time fee"
+          value={num(form.fullTimeFee)}
+          prefix="₦"
+          min={0}
+          max={1_000_000}
+          step={500}
+          onChange={(v) => setForm((f) => ({ ...f, fullTimeFee: v }))}
+          error={errors.fullTimeFee}
+        />
+        <NumberField
+          label="Contract fee"
+          value={num(form.contractFee)}
+          prefix="₦"
+          min={0}
+          max={1_000_000}
+          step={500}
+          onChange={(v) => setForm((f) => ({ ...f, contractFee: v }))}
+          error={errors.contractFee}
+        />
+        <NumberField
+          label="Unpaid internship discount"
+          value={num(form.unpaidInternshipDiscountPercent)}
+          suffix="% off the internship fee"
+          min={0}
+          max={100}
+          step={5}
+          onChange={(v) => setForm((f) => ({ ...f, unpaidInternshipDiscountPercent: v }))}
+          error={errors.unpaidInternshipDiscountPercent}
+        />
+        <NumberField
+          label="Renewal discount"
+          value={num(form.renewalDiscountPercent)}
+          suffix="% off the posting fee"
+          min={0}
+          max={100}
+          step={5}
+          onChange={(v) => setForm((f) => ({ ...f, renewalDiscountPercent: v }))}
+          error={errors.renewalDiscountPercent}
+          hint="Paid to put an expired posting live again."
+        />
+        <NumberField
+          label="Free postings"
+          value={num(form.freeAllowance)}
+          suffix="per verified employer"
+          min={0}
+          max={20}
+          step={1}
+          onChange={(v) => setForm((f) => ({ ...f, freeAllowance: v }))}
+          error={errors.freeAllowance}
+          hint="Counted across all paid types. Given back if a posting is rejected."
+        />
+        <NumberField
+          label="Live period"
+          value={num(form.liveDays)}
+          suffix="days"
+          min={1}
+          max={365}
+          step={1}
+          onChange={(v) => setForm((f) => ({ ...f, liveDays: v }))}
+          error={errors.liveDays}
+          hint="Applies to postings published from now on."
+        />
+      </FieldGrid>
     </SectionForm>
   );
 }

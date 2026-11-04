@@ -8,8 +8,15 @@ import {
   JOB_EXPERIENCE_LEVELS,
   JOB_WORK_ARRANGEMENT_OPTIONS,
   OPPORTUNITY_SORT_OPTIONS,
+  OPPORTUNITY_TYPE_META,
+  OPPORTUNITY_TYPE_ORDER,
 } from "@/config/opportunity";
-import type { OpportunitySortKey, OpportunityWorkArrangement } from "@/types/opportunity";
+import { cn } from "@/lib/utils";
+import type {
+  OpportunitySortKey,
+  OpportunityType,
+  OpportunityWorkArrangement,
+} from "@/types/opportunity";
 
 export interface OpportunityFilterValues {
   search: string;
@@ -17,6 +24,8 @@ export interface OpportunityFilterValues {
   experience: string;
   arrangement: string;
   sort: OpportunitySortKey;
+  /** An opportunity type, or "" for every kind. Only used where the type filter is shown. */
+  type?: OpportunityType | "";
 }
 
 interface OpportunityFiltersProps {
@@ -26,7 +35,47 @@ interface OpportunityFiltersProps {
   onExperienceChange: (value: string) => void;
   onArrangementChange: (value: string) => void;
   onSortChange: (value: OpportunitySortKey) => void;
+  /** Pass this to show the "Gigs / Internships / Full-time ..." filter. */
+  onTypeChange?: (value: OpportunityType | "") => void;
   onReset: () => void;
+}
+
+/** "All, Gigs, Internships, Full-time, Part-time, Contract": narrows the list to one kind of posting. */
+function TypeChips({
+  value,
+  onChange,
+}: {
+  value: OpportunityType | "";
+  onChange: (value: OpportunityType | "") => void;
+}) {
+  const options: { value: OpportunityType | ""; label: string }[] = [
+    { value: "", label: "All" },
+    ...OPPORTUNITY_TYPE_ORDER.map((t) => ({ value: t, label: OPPORTUNITY_TYPE_META[t].plural })),
+  ];
+  return (
+    <div role="radiogroup" aria-label="Kind of posting" className="flex gap-1.5 overflow-x-auto pb-1">
+      {options.map((o) => {
+        const active = value === o.value;
+        return (
+          <button
+            key={o.value || "all"}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onChange(o.value)}
+            className={cn(
+              "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+              active
+                ? "border-primary-600 bg-primary-600 text-white"
+                : "border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50"
+            )}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 function FilterFields({
@@ -88,10 +137,11 @@ export function OpportunityFilters({
   onExperienceChange,
   onArrangementChange,
   onSortChange,
+  onTypeChange,
   onReset,
 }: OpportunityFiltersProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
-  const activeFilterCount = ["categoryId", "experience", "arrangement"].filter(
+  const activeFilterCount = ["categoryId", "experience", "arrangement", ...(onTypeChange ? ["type"] : [])].filter(
     (k) => values[k as keyof OpportunityFilterValues]
   ).length;
 
@@ -143,6 +193,8 @@ export function OpportunityFilters({
           </Button>
         </div>
       </div>
+
+      {onTypeChange && <TypeChips value={values.type ?? ""} onChange={onTypeChange} />}
 
       {/* Desktop inline filter row */}
       <div className="hidden gap-3 lg:grid lg:grid-cols-3">

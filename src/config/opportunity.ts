@@ -8,7 +8,9 @@
 
 import type {
   OpportunityDuration,
+  OpportunityPayPeriod,
   OpportunityStatus,
+  OpportunityType,
   OpportunityWorkArrangement,
   ProposalStatus,
 } from "@/types/opportunity";
@@ -20,6 +22,75 @@ import { EMPLOYER_EXPERIENCE_LEVELS } from "@/config/employer";
 export { EMPLOYER_EXPERIENCE_LEVELS as JOB_EXPERIENCE_LEVELS };
 
 export { OPPORTUNITY_STATUS, PROPOSAL_STATUS };
+
+// ── Opportunity types ───────────────────────────────────────
+
+export interface OpportunityTypeMeta {
+  label: string;
+  /** Plural, for filters and counts. */
+  plural: string;
+  /** One line for the "what are you posting?" picker. */
+  description: string;
+  tone: "default" | "success" | "warning" | "error" | "info" | "outline";
+}
+
+/** In the order the picker and the My Jobs filter show them. */
+export const OPPORTUNITY_TYPE_ORDER: OpportunityType[] = [
+  "gig",
+  "internship",
+  "full_time",
+  "part_time",
+  "contract",
+];
+
+export const OPPORTUNITY_TYPE_META: Record<OpportunityType, OpportunityTypeMeta> = {
+  gig: {
+    label: "Gig",
+    plural: "Gigs",
+    description: "A one-off freelance job. Freelancers send proposals and you pay through a protected contract.",
+    tone: "outline",
+  },
+  internship: {
+    label: "Internship",
+    plural: "Internships",
+    description: "A short placement for students, paid or unpaid.",
+    tone: "info",
+  },
+  full_time: {
+    label: "Full-time",
+    plural: "Full-time",
+    description: "A permanent role with full working hours.",
+    tone: "success",
+  },
+  part_time: {
+    label: "Part-time",
+    plural: "Part-time",
+    description: "A regular role on reduced hours, good alongside lectures.",
+    tone: "success",
+  },
+  contract: {
+    label: "Contract",
+    plural: "Contract",
+    description: "A fixed-term role with a set end date.",
+    tone: "warning",
+  },
+};
+
+// ── Pay period (hiring postings) ────────────────────────────
+
+export const PAY_PERIOD_OPTIONS: { value: OpportunityPayPeriod; label: string; unit: string }[] = [
+  { value: "hourly", label: "Per hour", unit: "/hr" },
+  { value: "weekly", label: "Per week", unit: "/week" },
+  { value: "monthly", label: "Per month", unit: "/month" },
+  { value: "yearly", label: "Per year", unit: "/year" },
+];
+
+export const PAY_PERIOD_UNIT: Record<OpportunityPayPeriod, string> = {
+  hourly: "/hr",
+  weekly: "/week",
+  monthly: "/month",
+  yearly: "/year",
+};
 
 // ── Work arrangement labels ─────────────────────────────────
 

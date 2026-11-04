@@ -6,13 +6,20 @@ import type {
   Opportunity,
   OpportunityBudgetType,
   OpportunityDuration,
+  OpportunityHiring,
   OpportunityInput,
+  OpportunityPayPeriod,
   OpportunityScreeningQuestion,
+  OpportunityType,
   OpportunityWorkArrangement,
 } from "@/types/opportunity";
+import { isHiringType } from "@/types/opportunity";
 import {
   JOB_DESCRIPTION_MAX_CHARS,
   JOB_DEADLINE_MIN_DAYS,
+  JOB_DURATION_MONTHS_MAX,
+  JOB_ELIGIBILITY_MAX_CHARS,
+  JOB_OPENINGS_MAX,
   JOB_QUESTION_MAX_CHARS,
   JOB_REQUIREMENTS_MAX_CHARS,
   JOB_SCREENING_QUESTIONS_MAX,
@@ -24,12 +31,30 @@ import {
   DURATION_LABEL,
   JOB_EXPERIENCE_LEVELS,
   JOB_WORK_ARRANGEMENT_OPTIONS,
+  OPPORTUNITY_TYPE_META,
+  PAY_PERIOD_OPTIONS,
 } from "@/config/opportunity";
 import { Button, Input, Select } from "@/components/ui";
-import { TaxonomySelect } from "@/components/taxonomy";
+import { TaxonomySelect, TaxonomyMultiSelect } from "@/components/taxonomy";
 import { AttachmentPicker } from "@/components/uploads/AttachmentPicker";
 import { fetchCampuses, getCampuses } from "@/services/campus";
+import { defaultHiring } from "@/lib/job-api-mapping";
 import { JobPreview } from "./JobPreview";
+import { OpportunityTypePicker } from "./OpportunityTypePicker";
+
+/** The form always knows its type and hiring fields, even when an input omits them. */
+type FormValues = OpportunityInput & {
+  opportunityType: OpportunityType;
+  hiring: OpportunityHiring;
+};
+
+function withHiringDefaults(input: OpportunityInput): FormValues {
+  return {
+    ...input,
+    opportunityType: input.opportunityType ?? "gig",
+    hiring: input.hiring ?? defaultHiring(),
+  };
+}
 
 const fieldClass =
   "w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20";
@@ -43,8 +68,10 @@ function FieldError({ message }: { message?: string }) {
  * Builds blank values for the create job form. Sensible defaults for
  * backend-required enums so "save draft" always produces valid input.
  */
-export function emptyJobFormValues(): OpportunityInput {
+export function emptyJobFormValues(type: OpportunityType = "gig"): OpportunityInput {
   return {
+    opportunityType: type,
+    hiring: defaultHiring(),
     title: "",
     categoryId: "",
     summary: "",
@@ -65,6 +92,8 @@ export function emptyJobFormValues(): OpportunityInput {
 /** Converts an existing job record back into editable form values. */
 export function opportunityToInput(o: Opportunity): OpportunityInput {
   return {
+    opportunityType: o.opportunityType,
+    hiring: { ...o.hiring },
     title: o.title,
     categoryId: o.categoryId,
     summary: o.summary,
@@ -101,8 +130,40 @@ export function validateJobFormValues(values: OpportunityInput): Record<string, 
   if (values.skills.length === 0) errors.skills = "Add at least one skill.";
   else if (values.skills.length > JOB_SKILL_MAX_COUNT)
     errors.skills = `Jobs can have at most ${JOB_SKILL_MAX_COUNT} skills.`;
-  if (values.budget.min !== undefined && values.budget.max !== undefined && values.budget.max < values.budget.min)
-    errors.budget = "Maximum budget can't be lower than the minimum.";
+  const hiringPost = !!values.opportunityType && isHiringType(values.opportunityType);
+  const quotesPay = hiringPost ? (values.hiring ?? defaultHiring()).isPaid : true;
+  if (
+    quotesPay &&
+    values.budget.min !== undefined &&
+    values.budget.max !== undefined &&
+    values.budget.max < values.budget.min
+  )
+    errors.budget = hiringPost
+      ? "The highest pay can't be lower than the lowest pay."
+      : "Maximum budget can't be lower than the minimum.";
+  if (hiringPost) {
+    const hiring = values.hiring ?? defaultHiring();
+    const hasPay = values.budget.min !== undefined || values.budget.max !== undefined;
+    if (hiring.isPaid && hasPay && !hiring.payPeriod)
+      errors.payPeriod = "Choose how often the pay is given.";
+    if (
+      hiring.durationMonths !== undefined &&
+      (!Number.isInteger(hiring.durationMonths) ||
+        hiring.durationMonths < 1 ||
+        hiring.durationMonths > JOB_DURATION_MONTHS_MAX)
+    )
+      errors.durationMonths = `Length must be a whole number of months, 1 to ${JOB_DURATION_MONTHS_MAX}.`;
+    if (
+      !Number.isInteger(hiring.openings) ||
+      hiring.openings < 1 ||
+      hiring.openings > JOB_OPENINGS_MAX
+    )
+      errors.openings = `Openings must be a whole number, 1 to ${JOB_OPENINGS_MAX}.`;
+    if (hiring.eligibility.trim().length > JOB_ELIGIBILITY_MAX_CHARS)
+      errors.eligibility = `Eligibility must be ${JOB_ELIGIBILITY_MAX_CHARS} characters or fewer.`;
+    if (hiring.startDate && Number.isNaN(new Date(`${hiring.startDate}T00:00:00`).getTime()))
+      errors.startDate = "Pick a valid start date.";
+  }
   const deadline = new Date(`${values.deadline}T23:59:59`);
   if (!values.deadline || Number.isNaN(deadline.getTime()) || deadline.getTime() <= Date.now())
     errors.deadline = "Pick a deadline in the future.";
@@ -149,13 +210,13 @@ export function JobForm({
   onSaveDraft,
   onPublish,
 }: JobFormProps) {
-  const [values, setValues] = useState<OpportunityInput>(() =>
-    JSON.parse(JSON.stringify(initialValues))
+  const [values, setValues] = useState<FormValues>(() =>
+    withHiringDefaults(JSON.parse(JSON.stringify(initialValues)) as OpportunityInput)
   );
+  const hiringPost = isHiringType(values.opportunityType);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
-  const [skillDraft, setSkillDraft] = useState("");
 
   const [campuses, setCampuses] = useState(() => getCampuses());
 
@@ -170,8 +231,12 @@ export function JobForm({
     };
   }, []);
 
-  const set = <K extends keyof OpportunityInput>(key: K, value: OpportunityInput[K]) => {
+  const set = <K extends keyof FormValues>(key: K, value: FormValues[K]) => {
     setValues((v) => ({ ...v, [key]: value }));
+  };
+
+  const setHiring = (patch: Partial<OpportunityHiring>) => {
+    setValues((v) => ({ ...v, hiring: { ...v.hiring, ...patch } }));
   };
 
   const setLocation = (patch: Partial<OpportunityInput["location"]>) => {
@@ -180,21 +245,6 @@ export function JobForm({
 
   const setBudget = (patch: Partial<OpportunityInput["budget"]>) => {
     setValues((v) => ({ ...v, budget: { ...v.budget, ...patch } }));
-  };
-
-  const addSkill = () => {
-    const skill = skillDraft.trim();
-    if (!skill) return;
-    if (values.skills.includes(skill) || values.skills.length >= JOB_SKILL_MAX_COUNT) {
-      setSkillDraft("");
-      return;
-    }
-    set("skills", [...values.skills, skill]);
-    setSkillDraft("");
-  };
-
-  const removeSkill = (skill: string) => {
-    set("skills", values.skills.filter((s) => s !== skill));
   };
 
   const addQuestion = () => {
@@ -280,10 +330,10 @@ export function JobForm({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-xl font-bold text-neutral-900">
-            {mode === "create" ? "Create a job" : "Edit job draft"}
+            {mode === "create" ? "Post an opportunity" : "Edit draft"}
           </h1>
           <p className="mt-1 text-sm text-neutral-500">
-            Build a clear job post so campus talent can find and apply for it.
+            Build a clear post so campus talent can find and apply for it.
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => setPreview(true)} disabled={isSaving || isPublishing}>
@@ -307,7 +357,16 @@ export function JobForm({
         </div>
       )}
 
-      <Section title="Job details">
+      <Section title="What are you posting?">
+        <OpportunityTypePicker
+          value={values.opportunityType}
+          isPaid={values.hiring.isPaid}
+          onChange={(type) => set("opportunityType", type)}
+          disabled={isSaving || isPublishing}
+        />
+      </Section>
+
+      <Section title={`${OPPORTUNITY_TYPE_META[values.opportunityType].label} details`}>
         <div className="space-y-4">
           <div>
             <label className="mb-1 block text-xs font-medium text-neutral-700" htmlFor="job-title">
@@ -392,7 +451,7 @@ export function JobForm({
         </div>
       </Section>
 
-      <Section title="Work &amp; budget">
+      <Section title={hiringPost ? "Role & pay" : "Work & budget"}>
         <div className="space-y-4">
           <div>
             <label className="mb-1 block text-xs font-medium text-neutral-700" htmlFor="job-arrangement">
@@ -468,73 +527,227 @@ export function JobForm({
             </label>
           )}
 
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-neutral-700" htmlFor="job-budget-type">
-                Budget type *
+          {hiringPost ? (
+            <div className="space-y-4">
+              <label className="flex items-center gap-2 text-sm text-neutral-700">
+                <input
+                  type="checkbox"
+                  checked={values.hiring.isPaid}
+                  onChange={(e) => setHiring({ isPaid: e.target.checked })}
+                  className="h-4 w-4 rounded border-neutral-300 accent-primary-600"
+                />
+                This role is paid
               </label>
-              <Select
-                id="job-budget-type"
-                value={values.budget.type}
-                onChange={(e) =>
-                  setBudget({ type: e.target.value as OpportunityBudgetType })
-                }
-              >
-                <option value="hourly">Hourly</option>
-                <option value="project">Fixed project</option>
-                <option value="contract">Contract</option>
-              </Select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-neutral-700" htmlFor="job-budget-min">
-                Min (₦)
+
+              {values.hiring.isPaid ? (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-neutral-700" htmlFor="job-pay-min">
+                      Lowest pay (₦)
+                    </label>
+                    <Input
+                      id="job-pay-min"
+                      type="number"
+                      min={0}
+                      value={values.budget.min ?? ""}
+                      onChange={(e) =>
+                        setBudget({ min: e.target.value === "" ? undefined : Number(e.target.value) })
+                      }
+                      placeholder="30000"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-neutral-700" htmlFor="job-pay-max">
+                      Highest pay (₦)
+                    </label>
+                    <Input
+                      id="job-pay-max"
+                      type="number"
+                      min={0}
+                      value={values.budget.max ?? ""}
+                      onChange={(e) =>
+                        setBudget({ max: e.target.value === "" ? undefined : Number(e.target.value) })
+                      }
+                      placeholder="50000"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-neutral-700" htmlFor="job-pay-period">
+                      Paid
+                    </label>
+                    <Select
+                      id="job-pay-period"
+                      value={values.hiring.payPeriod ?? ""}
+                      placeholder="Choose"
+                      onChange={(e) =>
+                        setHiring({
+                          payPeriod: (e.target.value || undefined) as OpportunityPayPeriod | undefined,
+                        })
+                      }
+                    >
+                      {PAY_PERIOD_OPTIONS.map((p) => (
+                        <option key={p.value} value={p.value}>
+                          {p.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-neutral-500">
+                  Unpaid roles show no pay range. An unpaid internship also costs less to publish.
+                </p>
+              )}
+              <FieldError message={errors.budget} />
+              <FieldError message={errors.payPeriod} />
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-neutral-700" htmlFor="job-start-date">
+                    Start date
+                  </label>
+                  <Input
+                    id="job-start-date"
+                    type="date"
+                    value={values.hiring.startDate ?? ""}
+                    onChange={(e) => setHiring({ startDate: e.target.value || undefined })}
+                  />
+                  <FieldError message={errors.startDate} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-neutral-700" htmlFor="job-length-months">
+                    Length (months)
+                  </label>
+                  <Input
+                    id="job-length-months"
+                    type="number"
+                    min={1}
+                    max={JOB_DURATION_MONTHS_MAX}
+                    value={values.hiring.durationMonths ?? ""}
+                    onChange={(e) =>
+                      setHiring({
+                        durationMonths: e.target.value === "" ? undefined : Number(e.target.value),
+                      })
+                    }
+                    placeholder="3"
+                  />
+                  <FieldError message={errors.durationMonths} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-neutral-700" htmlFor="job-openings">
+                    Openings
+                  </label>
+                  <Input
+                    id="job-openings"
+                    type="number"
+                    min={1}
+                    max={JOB_OPENINGS_MAX}
+                    value={values.hiring.openings}
+                    onChange={(e) =>
+                      setHiring({ openings: e.target.value === "" ? 0 : Number(e.target.value) })
+                    }
+                  />
+                  <FieldError message={errors.openings} />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-neutral-700" htmlFor="job-eligibility">
+                  Who can apply
+                </label>
+                <Input
+                  id="job-eligibility"
+                  value={values.hiring.eligibility}
+                  maxLength={JOB_ELIGIBILITY_MAX_CHARS}
+                  onChange={(e) => setHiring({ eligibility: e.target.value })}
+                  placeholder="e.g. 300 level and above, any department"
+                />
+                <FieldError message={errors.eligibility} />
+              </div>
+
+              <label className="flex items-center gap-2 text-sm text-neutral-700">
+                <input
+                  type="checkbox"
+                  checked={values.hiring.offersCertificate}
+                  onChange={(e) => setHiring({ offersCertificate: e.target.checked })}
+                  className="h-4 w-4 rounded border-neutral-300 accent-primary-600"
+                />
+                A completion certificate is offered
               </label>
-              <Input
-                id="job-budget-min"
-                type="number"
-                min={0}
-                value={values.budget.min ?? ""}
-                onChange={(e) =>
-                  setBudget({ min: e.target.value === "" ? undefined : Number(e.target.value) })
-                }
-                placeholder="150000"
-              />
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-neutral-700" htmlFor="job-budget-max">
-                Max (₦)
-              </label>
-              <Input
-                id="job-budget-max"
-                type="number"
-                min={0}
-                value={values.budget.max ?? ""}
-                onChange={(e) =>
-                  setBudget({ max: e.target.value === "" ? undefined : Number(e.target.value) })
-                }
-                placeholder="400000"
-              />
-            </div>
-          </div>
-          <FieldError message={errors.budget} />
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-neutral-700" htmlFor="job-budget-type">
+                    Budget type *
+                  </label>
+                  <Select
+                    id="job-budget-type"
+                    value={values.budget.type}
+                    onChange={(e) =>
+                      setBudget({ type: e.target.value as OpportunityBudgetType })
+                    }
+                  >
+                    <option value="hourly">Hourly</option>
+                    <option value="project">Fixed project</option>
+                    <option value="contract">Contract</option>
+                  </Select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-neutral-700" htmlFor="job-budget-min">
+                    Min (₦)
+                  </label>
+                  <Input
+                    id="job-budget-min"
+                    type="number"
+                    min={0}
+                    value={values.budget.min ?? ""}
+                    onChange={(e) =>
+                      setBudget({ min: e.target.value === "" ? undefined : Number(e.target.value) })
+                    }
+                    placeholder="150000"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-neutral-700" htmlFor="job-budget-max">
+                    Max (₦)
+                  </label>
+                  <Input
+                    id="job-budget-max"
+                    type="number"
+                    min={0}
+                    value={values.budget.max ?? ""}
+                    onChange={(e) =>
+                      setBudget({ max: e.target.value === "" ? undefined : Number(e.target.value) })
+                    }
+                    placeholder="400000"
+                  />
+                </div>
+              </div>
+              <FieldError message={errors.budget} />
+            </>
+          )}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-neutral-700" htmlFor="job-duration">
-                Duration *
-              </label>
-              <Select
-                id="job-duration"
-                value={values.duration}
-                onChange={(e) => set("duration", e.target.value as OpportunityDuration)}
-              >
-                {(Object.keys(DURATION_LABEL) as OpportunityDuration[]).map((d) => (
-                  <option key={d} value={d}>
-                    {DURATION_LABEL[d]}
-                  </option>
-                ))}
-              </Select>
-            </div>
+            {!hiringPost && (
+              <div>
+                <label className="mb-1 block text-xs font-medium text-neutral-700" htmlFor="job-duration">
+                  Duration *
+                </label>
+                <Select
+                  id="job-duration"
+                  value={values.duration}
+                  onChange={(e) => set("duration", e.target.value as OpportunityDuration)}
+                >
+                  {(Object.keys(DURATION_LABEL) as OpportunityDuration[]).map((d) => (
+                    <option key={d} value={d}>
+                      {DURATION_LABEL[d]}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            )}
             <div>
               <label className="mb-1 block text-xs font-medium text-neutral-700" htmlFor="job-experience">
                 Experience level *
@@ -558,48 +771,17 @@ export function JobForm({
 
       <Section title="Skills">
         <div>
-          <label className="mb-1 block text-xs font-medium text-neutral-700" htmlFor="job-skills">
-            Required skills *
-          </label>
-          <div className="flex gap-2">
-            <input
-              id="job-skills"
-              value={skillDraft}
-              onChange={(e) => setSkillDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  addSkill();
-                }
-              }}
-              placeholder="Type a skill and press Enter"
-              className={fieldClass}
-            />
-            <Button type="button" variant="outline" onClick={addSkill} aria-label="Add skill">
-              <Plus className="h-4 w-4" aria-hidden />
-            </Button>
-          </div>
+          <TaxonomyMultiSelect
+            type="SKILL"
+            valueBy="name"
+            leafOnly
+            label="Required skills *"
+            value={values.skills}
+            onChange={(skills) => set("skills", skills)}
+            max={JOB_SKILL_MAX_COUNT}
+            placeholder="Search skills…"
+          />
           <FieldError message={errors.skills} />
-          {values.skills.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {values.skills.map((skill) => (
-                <span
-                  key={skill}
-                  className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-xs text-neutral-700"
-                >
-                  {skill}
-                  <button
-                    type="button"
-                    onClick={() => removeSkill(skill)}
-                    aria-label={`Remove ${skill}`}
-                    className="text-neutral-400 hover:text-neutral-700"
-                  >
-                    <X className="h-3 w-3" aria-hidden />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
           <p className="mt-2 text-[11px] text-neutral-400">
             Up to {JOB_SKILL_MAX_COUNT} skills. Candidates are matched against these.
           </p>
@@ -703,8 +885,9 @@ export function JobForm({
 
       <p className="flex items-center gap-1.5 text-[11px] text-neutral-400">
         <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
-        Publishing makes the job visible to freelancers right away. Drafts stay private, and you can
-        edit a job only while it is a draft.
+        {hiringPost
+          ? "Publishing uses one of your free postings or the posting fee, and you will see the cost before anything is charged. Drafts stay private and cost nothing."
+          : "Publishing makes the job visible to freelancers right away. Drafts stay private, and you can edit a job only while it is a draft."}
       </p>
     </div>
   );

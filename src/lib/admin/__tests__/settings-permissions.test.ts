@@ -29,12 +29,14 @@ function matrixFor(role: AdminRoleKey): RolePermissionMatrix {
 }
 
 describe("settings permission helpers (Module 50)", () => {
-  it("marks exactly financial and security as high-risk sections", () => {
+  it("marks exactly financial, posting fees and security as high-risk sections", () => {
     expect([...HIGH_RISK_SETTINGS_SECTIONS].sort()).toEqual([
       "financial",
+      "postings",
       "security",
     ]);
     expect(isHighRiskSettingsSection("financial")).toBe(true);
+    expect(isHighRiskSettingsSection("postings")).toBe(true);
     expect(isHighRiskSettingsSection("security")).toBe(true);
     expect(isHighRiskSettingsSection("general")).toBe(false);
     expect(isHighRiskSettingsSection("orders")).toBe(false);

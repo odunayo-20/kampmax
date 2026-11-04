@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ClipboardList } from "lucide-react";
+import Link from "next/link";
+import { ClipboardList, Flag } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Pagination } from "@/components/admin/Pagination";
 import {
@@ -27,7 +28,8 @@ import type {
   ManagedJobStatus,
   SortDir,
 } from "@/types/admin";
-import type { OpportunityWorkArrangement } from "@/types/opportunity";
+import type { OpportunityType, OpportunityWorkArrangement } from "@/types/opportunity";
+import { OPPORTUNITY_TYPE_ORDER } from "@/config/opportunity";
 import type { ManagedJobSortField } from "@/services/admin";
 
 function parseInitialFilters(params: URLSearchParams): JobFilterState {
@@ -35,6 +37,7 @@ function parseInitialFilters(params: URLSearchParams): JobFilterState {
   const validStatus = JOB_STATUS_TABS as (ManagedJobStatus | "all")[];
   const rawPublication = params.get("publication");
   const validPublication = JOB_PUBLICATION_OPTIONS as (ManagedJobPublication | "all")[];
+  const rawType = params.get("type");
   const rawArrangement = params.get("arrangement");
   const validArrangement = ARRANGEMENT_OPTIONS as (OpportunityWorkArrangement | "all")[];
   return {
@@ -47,6 +50,10 @@ function parseInitialFilters(params: URLSearchParams): JobFilterState {
       rawPublication &&
       validPublication.includes(rawPublication as ManagedJobPublication | "all")
         ? (rawPublication as ManagedJobPublication | "all")
+        : "all",
+    opportunityType:
+      rawType && OPPORTUNITY_TYPE_ORDER.includes(rawType as OpportunityType)
+        ? (rawType as OpportunityType)
         : "all",
     categoryId: params.get("category") ?? "all",
     campusId: params.get("campus") ?? "all",
@@ -97,6 +104,7 @@ function AdminJobsPageInner() {
       campusId: filters.campusId === "all" ? undefined : filters.campusId,
       employerId: filters.employerId === "all" ? undefined : filters.employerId,
       arrangement: filters.arrangement === "all" ? undefined : filters.arrangement,
+      opportunityType: filters.opportunityType === "all" ? undefined : filters.opportunityType,
       sortBy,
       sortDir,
       page,
@@ -124,6 +132,7 @@ function AdminJobsPageInner() {
       if (filters.campusId !== "all") sp.set("campus", filters.campusId);
       if (filters.employerId !== "all") sp.set("employer", filters.employerId);
       if (filters.arrangement !== "all") sp.set("arrangement", filters.arrangement);
+      if (filters.opportunityType !== "all") sp.set("type", filters.opportunityType);
       if (page > 1) sp.set("page", String(page));
       const next = sp.toString();
       if (next !== urlParams) router.replace(`${pathname}?${next}`, { scroll: false });
@@ -162,7 +171,8 @@ function AdminJobsPageInner() {
     filters.categoryId !== "all" ||
     filters.campusId !== "all" ||
     filters.employerId !== "all" ||
-    filters.arrangement !== "all";
+    filters.arrangement !== "all" ||
+    filters.opportunityType !== "all";
 
   const clearFilters = useCallback(() => {
     patchFilters(DEFAULT_JOB_FILTERS);
@@ -172,12 +182,21 @@ function AdminJobsPageInner() {
     <>
       <AdminPageHeader
         title="Jobs & Hiring"
-        description="Every job posted on the platform, its employer, applications and hiring state. Derived from the real opportunity store, read-only."
+        description="Every job posted on the platform, its employer, applications and hiring state. Postings go live without approval: open one to take it down, or work through user reports."
         actions={
-          <span className="inline-flex items-center gap-1.5 rounded-md border border-kampmax-border bg-white px-3 py-1.5 text-xs font-medium text-kampmax-text-secondary">
-            <ClipboardList className="h-3.5 w-3.5" />
-            {countsData ? `${countsData.all} jobs` : "…"}
-          </span>
+          <>
+            <Link
+              href="/admin/job-reports"
+              className="inline-flex items-center gap-1.5 rounded-md border border-kampmax-border bg-white px-3 py-1.5 text-xs font-medium text-kampmax-text transition-colors hover:bg-kampmax-muted/60"
+            >
+              <Flag className="h-3.5 w-3.5" />
+              {countsData ? `${countsData.reported} reported` : "Reports"}
+            </Link>
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-kampmax-border bg-white px-3 py-1.5 text-xs font-medium text-kampmax-text-secondary">
+              <ClipboardList className="h-3.5 w-3.5" />
+              {countsData ? `${countsData.all} jobs` : "…"}
+            </span>
+          </>
         }
       />
 

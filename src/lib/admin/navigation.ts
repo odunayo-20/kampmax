@@ -29,6 +29,7 @@ import {
   Boxes,
   ClipboardList,
   Fingerprint,
+  Flag,
   Headphones,
   Wrench,
   Newspaper,
@@ -76,6 +77,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     label: "Hiring",
     items: [
       { key: "jobs", href: "/admin/jobs", label: "Jobs", icon: ClipboardList },
+      { key: "jobReports", href: "/admin/job-reports", label: "Job reports", icon: Flag },
     ],
   },
   {

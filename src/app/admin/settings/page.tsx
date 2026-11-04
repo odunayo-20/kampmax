@@ -24,6 +24,7 @@ import {
   MarketplaceSectionForm,
   NotificationsSectionForm,
   OrdersSectionForm,
+  PostingsSectionForm,
   SecuritySectionForm,
 } from "@/components/admin/settings/section-forms";
 import {
@@ -365,6 +366,15 @@ function SettingsConsole() {
               onDirtyChange={setDirty}
             />
           )}
+          {section === "postings" && (
+            <PostingsSectionForm
+              value={config.postings}
+              onSave={(v) => saveSection("postings", v)}
+              onReset={() => resetSection("postings")}
+              disabled={readOnly}
+              onDirtyChange={setDirty}
+            />
+          )}
           {section === "loyalty" && (
             <LoyaltySectionForm
               value={config.loyalty}
@@ -419,7 +429,9 @@ function SettingsConsole() {
         title={
           pendingSave?.section === "security"
             ? "Change security settings?"
-            : "Change financial settings?"
+            : pendingSave?.section === "postings"
+              ? "Change posting fees?"
+              : "Change financial settings?"
         }
         message="These settings affect sensitive platform controls. Applying them is recorded in the audit trail against your admin account."
         confirmLabel="Save changes"
@@ -439,7 +451,9 @@ function SettingsConsole() {
         title={
           pendingReset === "security"
             ? "Reset security settings?"
-            : "Reset financial settings?"
+            : pendingReset === "postings"
+              ? "Reset posting fees?"
+              : "Reset financial settings?"
         }
         message="This restores the default values for this section. Any tuned values are lost and the section falls back to platform defaults."
         confirmLabel="Reset to defaults"

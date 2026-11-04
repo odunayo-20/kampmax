@@ -36,7 +36,7 @@ export function EmployerJobsOverview({ query }: { query: EmployerDashboardQueryS
         <EmployerDashboardEmpty
           title="No jobs yet"
           detail="Create your first job to start receiving applications."
-          action={{ href: "/employer/jobs/create", label: "Post a job" }}
+          action={{ href: "/employer/jobs/create", label: "Post an opportunity" }}
         />
       ) : (
         <ul className="divide-y divide-kampmax-border/70">

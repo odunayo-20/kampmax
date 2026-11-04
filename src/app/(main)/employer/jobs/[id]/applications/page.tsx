@@ -8,7 +8,10 @@ import {
   APPLICATION_SORT_OPTIONS,
   type EmployerApplicationSortKey,
 } from "@/config/applications";
+import { isHiringType } from "@/types/opportunity";
+import { useEmployerJob } from "@/hooks/use-jobs";
 import { EmployerApplicationsView } from "@/components/employer/applications/EmployerApplicationsView";
+import { JobApplicantsView } from "@/components/employer/applications/JobApplicantsView";
 
 function JobApplicationsContent({ jobId }: { jobId: string }) {
   const router = useRouter();
@@ -76,6 +79,15 @@ function JobApplicationsContent({ jobId }: { jobId: string }) {
 export default function EmployerJobApplicationsPage() {
   const params = useParams<{ id: string }>();
   const jobId = String(params.id);
+  // A gig has proposals; a vacancy or internship has CV applicants.
+  const jobQuery = useEmployerJob(jobId);
+
+  if (jobQuery.isPending) {
+    return <div className="text-sm text-neutral-500">Loading…</div>;
+  }
+  if (jobQuery.data && isHiringType(jobQuery.data.opportunityType)) {
+    return <JobApplicantsView jobId={jobId} />;
+  }
   return (
     <Suspense fallback={<div className="text-sm text-neutral-500">Loading…</div>}>
       <JobApplicationsContent jobId={jobId} />

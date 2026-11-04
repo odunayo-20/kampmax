@@ -2,8 +2,12 @@
 
 import Link from "next/link";
 import { AlertCircle, Briefcase, Inbox, Plus } from "lucide-react";
-import type { OpportunityStatus } from "@/types/opportunity";
-import { EMPLOYER_JOBS_PAGE_SIZE, EMPLOYER_JOB_FILTER_TABS } from "@/config/jobs";
+import type { OpportunityStatus, OpportunityType } from "@/types/opportunity";
+import {
+  EMPLOYER_JOBS_PAGE_SIZE,
+  EMPLOYER_JOB_FILTER_TABS,
+  EMPLOYER_JOB_TYPE_TABS,
+} from "@/config/jobs";
 import { useEmployerJobs, useEmployerJobsSummary } from "@/hooks/use-jobs";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
 import { Skeleton } from "@/components/home/Skeleton";
@@ -50,19 +54,24 @@ const EMPTY_COPY: Record<OpportunityStatus | "all", string> = {
  */
 export function EmployerJobsView({
   status,
+  type,
   page,
   onStatusChange,
+  onTypeChange,
   onPageChange,
 }: {
   status: OpportunityStatus | "all";
+  type: OpportunityType | "all";
   page: number;
   onStatusChange: (status: OpportunityStatus | "all") => void;
+  onTypeChange: (type: OpportunityType | "all") => void;
   onPageChange: (page: number) => void;
 }) {
   const [createHintOpen, setCreateHintOpen] = useState(false);
   const countsQuery = useEmployerJobsSummary();
   const listQuery = useEmployerJobs({
     status,
+    type,
     page,
     size: EMPLOYER_JOBS_PAGE_SIZE,
   });
@@ -76,15 +85,41 @@ export function EmployerJobsView({
         <div>
           <h1 className="text-xl font-bold text-neutral-900">My Jobs</h1>
           <p className="mt-1 text-sm text-neutral-500">
-            Create, publish and manage your job postings as an employer.
+            Post and manage your gigs, internships and vacancies as an employer.
           </p>
         </div>
         <Link
           href="/employer/jobs/create"
           className="inline-flex h-10 items-center justify-center gap-1.5 rounded-md bg-primary-600 px-5 text-sm font-semibold text-white hover:bg-primary-700"
         >
-          <Plus className="h-4 w-4" aria-hidden /> Create a job
+          <Plus className="h-4 w-4" aria-hidden /> Post an opportunity
         </Link>
+      </div>
+
+      <div
+        role="tablist"
+        aria-label="Filter by type"
+        className="flex gap-1.5 overflow-x-auto pb-1"
+      >
+        {EMPLOYER_JOB_TYPE_TABS.map((tab) => {
+          const active = type === tab.value;
+          return (
+            <button
+              key={tab.value}
+              role="tab"
+              aria-selected={active}
+              onClick={() => onTypeChange(tab.value)}
+              className={cn(
+                "shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors",
+                active
+                  ? "border-neutral-900 bg-neutral-900 text-white"
+                  : "border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50"
+              )}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
       <div
@@ -156,7 +191,7 @@ export function EmployerJobsView({
               href="/employer/jobs/create"
               className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-primary-600 px-3 text-xs font-semibold text-white hover:bg-primary-700"
             >
-              <Plus className="h-3.5 w-3.5" aria-hidden /> Create a job
+              <Plus className="h-3.5 w-3.5" aria-hidden /> Post an opportunity
             </Link>
             <button
               onClick={() => setCreateHintOpen(true)}
@@ -185,7 +220,7 @@ export function EmployerJobsView({
       <ConfirmDialog
         open={createHintOpen}
         title="How publishing works"
-        body="Publish moves a draft to Pending Review. Kampmax moderates it, then it goes live on the Jobs Marketplace where freelancers discover it. Moderation is a backend-owned step."
+        body="Publishing puts your posting on the marketplace where students find it. Gigs are free. A vacancy or internship uses one of your free postings or a posting fee, and you see the cost before anything is charged. Postings stay live for a set number of days, then you can renew them."
         confirmLabel="Got it"
         onConfirm={() => setCreateHintOpen(false)}
         onCancel={() => setCreateHintOpen(false)}

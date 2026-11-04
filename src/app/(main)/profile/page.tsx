@@ -6,7 +6,7 @@ import {
   ChevronRight, LogOut, Store, Package, Heart, MapPin,
   CreditCard, Wallet, Bell, Shield, HelpCircle,
   Settings, Star, ChevronDown, Pencil, Clock, Lock, ShieldCheck,
-  Ticket, CalendarPlus,
+  Ticket, CalendarPlus, FileText, Send,
 } from "lucide-react";
 import { Avatar } from "@/components/atoms/Avatar";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -295,6 +295,20 @@ export default function ProfilePage() {
           description="View and manage feedback you've left"
           action={<ChevronRight className="h-4 w-4 text-kampmax-text-secondary" />}
           onClick={() => router.push("/profile/reviews")}
+        />
+        <SettingsRow
+          icon={<FileText className="h-5 w-5" />}
+          label="My CVs"
+          description="The CVs you apply to internships and vacancies with"
+          action={<ChevronRight className="h-4 w-4 text-kampmax-text-secondary" />}
+          onClick={() => router.push("/profile/cvs")}
+        />
+        <SettingsRow
+          icon={<Send className="h-5 w-5" />}
+          label="My Applications"
+          description="Internships and vacancies you applied to, and how each is going"
+          action={<ChevronRight className="h-4 w-4 text-kampmax-text-secondary" />}
+          onClick={() => router.push("/profile/applications")}
         />
         <SettingsRow
           icon={<Pencil className="h-5 w-5" />}
