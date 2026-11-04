@@ -16,6 +16,7 @@ import { ContractFeeNote } from "@/components/engagements/ContractFeeNote";
 import { EngagementMilestones } from "@/components/engagements/EngagementMilestones";
 import { HourlyTimesheet } from "@/components/engagements/HourlyTimesheet";
 import { EngagementNotices } from "@/components/engagements/EngagementNotices";
+import { EngagementRevisions } from "@/components/engagements/EngagementRevisions";
 import { contractPriceLabel, describeCurrentMilestone } from "@/lib/engagement-milestones";
 import { ContractEmptyState } from "@/components/contracts/ContractEmptyState";
 import type { Contract, ContractStatus } from "@/types/contract";
@@ -163,6 +164,7 @@ export default function FreelancerContractsPage() {
                 <EngagementMilestones milestones={engagement.milestones} showFee />
                 <ContractFeeNote engagement={engagement} />
                 <EngagementNotices engagement={engagement} role="freelancer" />
+                <EngagementRevisions revisions={engagement.revisions} status={engagement.status} role="freelancer" />
                 {engagement.paymentType === "HOURLY" && (
                   <HourlyTimesheet
                     engagementId={engagement.id}
@@ -178,7 +180,7 @@ export default function FreelancerContractsPage() {
                   engagementId={engagement.id}
                   status={engagement.status}
                   role="freelancer"
-                  revisionCount={engagement.revisionCount}
+                  revisions={engagement.revisions}
                   milestone={describeCurrentMilestone(engagement)}
                   onChanged={() => {
                     void loadEngagements();

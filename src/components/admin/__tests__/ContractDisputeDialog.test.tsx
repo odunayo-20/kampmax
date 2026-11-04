@@ -25,6 +25,7 @@ const disputed = (dispute: Partial<NonNullable<Engagement["dispute"]>> = {}): En
   weeklyHourLimit: null,
   feeRate: null,
   feeMinimum: null,
+  revisions: { allowed: 3, used: 0, remaining: 3, requests: [] },
   currentMilestonePosition: 1,
   milestones: [
     {

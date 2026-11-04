@@ -5,6 +5,7 @@ import { AlertCircle, Loader2, X } from "lucide-react";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { cn, formatDateShort, formatNaira } from "@/lib/utils";
 import { milestoneAtStake } from "@/lib/engagement-milestones";
+import { EngagementRevisions } from "@/components/engagements/EngagementRevisions";
 import type { Engagement, EngagementDisputeOutcome } from "@/services/jobs";
 
 const MIN_NOTE = 5;
@@ -132,6 +133,9 @@ export function ContractDisputeDialog({
             <p className="text-xs font-medium text-kampmax-text-secondary">{openedBy} reported:</p>
             <p className="mt-1 whitespace-pre-wrap break-words text-kampmax-text">{dispute.reason}</p>
           </section>
+
+          {/* What the client asked for, and what counted: the context for judging a delivery dispute. */}
+          <EngagementRevisions revisions={engagement.revisions} status={engagement.status} role="admin" />
 
           {resolved ? (
             <section aria-label="Ruling" className="rounded-lg border border-kampmax-border p-3">

@@ -24,6 +24,7 @@ const engagement = (status: EngagementStatus): Engagement => ({
   weeklyHourLimit: null,
   feeRate: null,
   feeMinimum: null,
+  revisions: { allowed: 3, used: 0, remaining: 3, requests: [] },
   currentMilestonePosition: 1,
   milestones: [
     {
@@ -170,9 +171,10 @@ describe("which next steps each party is offered", () => {
     expect(engagementActionsFor("employer", "REVISION_REQUESTED")).toEqual(["dispute"]);
   });
 
-  it("employer: stops being offered changes once the limit is used", () => {
-    expect(engagementActionsFor("employer", "SUBMITTED", 2)).toContain("revise");
-    expect(engagementActionsFor("employer", "SUBMITTED", 3)).toEqual(["complete", "dispute"]);
+  it("employer: still responds to submitted work with every revision used, because a mistake can still be reported", () => {
+    // The count lives on the contract and the form closes only what is closed;
+    // the buttons do not depend on it any more.
+    expect(engagementActionsFor("employer", "SUBMITTED")).toEqual(["complete", "revise", "dispute"]);
   });
 
   it("freelancer: submits (or resubmits), can withdraw a submission, and can decline before funding", () => {

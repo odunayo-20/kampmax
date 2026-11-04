@@ -4,7 +4,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EngagementReasonDialog } from "./EngagementReasonDialog";
-import { MAX_REVISIONS } from "@/config/contract";
+import { RequestChangesDialog } from "./RequestChangesDialog";
+import type { RevisionKind, Revisions } from "@/lib/revisions";
 import { formatNaira } from "@/lib/utils";
 import { formatMinutes } from "@/lib/hourly";
 import type { CurrentMilestoneInfo } from "@/lib/engagement-milestones";
@@ -47,7 +48,9 @@ interface ActionDef {
   confirm?: string;
   /** A written reason asked for before the step runs. */
   ask?: ReasonPrompt;
-  run: (id: string, text: string) => Promise<{ error: ApiError | null }>;
+  /** Opens the request-changes form, which asks what kind of request this is as well as why. */
+  form?: "revision";
+  run: (id: string, text: string, kind?: RevisionKind) => Promise<{ error: ApiError | null }>;
 }
 
 const ACTIONS: Record<Kind, ActionDef> = {
@@ -89,17 +92,8 @@ const ACTIONS: Record<Kind, ActionDef> = {
     label: "Request changes",
     busyLabel: "Sending…",
     variant: "outline",
-    ask: {
-      title: "Ask for changes",
-      body: `Tell the freelancer what to fix. They can update the work and resubmit. You can ask for changes up to ${MAX_REVISIONS} times.`,
-      label: "What needs to change?",
-      placeholder: "e.g. The footer links are missing and the logo is blurry.",
-      confirmLabel: "Send request",
-      keepLabel: "Go back",
-      minLength: 5,
-      destructive: false,
-    },
-    run: (id, text) => requestEngagementRevision(id, text),
+    form: "revision",
+    run: (id, text, kind) => requestEngagementRevision(id, text, kind),
   },
   dispute: {
     kind: "dispute",
@@ -281,14 +275,13 @@ const ALLOWED: Record<Role, Partial<Record<EngagementStatus, Kind[]>>> = {
 export function engagementActionsFor(
   role: Role,
   status: EngagementStatus,
-  revisionCount = 0,
   /** `endable`: an hourly contract between paid weeks, which is ended rather than cancelled. */
   opts: { endable?: boolean } = {}
 ): Kind[] {
+  // "Request changes" stays even when the revisions are used up: it is also how
+  // a mistake or missing part is reported, and the form closes only what is closed.
   const kinds = ALLOWED[role][status] ?? [];
-  // Out of change requests: the employer must approve or dispute.
-  const allowed = revisionCount >= MAX_REVISIONS ? kinds.filter((k) => k !== "revise") : kinds;
-  return opts.endable ? allowed.map((k) => (k === "cancel" ? "end" : k)) : allowed;
+  return opts.endable ? kinds.map((k) => (k === "cancel" ? "end" : k)) : kinds;
 }
 
 /**
@@ -300,15 +293,15 @@ export function EngagementActions({
   engagementId,
   status,
   role,
-  revisionCount = 0,
+  revisions,
   milestone,
   onChanged,
 }: {
   engagementId: string;
   status: EngagementStatus;
   role: Role;
-  /** Change requests used so far; hides "Request changes" once the limit is hit. */
-  revisionCount?: number;
+  /** The delivery's revisions as the backend counts them; the request form explains what is left. */
+  revisions: Revisions;
   /** The milestone this contract is on, when it is paid in several; words the money steps. */
   milestone?: CurrentMilestoneInfo;
   onChanged: () => void;
@@ -316,32 +309,43 @@ export function EngagementActions({
   const [asking, setAsking] = useState<Kind | null>(null);
   const [busy, setBusy] = useState<Kind | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // What a step that succeeds without changing the status wants to tell the person.
+  const [notice, setNotice] = useState<string | null>(null);
   // Between the weeks of an hourly contract that has been paid, "cancel" is "end".
   const endable = !!milestone?.hourly && status === "PENDING_PAYMENT" && milestone.paidCount > 0;
-  const kinds = engagementActionsFor(role, status, revisionCount, { endable });
+  const kinds = engagementActionsFor(role, status, { endable });
   if (kinds.length === 0) return null;
 
   const askingDef = asking ? actionFor(asking, role, status, milestone) : null;
 
-  async function perform(def: ActionDef, text = "") {
+  async function perform(def: ActionDef, text = "", kind?: RevisionKind) {
     if (busy) return;
     setBusy(def.kind);
     setError(null);
-    const { error: failure } = await def.run(engagementId, text);
+    setNotice(null);
+    const { error: failure } = await def.run(engagementId, text, kind);
     setBusy(null);
     if (failure) {
       setError(failure.message ?? "That didn't work. Please try again.");
       // A written reason is worth keeping on screen; a plain confirm is not.
-      if (!def.ask) setAsking(null);
+      if (!def.ask && !def.form) setAsking(null);
       return;
     }
     setAsking(null);
+    // Extra work is not a revision and the work is not sent back, so nothing on
+    // the page changes status: say what happened instead.
+    if (kind === "NEW_SCOPE") {
+      setNotice(
+        "Sent. This is not a revision, and your review time keeps running. The freelancer can send you a new offer for the extra work."
+      );
+    }
     onChanged();
   }
 
   function choose(def: ActionDef) {
     setError(null);
-    if (def.ask || def.confirm) setAsking(def.kind);
+    setNotice(null);
+    if (def.ask || def.confirm || def.form) setAsking(def.kind);
     else void perform(def);
   }
 
@@ -366,10 +370,26 @@ export function EngagementActions({
         })}
       </div>
 
-      {error && !askingDef?.ask && (
+      {error && !askingDef?.ask && !askingDef?.form && (
         <p role="alert" className="mt-2 text-xs text-error-600">
           {error}
         </p>
+      )}
+
+      {notice && (
+        <p role="status" className="mt-2 text-xs text-kampmax-text-secondary">
+          {notice}
+        </p>
+      )}
+
+      {askingDef?.form === "revision" && (
+        <RequestChangesDialog
+          revisions={revisions}
+          busy={busy === askingDef.kind}
+          error={error}
+          onSubmit={(kind, text) => void perform(askingDef, text, kind)}
+          onClose={() => setAsking(null)}
+        />
       )}
 
       {askingDef?.ask && (

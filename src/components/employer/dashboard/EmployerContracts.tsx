@@ -7,6 +7,7 @@ import { EngagementActions } from "@/components/engagements/EngagementActions";
 import { EngagementMilestones } from "@/components/engagements/EngagementMilestones";
 import { HourlyTimesheet } from "@/components/engagements/HourlyTimesheet";
 import { EngagementNotices } from "@/components/engagements/EngagementNotices";
+import { EngagementRevisions } from "@/components/engagements/EngagementRevisions";
 import { contractPriceLabel, describeCurrentMilestone } from "@/lib/engagement-milestones";
 import { dashboardKeys } from "@/lib/query-keys";
 import { useEmployerContracts } from "@/hooks/use-employer-dashboard";
@@ -79,6 +80,11 @@ export function EmployerContracts() {
 
                 <EngagementMilestones milestones={contract.engagement.milestones} />
                 <EngagementNotices engagement={contract.engagement} role="employer" />
+                <EngagementRevisions
+                  revisions={contract.engagement.revisions}
+                  status={contract.engagementStatus}
+                  role="employer"
+                />
                 {contract.engagement.paymentType === "HOURLY" && (
                   <HourlyTimesheet
                     engagementId={contract.id}
@@ -91,7 +97,7 @@ export function EmployerContracts() {
                   engagementId={contract.id}
                   status={contract.engagementStatus}
                   role="employer"
-                  revisionCount={contract.engagement.revisionCount}
+                  revisions={contract.engagement.revisions}
                   milestone={describeCurrentMilestone(contract.engagement)}
                   onChanged={refresh}
                 />

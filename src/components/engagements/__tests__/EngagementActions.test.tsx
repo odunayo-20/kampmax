@@ -16,6 +16,7 @@ const jobs = vi.hoisted(() => ({
 vi.mock("@/services/jobs", () => jobs);
 
 import { EngagementActions, engagementActionsFor } from "../EngagementActions";
+import type { Revisions } from "@/lib/revisions";
 import { EngagementNotices } from "../EngagementNotices";
 
 const ok = { engagement: null, error: null };
@@ -25,9 +26,20 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+const fresh: Revisions = { allowed: 3, used: 0, remaining: 3, requests: [] };
+
 function renderActions(props: Partial<React.ComponentProps<typeof EngagementActions>> = {}) {
   const onChanged = vi.fn();
-  render(<EngagementActions engagementId="e1" status="SUBMITTED" role="employer" onChanged={onChanged} {...props} />);
+  render(
+    <EngagementActions
+      engagementId="e1"
+      status="SUBMITTED"
+      role="employer"
+      revisions={fresh}
+      onChanged={onChanged}
+      {...props}
+    />
+  );
   return { onChanged };
 }
 
@@ -44,7 +56,7 @@ describe("asking for a written reason", () => {
     fireEvent.click(send);
 
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
-    expect(jobs.requestEngagementRevision).toHaveBeenCalledWith("e1", "Fix the footer");
+    expect(jobs.requestEngagementRevision).toHaveBeenCalledWith("e1", "Fix the footer", "CHANGES");
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
@@ -404,13 +416,144 @@ describe("an hourly contract", () => {
 
   it("offers no 'end' while a week is funded or under way: it must be settled first", () => {
     for (const status of ["FUNDED", "IN_PROGRESS", "SUBMITTED"] as const) {
-      expect(engagementActionsFor("employer", status, 0, { endable: false })).not.toContain("end");
+      expect(engagementActionsFor("employer", status, { endable: false })).not.toContain("end");
     }
   });
 
   it("swaps cancel for end only where the caller says the contract can be ended", () => {
-    expect(engagementActionsFor("employer", "PENDING_PAYMENT", 0, { endable: true })).toEqual(["fund", "end"]);
-    expect(engagementActionsFor("freelancer", "PENDING_PAYMENT", 0, { endable: true })).toEqual(["end"]);
-    expect(engagementActionsFor("employer", "PENDING_PAYMENT", 0)).toEqual(["fund", "cancel"]);
+    expect(engagementActionsFor("employer", "PENDING_PAYMENT", { endable: true })).toEqual(["fund", "end"]);
+    expect(engagementActionsFor("freelancer", "PENDING_PAYMENT", { endable: true })).toEqual(["end"]);
+    expect(engagementActionsFor("employer", "PENDING_PAYMENT")).toEqual(["fund", "cancel"]);
+  });
+});
+
+describe("responding to submitted work", () => {
+  const used = (n: number): Revisions => ({ allowed: 3, used: n, remaining: 3 - n, requests: [] });
+  const open = () => fireEvent.click(screen.getByRole("button", { name: "Request changes" }));
+
+  it("sends an ordinary change as CHANGES, and a mistake report as FIX", async () => {
+    const { onChanged } = renderActions();
+    open();
+    fireEvent.click(screen.getByRole("radio", { name: /A mistake or something missing/ }));
+    fireEvent.change(screen.getByLabelText("What is wrong or missing?"), { target: { value: "The form does not send" } });
+    fireEvent.click(screen.getByRole("button", { name: "Report it" }));
+
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+    expect(jobs.requestEngagementRevision).toHaveBeenCalledWith("e1", "The form does not send", "FIX");
+  });
+
+  it("keeps offering it once every revision is used, because a mistake can still be reported", () => {
+    renderActions({ revisions: used(3) });
+    expect(screen.getByRole("button", { name: "Request changes" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Approve & release payment" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Report a problem" })).not.toBeNull();
+  });
+
+  it("closes ordinary changes in the form once every revision is used", () => {
+    renderActions({ revisions: used(3) });
+    open();
+    expect((screen.getByRole("radio", { name: /A change to the work/ }) as HTMLInputElement).disabled).toBe(true);
+    expect(screen.getByRole("link", { name: "Contact support" })).not.toBeNull();
+  });
+
+  it("says extra work was sent, and that it is not a revision, without pretending anything else changed", async () => {
+    const { onChanged } = renderActions();
+    open();
+    fireEvent.click(screen.getByRole("radio", { name: /Something new/ }));
+    fireEvent.change(screen.getByLabelText("What would you like added?"), { target: { value: "A blog section" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ask for extra work" }));
+
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+    expect(jobs.requestEngagementRevision).toHaveBeenCalledWith("e1", "A blog section", "NEW_SCOPE");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("status").textContent).toContain("This is not a revision");
+    expect(screen.getByRole("status").textContent).toContain("review time keeps running");
+  });
+
+  it("does not say that about a request that did send the work back", async () => {
+    const { onChanged } = renderActions();
+    open();
+    fireEvent.change(screen.getByLabelText("What needs to change?"), { target: { value: "Make it bigger" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send request" }));
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("keeps the form open with the backend's refusal, so the note is not lost", async () => {
+    jobs.requestEngagementRevision.mockResolvedValue({
+      engagement: null,
+      error: { message: "All 3 revisions have been used." },
+    });
+    const { onChanged } = renderActions();
+    open();
+    fireEvent.change(screen.getByLabelText("What needs to change?"), { target: { value: "Make it bigger" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send request" }));
+
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("All 3 revisions have been used."));
+    expect(onChanged).not.toHaveBeenCalled();
+    expect((screen.getByLabelText("What needs to change?") as HTMLTextAreaElement).value).toBe("Make it bigger");
+  });
+
+  it("offers the freelancer no way to respond to their own submission", () => {
+    renderActions({ role: "freelancer" });
+    expect(screen.queryByRole("button", { name: "Request changes" })).toBeNull();
+  });
+
+  it("offers a dispute to both sides when the revisions are used, and for the freelancer when work comes back", () => {
+    expect(engagementActionsFor("employer", "SUBMITTED")).toContain("dispute");
+    expect(engagementActionsFor("freelancer", "SUBMITTED")).toContain("dispute");
+    expect(engagementActionsFor("employer", "REVISION_REQUESTED")).toContain("dispute");
+    expect(engagementActionsFor("freelancer", "REVISION_REQUESTED")).toContain("dispute");
+  });
+});
+
+describe("EngagementNotices after a response to delivered work", () => {
+  const base = {
+    revisionNote: "The form does not send",
+    cancellationReason: null,
+    dispute: null,
+    autoReleaseAt: null,
+    autoReleasedAt: null,
+    status: "REVISION_REQUESTED" as const,
+  };
+  const request = (kind: "CHANGES" | "FIX" | "NEW_SCOPE") => ({
+    id: kind,
+    kind,
+    counted: kind === "CHANGES",
+    note: "x",
+    createdAt: "2026-11-04T10:00:00.000Z",
+  });
+
+  it("tells the freelancer a mistake report did not use a revision", () => {
+    render(
+      <EngagementNotices
+        role="freelancer"
+        engagement={{ ...base, revisions: { allowed: 3, used: 1, remaining: 2, requests: [request("FIX")] } }}
+      />
+    );
+    expect(screen.getByText("The client reported a mistake or something missing")).not.toBeNull();
+    expect(screen.getByText("This did not use up a revision.")).not.toBeNull();
+  });
+
+  it("says which revision a change was, from either side", () => {
+    const revisions = { allowed: 3, used: 2, remaining: 1, requests: [request("CHANGES")] };
+    const { unmount } = render(<EngagementNotices role="freelancer" engagement={{ ...base, revisions }} />);
+    expect(screen.getByText("The client asked for changes (revision 2 of 3)")).not.toBeNull();
+    unmount();
+    render(<EngagementNotices role="employer" engagement={{ ...base, revisions }} />);
+    expect(screen.getByText("You asked for changes (revision 2 of 3)")).not.toBeNull();
+  });
+
+  it("is not misled by a later request for extra work, which did not send the work back", () => {
+    render(
+      <EngagementNotices
+        role="freelancer"
+        engagement={{
+          ...base,
+          revisions: { allowed: 3, used: 1, remaining: 2, requests: [request("CHANGES"), request("NEW_SCOPE")] },
+        }}
+      />
+    );
+    expect(screen.getByText("The client asked for changes (revision 1 of 3)")).not.toBeNull();
   });
 });

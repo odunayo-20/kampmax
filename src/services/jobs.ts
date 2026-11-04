@@ -44,6 +44,7 @@
 
 import { apiClient } from "@/lib/api-client";
 import type { ApiError } from "@/lib/api-client";
+import type { RevisionKind, Revisions } from "@/lib/revisions";
 
 // ── Shared paginated result ──────────────────────────────────
 
@@ -324,6 +325,11 @@ export interface Engagement {
   /** The employer's latest change request; set while REVISION_REQUESTED. */
   revisionNote: string | null;
   revisionCount: number;
+  /**
+   * The revisions on the current delivery: how many are allowed, used and left,
+   * and what the client asked for. The backend counts; this is display only.
+   */
+  revisions: Revisions;
   /** Present once a dispute was opened — still open until `resolvedAt` is set. */
   dispute: EngagementDispute | null;
   createdAt: string;
@@ -709,16 +715,19 @@ export async function completeEngagement(id: string): Promise<{
 }
 
 /**
- * Send submitted work back for changes (employer).
+ * Respond to submitted work (employer): ask for a change (uses a revision),
+ * report a mistake or missing part (does not), or ask for extra work (not a
+ * revision, and the work is not sent back). The backend decides what counts.
  * Endpoint: POST /engagements/:id/request-revision
  */
 export async function requestEngagementRevision(
   id: string,
-  note: string
+  note: string,
+  kind: RevisionKind = "CHANGES"
 ): Promise<{ engagement: Engagement | null; error: ApiError | null }> {
-  const { data, error } = await apiClient.post<{ note: string }, Engagement>(
+  const { data, error } = await apiClient.post<{ note: string; kind: RevisionKind }, Engagement>(
     `/engagements/${id}/request-revision`,
-    { note }
+    { note, kind }
   );
   if (error) return { engagement: null, error };
   return { engagement: data, error: null };

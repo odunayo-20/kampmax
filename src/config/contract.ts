@@ -28,13 +28,6 @@ export const CONTRACT_STATUS_META: Record<
   DISPUTED: { label: "Disputed", icon: "alert" },
 };
 
-/**
- * How many times an employer can send submitted work back. Mirrors the
- * backend's MAX_REVISIONS, which is what actually enforces it — this only
- * lets the UI stop offering the button.
- */
-export const MAX_REVISIONS = 3;
-
 // ── Milestone status metadata ───────────────────────────────
 
 export const MILESTONE_STATUS_META: Record<

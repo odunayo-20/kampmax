@@ -10,7 +10,9 @@ type Role = "employer" | "freelancer";
 export type EngagementNoticeData = Pick<
   Engagement,
   "status" | "revisionNote" | "cancellationReason" | "dispute" | "autoReleaseAt" | "autoReleasedAt"
->;
+> &
+  // Only the request-changes notice reads this, and a contract always carries it.
+  Partial<Pick<Engagement, "revisions">>;
 
 const TONES = {
   warning: "border-accent-100 bg-accent-50 text-accent-700",
@@ -49,17 +51,21 @@ const PARTY_LABEL = { EMPLOYER: "The client", FREELANCER: "The freelancer" } as 
  * nothing when there is nothing to explain.
  */
 export function EngagementNotices({ engagement, role }: { engagement: EngagementNoticeData; role: Role }) {
-  const { status, revisionNote, cancellationReason, dispute, autoReleaseAt, autoReleasedAt } = engagement;
+  const { status, revisionNote, cancellationReason, dispute, autoReleaseAt, autoReleasedAt, revisions } = engagement;
   const me = role === "employer" ? "EMPLOYER" : "FREELANCER";
 
   if (status === "REVISION_REQUESTED" && revisionNote) {
+    // What kind of request sent it back decides whether it used a revision.
+    const latest = [...(revisions?.requests ?? [])].reverse().find((r) => r.kind !== "NEW_SCOPE");
+    const fix = latest?.kind === "FIX";
+    const who = role === "freelancer" ? "The client" : "You";
+    const title = fix
+      ? `${who} reported a mistake or something missing`
+      : `${who} asked for changes${latest && revisions ? ` (revision ${revisions.used} of ${revisions.allowed})` : ""}`;
     return (
-      <Notice
-        tone="warning"
-        icon={RotateCcw}
-        title={role === "freelancer" ? "The client asked for changes" : "You asked for changes"}
-      >
+      <Notice tone="warning" icon={RotateCcw} title={title}>
         “{revisionNote}”
+        {fix && <span className="mt-1 block">This did not use up a revision.</span>}
       </Notice>
     );
   }
