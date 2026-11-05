@@ -31,6 +31,7 @@ import {
   Fingerprint,
   Flag,
   Headphones,
+  Mail,
   Wrench,
   Newspaper,
 } from "lucide-react";
@@ -125,6 +126,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       { key: "safety", href: "/admin/safety", label: "Trust & Safety", icon: ShieldAlert },
       { key: "disputes", href: "/admin/disputes", label: "Disputes", icon: Scale },
       { key: "support", href: "/admin/support", label: "Support", icon: Headphones },
+      { key: "contactMessages", href: "/admin/contact-messages", label: "Contact messages", icon: Mail },
     ],
   },
   {

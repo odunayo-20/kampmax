@@ -283,6 +283,13 @@ import { createApiJobModerationService } from "./job-moderation.api";
 export const jobModerationService: AdminJobModerationService =
   createApiJobModerationService();
 
+import type { AdminContactMessagesService } from "./contact-messages.service";
+import { createApiContactMessagesService } from "./contact-messages.api";
+
+/** Messages sent through the public contact form. */
+export const contactMessagesService: AdminContactMessagesService =
+  createApiContactMessagesService();
+
 import {
   AdminAnalyticsService,
 } from "./analytics.service";

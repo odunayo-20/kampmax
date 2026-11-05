@@ -41,6 +41,7 @@ export type AdminNavItemKey =
   | "verifications"
   | "security"
   | "support"
+  | "contactMessages"
   | "eventOrganizers"
   | "blog";
 

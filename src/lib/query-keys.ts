@@ -473,6 +473,17 @@ export const adminKeys = {
     detail: (id: string) => ["admin", "job-reports", "detail", id] as const,
     application: (id: string) => ["admin", "job-reports", "application", id] as const,
   } as const,
+  /** Messages sent through the public contact form. */
+  contactMessages: {
+    all: ["admin", "contact-messages"] as const,
+    list: (query: {
+      status?: string;
+      inquiryType?: string;
+      search?: string;
+      page?: number;
+      pageSize?: number;
+    }) => ["admin", "contact-messages", "list", query] as const,
+  } as const,
   /**
    * Review management key factory (Module 41). Read-only oversight console
    * built on the real review stores. Keys are campus-scoped like the other
