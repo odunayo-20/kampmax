@@ -5,9 +5,11 @@ import type { AdminContactMessage } from "@/types/contact-messages";
 
 const handledMutate = vi.fn();
 const deleteMutate = vi.fn();
+const replyMutate = vi.fn();
 vi.mock("@/hooks/admin/use-admin-contact-messages", () => ({
   useSetContactHandled: () => ({ mutate: handledMutate, isPending: false }),
   useDeleteContactMessage: () => ({ mutate: deleteMutate, isPending: false }),
+  useReplyContactMessage: () => ({ mutate: replyMutate, isPending: false }),
 }));
 
 import { ContactMessageDialog, replyHref } from "../ContactMessageDialog";
@@ -32,6 +34,7 @@ const message = (over: Partial<AdminContactMessage> = {}): AdminContactMessage =
 beforeEach(() => {
   handledMutate.mockReset();
   deleteMutate.mockReset();
+  replyMutate.mockReset();
 });
 afterEach(cleanup);
 
@@ -61,6 +64,32 @@ describe("ContactMessageDialog", () => {
     const href = screen.getByRole("link", { name: /reply by email/i }).getAttribute("href");
     expect(href).toBe(replyHref(message()));
     expect(href).toMatch(/^mailto:ada@x\.test\?subject=Re%3A/);
+  });
+
+  it("can compose and send a reply directly through the dashboard", () => {
+    replyMutate.mockImplementation((_vars, opts: { onSuccess: () => void }) => opts.onSuccess());
+    render(<ContactMessageDialog message={message()} onClose={vi.fn()} />);
+
+    // Click "Reply" button to open the composer
+    fireEvent.click(screen.getByRole("button", { name: /^reply$/i }));
+
+    expect(screen.getByText(/reply via dashboard/i)).toBeTruthy();
+    expect(screen.getByLabelText(/subject/i)).toBeTruthy();
+
+    const textarea = screen.getByPlaceholderText(/type your response/i);
+    fireEvent.change(textarea, { target: { value: "Hello Ada, we would love to have you!" } });
+
+    // Click "Send reply"
+    fireEvent.click(screen.getByRole("button", { name: /send reply/i }));
+
+    expect(replyMutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "m1",
+        message: "Hello Ada, we would love to have you!",
+      }),
+      expect.anything()
+    );
+    expect(screen.getByText(/reply sent to ada@x\.test/i)).toBeTruthy();
   });
 
   it("marks a waiting message handled, then closes", () => {

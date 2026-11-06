@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, Loader2, Mail, RotateCcw, Trash2, X } from "lucide-react";
+import { CheckCircle2, Loader2, Mail, RotateCcw, Send, Trash2, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import {
   useDeleteContactMessage,
+  useReplyContactMessage,
   useSetContactHandled,
 } from "@/hooks/admin/use-admin-contact-messages";
-import { formatDate, formatTime } from "@/lib/utils";
+import { cn, formatDate, formatTime } from "@/lib/utils";
 import type { AdminContactMessage } from "@/types/contact-messages";
 
 /** A reply goes from the admin's own mail app; the subject is filled in, nothing else is sent from here. */
@@ -39,13 +40,24 @@ export function ContactMessageDialog({
 }) {
   const setHandled = useSetContactHandled();
   const remove = useDeleteContactMessage();
+  const reply = useReplyContactMessage();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const busy = setHandled.isPending || remove.isPending;
+  const [isReplying, setIsReplying] = useState(false);
+  const [replySubject, setReplySubject] = useState("");
+  const [replyBody, setReplyBody] = useState("");
+  const [replySuccess, setReplySuccess] = useState(false);
+  const busy = setHandled.isPending || remove.isPending || reply.isPending;
 
   useEffect(() => {
     setConfirmDelete(false);
     setError(null);
+    setIsReplying(false);
+    setReplyBody("");
+    setReplySuccess(false);
+    if (message) {
+      setReplySubject(`Re: your message to Kampmax (${message.inquiryLabel})`);
+    }
   }, [message?.id]);
 
   useEffect(() => {
@@ -131,6 +143,96 @@ export function ContactMessageDialog({
             {message.message}
           </p>
 
+          {isReplying && (
+            <div className="mt-4 rounded-xl border border-kampmax-navy/20 bg-kampmax-navy/[0.03] p-4 text-left">
+              <div className="flex items-center justify-between border-b border-kampmax-border pb-2">
+                <span className="text-xs font-semibold text-kampmax-text">Reply via Dashboard</span>
+                <span className="text-xs text-kampmax-text-secondary truncate max-w-[220px]">
+                  To: {message.name} &lt;{message.email}&gt;
+                </span>
+              </div>
+              <div className="mt-3 flex flex-col gap-2.5">
+                <div>
+                  <label htmlFor="reply-subject" className="block text-[11px] font-medium text-kampmax-text-secondary">
+                    Subject
+                  </label>
+                  <input
+                    id="reply-subject"
+                    type="text"
+                    value={replySubject}
+                    onChange={(e) => setReplySubject(e.target.value)}
+                    disabled={busy}
+                    className="mt-1 h-8 w-full rounded-md border border-kampmax-border bg-white px-2.5 text-xs text-kampmax-text outline-none focus:border-kampmax-navy focus:ring-1 focus:ring-kampmax-navy"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="reply-body" className="block text-[11px] font-medium text-kampmax-text-secondary">
+                    Your Reply
+                  </label>
+                  <textarea
+                    id="reply-body"
+                    rows={4}
+                    value={replyBody}
+                    onChange={(e) => setReplyBody(e.target.value)}
+                    disabled={busy}
+                    placeholder="Type your response to this inquiry..."
+                    className="mt-1 w-full rounded-md border border-kampmax-border bg-white p-2.5 text-xs text-kampmax-text outline-none focus:border-kampmax-navy focus:ring-1 focus:ring-kampmax-navy"
+                  />
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setIsReplying(false)}
+                    className="h-8 rounded-md px-2.5 text-xs font-medium text-kampmax-text-secondary hover:bg-kampmax-muted"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy || !replyBody.trim()}
+                    onClick={() => {
+                      setError(null);
+                      reply.mutate(
+                        {
+                          id: message.id,
+                          subject: replySubject.trim() || undefined,
+                          message: replyBody.trim(),
+                        },
+                        {
+                          onSuccess: () => {
+                            setIsReplying(false);
+                            setReplySuccess(true);
+                          },
+                          onError: fail,
+                        }
+                      );
+                    }}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-md bg-kampmax-navy px-3 text-xs font-medium text-white hover:bg-kampmax-navy-light disabled:opacity-50"
+                  >
+                    {reply.isPending ? (
+                      <>
+                        <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                        <span>Sending...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-3 w-3" aria-hidden />
+                        <span>Send reply</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {replySuccess && (
+            <p role="status" className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+              Reply sent to {message.email}! The inquiry has been marked as handled.
+            </p>
+          )}
+
           {!message.emailed && (
             <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
               The team inbox was never emailed about this one, so it only exists here.
@@ -154,9 +256,27 @@ export function ContactMessageDialog({
               Delete
             </button>
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setIsReplying((prev) => !prev);
+                  setReplySuccess(false);
+                }}
+                className={cn(
+                  "inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium transition-colors",
+                  isReplying
+                    ? "border-kampmax-navy bg-kampmax-navy/10 text-kampmax-navy"
+                    : "border-kampmax-border bg-white text-kampmax-text hover:bg-kampmax-muted/60"
+                )}
+              >
+                <Send className="h-3.5 w-3.5" aria-hidden />
+                Reply
+              </button>
               <a
                 href={replyHref(message)}
                 className="inline-flex h-9 items-center gap-1.5 rounded-md border border-kampmax-border bg-white px-3 text-sm font-medium text-kampmax-text hover:bg-kampmax-muted/60"
+                title="Open in your default mail app"
               >
                 <Mail className="h-3.5 w-3.5" aria-hidden />
                 Reply by email

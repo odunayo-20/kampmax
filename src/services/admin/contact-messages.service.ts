@@ -34,6 +34,11 @@ export interface AdminContactMessagesService {
   list(query?: ContactMessagesQuery): Promise<ContactMessagesPage>;
   /** PATCH /admin/contact-messages/:id/handled */
   setHandled(id: string, handled: boolean): Promise<AdminContactMessage>;
+  /** POST /admin/contact-messages/:id/reply: send reply email directly to sender. */
+  reply(
+    id: string,
+    payload: { subject?: string; message: string }
+  ): Promise<AdminContactMessage>;
   /** DELETE /admin/contact-messages/:id: for a deletion request or spam. */
   remove(id: string): Promise<void>;
 }

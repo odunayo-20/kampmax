@@ -43,3 +43,20 @@ export function useDeleteContactMessage() {
     onSuccess: () => void refresh(),
   });
 }
+
+/** Reply to a contact message by email directly from the admin dashboard. */
+export function useReplyContactMessage() {
+  const refresh = useRefreshMessages();
+  return useMutation({
+    mutationFn: ({
+      id,
+      subject,
+      message,
+    }: {
+      id: string;
+      subject?: string;
+      message: string;
+    }) => contactMessagesService.reply(id, { subject, message }),
+    onSuccess: () => void refresh(),
+  });
+}

@@ -65,6 +65,15 @@ export function createApiContactMessagesService(): AdminContactMessagesService {
       return data;
     },
 
+    async reply(id, payload) {
+      const { data, error } = await apiClient.post<
+        { subject?: string; message: string },
+        AdminContactMessage
+      >(`/admin/contact-messages/${encodeURIComponent(id)}/reply`, payload);
+      if (error) fail(error, "Couldn't send the reply.");
+      return data;
+    },
+
     async remove(id) {
       const { error } = await apiClient.delete(
         `/admin/contact-messages/${encodeURIComponent(id)}`
