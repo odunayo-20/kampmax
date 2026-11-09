@@ -16,6 +16,7 @@ export type AdminNavItemKey =
   | "campusPlaces"
   | "accommodationAgents"
   | "accommodationListings"
+  | "accommodationPayments"
   | "vendors"
   | "products"
   | "marketplace"
@@ -95,6 +96,7 @@ const ACTION_ROLES: Record<string, AdminRole[]> = {
   // backend accommodation.agents.review and accommodation.listings.moderate
   "accommodation:reviewAgents": ["SUPER_ADMIN", "ADMIN"],
   "accommodation:moderateListings": ["SUPER_ADMIN", "ADMIN"],
+  "accommodation:managePayments": ["SUPER_ADMIN", "ADMIN"],
   // backend blog.* permissions (see common/rbac/permissions.ts)
   "blog:create": ["SUPER_ADMIN", "ADMIN"],
   "blog:update": ["SUPER_ADMIN", "ADMIN"],
@@ -109,6 +111,7 @@ const ACTION_SLUGS: Record<string, string> = {
   "categories:manage": "taxonomy.manage",
   "accommodation:reviewAgents": "accommodation.agents.review",
   "accommodation:moderateListings": "accommodation.listings.moderate",
+  "accommodation:managePayments": "accommodation.payments.manage",
   "blog:create": "blog.create",
   "blog:update": "blog.update",
   "blog:publish": "blog.publish",

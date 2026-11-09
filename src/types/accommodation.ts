@@ -186,3 +186,66 @@ export interface AdminListingDetail {
   createdAt: string;
   updatedAt: string;
 }
+
+// ---------- payments ----------
+
+export type ListingPaymentStatus = "PENDING" | "SUCCESS" | "FAILED" | "REFUND_PENDING" | "REFUNDED";
+
+export const PAYMENT_STATUS_LABELS: Record<ListingPaymentStatus, string> = {
+  PENDING: "Waiting",
+  SUCCESS: "Paid",
+  FAILED: "Failed",
+  REFUND_PENDING: "Needs refund",
+  REFUNDED: "Refunded",
+};
+
+export const PAYMENT_TYPE_LABELS: Record<string, string> = {
+  INITIAL: "First payment",
+  RENEWAL: "Automatic renewal",
+  RECOVERY: "Manual renewal",
+};
+
+export interface AdminPayment {
+  id: string;
+  subscriptionId: string;
+  listingId: string;
+  agentId: string;
+  agentName: string | null;
+  listingTitle: string | null;
+  reference: string;
+  /** The payment gateway's own reference, for support and reconciliation. */
+  gatewayReference: string | null;
+  amount: number;
+  currency: string;
+  paymentType: string;
+  billingCycle: number;
+  status: ListingPaymentStatus;
+  paidAt: string | null;
+  failureReason: string | null;
+  refundReason: string | null;
+  refundedAt: string | null;
+  createdAt: string;
+}
+
+/** Where money or renewals might be stuck. The sweeps fix most of it by themselves. */
+export interface PaymentReconciliation {
+  generatedAt: string;
+  payments: {
+    pendingOverTenMinutes: number;
+    oldestPendingSince: string | null;
+    refundsOwed: { count: number; amount: number };
+  };
+  subscriptions: {
+    renewalsStuckOverAnHour: number;
+    renewalsOverdueOverAnHour: number;
+    pastDue: number;
+  };
+}
+
+/** A file the browser can offer for saving. */
+export type DownloadedFile = AgentDocumentFile;
+
+/** Nothing was charged for these, so there is nothing to send back. */
+export function isRefundable(p: Pick<AdminPayment, "amount" | "gatewayReference">): boolean {
+  return p.amount > 0 && Boolean(p.gatewayReference) && p.gatewayReference !== "FREE";
+}

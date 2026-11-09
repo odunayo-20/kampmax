@@ -3,12 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const getMock = vi.hoisted(() => vi.fn());
 const patchMock = vi.hoisted(() => vi.fn());
 const getBlobMock = vi.hoisted(() => vi.fn());
+const postMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/api-client", () => ({
-  apiClient: { get: getMock, patch: patchMock, getBlob: getBlobMock },
+  apiClient: { get: getMock, patch: patchMock, post: postMock, getBlob: getBlobMock },
 }));
 
 import { canAdminPerform } from "@/lib/admin/permissions";
-import { missingForApproval, type AgentDocument } from "@/types/accommodation";
+import { isRefundable, missingForApproval, type AgentDocument } from "@/types/accommodation";
 import { createApiAccommodationService } from "../accommodation.api";
 
 const service = createApiAccommodationService();
@@ -24,6 +25,7 @@ beforeEach(() => {
   getMock.mockReset();
   patchMock.mockReset();
   getBlobMock.mockReset();
+  postMock.mockReset();
 });
 
 describe("agents: listing", () => {
@@ -254,5 +256,123 @@ describe("who sees the decision buttons", () => {
     expect(canAdminPerform({ role: "ADMIN" }, "accommodation", "moderateListings")).toBe(true);
     expect(canAdminPerform({ role: "CAMPUS_ADMIN" }, "accommodation", "reviewAgents")).toBe(false);
     expect(canAdminPerform({ role: "CAMPUS_ADMIN" }, "accommodation", "moderateListings")).toBe(false);
+  });
+});
+
+describe("payments", () => {
+  const page = {
+    items: [{ id: "p1" }],
+    meta: { total: 31, page: 2, limit: 15, totalPages: 3 },
+    counts: { REFUND_PENDING: 2, SUCCESS: 40, FAILED: 5 },
+  };
+
+  it("lists with no query string by default, keeping the per-status counts", async () => {
+    getMock.mockResolvedValue(ok(page));
+    const result = await service.listPayments();
+    expect(getMock).toHaveBeenCalledWith(`${BASE}/payments`);
+    expect(result).toEqual({
+      items: [{ id: "p1" }],
+      page: 2,
+      pageSize: 15,
+      total: 31,
+      totalPages: 3,
+      counts: { REFUND_PENDING: 2, SUCCESS: 40, FAILED: 5 },
+    });
+  });
+
+  it("filters by status and names the page size 'limit'", async () => {
+    getMock.mockResolvedValue(ok(page));
+    await service.listPayments({ status: "REFUND_PENDING", page: 2, pageSize: 15 });
+    expect(getMock).toHaveBeenCalledWith(`${BASE}/payments?status=REFUND_PENDING&page=2&limit=15`);
+  });
+
+  it("marks a payment for refund with the reason, and returns nothing", async () => {
+    patchMock.mockResolvedValue(ok({ id: "p1", status: "REFUND_PENDING" }));
+    await expect(service.flagPaymentForRefund("p/1", "Charged twice")).resolves.toBeUndefined();
+    expect(patchMock).toHaveBeenCalledWith(`${BASE}/payments/p%2F1/flag-refund`, { reason: "Charged twice" });
+  });
+
+  it("sends a refund as a POST with an empty body", async () => {
+    postMock.mockResolvedValue(ok({ id: "p1", status: "REFUNDED" }));
+    await expect(service.refundPayment("p1")).resolves.toBeUndefined();
+    expect(postMock).toHaveBeenCalledWith(`${BASE}/payments/p1/refund`, {});
+  });
+
+  it("explains a refusal in the backend's words, and when the gateway is down", async () => {
+    postMock.mockResolvedValue(failure(502, "The payment gateway did not accept the refund. Try again shortly."));
+    await expect(service.refundPayment("p1")).rejects.toThrow("The payment gateway did not accept the refund. Try again shortly.");
+    postMock.mockResolvedValue(failure(400, "Only a payment waiting for refund can be refunded."));
+    await expect(service.refundPayment("p1")).rejects.toThrow("Only a payment waiting for refund can be refunded.");
+  });
+
+  it("falls back to a plain sentence for a refund with no explanation", async () => {
+    postMock.mockResolvedValue(failure(500, ""));
+    await expect(service.refundPayment("p1")).rejects.toThrow("Couldn't send the refund.");
+  });
+
+  it("maps the common failures to plain sentences", async () => {
+    getMock.mockResolvedValue(failure(403));
+    await expect(service.listPayments()).rejects.toThrow("You don't have permission to do that.");
+    getMock.mockResolvedValue(failure(401));
+    await expect(service.paymentReconciliation()).rejects.toThrow("You're signed out. Sign in again to continue.");
+  });
+
+  it("loads the reconciliation report", async () => {
+    const report = { generatedAt: "2026-12-01T00:00:00Z", payments: {}, subscriptions: {} };
+    getMock.mockResolvedValue(ok(report));
+    expect(await service.paymentReconciliation()).toBe(report);
+    expect(getMock).toHaveBeenCalledWith(`${BASE}/payments/reconciliation`);
+  });
+
+  describe("CSV export", () => {
+    const file = { blob: new Blob(["csv"], { type: "text/csv" }), filename: "accommodation-payments.csv", error: null };
+
+    it("asks for the default range when no dates are chosen", async () => {
+      getBlobMock.mockResolvedValue(file);
+      const result = await service.exportPayments();
+      expect(getBlobMock).toHaveBeenCalledWith(`${BASE}/payments/export`);
+      expect(result.filename).toBe("accommodation-payments.csv");
+      expect(result.blob).toBe(file.blob);
+    });
+
+    it("includes the last day chosen by sending the day after as the exclusive end", async () => {
+      getBlobMock.mockResolvedValue(file);
+      await service.exportPayments({ from: "2026-11-01", to: "2026-11-30" });
+      expect(getBlobMock).toHaveBeenCalledWith(`${BASE}/payments/export?from=2026-11-01&to=2026-12-01`);
+    });
+
+    it("rolls the end day over a month and a year correctly", async () => {
+      getBlobMock.mockResolvedValue(file);
+      await service.exportPayments({ to: "2026-12-31" });
+      expect(getBlobMock).toHaveBeenCalledWith(`${BASE}/payments/export?to=2027-01-01`);
+      await service.exportPayments({ to: "2028-02-28" });
+      expect(getBlobMock).toHaveBeenLastCalledWith(`${BASE}/payments/export?to=2028-02-29`);
+    });
+
+    it("leaves out an end date that is not a date", async () => {
+      getBlobMock.mockResolvedValue(file);
+      await service.exportPayments({ from: "2026-11-01", to: "not-a-date" });
+      expect(getBlobMock).toHaveBeenCalledWith(`${BASE}/payments/export?from=2026-11-01`);
+    });
+
+    it("says so plainly when the export is refused, or the range is too big", async () => {
+      getBlobMock.mockResolvedValue({ blob: null, filename: null, error: Object.assign(new Error("Forbidden"), { status: 403 }) });
+      await expect(service.exportPayments()).rejects.toThrow("You don't have permission to do that.");
+      getBlobMock.mockResolvedValue({ blob: null, filename: null, error: Object.assign(new Error("Choose a range of at most 366 days."), { status: 400 }) });
+      await expect(service.exportPayments({ from: "2020-01-01" })).rejects.toThrow("Choose a range of at most 366 days.");
+    });
+  });
+});
+
+describe("isRefundable", () => {
+  it("is true for a real charge with a gateway reference", () => {
+    expect(isRefundable({ amount: 2000, gatewayReference: "12345" })).toBe(true);
+  });
+
+  it("is false when nothing was charged, or there is nothing to refund against", () => {
+    expect(isRefundable({ amount: 0, gatewayReference: "12345" })).toBe(false);
+    expect(isRefundable({ amount: 2000, gatewayReference: "FREE" })).toBe(false);
+    expect(isRefundable({ amount: 2000, gatewayReference: null })).toBe(false);
+    expect(isRefundable({ amount: 2000, gatewayReference: "" })).toBe(false);
   });
 });

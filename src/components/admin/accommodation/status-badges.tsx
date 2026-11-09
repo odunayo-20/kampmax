@@ -3,9 +3,11 @@ import {
   AGENT_STATUS_LABELS,
   LISTING_MODERATION_LABELS,
   LISTING_PUBLICATION_LABELS,
+  PAYMENT_STATUS_LABELS,
   type AccommodationAgentStatus,
   type AgentDocumentStatus,
   type ListingModerationStatus,
+  type ListingPaymentStatus,
   type ListingPublicationStatus,
 } from "@/types/accommodation";
 
@@ -60,4 +62,16 @@ const PUBLICATION_STYLE: Record<ListingPublicationStatus, string> = {
 
 export function PublicationBadge({ status }: { status: ListingPublicationStatus }) {
   return <span className={cn(PILL, PUBLICATION_STYLE[status])}>{LISTING_PUBLICATION_LABELS[status]}</span>;
+}
+
+const PAYMENT_STYLE: Record<ListingPaymentStatus, string> = {
+  PENDING: "bg-amber-50 text-amber-700",
+  SUCCESS: "bg-emerald-50 text-emerald-700",
+  FAILED: "bg-red-50 text-red-700",
+  REFUND_PENDING: "bg-orange-50 text-orange-700",
+  REFUNDED: "bg-sky-50 text-sky-700",
+};
+
+export function PaymentStatusBadge({ status }: { status: ListingPaymentStatus }) {
+  return <span className={cn(PILL, PAYMENT_STYLE[status])}>{PAYMENT_STATUS_LABELS[status]}</span>;
 }

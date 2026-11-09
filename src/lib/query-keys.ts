@@ -501,6 +501,12 @@ export const adminKeys = {
         ["admin", "accommodation", "listings", "list", query] as const,
       detail: (id: string) => ["admin", "accommodation", "listings", "detail", id] as const,
     } as const,
+    payments: {
+      all: ["admin", "accommodation", "payments"] as const,
+      list: (query: { status?: string; page?: number; pageSize?: number }) =>
+        ["admin", "accommodation", "payments", "list", query] as const,
+      reconciliation: ["admin", "accommodation", "payments", "reconciliation"] as const,
+    } as const,
   } as const,
   /** Named places on campuses and the suggestions students send in. */
   campusPlaces: {

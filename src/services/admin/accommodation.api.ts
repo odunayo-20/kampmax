@@ -5,13 +5,18 @@ import type {
   AdminAgentListItem,
   AdminListingDetail,
   AdminListingItem,
+  AdminPayment,
+  PaymentReconciliation,
 } from "@/types/accommodation";
 import type {
   AdminAccommodationService,
   AgentsPage,
   AgentsQuery,
   ListingsPage,
+  ExportRange,
   ListingsQuery,
+  PaymentsPage,
+  PaymentsQuery,
 } from "./accommodation.service";
 
 /** Live service over AdminAccommodationController (/accommodation/admin). */
@@ -62,6 +67,34 @@ function listingQuery(query: ListingsQuery): string {
   if (query.status) params.set("status", query.status);
   if (query.page) params.set("page", String(query.page));
   if (query.pageSize) params.set("limit", String(query.pageSize));
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
+}
+
+function paymentQuery(query: PaymentsQuery): string {
+  const params = new URLSearchParams();
+  if (query.status) params.set("status", query.status);
+  if (query.page) params.set("page", String(query.page));
+  if (query.pageSize) params.set("limit", String(query.pageSize));
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
+}
+
+const DAY_MS = 86_400_000;
+
+/**
+ * The export range as the backend wants it: the start of the first day up to (not
+ * including) the day after the last, so the end day the admin picked is included.
+ */
+function exportQuery(range: ExportRange): string {
+  const params = new URLSearchParams();
+  if (range.from) params.set("from", range.from);
+  if (range.to) {
+    const end = new Date(`${range.to}T00:00:00Z`);
+    if (!Number.isNaN(end.getTime())) {
+      params.set("to", new Date(end.getTime() + DAY_MS).toISOString().slice(0, 10));
+    }
+  }
   const qs = params.toString();
   return qs ? `?${qs}` : "";
 }
@@ -152,5 +185,44 @@ export function createApiAccommodationService(): AdminAccommodationService {
     rejectListing: (id, reason) => decide(`${listing(id)}/reject`, { reason }, "Couldn't reject the listing."),
     suspendListing: (id, reason) => decide(`${listing(id)}/suspend`, { reason }, "Couldn't suspend the listing."),
     restoreListing: (id) => decide(`${listing(id)}/restore`, {}, "Couldn't restore the listing."),
+
+    // ---- payments ----
+    async listPayments(query = {}) {
+      const { data, error } = await apiClient.get<{
+        items: AdminPayment[];
+        meta: BackendMeta;
+        counts: PaymentsPage["counts"];
+      }>(`${base}/payments${paymentQuery(query)}`);
+      if (error) fail(error, "Couldn't load the payments.");
+      return { ...paged(data.items, data.meta), counts: data.counts };
+    },
+
+    async flagPaymentForRefund(id, reason) {
+      await decide(
+        `${base}/payments/${encodeURIComponent(id)}/flag-refund`,
+        { reason },
+        "Couldn't mark the payment for refund."
+      );
+    },
+
+    async refundPayment(id) {
+      const { error } = await apiClient.post<Record<string, never>>(
+        `${base}/payments/${encodeURIComponent(id)}/refund`,
+        {}
+      );
+      if (error) fail(error, "Couldn't send the refund.");
+    },
+
+    async paymentReconciliation() {
+      const { data, error } = await apiClient.get<PaymentReconciliation>(`${base}/payments/reconciliation`);
+      if (error) fail(error, "Couldn't load the reconciliation report.");
+      return data;
+    },
+
+    async exportPayments(range = {}) {
+      const { blob, filename, error } = await apiClient.getBlob(`${base}/payments/export${exportQuery(range)}`);
+      if (error || !blob) fail(error ?? (new Error("No file") as ApiError), "Couldn't download the payments.");
+      return { blob, filename };
+    },
   };
 }

@@ -13,7 +13,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminKeys } from "@/lib/query-keys";
 import { accommodationService } from "@/services/admin";
-import type { AgentsQuery, ListingsQuery } from "@/services/admin/accommodation.service";
+import type { AgentsQuery, ListingsQuery, PaymentsQuery } from "@/services/admin/accommodation.service";
 
 // ---------- agents ----------
 
@@ -166,6 +166,43 @@ export function useRestoreListing() {
   const refresh = useRefreshAccommodation();
   return useMutation({
     mutationFn: (id: string) => accommodationService.restoreListing(id),
+    onSuccess: () => void refresh(),
+  });
+}
+
+// ---------- payments ----------
+
+/** `enabled` lets a page skip the request for an admin who may not see payments. */
+export function useAdminPayments(query: PaymentsQuery, enabled = true) {
+  return useQuery({
+    queryKey: adminKeys.accommodation.payments.list(query),
+    queryFn: () => accommodationService.listPayments(query),
+    placeholderData: keepPreviousData,
+    enabled,
+  });
+}
+
+export function usePaymentReconciliation(enabled = true) {
+  return useQuery({
+    queryKey: adminKeys.accommodation.payments.reconciliation,
+    queryFn: () => accommodationService.paymentReconciliation(),
+    enabled,
+  });
+}
+
+export function useFlagPaymentForRefund() {
+  const refresh = useRefreshAccommodation();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      accommodationService.flagPaymentForRefund(id, reason),
+    onSuccess: () => void refresh(),
+  });
+}
+
+export function useRefundPayment() {
+  const refresh = useRefreshAccommodation();
+  return useMutation({
+    mutationFn: (id: string) => accommodationService.refundPayment(id),
     onSuccess: () => void refresh(),
   });
 }

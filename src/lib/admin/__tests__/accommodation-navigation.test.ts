@@ -12,6 +12,7 @@ describe("accommodation in the admin navigation", () => {
     expect(group?.items.map((i) => i.href)).toEqual([
       "/admin/accommodation/agents",
       "/admin/accommodation/listings",
+      "/admin/accommodation/payments",
     ]);
   });
 

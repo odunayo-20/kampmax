@@ -15,8 +15,12 @@ import type {
   AdminAgentListItem,
   AdminListingDetail,
   AdminListingItem,
+  AdminPayment,
   AgentDocumentFile,
+  DownloadedFile,
+  ListingPaymentStatus,
   ListingModerationStatus,
+  PaymentReconciliation,
 } from "@/types/accommodation";
 
 export interface AgentsQuery {
@@ -41,6 +45,23 @@ export interface ListingsQuery {
 export interface ListingsPage extends Paginated<AdminListingItem> {
   /** Listings per moderation status, across all pages. */
   counts: Partial<Record<ListingModerationStatus, number>>;
+}
+
+export interface PaymentsQuery {
+  status?: ListingPaymentStatus;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaymentsPage extends Paginated<AdminPayment> {
+  /** Payments per status, across all pages and whatever the filter. */
+  counts: Partial<Record<ListingPaymentStatus, number>>;
+}
+
+/** Calendar days (YYYY-MM-DD) for the CSV export. The end day is included. */
+export interface ExportRange {
+  from?: string;
+  to?: string;
 }
 
 export interface AdminAccommodationService {
@@ -86,4 +107,16 @@ export interface AdminAccommodationService {
   suspendListing(id: string, reason: string): Promise<AdminListingDetail>;
   /** PATCH …/restore */
   restoreListing(id: string): Promise<AdminListingDetail>;
+
+  // ---- payments ----
+  /** GET /accommodation/admin/payments */
+  listPayments(query?: PaymentsQuery): Promise<PaymentsPage>;
+  /** PATCH …/payments/:id/flag-refund: marks a paid payment as owed back and stops its renewal. */
+  flagPaymentForRefund(id: string, reason: string): Promise<void>;
+  /** POST …/payments/:id/refund: sends the refund to the payment gateway; can be retried if it refuses. */
+  refundPayment(id: string): Promise<void>;
+  /** GET …/payments/reconciliation */
+  paymentReconciliation(): Promise<PaymentReconciliation>;
+  /** GET …/payments/export: CSV of payments created in the range (default: last 30 days). */
+  exportPayments(range?: ExportRange): Promise<DownloadedFile>;
 }
