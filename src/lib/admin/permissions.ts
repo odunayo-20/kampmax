@@ -13,6 +13,7 @@ export type AdminNavItemKey =
   | "dashboard"
   | "users"
   | "campuses"
+  | "campusPlaces"
   | "vendors"
   | "products"
   | "marketplace"

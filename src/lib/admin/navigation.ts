@@ -8,6 +8,7 @@ import {
   CalendarCheck,
   GraduationCap,
   LayoutDashboard,
+  MapPin,
   Megaphone,
   Package,
   PieChart,
@@ -71,6 +72,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         { key: "employers", href: "/admin/employers", label: "Employers", icon: Handshake },
         { key: "verifications", href: "/admin/verifications", label: "Verifications", icon: BadgeCheck },
         { key: "campuses", href: "/admin/campuses", label: "Campuses", icon: Building2 },
+        { key: "campusPlaces", href: "/admin/campus-places", label: "Campus places", icon: MapPin },
       ],
     },
   {

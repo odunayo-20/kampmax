@@ -26,8 +26,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body>
+    // Browser extensions (Grammarly, password managers) add attributes to <html> and
+    // <body> before React loads. That is harmless, so don't report it as a mismatch.
+    <html lang="en" suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <RouteProgress />
         <Providers>{children}</Providers>
       </body>

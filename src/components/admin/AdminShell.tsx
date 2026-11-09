@@ -27,6 +27,7 @@ import type { AdminRole } from "@/types/admin";
 const SEGMENT_TO_KEY: Record<string, AdminNavItemKey> = {
   users: "users",
   campuses: "campuses",
+  "campus-places": "campusPlaces",
   vendors: "vendors",
   marketplace: "marketplace",
   jobs: "jobs",

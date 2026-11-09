@@ -290,6 +290,13 @@ import { createApiContactMessagesService } from "./contact-messages.api";
 export const contactMessagesService: AdminContactMessagesService =
   createApiContactMessagesService();
 
+import type { AdminCampusPlacesService } from "./campus-places.service";
+import { createApiCampusPlacesService } from "./campus-places.api";
+
+/** Named places on campuses (gates, hostels, markets) and students' suggestions. */
+export const campusPlacesService: AdminCampusPlacesService =
+  createApiCampusPlacesService();
+
 import {
   AdminAnalyticsService,
 } from "./analytics.service";
