@@ -476,6 +476,34 @@ export class ApiClient {
     return this.request<R>("PATCH", path, body, options);
   }
 
+  /**
+   * GET a file rather than JSON (a private document, say), with the same sign-in
+   * and token refresh as every other call. A browser <img> or link cannot send the
+   * token, so the file is fetched here and shown from an object URL.
+   */
+  async getBlob(
+    path: string,
+    options: RequestInit = {}
+  ): Promise<{ blob: Blob | null; filename: string | null; error: ApiError | null }> {
+    let response: Response;
+    try {
+      response = await fetchApi(path, { ...options, method: "GET" });
+    } catch (err) {
+      const apiError = new Error(
+        err instanceof Error && err.message ? err.message : "Network request failed"
+      ) as ApiError;
+      apiError.code = "NETWORK_ERROR";
+      return { blob: null, filename: null, error: apiError };
+    }
+    if (!response.ok) {
+      const { apiError } = await parseResponse<unknown>(response);
+      return { blob: null, filename: null, error: apiError };
+    }
+    const disposition = response.headers.get("content-disposition") ?? "";
+    const filename = /filename="?([^";]+)"?/i.exec(disposition)?.[1] ?? null;
+    return { blob: await response.blob(), filename, error: null };
+  }
+
   /** DELETE */
   async delete<R = unknown>(path: string, options: RequestInit = {}): Promise<{ data: R; error: ApiError | null }> {
     return this.request<R>("DELETE", path, undefined, options);

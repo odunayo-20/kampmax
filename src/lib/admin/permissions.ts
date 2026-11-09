@@ -14,6 +14,8 @@ export type AdminNavItemKey =
   | "users"
   | "campuses"
   | "campusPlaces"
+  | "accommodationAgents"
+  | "accommodationListings"
   | "vendors"
   | "products"
   | "marketplace"
@@ -90,6 +92,9 @@ export function canSeeSection(
 const ACTION_ROLES: Record<string, AdminRole[]> = {
   // backend permission `taxonomy.manage` (SUPER_ADMIN, ADMIN)
   "categories:manage": ["SUPER_ADMIN", "ADMIN"],
+  // backend accommodation.agents.review and accommodation.listings.moderate
+  "accommodation:reviewAgents": ["SUPER_ADMIN", "ADMIN"],
+  "accommodation:moderateListings": ["SUPER_ADMIN", "ADMIN"],
   // backend blog.* permissions (see common/rbac/permissions.ts)
   "blog:create": ["SUPER_ADMIN", "ADMIN"],
   "blog:update": ["SUPER_ADMIN", "ADMIN"],
@@ -102,6 +107,8 @@ const ACTION_ROLES: Record<string, AdminRole[]> = {
 /** UI action -> backend permission slug (see backend common/rbac/permissions.ts). */
 const ACTION_SLUGS: Record<string, string> = {
   "categories:manage": "taxonomy.manage",
+  "accommodation:reviewAgents": "accommodation.agents.review",
+  "accommodation:moderateListings": "accommodation.listings.moderate",
   "blog:create": "blog.create",
   "blog:update": "blog.update",
   "blog:publish": "blog.publish",

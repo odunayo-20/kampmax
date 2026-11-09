@@ -484,6 +484,24 @@ export const adminKeys = {
       pageSize?: number;
     }) => ["admin", "contact-messages", "list", query] as const,
   } as const,
+  /** Accommodation agents (applications) and listing moderation. */
+  accommodation: {
+    all: ["admin", "accommodation"] as const,
+    agents: {
+      all: ["admin", "accommodation", "agents"] as const,
+      list: (query: { status?: string; search?: string; page?: number; pageSize?: number }) =>
+        ["admin", "accommodation", "agents", "list", query] as const,
+      detail: (id: string) => ["admin", "accommodation", "agents", "detail", id] as const,
+      listings: (id: string, page: number) =>
+        ["admin", "accommodation", "agents", "listings", id, page] as const,
+    } as const,
+    listings: {
+      all: ["admin", "accommodation", "listings"] as const,
+      list: (query: { status?: string; page?: number; pageSize?: number }) =>
+        ["admin", "accommodation", "listings", "list", query] as const,
+      detail: (id: string) => ["admin", "accommodation", "listings", "detail", id] as const,
+    } as const,
+  } as const,
   /** Named places on campuses and the suggestions students send in. */
   campusPlaces: {
     all: ["admin", "campus-places"] as const,

@@ -35,6 +35,8 @@ import {
   Mail,
   Wrench,
   Newspaper,
+  Home,
+  UserCheck,
 } from "lucide-react";
 import { AdminNavItemKey, canSeeSection } from "./permissions";
 import { AdminRole } from "@/types/admin";
@@ -75,6 +77,14 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         { key: "campusPlaces", href: "/admin/campus-places", label: "Campus places", icon: MapPin },
       ],
     },
+  {
+    id: "accommodation",
+    label: "Accommodation",
+    items: [
+      { key: "accommodationAgents", href: "/admin/accommodation/agents", label: "Agents", icon: UserCheck },
+      { key: "accommodationListings", href: "/admin/accommodation/listings", label: "Listings", icon: Home },
+    ],
+  },
   {
     id: "hiring",
     label: "Hiring",
@@ -162,16 +172,21 @@ const LABELS: Record<string, string> = Object.fromEntries([
   ),
 ]);
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export function breadcrumbLabel(segment: string, index: number): string {
   if (index === 0) return "Admin";
   if (index === 1) {
     return LABELS[`/${segment}`] ?? titleCase(segment);
   }
+  // A UUID (accommodation agents and listings) is shortened to its first block.
+  if (UUID.test(segment)) return segment.slice(0, 8).toUpperCase();
   // Detail routes (/orders/KMP-2437 etc.)
   return segment.includes("-") ? segment.toUpperCase() : titleCase(segment);
 }
 
 export function isDetailSegment(segment: string): boolean {
+    if (UUID.test(segment)) return true;
     return /^(KMP-|usr-|vnd-|prd-|dsp-|rpt-|rev-|pst-|wdr-|prm-|fl-|freelancer|p\d+|opp_|r\d+|prv_|vrf-|tkt-)/i.test(segment);
 }
 

@@ -28,6 +28,8 @@ const SEGMENT_TO_KEY: Record<string, AdminNavItemKey> = {
   users: "users",
   campuses: "campuses",
   "campus-places": "campusPlaces",
+  // one section guard for the whole /admin/accommodation area (agents + listings)
+  accommodation: "accommodationAgents",
   vendors: "vendors",
   marketplace: "marketplace",
   jobs: "jobs",

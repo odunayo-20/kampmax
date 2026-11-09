@@ -297,6 +297,13 @@ import { createApiCampusPlacesService } from "./campus-places.api";
 export const campusPlacesService: AdminCampusPlacesService =
   createApiCampusPlacesService();
 
+import type { AdminAccommodationService } from "./accommodation.service";
+import { createApiAccommodationService } from "./accommodation.api";
+
+/** Accommodation agents (applications, private documents) and listing moderation. */
+export const accommodationService: AdminAccommodationService =
+  createApiAccommodationService();
+
 import {
   AdminAnalyticsService,
 } from "./analytics.service";
