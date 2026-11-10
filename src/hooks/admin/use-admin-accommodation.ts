@@ -13,7 +13,8 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminKeys } from "@/lib/query-keys";
 import { accommodationService } from "@/services/admin";
-import type { AgentsQuery, ListingsQuery, PaymentsQuery } from "@/services/admin/accommodation.service";
+import type { ResolveReportInput } from "@/types/accommodation";
+import type { AgentsQuery, ListingsQuery, PaymentsQuery, ReportsQuery } from "@/services/admin/accommodation.service";
 
 // ---------- agents ----------
 
@@ -203,6 +204,26 @@ export function useRefundPayment() {
   const refresh = useRefreshAccommodation();
   return useMutation({
     mutationFn: (id: string) => accommodationService.refundPayment(id),
+    onSuccess: () => void refresh(),
+  });
+}
+
+// ---------- reports ----------
+
+export function useAdminReports(query: ReportsQuery) {
+  return useQuery({
+    queryKey: adminKeys.accommodation.reports.list(query),
+    queryFn: () => accommodationService.listReports(query),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Closing a report can also take a listing down, so the whole accommodation tree refreshes. */
+export function useResolveReport() {
+  const refresh = useRefreshAccommodation();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: ResolveReportInput }) =>
+      accommodationService.resolveReport(id, input),
     onSuccess: () => void refresh(),
   });
 }

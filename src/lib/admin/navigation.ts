@@ -84,6 +84,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       { key: "accommodationAgents", href: "/admin/accommodation/agents", label: "Agents", icon: UserCheck },
       { key: "accommodationListings", href: "/admin/accommodation/listings", label: "Listings", icon: Home },
       { key: "accommodationPayments", href: "/admin/accommodation/payments", label: "Payments", icon: Receipt },
+      { key: "accommodationReports", href: "/admin/accommodation/reports", label: "Reports", icon: Flag },
     ],
   },
   {

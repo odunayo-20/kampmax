@@ -9,7 +9,7 @@ vi.mock("@/lib/api-client", () => ({
 }));
 
 import { canAdminPerform } from "@/lib/admin/permissions";
-import { isRefundable, missingForApproval, type AgentDocument } from "@/types/accommodation";
+import { canSuspendFromReport, isRefundable, missingForApproval, type AgentDocument } from "@/types/accommodation";
 import { createApiAccommodationService } from "../accommodation.api";
 
 const service = createApiAccommodationService();
@@ -374,5 +374,108 @@ describe("isRefundable", () => {
     expect(isRefundable({ amount: 2000, gatewayReference: "FREE" })).toBe(false);
     expect(isRefundable({ amount: 2000, gatewayReference: null })).toBe(false);
     expect(isRefundable({ amount: 2000, gatewayReference: "" })).toBe(false);
+  });
+});
+
+describe("reports", () => {
+  const page = {
+    items: [{ id: "r1" }],
+    meta: { total: 31, page: 2, limit: 15, totalPages: 3 },
+    counts: { OPEN: 4, RESOLVED: 20, DISMISSED: 7 },
+  };
+
+  it("asks for the open reports by leaving the status out, and keeps the tab counts", async () => {
+    getMock.mockResolvedValue(ok(page));
+    const result = await service.listReports();
+    expect(getMock).toHaveBeenCalledWith(`${BASE}/reports`);
+    expect(result).toEqual({
+      items: [{ id: "r1" }],
+      page: 2,
+      pageSize: 15,
+      total: 31,
+      totalPages: 3,
+      counts: { OPEN: 4, RESOLVED: 20, DISMISSED: 7 },
+    });
+  });
+
+  it("filters by status and names the page size 'limit'", async () => {
+    getMock.mockResolvedValue(ok(page));
+    await service.listReports({ status: "DISMISSED", page: 2, pageSize: 15 });
+    expect(getMock).toHaveBeenCalledWith(`${BASE}/reports?status=DISMISSED&page=2&limit=15`);
+  });
+
+  it("maps a refusal to a plain sentence", async () => {
+    getMock.mockResolvedValue(failure(403));
+    await expect(service.listReports()).rejects.toThrow("You don't have permission to do that.");
+  });
+
+  describe("resolving", () => {
+    beforeEach(() => patchMock.mockResolvedValue(ok({ report: { id: "r1" }, listingSuspended: true })));
+
+    it("sends the decision and the trimmed note", async () => {
+      await service.resolveReport("r1", { decision: "RESOLVED", resolution: "  Photos are copied  " });
+      expect(patchMock).toHaveBeenCalledWith(`${BASE}/reports/r1/resolve`, {
+        decision: "RESOLVED",
+        resolution: "Photos are copied",
+      });
+    });
+
+    it("asks to take the listing down only when told to", async () => {
+      await service.resolveReport("r1", { decision: "RESOLVED", resolution: "Fake listing", suspendListing: true });
+      expect(patchMock).toHaveBeenLastCalledWith(`${BASE}/reports/r1/resolve`, {
+        decision: "RESOLVED",
+        resolution: "Fake listing",
+        suspendListing: true,
+      });
+      await service.resolveReport("r1", { decision: "RESOLVED", resolution: "Looked fine", suspendListing: false });
+      expect(patchMock).toHaveBeenLastCalledWith(`${BASE}/reports/r1/resolve`, {
+        decision: "RESOLVED",
+        resolution: "Looked fine",
+      });
+    });
+
+    it("never takes a listing down when dismissing, whatever was ticked", async () => {
+      await service.resolveReport("r1", { decision: "DISMISSED", resolution: "Nothing wrong", suspendListing: true });
+      expect(patchMock).toHaveBeenCalledWith(`${BASE}/reports/r1/resolve`, {
+        decision: "DISMISSED",
+        resolution: "Nothing wrong",
+      });
+    });
+
+    it("says whether the listing was actually taken down", async () => {
+      expect(await service.resolveReport("r1", { decision: "RESOLVED", resolution: "Fake", suspendListing: true })).toEqual({
+        listingSuspended: true,
+      });
+      patchMock.mockResolvedValue(ok({ report: { id: "r1" }, listingSuspended: false }));
+      expect(await service.resolveReport("r1", { decision: "RESOLVED", resolution: "Fake", suspendListing: true })).toEqual({
+        listingSuspended: false,
+      });
+    });
+
+    it("treats a missing flag as not taken down", async () => {
+      patchMock.mockResolvedValue(ok({ report: { id: "r1" } }));
+      expect((await service.resolveReport("r1", { decision: "DISMISSED", resolution: "Nothing wrong" })).listingSuspended).toBe(false);
+    });
+
+    it("explains a refusal in the backend's words", async () => {
+      patchMock.mockResolvedValue(failure(400, "This report has already been handled."));
+      await expect(service.resolveReport("r1", { decision: "RESOLVED", resolution: "Done it" })).rejects.toThrow(
+        "This report has already been handled."
+      );
+    });
+
+    it("encodes the id", async () => {
+      await service.resolveReport("r/1", { decision: "RESOLVED", resolution: "Done it" });
+      expect(patchMock).toHaveBeenCalledWith(`${BASE}/reports/r%2F1/resolve`, expect.anything());
+    });
+  });
+});
+
+describe("canSuspendFromReport", () => {
+  it("is only possible for a listing that is on the site", () => {
+    expect(canSuspendFromReport({ listingModerationStatus: "APPROVED" })).toBe(true);
+    for (const status of ["DRAFT", "PENDING_APPROVAL", "REJECTED", "ADMIN_SUSPENDED", null] as const) {
+      expect(canSuspendFromReport({ listingModerationStatus: status })).toBe(false);
+    }
   });
 });

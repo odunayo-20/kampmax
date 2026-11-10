@@ -17,6 +17,7 @@ export type AdminNavItemKey =
   | "accommodationAgents"
   | "accommodationListings"
   | "accommodationPayments"
+  | "accommodationReports"
   | "vendors"
   | "products"
   | "marketplace"

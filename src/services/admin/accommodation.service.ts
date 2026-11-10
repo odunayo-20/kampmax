@@ -20,7 +20,10 @@ import type {
   DownloadedFile,
   ListingPaymentStatus,
   ListingModerationStatus,
+  AdminReport,
   PaymentReconciliation,
+  ReportStatus,
+  ResolveReportInput,
 } from "@/types/accommodation";
 
 export interface AgentsQuery {
@@ -62,6 +65,18 @@ export interface PaymentsPage extends Paginated<AdminPayment> {
 export interface ExportRange {
   from?: string;
   to?: string;
+}
+
+export interface ReportsQuery {
+  /** The backend shows open reports when this is left out. */
+  status?: ReportStatus;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface ReportsPage extends Paginated<AdminReport> {
+  /** Reports per status, across all pages. */
+  counts: Partial<Record<ReportStatus, number>>;
 }
 
 export interface AdminAccommodationService {
@@ -119,4 +134,13 @@ export interface AdminAccommodationService {
   paymentReconciliation(): Promise<PaymentReconciliation>;
   /** GET …/payments/export: CSV of payments created in the range (default: last 30 days). */
   exportPayments(range?: ExportRange): Promise<DownloadedFile>;
+
+  // ---- reports ----
+  /** GET /accommodation/admin/reports */
+  listReports(query?: ReportsQuery): Promise<ReportsPage>;
+  /**
+   * PATCH …/reports/:id/resolve: closes the report with a note and tells the reporter.
+   * `listingSuspended` is false when the listing was not on the site to take down.
+   */
+  resolveReport(id: string, input: ResolveReportInput): Promise<{ listingSuspended: boolean }>;
 }

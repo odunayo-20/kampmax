@@ -249,3 +249,60 @@ export type DownloadedFile = AgentDocumentFile;
 export function isRefundable(p: Pick<AdminPayment, "amount" | "gatewayReference">): boolean {
   return p.amount > 0 && Boolean(p.gatewayReference) && p.gatewayReference !== "FREE";
 }
+
+// ---------- reports ----------
+
+export type ReportReason = "FRAUD" | "FAKE_LISTING" | "UNAVAILABLE" | "INCORRECT_INFO" | "DUPLICATE" | "OTHER";
+
+export const REPORT_REASON_LABELS: Record<ReportReason, string> = {
+  FRAUD: "Fraud or scam",
+  FAKE_LISTING: "Fake listing",
+  UNAVAILABLE: "No longer available",
+  INCORRECT_INFO: "Wrong information",
+  DUPLICATE: "Duplicate listing",
+  OTHER: "Something else",
+};
+
+export type ReportStatus = "OPEN" | "RESOLVED" | "DISMISSED";
+
+export const REPORT_STATUS_LABELS: Record<ReportStatus, string> = {
+  OPEN: "Open",
+  RESOLVED: "Resolved",
+  DISMISSED: "Dismissed",
+};
+
+export interface AdminReport {
+  id: string;
+  listingId: string;
+  listingTitle: string | null;
+  listingModerationStatus: ListingModerationStatus | null;
+  agentId: string | null;
+  agentName: string | null;
+  reason: ReportReason;
+  description: string | null;
+  status: ReportStatus;
+  /** How many open reports this listing has: a pile-up is a signal. */
+  openReportsOnListing: number;
+  reporterId: string;
+  /** First name and last initial only. */
+  reporterName: string | null;
+  reviewedAt: string | null;
+  resolution: string | null;
+  createdAt: string;
+}
+
+export interface ResolveReportInput {
+  decision: "RESOLVED" | "DISMISSED";
+  /** What was found and done; the backend wants 5 to 500 characters. */
+  resolution: string;
+  /** Also take the listing down. Only meaningful for an approved listing. */
+  suspendListing?: boolean;
+}
+
+export const RESOLUTION_MIN = 5;
+export const RESOLUTION_MAX = 500;
+
+/** Only an approved listing is on the site, so only that can be taken down. */
+export function canSuspendFromReport(report: Pick<AdminReport, "listingModerationStatus">): boolean {
+  return report.listingModerationStatus === "APPROVED";
+}

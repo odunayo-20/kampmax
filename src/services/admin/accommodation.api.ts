@@ -6,6 +6,7 @@ import type {
   AdminListingDetail,
   AdminListingItem,
   AdminPayment,
+  AdminReport,
   PaymentReconciliation,
 } from "@/types/accommodation";
 import type {
@@ -17,6 +18,8 @@ import type {
   ListingsQuery,
   PaymentsPage,
   PaymentsQuery,
+  ReportsPage,
+  ReportsQuery,
 } from "./accommodation.service";
 
 /** Live service over AdminAccommodationController (/accommodation/admin). */
@@ -72,6 +75,15 @@ function listingQuery(query: ListingsQuery): string {
 }
 
 function paymentQuery(query: PaymentsQuery): string {
+  const params = new URLSearchParams();
+  if (query.status) params.set("status", query.status);
+  if (query.page) params.set("page", String(query.page));
+  if (query.pageSize) params.set("limit", String(query.pageSize));
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
+}
+
+function reportQuery(query: ReportsQuery): string {
   const params = new URLSearchParams();
   if (query.status) params.set("status", query.status);
   if (query.page) params.set("page", String(query.page));
@@ -217,6 +229,31 @@ export function createApiAccommodationService(): AdminAccommodationService {
       const { data, error } = await apiClient.get<PaymentReconciliation>(`${base}/payments/reconciliation`);
       if (error) fail(error, "Couldn't load the reconciliation report.");
       return data;
+    },
+
+    // ---- reports ----
+    async listReports(query = {}) {
+      const { data, error } = await apiClient.get<{
+        items: AdminReport[];
+        meta: BackendMeta;
+        counts: ReportsPage["counts"];
+      }>(`${base}/reports${reportQuery(query)}`);
+      if (error) fail(error, "Couldn't load the reports.");
+      return { ...paged(data.items, data.meta), counts: data.counts };
+    },
+
+    async resolveReport(id, input) {
+      const result = await decide<{ listingSuspended: boolean }>(
+        `${base}/reports/${encodeURIComponent(id)}/resolve`,
+        {
+          decision: input.decision,
+          resolution: input.resolution.trim(),
+          // Dismissing never takes a listing down, whatever the box says.
+          ...(input.decision === "RESOLVED" && input.suspendListing ? { suspendListing: true } : {}),
+        },
+        "Couldn't close the report."
+      );
+      return { listingSuspended: Boolean(result?.listingSuspended) };
     },
 
     async exportPayments(range = {}) {

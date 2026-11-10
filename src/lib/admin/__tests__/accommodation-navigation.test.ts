@@ -13,6 +13,7 @@ describe("accommodation in the admin navigation", () => {
       "/admin/accommodation/agents",
       "/admin/accommodation/listings",
       "/admin/accommodation/payments",
+      "/admin/accommodation/reports",
     ]);
   });
 
