@@ -1055,3 +1055,23 @@ export const serviceProviderDashboardKeys = {
   reviewsSummary: (userId: string | undefined) =>
     ["service-provider-dashboard", "reviews-summary", userId] as const,
 };
+
+/** Public accommodation discovery and owner-scoped accommodation activity. */
+export const publicAccommodationKeys = {
+  all: ["accommodation"] as const,
+  search: <T extends object>(filters: T) => ["accommodation", "search", filters] as const,
+  listing: (id: string) => ["accommodation", "listing", id] as const,
+  agentStatus: (userId: string | undefined) => ["accommodation", "agent-status", userId] as const,
+  agentProfile: (userId: string | undefined) => ["accommodation", "agent-profile", userId] as const,
+  properties: (userId: string | undefined, page: number) =>
+    ["accommodation", "properties", userId, page] as const,
+  agentListings: (userId: string | undefined, page: number) =>
+    ["accommodation", "agent-listings", userId, page] as const,
+  saved: (userId: string | undefined, page: number) =>
+    ["accommodation", "saved", userId, page] as const,
+  enquiries: (userId: string | undefined, role: "USER" | "AGENT", page: number) =>
+    ["accommodation", "enquiries", userId, role, page] as const,
+  enquiry: (userId: string | undefined, id: string) =>
+    ["accommodation", "enquiry", userId, id] as const,
+  catalog: ["accommodation", "catalog"] as const,
+};

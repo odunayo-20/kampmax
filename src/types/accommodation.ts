@@ -428,6 +428,260 @@ export interface TaxonomyItem {
 
 export type TaxonomyKind = "categories" | "amenities";
 
+// ---------- agent and renter accommodation flows ----------
+
+export interface AccommodationPage<T> {
+  items: T[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+export interface AccommodationCategoryOption {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  isActive: boolean;
+}
+
+export interface AccommodationAmenityOption {
+  id: string;
+  name: string;
+  slug: string;
+  isActive: boolean;
+}
+
+export type AccommodationAgentProfile = Omit<AdminAgentDetail, "userId">;
+
+export interface AccommodationUnit {
+  id: string;
+  propertyId: string;
+  unitName: string;
+  unitType: string;
+  bedrooms: number;
+  bathrooms: number;
+  occupancyCapacity: number;
+  furnishingStatus: "FURNISHED" | "SEMI_FURNISHED" | "UNFURNISHED";
+  availabilityStatus: "AVAILABLE" | "RESERVED" | "OCCUPIED" | "UNAVAILABLE";
+}
+
+export interface AccommodationProperty {
+  id: string;
+  title: string;
+  description: string | null;
+  categoryId: string;
+  categoryName: string | null;
+  country: string;
+  state: string;
+  city: string;
+  neighbourhood: string | null;
+  address: string;
+  landmark: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  campusId: string | null;
+  units: AccommodationUnit[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AccommodationListing {
+  id: string;
+  propertyId: string;
+  unitId: string;
+  title: string;
+  description: string | null;
+  rentAmount: number;
+  currency: string;
+  paymentFrequency: string;
+  cautionFee: number;
+  agencyFee: number;
+  agreementFee: number;
+  otherCharges: number;
+  totalUpfrontCost: number;
+  moderationStatus: ListingModerationStatus;
+  publicationStatus: ListingPublicationStatus;
+  availabilityStatus: string;
+  rejectionReason: string | null;
+  submittedAt: string | null;
+  approvedAt: string | null;
+  expiresAt: string | null;
+  lastAvailabilityConfirmedAt: string | null;
+  unit: { id: string; unitName: string; unitType: string } | null;
+  property: { id: string; title: string; city: string; state: string } | null;
+  media: { id: string; mediaId: string; url: string; caption: string | null }[];
+  amenities: { id: string; name: string }[];
+  subscription: {
+    id: string;
+    status: string;
+    amount: number;
+    autoRenew: boolean;
+    endsAt: string | null;
+  } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PublicAccommodationListing {
+  id: string;
+  title: string;
+  category: { name: string; slug: string } | null;
+  neighbourhood: string | null;
+  city: string;
+  state: string;
+  campus: { id: string; name: string } | null;
+  rentAmount: number;
+  currency: string;
+  paymentFrequency: string;
+  totalUpfrontCost: number;
+  bedrooms: number;
+  bathrooms: number;
+  furnishingStatus: string;
+  coverImage: string | null;
+  distanceKm: number | null;
+  agent: { id: string; name: string; verified: true };
+}
+
+export type SavedAccommodationListing =
+  | {
+      id: string;
+      savedAt: string;
+      available: true;
+      listing: PublicAccommodationListing;
+    }
+  | {
+      id: string;
+      savedAt: string;
+      available: false;
+      listing: { id: string; title: string | null };
+    };
+
+export interface PublicAccommodationListingDetail extends PublicAccommodationListing {
+  description: string | null;
+  landmark: string | null;
+  occupancyCapacity: number;
+  charges: {
+    rent: number;
+    cautionFee: number;
+    agencyFee: number;
+    agreementFee: number;
+    otherCharges: number;
+    totalUpfront: number;
+  };
+  media: { url: string; type: string; caption: string | null }[];
+  amenities: { name: string; slug: string }[];
+  mapPoint: { latitude: number; longitude: number } | null;
+  agentProfile: {
+    id: string;
+    name: string;
+    agencyName: string | null;
+    photoUrl: string | null;
+    verified: true;
+    memberSince: string | null;
+    activeListings: number;
+  };
+  lastAvailabilityConfirmedAt: string | null;
+}
+
+export type AccommodationContactMethod = "IN_APP" | "PHONE" | "EMAIL";
+export type AccommodationEnquiryStatus =
+  | "NEW"
+  | "CONTACTED"
+  | "INSPECTION_SCHEDULED"
+  | "VISITED"
+  | "NEGOTIATING"
+  | "CLOSED"
+  | "CANCELLED"
+  | "NOT_INTERESTED"
+  | "UNRESPONSIVE";
+export type AccommodationInspectionStatus =
+  | "REQUESTED"
+  | "CONFIRMED"
+  | "RESCHEDULE_PROPOSED"
+  | "REJECTED"
+  | "COMPLETED"
+  | "CANCELLED";
+
+export interface AccommodationInspection {
+  id: string;
+  enquiryId: string;
+  listingId: string;
+  listingTitle: string | null;
+  status: AccommodationInspectionStatus;
+  requestedDate: string;
+  proposedDate: string | null;
+  confirmedDate: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface AccommodationEnquiry {
+  id: string;
+  listingId: string;
+  listingTitle: string | null;
+  status: AccommodationEnquiryStatus;
+  role: "USER" | "AGENT";
+  counterpart: string;
+  preferredContactMethod: AccommodationContactMethod;
+  preferredInspectionDate: string | null;
+  firstResponseAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  contact?: { phone?: string; email?: string };
+  messages?: {
+    id: string;
+    from: "USER" | "AGENT";
+    body: string;
+    createdAt: string;
+  }[];
+  inspection?: AccommodationInspection | null;
+}
+
+export interface AccommodationPaymentStart {
+  subscription: AccommodationSubscription;
+  payment: AccommodationPayment;
+  authorizationUrl?: string;
+  note?: string;
+}
+
+export interface AccommodationSubscription {
+  id: string;
+  listingId: string;
+  status: string;
+  amount: number;
+  currency: string;
+  durationDays: number;
+  startsAt: string | null;
+  endsAt: string | null;
+  nextBillingAt: string | null;
+  autoRenew: boolean;
+  billingCycle: number;
+  cancelledAt: string | null;
+  lastPaymentAt: string | null;
+  lastFailureAt: string | null;
+  createdAt: string;
+}
+
+export interface AccommodationPayment {
+  id: string;
+  subscriptionId: string;
+  listingId: string;
+  reference: string;
+  amount: number;
+  currency: string;
+  paymentType: string;
+  billingCycle: number;
+  status: ListingPaymentStatus;
+  paidAt: string | null;
+  failureReason: string | null;
+  refundReason: string | null;
+  createdAt: string;
+}
+
 export interface TaxonomyInput {
   name: string;
   description?: string;
