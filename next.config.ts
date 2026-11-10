@@ -45,6 +45,20 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async redirects() {
+    return [
+      {
+        source: "/accommodation/agent/onboarding",
+        destination: "/onboarding/agent",
+        permanent: false,
+      },
+      {
+        source: "/accommodation/agent",
+        destination: "/agent",
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

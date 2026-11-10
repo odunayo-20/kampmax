@@ -264,7 +264,7 @@ export const MORE_MENU_SECTIONS: NavSectionConfig[] = [
       {
         id: "accommodation-agent",
         label: "List Accommodation",
-        href: "/accommodation/agent",
+        href: "/onboarding/agent",
         icon: Building2,
         description: "Apply as an agent and manage property listings",
         badge: "List",

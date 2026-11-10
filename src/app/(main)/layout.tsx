@@ -36,6 +36,7 @@ const PROTECTED_PREFIXES = [
 export function isProtectedPath(pathname: string): boolean {
   if (
     pathname.startsWith("/vendor") ||
+    pathname.startsWith("/agent") ||
     isServiceProviderDashboardPath(pathname) ||
     isFreelancerDashboardPath(pathname) ||
     isEmployerDashboardPath(pathname)
@@ -67,12 +68,14 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
   // Dashboard sections render their own full-screen shell (sidebar/header)
   const isVendorSection = pathname.startsWith("/vendor");
+  const isAgentSection = pathname.startsWith("/agent");
   const isAccommodationAgentSection = pathname.startsWith("/accommodation/agent");
   const isServiceProviderSection = isServiceProviderDashboardPath(pathname);
   const isFreelancerSection = isFreelancerDashboardPath(pathname);
   const isEmployerSection = isEmployerDashboardPath(pathname);
   const isDashboardSection =
     isVendorSection ||
+    isAgentSection ||
     isAccommodationAgentSection ||
     isServiceProviderSection ||
     isFreelancerSection ||

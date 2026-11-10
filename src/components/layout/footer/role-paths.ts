@@ -1,5 +1,6 @@
 import {
   BriefcaseBusiness,
+  Building2,
   ShoppingBag,
   Store,
   Users,
@@ -20,7 +21,7 @@ import {
  *                     own access gates; client state never authorizes them).
  *
  * The backend auth contract exposes `UserRole = "student" | "vendor" | "admin"`
- * only; freelancer / service-provider / employer are profile-activation
+ * only; freelancer / service-provider / employer / agent are profile-activation
  * onboards under one account. This file does NOT claim roles the backend
  * cannot issue.
  */
@@ -30,7 +31,8 @@ export type KampmaxRoleId =
   | "vendor"
   | "freelancer"
   | "service_provider"
-  | "employer";
+  | "employer"
+  | "agent";
 
 export interface KampmaxRolePath {
   id: KampmaxRoleId;
@@ -92,6 +94,15 @@ export const KAMPMAX_ROLE_PATHS: Record<KampmaxRoleId, KampmaxRolePath> = {
     joinLabel: "Hire on Kampmax",
     guestHref: "/onboarding/employer",
     memberHref: "/employer/dashboard",
+  },
+  agent: {
+    id: "agent",
+    icon: Building2,
+    title: "Accommodation Agent",
+    description: "List student rooms, hostels, and apartments.",
+    joinLabel: "List Accommodation",
+    guestHref: "/onboarding/agent",
+    memberHref: "/agent",
   },
 };
 

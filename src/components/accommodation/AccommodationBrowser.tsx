@@ -47,7 +47,7 @@ export function AccommodationBrowser() {
           <Link className="rounded-lg border border-kampmax-border px-3 py-2 text-sm hover:bg-white" href="/accommodation/saved">
             Saved
           </Link>
-          <Link className="rounded-lg bg-kampmax-blue px-3 py-2 text-sm font-semibold text-white hover:opacity-90" href="/accommodation/agent">
+          <Link className="rounded-lg bg-kampmax-blue px-3 py-2 text-sm font-semibold text-white hover:opacity-90" href="/onboarding/agent">
             List a property
           </Link>
         </div>

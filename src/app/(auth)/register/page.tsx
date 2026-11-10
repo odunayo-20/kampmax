@@ -39,6 +39,7 @@ const ROLE_CHOICES: RoleChoice[] = [
   { id: "freelancer", role: "student", next: "/onboarding/freelancer", cta: "Become a Freelancer" },
   { id: "service_provider", role: "student", next: "/onboarding/service-provider", cta: "Become a Service Provider" },
   { id: "employer", role: "student", next: "/onboarding/employer", cta: "Hire Talent" },
+  { id: "agent", role: "student", next: "/onboarding/agent", cta: "Become an Accommodation Agent" },
 ];
 
 function choiceById(id: KampmaxRoleId): RoleChoice {

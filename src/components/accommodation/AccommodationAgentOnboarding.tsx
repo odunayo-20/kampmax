@@ -10,7 +10,6 @@ import {
 import {
   useAccommodationAgentProfile,
   useAccommodationAgentStatus,
-  useApplyAsAccommodationAgent,
   useRemoveAccommodationDocument,
   useUploadAccommodationDocument,
 } from "@/hooks/use-accommodation";
