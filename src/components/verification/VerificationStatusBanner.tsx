@@ -6,7 +6,7 @@ import type { KycStatus } from "@/types/verification";
 
 interface VerificationStatusBannerProps {
   status: KycStatus;
-  role: "vendor" | "freelancer";
+  role: "vendor" | "freelancer" | "agent";
   verificationHref: string;
   className?: string;
 }
@@ -28,7 +28,7 @@ export function VerificationStatusBanner({
           </div>
           <div>
             <p className="text-sm font-semibold text-emerald-950">
-              Verified {role === "vendor" ? "Vendor Account" : "Freelancer Pro"}
+              Verified {role === "vendor" ? "Vendor Account" : role === "agent" ? "Agent Account" : "Freelancer Pro"}
             </p>
             <p className="text-xs text-emerald-700">
               Your verification is complete. All privileges are active.
@@ -142,6 +142,8 @@ export function VerificationStatusBanner({
           <p className="text-xs text-kampmax-text-secondary mt-0.5">
             {role === "vendor"
               ? "Upload your verification documents so Kampmax can verify your store."
+              : role === "agent"
+              ? "Upload your verification documents so Kampmax can verify your agent profile."
               : "Ask for a review of your freelancer profile to earn the verified badge."}
           </p>
         </div>
