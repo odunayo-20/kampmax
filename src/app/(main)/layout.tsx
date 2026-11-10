@@ -67,11 +67,16 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
   // Dashboard sections render their own full-screen shell (sidebar/header)
   const isVendorSection = pathname.startsWith("/vendor");
+  const isAccommodationAgentSection = pathname.startsWith("/accommodation/agent");
   const isServiceProviderSection = isServiceProviderDashboardPath(pathname);
   const isFreelancerSection = isFreelancerDashboardPath(pathname);
   const isEmployerSection = isEmployerDashboardPath(pathname);
   const isDashboardSection =
-    isVendorSection || isServiceProviderSection || isFreelancerSection || isEmployerSection;
+    isVendorSection ||
+    isAccommodationAgentSection ||
+    isServiceProviderSection ||
+    isFreelancerSection ||
+    isEmployerSection;
 
   const isProtected = isProtectedPath(pathname);
   // Only pages that can't render without a session wait for it. Public pages paint

@@ -50,7 +50,7 @@ function money(amount: number, currency = "NGN") {
   }).format(amount);
 }
 
-function ApplyForm({ initial }: { initial?: { fullName?: string; phone?: string; email?: string; operatingLocation?: string; agencyName?: string | null; businessAddress?: string | null } }) {
+export function ApplyForm({ initial }: { initial?: { fullName?: string; phone?: string; email?: string; operatingLocation?: string; agencyName?: string | null; businessAddress?: string | null } }) {
   const apply = useApplyAsAccommodationAgent();
   const [values, setValues] = useState({
     fullName: initial?.fullName ?? "",
@@ -424,7 +424,20 @@ export function AccommodationAgentDashboard() {
     return <main className="mx-auto max-w-5xl px-4 py-10"><p role="alert" className="rounded-xl border border-red-200 bg-white p-5 text-sm text-red-700">Could not check your agent application: {status.error.message}</p></main>;
   }
   if (!status.data.applied) {
-    return <main className="mx-auto max-w-3xl px-4 py-8"><Link href="/accommodation" className="text-sm text-kampmax-blue hover:underline">← Find accommodation</Link><div className="mt-4"><ApplyForm /></div></main>;
+    return (
+      <main className="mx-auto max-w-3xl px-4 py-8">
+        <h1 className="text-2xl font-bold text-kampmax-text">Become an accommodation agent</h1>
+        <p className="mt-2 text-sm text-kampmax-text-secondary">
+          Complete your agent application and verification documents before listing rooms and apartments.
+        </p>
+        <Link
+          href="/accommodation/agent/onboarding"
+          className="mt-5 inline-flex rounded-lg bg-kampmax-blue px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90"
+        >
+          Start agent onboarding
+        </Link>
+      </main>
+    );
   }
   if (profile.isPending) {
     return <main className="mx-auto max-w-5xl px-4 py-10"><div className="h-52 animate-pulse rounded-xl bg-kampmax-muted" /></main>;
@@ -447,7 +460,7 @@ export function AccommodationAgentDashboard() {
         <Link href="#agent-enquiries" className="rounded-lg border border-kampmax-border bg-white px-3 py-2 text-sm">Enquiries about my listings</Link>
       </div>
 
-      <section className="rounded-xl border border-kampmax-border bg-white p-5">
+      <section id="agent-profile" className="rounded-xl border border-kampmax-border bg-white p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-kampmax-text">{agent.fullName}</h2>
@@ -481,7 +494,7 @@ export function AccommodationAgentDashboard() {
         {update.error && <p role="alert" className="mt-2 text-xs text-red-700">{update.error.message}</p>}
       </section>
 
-      <section className="rounded-xl border border-kampmax-border bg-white p-5">
+      <section id="agent-verification" className="rounded-xl border border-kampmax-border bg-white p-5">
         <h2 className="text-lg font-semibold text-kampmax-text">Verification documents</h2>
         <p className="mt-1 text-sm text-kampmax-text-secondary">Upload PDF, JPEG or PNG files up to 5 MB. Private files are visible only to you and the review team.</p>
         {agent.status === "PENDING" && missing.length > 0 && <p className="mt-3 text-sm text-amber-800">Still needed for review: {missing.join(" and ")}.</p>}
@@ -530,7 +543,7 @@ export function AccommodationAgentDashboard() {
             <PropertyForm categories={catalog.data.categories} />
           ) : null}
 
-          <section className="rounded-xl border border-kampmax-border bg-white p-5">
+          <section id="agent-properties" className="rounded-xl border border-kampmax-border bg-white p-5">
             <h2 className="text-lg font-semibold text-kampmax-text">Your properties and units</h2>
             {properties.isPending ? <p className="mt-3 text-sm text-kampmax-text-secondary">Loading properties…</p> : properties.isError ? <p role="alert" className="mt-3 text-sm text-red-700">{properties.error.message}</p> : properties.data.items.length === 0 ? <p className="mt-3 text-sm text-kampmax-text-secondary">Add a property above to start listing rooms.</p> : (
               <div className="mt-3 space-y-3">
@@ -545,7 +558,7 @@ export function AccommodationAgentDashboard() {
             )
           ) : null}
 
-          <section className="rounded-xl border border-kampmax-border bg-white p-5">
+          <section id="agent-listings" className="rounded-xl border border-kampmax-border bg-white p-5">
             <h2 className="text-lg font-semibold text-kampmax-text">Your listings</h2>
             <label className="mt-3 flex items-start gap-2 text-xs text-kampmax-text-secondary">
               Listings are drafts until you subscribe to a package. Automatic renewal is optional and is confirmed when you choose a package.
@@ -564,7 +577,7 @@ export function AccommodationAgentDashboard() {
             )}
           </section>
 
-          <section className="rounded-xl border border-kampmax-border bg-white p-5">
+          <section id="agent-billing" className="rounded-xl border border-kampmax-border bg-white p-5">
             <h2 className="text-lg font-semibold text-kampmax-text">Subscriptions and payment history</h2>
             {subscriptions.isPending || payments.isPending ? (
               <p className="mt-3 text-sm text-kampmax-text-secondary">Loading billing activity…</p>
