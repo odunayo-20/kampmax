@@ -327,7 +327,7 @@ function ListingForm({
         title: data.title.trim(),
         description: data.description.trim() || undefined,
         rentAmount: Number(data.rentAmount),
-        paymentFrequency: data.paymentFrequency as "MONTHLY" | "QUARTERLY" | "BIANNUAL" | "ANNUAL",
+        paymentFrequency: data.paymentFrequency as "MONTHLY" | "QUARTERLY" | "BIANNUALLY" | "ANNUALLY" | "PER_SEMESTER" | "PER_NIGHT",
         cautionFee: Number(data.cautionFee || 0),
         agencyFee: Number(data.agencyFee || 0),
         agreementFee: Number(data.agreementFee || 0),
@@ -373,7 +373,7 @@ function ListingForm({
         ))}
         <label className="text-xs font-medium text-kampmax-text-secondary">Rent frequency
           <select value={data.paymentFrequency} onChange={(event) => setData((current) => ({ ...current, paymentFrequency: event.target.value }))} className="mt-1 block w-full rounded-md border border-kampmax-border bg-white px-3 py-2 text-sm">
-            <option value="MONTHLY">Monthly</option><option value="QUARTERLY">Quarterly</option><option value="BIANNUAL">Every six months</option><option value="ANNUAL">Annually</option>
+            <option value="ANNUALLY">Annually</option><option value="BIANNUALLY">Every six months</option><option value="PER_SEMESTER">Per semester</option><option value="QUARTERLY">Quarterly</option><option value="MONTHLY">Monthly</option><option value="PER_NIGHT">Per night</option>
           </select>
         </label>
         <label className="text-xs font-medium text-kampmax-text-secondary sm:col-span-2">Description

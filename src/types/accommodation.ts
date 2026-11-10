@@ -489,6 +489,14 @@ export interface AccommodationProperty {
   updatedAt: string;
 }
 
+export type AccommodationPaymentFrequency =
+  | "MONTHLY"
+  | "QUARTERLY"
+  | "BIANNUALLY"
+  | "ANNUALLY"
+  | "PER_SEMESTER"
+  | "PER_NIGHT";
+
 export interface AccommodationListing {
   id: string;
   propertyId: string;

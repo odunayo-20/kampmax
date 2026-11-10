@@ -13,6 +13,7 @@ import type {
   AccommodationPackage,
   AccommodationPaymentStart,
   AccommodationPayment,
+  AccommodationPaymentFrequency,
   AccommodationProperty,
   AccommodationSubscription,
   AccommodationUnit,
@@ -113,7 +114,7 @@ export interface CreateAccommodationListing {
   title: string;
   description?: string;
   rentAmount?: number;
-  paymentFrequency?: "MONTHLY" | "QUARTERLY" | "BIANNUAL" | "ANNUAL";
+  paymentFrequency?: AccommodationPaymentFrequency | "MONTHLY" | "QUARTERLY" | "BIANNUALLY" | "ANNUALLY" | "PER_SEMESTER" | "PER_NIGHT";
   cautionFee?: number;
   agencyFee?: number;
   agreementFee?: number;

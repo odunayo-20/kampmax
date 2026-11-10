@@ -80,7 +80,7 @@ export function AccommodationListingManager({
           title: String(form.get("title") ?? "").trim(),
           description: String(form.get("description") ?? "").trim(),
           rentAmount: Number(form.get("rentAmount")),
-          paymentFrequency: String(form.get("paymentFrequency")) as "MONTHLY" | "QUARTERLY" | "BIANNUAL" | "ANNUAL",
+          paymentFrequency: String(form.get("paymentFrequency")) as "MONTHLY" | "QUARTERLY" | "BIANNUALLY" | "ANNUALLY" | "PER_SEMESTER" | "PER_NIGHT",
           cautionFee: Number(form.get("cautionFee") || 0),
           agencyFee: Number(form.get("agencyFee") || 0),
           agreementFee: Number(form.get("agreementFee") || 0),
@@ -195,7 +195,7 @@ export function AccommodationListingManager({
           ))}
           <label className="text-xs text-kampmax-text-secondary">Rent frequency
             <select name="paymentFrequency" defaultValue={listing.paymentFrequency} className="mt-1 block w-full rounded-md border border-kampmax-border bg-white px-3 py-2 text-sm">
-              <option value="MONTHLY">Monthly</option><option value="QUARTERLY">Quarterly</option><option value="BIANNUAL">Every six months</option><option value="ANNUAL">Annually</option>
+              <option value="ANNUALLY">Annually</option><option value="BIANNUALLY">Every six months</option><option value="PER_SEMESTER">Per semester</option><option value="QUARTERLY">Quarterly</option><option value="MONTHLY">Monthly</option><option value="PER_NIGHT">Per night</option>
             </select>
           </label>
           <label className="text-xs text-kampmax-text-secondary sm:col-span-2">Description

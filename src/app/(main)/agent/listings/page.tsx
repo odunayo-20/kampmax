@@ -10,6 +10,7 @@ import {
   useCreateAccommodationListing,
 } from "@/hooks/use-accommodation";
 import { accommodationApi } from "@/services/accommodation";
+import type { AccommodationPaymentFrequency } from "@/types/accommodation";
 import { AccommodationListingManager } from "@/components/accommodation/AccommodationListingManager";
 import { Skeleton } from "@/components/ui/Skeleton";
 
@@ -32,7 +33,7 @@ function ListingForm({
     title: "",
     description: "",
     rentAmount: "",
-    paymentFrequency: "ANNUAL",
+    paymentFrequency: "ANNUALLY" as AccommodationPaymentFrequency,
     cautionFee: "",
     agencyFee: "",
     agreementFee: "",
@@ -55,7 +56,7 @@ function ListingForm({
         title: data.title.trim(),
         description: data.description.trim() || undefined,
         rentAmount: Number(data.rentAmount),
-        paymentFrequency: data.paymentFrequency as "MONTHLY" | "QUARTERLY" | "BIANNUAL" | "ANNUAL",
+        paymentFrequency: data.paymentFrequency as AccommodationPaymentFrequency,
         cautionFee: Number(data.cautionFee || 0),
         agencyFee: Number(data.agencyFee || 0),
         agreementFee: Number(data.agreementFee || 0),
@@ -67,7 +68,7 @@ function ListingForm({
         title: "",
         description: "",
         rentAmount: "",
-        paymentFrequency: "ANNUAL",
+        paymentFrequency: "ANNUALLY" as AccommodationPaymentFrequency,
         cautionFee: "",
         agencyFee: "",
         agreementFee: "",
@@ -160,13 +161,20 @@ function ListingForm({
           Payment Frequency
           <select
             value={data.paymentFrequency}
-            onChange={(e) => setData((c) => ({ ...c, paymentFrequency: e.target.value }))}
+            onChange={(e) =>
+              setData((c) => ({
+                ...c,
+                paymentFrequency: e.target.value as AccommodationPaymentFrequency,
+              }))
+            }
             className="mt-1 block w-full rounded-xl border border-kampmax-border bg-white px-3.5 py-2 text-sm text-kampmax-text focus:border-kampmax-blue focus:outline-none"
           >
-            <option value="ANNUAL">Per Year (Annual)</option>
-            <option value="BIANNUAL">Every 6 Months (Biannual)</option>
+            <option value="ANNUALLY">Per Year (Annually)</option>
+            <option value="BIANNUALLY">Every 6 Months (Biannually)</option>
+            <option value="PER_SEMESTER">Per Semester</option>
             <option value="QUARTERLY">Quarterly</option>
             <option value="MONTHLY">Monthly</option>
+            <option value="PER_NIGHT">Per Night</option>
           </select>
         </label>
 
