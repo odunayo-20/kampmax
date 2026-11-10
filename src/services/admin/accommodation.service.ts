@@ -11,7 +11,18 @@
 import type { Paginated } from "@/types/admin";
 import type {
   AccommodationAgentStatus,
+  AccommodationPackage,
+  AccommodationSettings,
   AdminAgentDetail,
+  AdminDashboard,
+  AdminSubscription,
+  DashboardRange,
+  SubscriptionStatus,
+  TaxonomyInput,
+  TaxonomyItem,
+  TaxonomyKind,
+  TaxonomyUpdate,
+  UpdatePackageInput,
   AdminAgentListItem,
   AdminListingDetail,
   AdminListingItem,
@@ -143,4 +154,41 @@ export interface AdminAccommodationService {
    * `listingSuspended` is false when the listing was not on the site to take down.
    */
   resolveReport(id: string, input: ResolveReportInput): Promise<{ listingSuspended: boolean }>;
+
+  // ---- subscriptions (read-only) ----
+  /** GET /accommodation/admin/subscriptions */
+  listSubscriptions(query?: SubscriptionsQuery): Promise<SubscriptionsPage>;
+  /** GET …/subscriptions/:id/payments: every charge, oldest first. */
+  subscriptionPayments(id: string): Promise<AdminPayment[]>;
+
+  // ---- overview ----
+  /** GET /accommodation/admin/dashboard (default: last 30 days) */
+  dashboard(range?: DashboardRange): Promise<AdminDashboard>;
+
+  // ---- settings and packages (changes need accommodation.configure: Super Admin) ----
+  /** GET /accommodation/admin/packages: includes turned-off packages. */
+  listPackages(): Promise<AccommodationPackage[]>;
+  /** PATCH …/packages/:id: new price applies to new subscriptions only; running ones keep the price they were sold at. */
+  updatePackage(id: string, input: UpdatePackageInput): Promise<AccommodationPackage>;
+  /** GET /accommodation/admin/settings */
+  getSettings(): Promise<AccommodationSettings>;
+  /** PATCH …/settings */
+  updateSettings(input: Partial<AccommodationSettings>): Promise<AccommodationSettings>;
+  /** GET …/categories or …/amenities: turned-off ones included, with usage counts. */
+  listTaxonomy(kind: TaxonomyKind): Promise<TaxonomyItem[]>;
+  /** POST …/categories or …/amenities */
+  createTaxonomy(kind: TaxonomyKind, input: TaxonomyInput): Promise<TaxonomyItem>;
+  /** PATCH …/categories/:id or …/amenities/:id: renaming never changes the slug. */
+  updateTaxonomy(kind: TaxonomyKind, id: string, input: TaxonomyUpdate): Promise<TaxonomyItem>;
 }
+
+export interface SubscriptionsQuery {
+  status?: SubscriptionStatus;
+  page?: number;
+  pageSize?: number;
+}
+
+export type SubscriptionsPage = Paginated<AdminSubscription> & {
+  /** How many subscriptions sit in each status, whatever the filter. */
+  counts: Partial<Record<SubscriptionStatus, number>>;
+};

@@ -29,8 +29,9 @@ function NavGroups({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?:
               // Segment-boundary match so /admin/campus doesn't also
               // highlight for /admin/campuses (and vice versa).
               const active =
-                item.href === "/admin"
-                  ? pathname === "/admin"
+                // Overview is the section root, so it only matches itself.
+                item.href === "/admin" || item.key === "accommodationOverview"
+                  ? pathname === item.href
                   : pathname === item.href ||
                     pathname.startsWith(`${item.href}/`);
               const Icon = item.icon;

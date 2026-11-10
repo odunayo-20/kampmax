@@ -37,6 +37,8 @@ import {
   Newspaper,
   Home,
   UserCheck,
+  Repeat,
+  SlidersHorizontal,
 } from "lucide-react";
 import { AdminNavItemKey, canSeeSection } from "./permissions";
 import { AdminRole } from "@/types/admin";
@@ -81,10 +83,18 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     id: "accommodation",
     label: "Accommodation",
     items: [
+      { key: "accommodationOverview", href: "/admin/accommodation", label: "Overview", icon: BarChart3 },
       { key: "accommodationAgents", href: "/admin/accommodation/agents", label: "Agents", icon: UserCheck },
       { key: "accommodationListings", href: "/admin/accommodation/listings", label: "Listings", icon: Home },
+      {
+        key: "accommodationSubscriptions",
+        href: "/admin/accommodation/subscriptions",
+        label: "Subscriptions",
+        icon: Repeat,
+      },
       { key: "accommodationPayments", href: "/admin/accommodation/payments", label: "Payments", icon: Receipt },
       { key: "accommodationReports", href: "/admin/accommodation/reports", label: "Reports", icon: Flag },
+      { key: "accommodationSettings", href: "/admin/accommodation/settings", label: "Settings", icon: SlidersHorizontal },
     ],
   },
   {
@@ -170,7 +180,10 @@ export function getNavForRole(role: AdminRole): AdminNavGroup[] {
 
 const LABELS: Record<string, string> = Object.fromEntries([
   ...ADMIN_NAV_GROUPS.flatMap((g) =>
-    g.items.map((i) => [i.href.replace("/admin", "") || "/", i.label] as const)
+    g.items
+      // Overview shares its path with the section itself, which keeps the section name.
+      .filter((i) => i.key !== "accommodationOverview")
+      .map((i) => [i.href.replace("/admin", "") || "/", i.label] as const)
   ),
 ]);
 

@@ -512,6 +512,16 @@ export const adminKeys = {
       list: (query: { status?: string; page?: number; pageSize?: number }) =>
         ["admin", "accommodation", "reports", "list", query] as const,
     } as const,
+    subscriptions: {
+      all: ["admin", "accommodation", "subscriptions"] as const,
+      list: (query: { status?: string; page?: number; pageSize?: number }) =>
+        ["admin", "accommodation", "subscriptions", "list", query] as const,
+      payments: (id: string) => ["admin", "accommodation", "subscriptions", "payments", id] as const,
+    } as const,
+    dashboard: (range: { from?: string; to?: string }) => ["admin", "accommodation", "dashboard", range] as const,
+    packages: ["admin", "accommodation", "packages"] as const,
+    settings: ["admin", "accommodation", "settings"] as const,
+    taxonomy: (kind: string) => ["admin", "accommodation", "taxonomy", kind] as const,
   } as const,
   /** Named places on campuses and the suggestions students send in. */
   campusPlaces: {

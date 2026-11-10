@@ -1,8 +1,13 @@
 import { apiClient, type ApiError } from "@/lib/api-client";
 import type { Paginated } from "@/types/admin";
 import type {
+  AccommodationPackage,
+  AccommodationSettings,
   AdminAgentDetail,
   AdminAgentListItem,
+  AdminDashboard,
+  AdminSubscription,
+  TaxonomyItem,
   AdminListingDetail,
   AdminListingItem,
   AdminPayment,
@@ -20,6 +25,8 @@ import type {
   PaymentsQuery,
   ReportsPage,
   ReportsQuery,
+  SubscriptionsPage,
+  SubscriptionsQuery,
 } from "./accommodation.service";
 
 /** Live service over AdminAccommodationController (/accommodation/admin). */
@@ -117,8 +124,8 @@ export function createApiAccommodationService(): AdminAccommodationService {
   const listing = (id: string) => `${base}/listings/${encodeURIComponent(id)}`;
 
   /** A decision that returns the updated record. */
-  async function decide<R>(path: string, body: Record<string, unknown>, fallback: string): Promise<R> {
-    const { data, error } = await apiClient.patch<Record<string, unknown>, R>(path, body);
+  async function decide<R>(path: string, body: object, fallback: string): Promise<R> {
+    const { data, error } = await apiClient.patch<object, R>(path, body);
     if (error) fail(error, fallback);
     return data;
   }
@@ -254,6 +261,86 @@ export function createApiAccommodationService(): AdminAccommodationService {
         "Couldn't close the report."
       );
       return { listingSuspended: Boolean(result?.listingSuspended) };
+    },
+
+    // ---- subscriptions ----
+    async listSubscriptions(query: SubscriptionsQuery = {}) {
+      const params = new URLSearchParams();
+      if (query.status) params.set("status", query.status);
+      if (query.page) params.set("page", String(query.page));
+      if (query.pageSize) params.set("limit", String(query.pageSize));
+      const qs = params.toString();
+      const { data, error } = await apiClient.get<{
+        items: AdminSubscription[];
+        meta: BackendMeta;
+        counts: SubscriptionsPage["counts"];
+      }>(`${base}/subscriptions${qs ? `?${qs}` : ""}`);
+      if (error) fail(error, "Couldn't load the subscriptions.");
+      return { ...paged(data.items, data.meta), counts: data.counts };
+    },
+
+    async subscriptionPayments(id) {
+      const { data, error } = await apiClient.get<AdminPayment[]>(
+        `${base}/subscriptions/${encodeURIComponent(id)}/payments`
+      );
+      if (error) fail(error, "Couldn't load the billing history.");
+      return data;
+    },
+
+    // ---- overview ----
+    async dashboard(range = {}) {
+      const params = new URLSearchParams();
+      if (range.from) params.set("from", range.from);
+      if (range.to) params.set("to", range.to);
+      const qs = params.toString();
+      const { data, error } = await apiClient.get<AdminDashboard>(`${base}/dashboard${qs ? `?${qs}` : ""}`);
+      if (error) fail(error, "Couldn't load the overview.");
+      return data;
+    },
+
+    // ---- settings and packages ----
+    async listPackages() {
+      const { data, error } = await apiClient.get<AccommodationPackage[]>(`${base}/packages`);
+      if (error) fail(error, "Couldn't load the packages.");
+      return data;
+    },
+
+    updatePackage(id, input) {
+      return decide<AccommodationPackage>(
+        `${base}/packages/${encodeURIComponent(id)}`,
+        input,
+        "Couldn't save the package."
+      );
+    },
+
+    async getSettings() {
+      const { data, error } = await apiClient.get<AccommodationSettings>(`${base}/settings`);
+      if (error) fail(error, "Couldn't load the settings.");
+      return data;
+    },
+
+    updateSettings(input) {
+      return decide<AccommodationSettings>(`${base}/settings`, input, "Couldn't save the settings.");
+    },
+
+    async listTaxonomy(kind) {
+      const { data, error } = await apiClient.get<TaxonomyItem[]>(`${base}/${kind}`);
+      if (error) fail(error, kind === "categories" ? "Couldn't load the property types." : "Couldn't load the facilities.");
+      return data;
+    },
+
+    async createTaxonomy(kind, input) {
+      const body = {
+        name: input.name.trim(),
+        ...(input.description?.trim() ? { description: input.description.trim() } : {}),
+      };
+      const { data, error } = await apiClient.post<object, TaxonomyItem>(`${base}/${kind}`, body);
+      if (error) fail(error, "Couldn't add it.");
+      return data;
+    },
+
+    updateTaxonomy(kind, id, input) {
+      return decide<TaxonomyItem>(`${base}/${kind}/${encodeURIComponent(id)}`, input, "Couldn't save the change.");
     },
 
     async exportPayments(range = {}) {

@@ -7,13 +7,16 @@ const UUID = "5205c7a4-d1c7-4fb4-ad2e-285fe6bab6d8";
 describe("accommodation in the admin navigation", () => {
   const group = ADMIN_NAV_GROUPS.find((g) => g.id === "accommodation");
 
-  it("has its own group with agents first, because applications gate everything else", () => {
+  it("has its own group, opening on the overview and then agents, because applications gate everything else", () => {
     expect(group?.label).toBe("Accommodation");
     expect(group?.items.map((i) => i.href)).toEqual([
+      "/admin/accommodation",
       "/admin/accommodation/agents",
       "/admin/accommodation/listings",
+      "/admin/accommodation/subscriptions",
       "/admin/accommodation/payments",
       "/admin/accommodation/reports",
+      "/admin/accommodation/settings",
     ]);
   });
 
@@ -33,12 +36,18 @@ describe("accommodation in the admin navigation", () => {
     expect(getNavForRole("CAMPUS_ADMIN").map((g) => g.id)).not.toContain("accommodation");
     expect(canSeeSection("CAMPUS_ADMIN", "accommodationAgents")).toBe(false);
     expect(canSeeSection("CAMPUS_ADMIN", "accommodationListings")).toBe(false);
+    expect(canSeeSection("CAMPUS_ADMIN", "accommodationOverview")).toBe(false);
+    expect(canSeeSection("CAMPUS_ADMIN", "accommodationSubscriptions")).toBe(false);
+    expect(canSeeSection("CAMPUS_ADMIN", "accommodationSettings")).toBe(false);
   });
 });
 
 describe("breadcrumbs on the accommodation detail pages", () => {
   it("names the section and the list", () => {
+    // The overview shares the section path, so it must not rename the section.
     expect(breadcrumbLabel("accommodation", 1)).toBe("Accommodation");
+    expect(breadcrumbLabel("subscriptions", 2)).toBe("Subscriptions");
+    expect(breadcrumbLabel("settings", 2)).toBe("Settings");
     expect(breadcrumbLabel("agents", 2)).toBe("Agents");
     expect(breadcrumbLabel("listings", 2)).toBe("Listings");
   });

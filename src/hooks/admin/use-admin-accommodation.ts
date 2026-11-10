@@ -13,8 +13,22 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminKeys } from "@/lib/query-keys";
 import { accommodationService } from "@/services/admin";
-import type { ResolveReportInput } from "@/types/accommodation";
-import type { AgentsQuery, ListingsQuery, PaymentsQuery, ReportsQuery } from "@/services/admin/accommodation.service";
+import type {
+  AccommodationSettings,
+  DashboardRange,
+  ResolveReportInput,
+  TaxonomyInput,
+  TaxonomyKind,
+  TaxonomyUpdate,
+  UpdatePackageInput,
+} from "@/types/accommodation";
+import type {
+  AgentsQuery,
+  ListingsQuery,
+  PaymentsQuery,
+  ReportsQuery,
+  SubscriptionsQuery,
+} from "@/services/admin/accommodation.service";
 
 // ---------- agents ----------
 
@@ -218,7 +232,94 @@ export function useAdminReports(query: ReportsQuery) {
   });
 }
 
-/** Closing a report can also take a listing down, so the whole accommodation tree refreshes. */
+// ---------- subscriptions (read-only) ----------
+
+export function useAdminSubscriptions(query: SubscriptionsQuery, enabled = true) {
+  return useQuery({
+    queryKey: adminKeys.accommodation.subscriptions.list(query),
+    queryFn: () => accommodationService.listSubscriptions(query),
+    placeholderData: keepPreviousData,
+    enabled,
+  });
+}
+
+/** Loaded when a row is opened. */
+export function useSubscriptionPayments(id: string, enabled: boolean) {
+  return useQuery({
+    queryKey: adminKeys.accommodation.subscriptions.payments(id),
+    queryFn: () => accommodationService.subscriptionPayments(id),
+    enabled,
+  });
+}
+
+// ---------- overview ----------
+
+export function useAccommodationDashboard(range: DashboardRange) {
+  return useQuery({
+    queryKey: adminKeys.accommodation.dashboard(range),
+    queryFn: () => accommodationService.dashboard(range),
+    placeholderData: keepPreviousData,
+  });
+}
+
+// ---------- settings and packages ----------
+
+export function useAccommodationPackages() {
+  return useQuery({
+    queryKey: adminKeys.accommodation.packages,
+    queryFn: () => accommodationService.listPackages(),
+  });
+}
+
+export function useUpdatePackage() {
+  const refresh = useRefreshAccommodation();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UpdatePackageInput }) =>
+      accommodationService.updatePackage(id, input),
+    onSuccess: () => void refresh(),
+  });
+}
+
+export function useAccommodationSettings() {
+  return useQuery({
+    queryKey: adminKeys.accommodation.settings,
+    queryFn: () => accommodationService.getSettings(),
+  });
+}
+
+export function useUpdateAccommodationSettings() {
+  const refresh = useRefreshAccommodation();
+  return useMutation({
+    mutationFn: (input: Partial<AccommodationSettings>) => accommodationService.updateSettings(input),
+    onSuccess: () => void refresh(),
+  });
+}
+
+export function useAccommodationTaxonomy(kind: TaxonomyKind) {
+  return useQuery({
+    queryKey: adminKeys.accommodation.taxonomy(kind),
+    queryFn: () => accommodationService.listTaxonomy(kind),
+  });
+}
+
+export function useCreateTaxonomy(kind: TaxonomyKind) {
+  const refresh = useRefreshAccommodation();
+  return useMutation({
+    mutationFn: (input: TaxonomyInput) => accommodationService.createTaxonomy(kind, input),
+    onSuccess: () => void refresh(),
+  });
+}
+
+export function useUpdateTaxonomy(kind: TaxonomyKind) {
+  const refresh = useRefreshAccommodation();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: TaxonomyUpdate }) =>
+      accommodationService.updateTaxonomy(kind, id, input),
+    onSuccess: () => void refresh(),
+  });
+}
+
+/** Closing a report can also take a listing down/** Closing a report can also take a listing down, so the whole accommodation tree refreshes. */
 export function useResolveReport() {
   const refresh = useRefreshAccommodation();
   return useMutation({

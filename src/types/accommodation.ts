@@ -306,3 +306,135 @@ export const RESOLUTION_MAX = 500;
 export function canSuspendFromReport(report: Pick<AdminReport, "listingModerationStatus">): boolean {
   return report.listingModerationStatus === "APPROVED";
 }
+
+// ---------- subscriptions (read-only) ----------
+
+export type SubscriptionStatus =
+  | "PENDING"
+  | "ACTIVE"
+  | "PAST_DUE"
+  | "SUSPENDED"
+  | "EXPIRED"
+  | "CANCELLED";
+
+export const SUBSCRIPTION_STATUS_LABELS: Record<SubscriptionStatus, string> = {
+  PENDING: "Waiting for approval",
+  ACTIVE: "Active",
+  PAST_DUE: "Past due",
+  SUSPENDED: "Suspended",
+  EXPIRED: "Expired",
+  CANCELLED: "Cancelled",
+};
+
+export interface AdminSubscription {
+  id: string;
+  listingId: string;
+  listingTitle: string | null;
+  agentId: string;
+  agentName: string | null;
+  status: SubscriptionStatus;
+  amount: number;
+  currency: string;
+  durationDays: number;
+  startsAt: string | null;
+  endsAt: string | null;
+  nextBillingAt: string | null;
+  autoRenew: boolean;
+  billingCycle: number;
+  cancelledAt: string | null;
+  lastPaymentAt: string | null;
+  lastFailureAt: string | null;
+  /** Failed renewal charges since the last success; the third suspends the listing. */
+  retryCount: number;
+  nextRetryAt: string | null;
+  createdAt: string;
+}
+
+// ---------- overview dashboard ----------
+
+export interface AdminDashboard {
+  range: { from: string; to: string };
+  agents: { total: number; pending: number; verified: number; suspended: number; newInRange: number };
+  properties: number;
+  listings: { total: number; active: number; pendingApproval: number; expired: number; suspended: number };
+  subscriptions: {
+    active: number;
+    pastDue: number;
+    suspended: number;
+    monthlyRecurringRevenue: number;
+    averageRevenuePerActiveListing: number | null;
+    /** A percentage (12.5 means 12.5%), or null when nothing has started. */
+    cancellationRate: number | null;
+  };
+  payments: {
+    revenueInRange: number;
+    paidInRange: number;
+    failedInRange: number;
+    failedPaymentRate: number | null;
+    renewalSuccessRate: number | null;
+    refundsPending: { count: number; amount: number };
+    revenueByMonth: { month: string; revenue: number }[];
+  };
+  enquiries: { inRange: number; answered: number; averageResponseHours: number | null };
+  inspections: {
+    requestedInRange: number;
+    completedInRange: number;
+    enquiryToInspectionRate: number | null;
+    completionRate: number | null;
+  };
+  reports: { open: number; newInRange: number };
+}
+
+export interface DashboardRange {
+  /** yyyy-mm-dd */
+  from?: string;
+  /** yyyy-mm-dd, included */
+  to?: string;
+}
+
+// ---------- settings and packages (Super Admin edits) ----------
+
+export interface AccommodationPackage {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  currency: string;
+  durationDays: number;
+  isActive: boolean;
+}
+
+export interface UpdatePackageInput {
+  price?: number;
+  durationDays?: number;
+  isActive?: boolean;
+}
+
+export interface AccommodationSettings {
+  availabilityIntervalDays: number;
+  availabilityGraceDays: number;
+}
+
+/** A property type or a facility. The slug is fixed at creation so saved links keep working. */
+export interface TaxonomyItem {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  isActive: boolean;
+  /** How many properties (types) or listings (facilities) use it. */
+  usage: number;
+}
+
+export type TaxonomyKind = "categories" | "amenities";
+
+export interface TaxonomyInput {
+  name: string;
+  description?: string;
+}
+
+export interface TaxonomyUpdate {
+  name?: string;
+  description?: string;
+  isActive?: boolean;
+}
