@@ -7,13 +7,14 @@ import { getVendorDashboardAccessApi } from "@/services/vendor-dashboard";
 import { getServiceProviderDashboardAccessApi } from "@/services/service-provider-dashboard";
 import { getFreelancerDashboardAccessApi } from "@/services/freelancer-dashboard";
 import { getEmployerDashboardAccessApi } from "@/services/employer";
+import { getAgentDashboardAccessApi } from "@/services/agent-dashboard";
 
 /**
- * The four kinds of profile an account can hold, and how to find out which it has.
+ * The profiles an account can hold, and how to find out which it has.
  * One definition for everything that lists them: the top-bar switcher, the profiles
  * page and the home page strip.
  */
-export type ProfileId = "vendor" | "freelancer" | "service" | "employer";
+export type ProfileId = "vendor" | "freelancer" | "service" | "employer" | "agent";
 
 type AccessResult = { kind?: string; storeName?: string; displayName?: string } | null;
 
@@ -71,6 +72,16 @@ export const PROFILE_DEFINITIONS: ProfileDefinition[] = [
     onboardHref: "/onboarding/employer",
     onboardLabel: "Become an Employer",
     check: getEmployerDashboardAccessApi,
+  },
+  {
+    id: "agent",
+    label: "Accommodation Agent",
+    description: "List student rooms, hostels, and apartments.",
+    icon: Building2,
+    activeHref: "/agent",
+    onboardHref: "/onboarding/agent",
+    onboardLabel: "List Accommodation",
+    check: getAgentDashboardAccessApi,
   },
 ];
 

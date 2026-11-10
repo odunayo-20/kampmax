@@ -35,9 +35,9 @@ export function YourProfilesStrip() {
   }
 
   // A profile we couldn't check is left out rather than guessed at.
-  const entries = PROFILE_DEFINITIONS.map((definition) => ({ definition, state: states![definition.id] }))
-    .filter(({ state }) => state.status !== "error")
-    .sort((a, b) => Number(b.state.status === "active") - Number(a.state.status === "active"));
+  const entries = PROFILE_DEFINITIONS.map((definition) => ({ definition, state: states?.[definition.id] }))
+    .filter(({ state }) => state && state.status !== "error")
+    .sort((a, b) => Number(b.state?.status === "active") - Number(a.state?.status === "active"));
   if (entries.length === 0) return null;
 
   return (

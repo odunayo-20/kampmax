@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
+  User,
   Building2,
   ClipboardList,
   MessageSquareText,
@@ -28,12 +29,13 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/agent", label: "Overview", icon: LayoutDashboard, exact: true },
+  { href: "/agent/profile", label: "Profile", icon: User },
   { href: "/agent/properties", label: "Properties & Units", icon: Building2 },
   { href: "/agent/listings", label: "Listings", icon: ClipboardList },
   { href: "/agent/enquiries", label: "Enquiries & Leads", icon: MessageSquareText },
   { href: "/agent/billing", label: "Subscriptions & Billing", icon: Wallet },
   { href: "/agent/verification", label: "KYC & Verification", icon: ShieldCheck },
-  { href: "/agent/settings", label: "Profile & Settings", icon: Settings },
+  { href: "/agent/settings", label: "Settings", icon: Settings },
 ];
 
 export function AgentSidebar({

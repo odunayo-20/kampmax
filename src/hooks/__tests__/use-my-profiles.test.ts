@@ -5,11 +5,13 @@ const access = vi.hoisted(() => ({
   freelancer: vi.fn(),
   service: vi.fn(),
   employer: vi.fn(),
+  agent: vi.fn(),
 }));
 vi.mock("@/services/vendor-dashboard", () => ({ getVendorDashboardAccessApi: access.vendor }));
 vi.mock("@/services/freelancer-dashboard", () => ({ getFreelancerDashboardAccessApi: access.freelancer }));
 vi.mock("@/services/service-provider-dashboard", () => ({ getServiceProviderDashboardAccessApi: access.service }));
 vi.mock("@/services/employer", () => ({ getEmployerDashboardAccessApi: access.employer }));
+vi.mock("@/services/agent-dashboard", () => ({ getAgentDashboardAccessApi: access.agent }));
 vi.mock("@/lib/auth-context", () => ({ useAuth: () => ({ status: "authenticated" }) }));
 
 import { hasProfile, loadMyProfiles } from "../use-my-profiles";
@@ -19,6 +21,7 @@ beforeEach(() => {
   access.freelancer.mockResolvedValue({ kind: "no_freelancer" });
   access.service.mockResolvedValue({ kind: "no_service_provider" });
   access.employer.mockResolvedValue({ kind: "no_employer" });
+  access.agent.mockResolvedValue({ kind: "no_agent" });
 });
 
 describe("hasProfile", () => {
@@ -43,6 +46,7 @@ describe("loadMyProfiles", () => {
       freelancer: { status: "none" },
       service: { status: "active", sub: "Ada Cuts" },
       employer: { status: "none" },
+      agent: { status: "none" },
     });
   });
 
@@ -55,5 +59,6 @@ describe("loadMyProfiles", () => {
     expect(states.freelancer).toEqual({ status: "error" });
     expect(states.employer).toEqual({ status: "active", sub: undefined });
     expect(states.vendor).toEqual({ status: "none" });
+    expect(states.agent).toEqual({ status: "none" });
   });
 });

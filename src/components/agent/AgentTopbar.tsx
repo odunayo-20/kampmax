@@ -1,23 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { Menu, MapPin, Plus, ExternalLink } from "lucide-react";
-import { useAuth } from "@/lib/auth-context";
-import { Avatar } from "@/components/ui";
+import { Menu, MapPin, Plus, ExternalLink, Home } from "lucide-react";
+import { ProfileSwitcher } from "@/components/vendor-dashboard/ProfileSwitcher";
 
 export function AgentTopbar({
   onOpenMobile,
   location,
+  agentName,
 }: {
   onOpenMobile: () => void;
   location?: string;
+  agentName?: string;
 }) {
-  const { user } = useAuth();
-
   return (
-    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-kampmax-border bg-white px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b border-kampmax-border bg-white px-4 lg:px-8">
       {/* Left: Mobile Drawer Trigger & Workspace Indicator */}
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 items-center gap-3">
         <button
           type="button"
           onClick={onOpenMobile}
@@ -27,12 +26,12 @@ export function AgentTopbar({
           <Menu className="h-5 w-5" aria-hidden />
         </button>
 
-        <div className="flex items-center gap-2">
-          <span className="hidden text-sm font-semibold text-kampmax-text sm:inline">
-            Agent Workspace
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-sm font-bold text-kampmax-text">
+            {agentName || "Agent Workspace"}
           </span>
           {location && (
-            <span className="inline-flex items-center gap-1 rounded-md bg-neutral-100 px-2.5 py-1 text-xs font-medium text-kampmax-text-secondary">
+            <span className="hidden items-center gap-1 rounded-md bg-neutral-100 px-2.5 py-1 text-xs font-medium text-kampmax-text-secondary sm:inline-flex">
               <MapPin className="h-3 w-3 text-kampmax-blue" aria-hidden />
               {location}
             </span>
@@ -40,36 +39,28 @@ export function AgentTopbar({
         </div>
       </div>
 
-      {/* Right: Quick Actions & Profile */}
-      <div className="flex items-center gap-3">
+      {/* Right: Quick Actions & Shared ProfileSwitcher */}
+      <div className="flex items-center gap-2 sm:gap-3">
         <Link
           href="/agent/properties"
-          className="inline-flex items-center gap-1.5 rounded-xl bg-kampmax-blue px-3.5 py-1.5 text-xs font-semibold text-white shadow-2xs transition-opacity hover:opacity-95"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-kampmax-blue px-3 py-1.5 text-xs font-semibold text-white shadow-2xs transition-opacity hover:opacity-95"
         >
           <Plus className="h-3.5 w-3.5" aria-hidden />
-          <span>New Property</span>
+          <span className="hidden sm:inline">New Property</span>
         </Link>
 
         <Link
           href="/accommodation"
-          target="_blank"
-          className="hidden items-center gap-1 text-xs font-medium text-kampmax-text-secondary hover:text-kampmax-blue sm:inline-flex"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-kampmax-border px-3 py-1.5 text-xs font-medium text-kampmax-text hover:bg-neutral-50"
         >
-          <span>Marketplace</span>
-          <ExternalLink className="h-3 w-3" aria-hidden />
+          <Home className="h-4 w-4" aria-hidden />
+          <span className="hidden sm:inline">View Accommodation</span>
+          <ExternalLink className="hidden h-3.5 w-3.5 sm:inline" aria-hidden />
         </Link>
 
-        <div className="h-4 w-px bg-kampmax-border" aria-hidden />
-
-        <div className="flex items-center gap-2">
-          <Avatar
-            name={user?.name || "Agent"}
-            src={user?.avatar}
-            size="sm"
-          />
-        </div>
+        {/* Shared Cross-Vertical Profile Switcher */}
+        <ProfileSwitcher />
       </div>
     </header>
   );
 }
-

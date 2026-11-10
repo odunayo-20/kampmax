@@ -22,6 +22,7 @@ const states = (overrides: Partial<Record<ProfileId, ProfileState>> = {}) => ({
   freelancer: { status: "none" },
   service: { status: "none" },
   employer: { status: "none" },
+  agent: { status: "none" },
   ...overrides,
 });
 
@@ -60,6 +61,7 @@ describe("YourProfilesStrip", () => {
       "/freelancer/dashboard",
       "/onboarding/service-provider",
       "/onboarding/employer",
+      "/onboarding/agent",
     ]);
     expect(screen.getByText("Ada's Books")).toBeTruthy();
     expect(screen.getByText("Become an Employer")).toBeTruthy();
@@ -69,7 +71,7 @@ describe("YourProfilesStrip", () => {
     show(states({ freelancer: { status: "error" } }));
 
     expect(screen.queryByText(/freelancer/i)).toBeNull();
-    expect(screen.getAllByRole("link")).toHaveLength(4); // 3 profiles + the "Manage" link
+    expect(screen.getAllByRole("link")).toHaveLength(5); // 4 profiles + the "Manage" link
   });
 
   it("links to the profiles page to manage them", () => {
