@@ -8,15 +8,10 @@ import {
   Building2,
   Package,
   ShoppingCart,
-  ScanLine,
   Megaphone,
-  BarChart3,
-  Wallet,
   ShieldCheck,
-  UsersRound,
   MessageSquare,
   Settings,
-  Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LogoIcon } from "@/components/ui/Logo";
@@ -28,7 +23,6 @@ interface NavItem {
   href: string;
   label: string;
   icon: typeof Store;
-  placeholder?: boolean;
   badge?: string;
 }
 
@@ -67,22 +61,18 @@ export function AgentSidebar({
       title: "Inquiries & Leads",
       items: [
         { href: "/agent/enquiries", label: "Enquiries", icon: ShoppingCart },
-        { href: "/agent/inspections", label: "Inspections", icon: ScanLine, placeholder: true },
       ],
     },
     {
       title: "Growth",
       items: [
         { href: "/agent/billing", label: "Subscriptions", icon: Megaphone },
-        { href: "/agent/analytics", label: "Analytics", icon: BarChart3, placeholder: true },
-        { href: "/agent/earnings", label: "Earnings", icon: Wallet, placeholder: true },
       ],
     },
     {
       title: "Account",
       items: [
         { href: "/agent/verification", label: "Verification & KYC", icon: ShieldCheck },
-        { href: "/agent/staff", label: "Staff", icon: UsersRound, placeholder: true },
         {
           href: "/chat",
           label: "Messages",
@@ -146,7 +136,6 @@ export function AgentSidebar({
                     >
                       <NavLinkIcon icon={item.icon} />
                       <span className="flex-1 truncate">{item.label}</span>
-                      {item.placeholder && <Lock className="h-3.5 w-3.5 text-white/40" aria-label="Coming soon" />}
                       {item.badge && (
                         <span className="rounded-full bg-kampmax-gold px-1.5 py-0.5 text-[10px] font-bold text-kampmax-navy">
                           {item.badge}
