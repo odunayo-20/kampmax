@@ -16,6 +16,8 @@ const nextConfig: NextConfig = {
       ...extraMediaHosts,
       { protocol: "https", hostname: "images.unsplash.com" },
       { protocol: "https", hostname: "res.cloudinary.com" },
+      { protocol: "https", hostname: "*.r2.cloudflarestorage.com" },
+      { protocol: "https", hostname: "*.r2.dev" },
       // Locally stored uploads in development (backend STORAGE_PROVIDER=local).
       { protocol: "http", hostname: "localhost" },
     ],
@@ -50,6 +52,22 @@ const nextConfig: NextConfig = {
       {
         source: "/accommodation/agent/onboarding",
         destination: "/onboarding/agent",
+        permanent: false,
+      },
+      // A payment gateway return to the old address carries the payment reference
+      // (the query string is kept), so the billing page can confirm the payment.
+      {
+        source: "/accommodation/agent",
+        has: [{ type: "query" as const, key: "reference" }],
+        destination: "/agent/billing",
+        permanent: false,
+      },
+      // A payment gateway return to the old address carries the payment reference
+      // (the query string is kept), so the billing page can confirm the payment.
+      {
+        source: "/accommodation/agent",
+        has: [{ type: "query" as const, key: "trxref" }],
+        destination: "/agent/billing",
         permanent: false,
       },
       {

@@ -572,6 +572,15 @@ export const accommodationApi = {
     );
   },
 
+  /** The server asks Paystack and settles the payment; a success message from the browser is never trusted. */
+  verifyPayment(reference: string) {
+    return unwrap(
+      apiClient.get<AccommodationPayment>(
+        `/accommodation/payments/verify/${encodeURIComponent(reference)}`
+      )
+    );
+  },
+
   paymentHistory(page = 1, limit = 20) {
     return unwrap(
       apiClient.get<AccommodationPage<AccommodationPayment>>(

@@ -142,14 +142,14 @@ export function AdminSidebar() {
         onClick={toggleCollapsed}
         aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         className={cn(
-          "absolute -right-9 top-[68px] hidden h-8 w-8 items-center justify-center rounded-md border border-kampmax-border bg-white text-kampmax-text-secondary shadow-sm transition-colors hover:bg-kampmax-muted lg:flex",
+          "absolute -right-6 top-[68px] hidden h-6 w-6 items-center justify-center rounded-md border border-kampmax-border bg-white text-kampmax-text-secondary shadow-sm transition-colors hover:bg-kampmax-muted lg:flex",
           "focus-visible:outline focus-visible:outline-2 focus-visible:outline-kampmax-blue"
         )}
       >
         {collapsed ? (
-          <PanelLeftOpen className="h-4 w-4" />
+          <PanelLeftOpen className="h-3.5 w-3.5" />
         ) : (
-          <PanelLeftClose className="h-4 w-4" />
+          <PanelLeftClose className="h-3.5 w-3.5" />
         )}
       </button>
     </aside>

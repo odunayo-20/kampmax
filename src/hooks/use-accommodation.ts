@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
+import { getFriendlyErrorMessage } from "@/lib/error-messages";
 import { publicAccommodationKeys } from "@/lib/query-keys";
 import {
   accommodationApi,
@@ -17,6 +19,7 @@ import {
 import type {
   AccommodationAgentStatus,
   AccommodationEnquiry,
+  AccommodationPayment,
   AgentDocumentType,
 } from "@/types/accommodation";
 
@@ -300,7 +303,7 @@ export function useSubscribeAccommodationListing() {
         callbackUrl:
           typeof window === "undefined"
             ? undefined
-            : `${window.location.origin}/accommodation/agent?payment=return`,
+            : `${window.location.origin}/agent/billing`,
       }),
     onSuccess: refresh,
   });
@@ -448,10 +451,61 @@ export function useRenewAccommodationSubscription() {
         callbackUrl:
           typeof window === "undefined"
             ? undefined
-            : `${window.location.origin}/accommodation/agent?payment=return`,
+            : `${window.location.origin}/agent/billing`,
       }),
     onSuccess: refresh,
   });
+}
+
+export type AccommodationPaymentNotice = { tone: "ok" | "wait" | "error"; text: string };
+
+/** What to tell the agent about a payment the gateway sent them back from. */
+export function paymentReturnNotice(
+  payment: Pick<AccommodationPayment, "status" | "paymentType">
+): AccommodationPaymentNotice {
+  if (payment.status === "SUCCESS") {
+    return {
+      tone: "ok",
+      text:
+        payment.paymentType === "INITIAL"
+          ? "Payment received. Your listing is now waiting for our team to approve it, and goes live once it is."
+          : "Payment received. Your listing has been renewed.",
+    };
+  }
+  if (payment.status === "PENDING") {
+    return {
+      tone: "wait",
+      text: "We are still waiting for the bank to confirm this payment. This page updates when it arrives.",
+    };
+  }
+  return { tone: "error", text: "That payment did not go through, so nothing was charged. You can try again." };
+}
+
+/**
+ * Paystack sends the agent back with ?reference=ACC-…; this confirms that
+ * payment with the server exactly once, tidies the URL, and refreshes the
+ * accommodation data. Other payments' references are ignored.
+ */
+export function useAccommodationPaymentReturn() {
+  const queryClient = useQueryClient();
+  const [notice, setNotice] = useState<AccommodationPaymentNotice | null>(null);
+  const handled = useRef(false);
+
+  useEffect(() => {
+    if (handled.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const reference = params.get("reference") ?? params.get("trxref");
+    if (!reference?.startsWith("ACC-")) return;
+    handled.current = true;
+    window.history.replaceState(null, "", window.location.pathname);
+    accommodationApi
+      .verifyPayment(reference)
+      .then((payment) => setNotice(paymentReturnNotice(payment)))
+      .catch((error) => setNotice({ tone: "error", text: getFriendlyErrorMessage(error) }))
+      .finally(() => void queryClient.invalidateQueries({ queryKey: publicAccommodationKeys.all }));
+  }, [queryClient]);
+
+  return { notice };
 }
 
 export function isApprovedAccommodationAgent(status: AccommodationAgentStatus | null | undefined) {

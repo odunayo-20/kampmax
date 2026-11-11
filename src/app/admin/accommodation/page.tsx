@@ -58,6 +58,24 @@ function monthLabel(month: string): string {
   });
 }
 
+/**
+ * The backend lists only months that had payments, so a young business shows
+ * one giant bar. Show the six months ending at the range end instead, with
+ * zero for the months that had none.
+ */
+function lastSixMonths(
+  revenueByMonth: { month: string; revenue: number }[],
+  endIso: string
+): { month: string; revenue: number }[] {
+  const known = new Map(revenueByMonth.map((m) => [m.month, m.revenue]));
+  const end = new Date(endIso);
+  return Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - (5 - i), 1));
+    const month = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    return { month, revenue: known.get(month) ?? 0 };
+  });
+}
+
 interface Attention {
   label: string;
   count: number;
@@ -292,7 +310,10 @@ export default function AdminAccommodationOverviewPage() {
                   subtitle="Paid, after refunds"
                   type="bar"
                   accent="blue"
-                  data={d.payments.revenueByMonth.map((m) => ({ label: monthLabel(m.month), value: m.revenue }))}
+                  data={lastSixMonths(d.payments.revenueByMonth, d.range.to).map((m) => ({
+                    label: monthLabel(m.month),
+                    value: m.revenue,
+                  }))}
                   formatValue={formatNaira}
                 />
               )}

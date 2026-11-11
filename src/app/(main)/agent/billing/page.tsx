@@ -4,6 +4,7 @@ import { Wallet, CheckCircle, Clock, CreditCard } from "lucide-react";
 import {
   useAccommodationSubscriptions,
   useAccommodationPayments,
+  useAccommodationPaymentReturn,
 } from "@/hooks/use-accommodation";
 import { Skeleton } from "@/components/ui/Skeleton";
 
@@ -18,9 +19,24 @@ function money(amount: number, currency = "NGN") {
 export default function AgentBillingPage() {
   const subscriptionsQuery = useAccommodationSubscriptions(1, true);
   const paymentsQuery = useAccommodationPayments(1, true);
+  const { notice } = useAccommodationPaymentReturn();
 
   return (
     <div className="space-y-6">
+      {notice && (
+        <div
+          role={notice.tone === "error" ? "alert" : "status"}
+          className={`rounded-xl border px-4 py-3 text-sm ${
+            notice.tone === "ok"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+              : notice.tone === "wait"
+                ? "border-amber-200 bg-amber-50 text-amber-800"
+                : "border-red-200 bg-red-50 text-red-700"
+          }`}
+        >
+          {notice.text}
+        </div>
+      )}
       <div>
         <div className="flex items-center gap-2">
           <Wallet className="h-6 w-6 text-kampmax-blue" />

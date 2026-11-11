@@ -138,6 +138,21 @@ describe("overview: content", () => {
     expect(screen.getByText("Revenue by month")).toBeTruthy();
   });
 
+  it("shows the six months up to the end of the range, so one month of sales is not one giant bar", () => {
+    h.useAccommodationDashboard.mockReturnValue(
+      loaded(
+        dashboard({
+          range: { from: "2026-11-01", to: "2026-11-30" },
+          payments: { ...dashboard().payments, revenueByMonth: [{ month: "2026-11", revenue: 400 }] },
+        })
+      )
+    );
+    const { container } = render(<OverviewPage />);
+    for (const label of [/Jun 26/, /Jul 26/, /Aug 26/, /Sep\w* 26/, /Oct 26/, /Nov 26/]) {
+      expect(container.textContent).toMatch(label);
+    }
+  });
+
   it("covers listings, agents and demand", () => {
     render(<OverviewPage />);
     const listings = screen.getByRole("region", { name: "Listings and agents" });
