@@ -14,10 +14,10 @@ export const metadata: Metadata = {
   },
 };
 
+// Pinch-zoom stays enabled: blocking it fails WCAG 1.4.4 (Resize text) for low-vision users.
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
 };
 
 export default function RootLayout({

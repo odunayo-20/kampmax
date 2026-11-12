@@ -329,6 +329,18 @@ export interface Order {
   cancelReason?: string;
   notes?: string;
   timeline: OrderTimelineEntry[];
+  /** Set once a dispute has been opened (by the customer or Kampmax). */
+  dispute?: OrderDispute;
+  /** True once the vendor has been paid; a dispute can no longer hold the money. */
+  settled?: boolean;
+}
+
+export interface OrderDispute {
+  openedAt: string;
+  reason: string | null;
+  /** Set once a Kampmax reviewer has ruled; absent while the dispute is open. */
+  resolvedAt?: string;
+  resolution?: string | null;
 }
 
 export interface OrderTimelineEntry {

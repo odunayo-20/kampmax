@@ -50,28 +50,41 @@ describe("YourProfilesStrip", () => {
     expect(screen.getByRole("status", { name: "Loading your profiles" })).toBeTruthy();
   });
 
-  it("lists held profiles first, linking to their dashboards, then the ones to set up", () => {
+  it("lists held profiles, then ONE entry for everything not set up yet", () => {
     show(states({ freelancer: { status: "active", sub: undefined }, vendor: { status: "active", sub: "Ada's Books" } }));
 
     const items = within(screen.getByRole("list")).getAllByRole("link");
 
-    // Held (in their usual order), then not held.
     expect(items.map((a) => a.getAttribute("href"))).toEqual([
       "/vendor",
       "/freelancer/dashboard",
-      "/onboarding/service-provider",
-      "/onboarding/employer",
-      "/onboarding/agent",
+      "/account/earn", // one door, not three onboarding links
     ]);
     expect(screen.getByText("Ada's Books")).toBeTruthy();
-    expect(screen.getByText("Become an Employer")).toBeTruthy();
+    expect(screen.getByText("Earn or hire")).toBeTruthy();
+    expect(screen.queryByText("Become an Employer")).toBeNull();
+  });
+
+  it("offers only the single earn entry to someone with no profiles", () => {
+    show(states());
+
+    const items = within(screen.getByRole("list")).getAllByRole("link");
+    expect(items.map((a) => a.getAttribute("href"))).toEqual(["/account/earn"]);
+  });
+
+  it("drops the earn entry once every profile is held", () => {
+    const all = { status: "active" } as const;
+    show(states({ vendor: all, freelancer: all, service: all, employer: all, agent: all }));
+
+    const hrefs = within(screen.getByRole("list")).getAllByRole("link").map((a) => a.getAttribute("href"));
+    expect(hrefs).not.toContain("/account/earn");
+    expect(hrefs).toHaveLength(5);
   });
 
   it("leaves out a profile it couldn't check instead of guessing", () => {
     show(states({ freelancer: { status: "error" } }));
 
     expect(screen.queryByText(/freelancer/i)).toBeNull();
-    expect(screen.getAllByRole("link")).toHaveLength(5); // 4 profiles + the "Manage" link
   });
 
   it("links to the profiles page to manage them", () => {

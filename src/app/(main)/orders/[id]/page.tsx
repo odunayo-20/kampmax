@@ -23,6 +23,9 @@ import { Breadcrumbs, BreadcrumbItem } from "@/components/layout/Breadcrumbs";
 import { Button } from "@/components/atoms/Button";
 import { OrderStatusBadge } from "@/components/atoms/Badge";
 import { OrderTimeline } from "@/components/orders/OrderTimeline";
+import { MoneyTimeline } from "@/components/trust/MoneyTimeline";
+import { HelpAndDisputeCard } from "@/components/trust/HelpAndDisputeCard";
+import { orderMoneyTimeline } from "@/components/trust/money-steps";
 import { OrderItems } from "@/components/orders/OrderItems";
 import { OrderFees } from "@/components/orders/OrderFees";
 import { OrderActions } from "@/components/orders/OrderActions";
@@ -36,6 +39,7 @@ import {
   fetchOrderById,
   cancelOrderApi,
   confirmOrderReceiptApi,
+  openOrderDisputeApi,
 } from "@/services/orders";
 import { createReview } from "@/services/reviews";
 import { getVendorById } from "@/services/users";
@@ -69,8 +73,6 @@ export default function OrderDetailPage({
   // Dispute & Release Modals State
   const [disputeModalOpen, setDisputeModalOpen] = useState(false);
   const [releaseModalOpen, setReleaseModalOpen] = useState(false);
-  const [disputeFiled, setDisputeFiled] = useState(false);
-  const [disputeDetails, setDisputeDetails] = useState<{ reason: string; statement: string } | null>(null);
   const [escrowReleased, setEscrowReleased] = useState(false);
 
   // Customer Review Modal State
@@ -241,9 +243,17 @@ export default function OrderDetailPage({
     }
   }
 
-  function handleDisputeSubmit(reason: string, statement: string) {
-    setDisputeFiled(true);
-    setDisputeDetails({ reason, statement });
+  /** Files the dispute on the server; the page only shows a dispute once the server has one. */
+  async function handleDisputeSubmit(
+    reason: string,
+    statement: string
+  ): Promise<{ ok: boolean; message?: string }> {
+    const { data, error } = await openOrderDisputeApi(order!.backendId ?? order!.id, reason, statement);
+    if (error || !data) {
+      return { ok: false, message: error?.message || "We couldn't file your dispute. Nothing was changed." };
+    }
+    setOrder(data);
+    return { ok: true };
   }
 
   async function handleEscrowConfirm(
@@ -313,7 +323,7 @@ export default function OrderDetailPage({
           </div>
 
           <div className="flex items-center gap-2">
-            {!disputeFiled && currentStatus !== "cancelled" && currentStatus !== "delivered" && (
+            {!displayOrder.dispute && !displayOrder.settled && currentStatus !== "cancelled" && currentStatus !== "placed" && (
               <button
                 onClick={() => setDisputeModalOpen(true)}
                 className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-error-50 hover:bg-error-100 text-error-700 border border-error-200 text-xs font-semibold transition-colors"
@@ -349,21 +359,30 @@ export default function OrderDetailPage({
           </div>
         )}
 
-        {/* Dispute Filed Alert Banner */}
-        {disputeFiled && (
-          <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-1">
+        {/* Dispute state comes from the server, never from a local guess */}
+        {displayOrder.dispute && (
+          <div role="status" className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-1">
             <div className="flex items-center gap-2 font-bold text-amber-800">
-              <AlertTriangle className="w-4 h-4 text-amber-600" />
-              <span>Active Dispute Filed — Escrow Frozen</span>
+              <AlertTriangle className="w-4 h-4 text-amber-600" aria-hidden />
+              <span>
+                {displayOrder.dispute.resolvedAt
+                  ? "Dispute reviewed"
+                  : "Dispute open. The vendor payout is on hold"}
+              </span>
             </div>
             <p className="text-[11px] text-amber-700">
-              Reason: <strong>{disputeDetails?.reason}</strong>. Kampmax Trust & Safety team is reviewing the claim and evidence.
+              {displayOrder.dispute.resolvedAt
+                ? <>Outcome: <strong>{displayOrder.dispute.resolution || "Closed by Kampmax Trust & Safety"}</strong>.</>
+                : <>Reason: <strong>{displayOrder.dispute.reason}</strong>. Kampmax Trust &amp; Safety is reviewing it and you will be notified of the outcome.</>}
             </p>
           </div>
         )}
 
         {/* Order Progress Stepper */}
         <OrderProgressStepper status={currentStatus} />
+
+        {/* Where the money is, in plain words */}
+        <MoneyTimeline model={orderMoneyTimeline(displayOrder)} />
 
         {/* Campus Pickup PIN & QR Verification Card */}
         {currentStatus !== "cancelled" && currentStatus !== "delivered" && (
@@ -483,6 +502,15 @@ export default function OrderDetailPage({
           total={displayOrder.total}
           paymentMethod={displayOrder.paymentMethod}
           paymentStatus={displayOrder.paymentStatus}
+        />
+
+        {/* One clear way to get help or report a problem */}
+        <HelpAndDisputeCard
+          context="order"
+          reference={displayOrder.id}
+          showDispute={
+            !displayOrder.dispute && !displayOrder.settled && currentStatus !== "cancelled" && currentStatus !== "placed"
+          }
         />
 
         {/* Actions */}

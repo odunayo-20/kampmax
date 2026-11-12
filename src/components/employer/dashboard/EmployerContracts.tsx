@@ -13,6 +13,7 @@ import { dashboardKeys } from "@/lib/query-keys";
 import { useEmployerContracts } from "@/hooks/use-employer-dashboard";
 import { formatDate } from "@/lib/utils";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
+import { ContractMoneyPanel } from "@/components/trust/ContractMoneyPanel";
 import {
   EmployerDashboardEmpty,
   EmployerDashboardError,
@@ -79,6 +80,7 @@ export function EmployerContracts() {
                 )}
 
                 <EngagementMilestones milestones={contract.engagement.milestones} />
+                <ContractMoneyPanel engagement={contract.engagement} party="employer" />
                 <EngagementNotices engagement={contract.engagement} role="employer" />
                 <EngagementRevisions
                   revisions={contract.engagement.revisions}

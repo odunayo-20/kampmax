@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { X, AlertTriangle, Upload, CheckCircle2, ShieldAlert } from "lucide-react";
+import { useEffect, useState } from "react";
+import { X, AlertTriangle, ShieldAlert } from "lucide-react";
 import { Order } from "@/types";
 import { Button } from "@/components/atoms/Button";
 
@@ -9,7 +9,8 @@ interface OpenDisputeModalProps {
   order: Order;
   isOpen: boolean;
   onClose: () => void;
-  onSubmitDispute: (reason: string, statement: string) => void;
+  /** Files the dispute with the server. The modal only says "filed" when this resolves ok. */
+  onSubmitDispute: (reason: string, statement: string) => Promise<{ ok: boolean; message?: string }>;
 }
 
 const DISPUTE_REASONS = [
@@ -30,21 +31,37 @@ export function OpenDisputeModal({
   const [statement, setStatement] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Escape closes the dialog (keyboard users must not be trapped).
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!statement.trim()) return;
+    if (!statement.trim() || submitting) return;
 
     setSubmitting(true);
-    setTimeout(() => {
-      const reasonLabel =
-        DISPUTE_REASONS.find((r) => r.id === selectedReason)?.label || selectedReason;
-      onSubmitDispute(reasonLabel, statement);
+    setError(null);
+    const reasonLabel =
+      DISPUTE_REASONS.find((r) => r.id === selectedReason)?.label || selectedReason;
+    try {
+      const result = await onSubmitDispute(reasonLabel, statement.trim());
+      if (result.ok) setSubmitted(true);
+      else setError(result.message || "We couldn't file your dispute. Nothing was changed. Please try again.");
+    } catch {
+      setError("We couldn't reach Kampmax. Nothing was changed. Check your connection and try again.");
+    } finally {
       setSubmitting(false);
-      setSubmitted(true);
-    }, 600);
+    }
   }
 
   return (
@@ -53,6 +70,9 @@ export function OpenDisputeModal({
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dispute-title"
         className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-neutral-200 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
@@ -60,9 +80,11 @@ export function OpenDisputeModal({
         <div className="flex items-center justify-between p-4 border-b border-neutral-100 bg-error-50/50">
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-5 h-5 text-error-600" />
-            <h2 className="text-base font-bold text-neutral-900">Report Issue / Open Dispute</h2>
+            <h2 id="dispute-title" className="text-base font-bold text-neutral-900">Report Issue / Open Dispute</h2>
           </div>
           <button
+            type="button"
+            aria-label="Close"
             onClick={onClose}
             className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100"
           >
@@ -77,9 +99,9 @@ export function OpenDisputeModal({
               <AlertTriangle className="w-8 h-8" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-neutral-900">Dispute Filed & Escrow Frozen</h3>
+              <h3 className="text-xl font-bold text-neutral-900">Dispute filed. Payout on hold</h3>
               <p className="text-xs text-neutral-500 mt-1">
-                Your claim for order <strong className="text-neutral-900">#{order.id}</strong> has been submitted. Escrow payout to the vendor is now frozen while Kampmax support reviews the case.
+                Your claim for order <strong className="text-neutral-900">#{order.id}</strong> has been received. The vendor will not be paid while Kampmax Trust &amp; Safety reviews it. You will be notified of the outcome, and you can follow it on this order.
               </p>
             </div>
             <Button
@@ -134,18 +156,20 @@ export function OpenDisputeModal({
               />
             </div>
 
-            {/* Photo Upload Simulation */}
-            <div className="p-3 border-2 border-dashed border-neutral-200 rounded-xl bg-neutral-50 text-center">
-              <Upload className="w-5 h-5 mx-auto text-neutral-400 mb-1" />
-              <span className="text-[11px] font-semibold text-neutral-600 block">
-                Attach Photo / Video Proof (Optional)
-              </span>
-              <span className="text-[10px] text-neutral-400">PNG, JPG or MP4 up to 10MB</span>
-            </div>
+            <p className="text-[11px] text-neutral-500">
+              Photos or video? Don&apos;t worry about attaching them here. If we need proof, the
+              Trust &amp; Safety team will ask you for it by message.
+            </p>
 
             <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 text-[11px] leading-tight">
-              <span className="font-bold">Kampmax Buyer Escrow Protection:</span> Opening a dispute freezes funds in escrow until resolved by vendor agreement or Kampmax Trust & Safety.
+              <span className="font-bold">What happens next:</span> the vendor is not paid while we review. Kampmax Trust &amp; Safety decides, and a refund goes back to your wallet if the claim is upheld.
             </div>
+
+            {error && (
+              <div role="alert" className="rounded-xl border border-error-200 bg-error-50 p-3 text-[11px] font-medium text-error-700">
+                {error}
+              </div>
+            )}
 
             <div className="flex gap-2 pt-2">
               <button

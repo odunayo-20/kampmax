@@ -1,7 +1,9 @@
 "use client";
 
 import type { Editor } from "@tiptap/core";
+import { useRef } from "react";
 import { useEditorState } from "@tiptap/react";
+import { useRovingToolbar } from "./use-roving-toolbar";
 import {
   AlignCenter,
   AlignLeft,
@@ -126,6 +128,9 @@ export function EditorToolbar({ editor, disabled, openLink, pickImage, openEmbed
     }),
   });
 
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  useRovingToolbar(toolbarRef);
+
   const chain = () => editor.chain().focus();
   const off = !!disabled;
 
@@ -137,7 +142,7 @@ export function EditorToolbar({ editor, disabled, openLink, pickImage, openEmbed
   const listItemType = editor.isActive("taskItem") ? "taskItem" : "listItem";
 
   return (
-    <div role="toolbar" aria-label="Text formatting" aria-orientation="horizontal" className="z-10 md:sticky md:top-14 flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-t-lg border-b border-kampmax-border bg-white px-2 py-1.5">
+    <div ref={toolbarRef} role="toolbar" aria-label="Text formatting" aria-orientation="horizontal" className="z-10 md:sticky md:top-14 flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-t-lg border-b border-kampmax-border bg-white px-2 py-1.5">
       <Group label="History">
         <ToolButton label="Undo" shortcut={`${MOD}Z`} disabled={off || !s.canUndo} onClick={() => chain().undo().run()}>
           <Undo2 aria-hidden className="h-4 w-4" />

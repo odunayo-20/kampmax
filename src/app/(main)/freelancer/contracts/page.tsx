@@ -21,6 +21,7 @@ import { contractPriceLabel, describeCurrentMilestone } from "@/lib/engagement-m
 import { ContractEmptyState } from "@/components/contracts/ContractEmptyState";
 import type { Contract, ContractStatus } from "@/types/contract";
 import { CONTRACT_STATUS } from "@/types/contract";
+import { ContractMoneyPanel } from "@/components/trust/ContractMoneyPanel";
 
 // Freelancer contracts page with status filters. Data comes from the backend
 // (services/contract). No fake production data.
@@ -163,6 +164,7 @@ export default function FreelancerContractsPage() {
                 </p>
                 <EngagementMilestones milestones={engagement.milestones} showFee />
                 <ContractFeeNote engagement={engagement} />
+                <ContractMoneyPanel engagement={engagement} party="freelancer" />
                 <EngagementNotices engagement={engagement} role="freelancer" />
                 <EngagementRevisions revisions={engagement.revisions} status={engagement.status} role="freelancer" />
                 {engagement.paymentType === "HOURLY" && (

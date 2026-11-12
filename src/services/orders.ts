@@ -70,6 +70,13 @@ export interface BackendOrderDetail extends BackendOrderListItem {
   address: BackendOrderAddressResponse;
   statusHistory: BackendOrderStatusHistoryResponse[];
   updatedAt: string | Date;
+  dispute?: {
+    openedAt: string | Date;
+    reason: string | null;
+    resolvedAt: string | Date | null;
+    resolution: string | null;
+  } | null;
+  settled?: boolean;
 }
 
 export interface BackendPaginatedOrders {
@@ -266,6 +273,15 @@ export function mapBackendOrderToFrontend(
     updatedAt: updatedAtStr,
     notes: raw.notes || undefined,
     timeline,
+    dispute: raw.dispute
+      ? {
+          openedAt: new Date(raw.dispute.openedAt).toISOString(),
+          reason: raw.dispute.reason,
+          resolvedAt: raw.dispute.resolvedAt ? new Date(raw.dispute.resolvedAt).toISOString() : undefined,
+          resolution: raw.dispute.resolution,
+        }
+      : undefined,
+    settled: raw.settled === true,
   };
 }
 
@@ -464,6 +480,30 @@ export async function confirmOrderReceiptApi(
   } else {
     cachedOrders.unshift(mapped);
   }
+  return { data: mapped, error: null };
+}
+
+/**
+ * Report a problem with a paid order. The server records the dispute and puts the
+ * vendor's payout on hold; nothing is claimed in the UI until this succeeds.
+ * POST /api/v1/orders/:id/dispute
+ */
+export async function openOrderDisputeApi(
+  id: string,
+  reason: string,
+  statement: string
+): Promise<{ data: Order | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.post<{ reason: string; statement: string }, BackendOrderDetail>(
+    `/orders/${id}/dispute`,
+    { reason, statement }
+  );
+  if (error || !data || !data.id) {
+    return { data: null, error };
+  }
+  const mapped = mapBackendOrderToFrontend(data);
+  const idx = cachedOrders.findIndex((o) => o.id === mapped.id || o.id === id);
+  if (idx >= 0) cachedOrders[idx] = mapped;
+  else cachedOrders.unshift(mapped);
   return { data: mapped, error: null };
 }
 
