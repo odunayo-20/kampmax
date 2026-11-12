@@ -7,16 +7,7 @@ import {
   VerifyOtpData,
 } from "@/types";
 import { apiClient } from "@/lib/api-client";
-import {
-  ACCESS_TOKEN_KEY,
-  REFRESH_TOKEN_KEY,
-  getAccessToken,
-  setAccessToken,
-  getRefreshToken,
-  setRefreshToken,
-  clearAuthTokens,
-  persistAuthTokens,
-} from "@/lib/auth-storage";
+import { setAccessToken, clearAuthTokens } from "@/lib/auth-storage";
 
 // ============================================================
 // MOCK DELAY — simulates network latency
@@ -226,11 +217,10 @@ export async function login(data: LoginData): Promise<AuthResult> {
 
   const mapped = mapAuthResult(result.data);
 
-  // Persist tokens if the backend returned them
+  // Keep the access token in memory. The refresh token is not in the response:
+  // the backend sets it as an httpOnly cookie the page cannot read.
   if (mapped.success && mapped.accessToken) {
-    persistAuthTokens(mapped.accessToken, mapped.refreshToken ?? getRefreshToken());
     setAccessToken(mapped.accessToken);
-    setRefreshToken(mapped.refreshToken ?? getRefreshToken());
   }
 
   return mapped;
@@ -387,21 +377,16 @@ export async function getCurrentSession(
 export async function logout(token: string): Promise<void> {
   await delay();
 
-  // Read the current refresh token from storage to send to backend
-  const currentRefreshToken = getRefreshToken();
-  const refreshTokenForBackend = currentRefreshToken ?? undefined;
-  
-  // Call the backend logout endpoint with refresh token in body
+  // The backend revokes the session named by the httpOnly refresh cookie and
+  // clears it; there is no token for this code to send.
   try {
-    await apiClient.post<{ refreshToken?: string }, { success: boolean }>("/auth/logout", { refreshToken: refreshTokenForBackend });
+    await apiClient.post<Record<string, never>, { success: boolean }>("/auth/logout", {});
   } catch {
     // Network error — continue with local cleanup
   }
 
   // Always clear local authentication state (resilient to network failure)
   clearAuthTokens();
-  setAccessToken(null);
-  setRefreshToken(null);
 }
 
 // ============================================================

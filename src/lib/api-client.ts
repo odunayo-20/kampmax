@@ -5,11 +5,9 @@
  * All requests go through the BASE_URL from api-config.
  * The client centrally prepends /api/v1 to all endpoints.
  *
- * Authentication: reads the auth token from the existing
- * AuthProvider localStorage store ( kampmax_auth_token ).
- * The client does NOT store its own copy of the token -
- * it reads it fresh on each request so it always reflects
- * the current AuthProvider state.
+ * Authentication: the short-lived access token is read from the in-memory
+ * session store (auth-storage.ts) on each request, so it always reflects the
+ * current session. Nothing token-like is written to localStorage.
  *
  * Response envelope (NestJS backend format):
  *   Success:  { success: true, statusCode: 200, message: "...", data: {...}, timestamp: "...", path: "..." }
@@ -24,9 +22,9 @@
  * - All errors include the raw response for inspection
  *
  * 401 refresh-retry:
- * - On receiving 401, the client attempts a single refresh
- *   using the refresh token stored in localStorage
- *   ( kampmax_refresh_token ).
+ * - On receiving 401, the client attempts a single refresh. The refresh
+ *   token is an httpOnly cookie the browser attaches by itself; this code
+ *   never sees it (see auth-storage.ts for the security model).
  * - A shared refresh promise prevents concurrent 401s from
  *   triggering multiple refresh requests.
  * - On refresh failure, the authentication state is cleared
@@ -37,7 +35,7 @@
 import { API_BASE_URL, getApiBaseUrl, setApiBaseUrl } from "./api-config";
 
 // -- Auth token storage helpers --
-import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, getAccessToken, setAccessToken, getRefreshToken, setRefreshToken, clearAuthTokens, persistAuthTokens } from "./auth-storage";
+import { getAccessToken, setAccessToken, clearAuthTokens } from "./auth-storage";
 
 // -- Auth failure notification --
 type AuthFailureListener = () => void;
@@ -66,79 +64,69 @@ export interface ApiError extends Error {
 // -- Refresh token management --
 let refreshPromise: Promise<string | null> | null = null;
 
-async function refreshAuth(): Promise<string | null> {
+/** Marks every request as coming from the browser app, which switches the
+ * backend to cookie sessions and doubles as CSRF protection (a cross-site form
+ * cannot add a custom header). */
+export const WEB_CLIENT_HEADERS = { "X-Kampmax-Client": "web" } as const;
+
+/** Runs fn while holding a cross-tab lock, so two open tabs never rotate the
+ * same refresh cookie at the same moment (the loser would be signed out). */
+async function withRefreshLock<T>(fn: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
+  if (!locks?.request) return fn();
+  return locks.request("kampmax-refresh", fn) as Promise<T>;
+}
+
+/**
+ * Exchanges the httpOnly refresh cookie for a new access token and keeps it in
+ * memory. Also used at page load to restore a session. Returns null when there
+ * is no valid session (the cookie is missing, expired or revoked); rejects when
+ * the server cannot be reached.
+ */
+export async function refreshAuth(): Promise<string | null> {
   // If already refreshing, wait for the existing promise
   if (refreshPromise) {
     return refreshPromise;
   }
 
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) {
-    notifyAuthFailure();
-    clearAuthTokens();
-    return null;
-  }
-
-  refreshPromise = (async (): Promise<string | null> => {
+  refreshPromise = withRefreshLock(async (): Promise<string | null> => {
     try {
-      // Direct fetch for refresh — does NOT go through the 401 handler
-      // POST /api/v1/auth/refresh with the refresh token in the body
+      // Direct fetch for refresh: does NOT go through the 401 handler.
       const refreshResp = await fetch(new URL("/api/v1/auth/refresh", getApiBaseUrl()).toString(), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ refreshToken }),
+        credentials: "include",
+        headers: { "Content-Type": "application/json", ...WEB_CLIENT_HEADERS },
+        body: "{}",
       });
 
       if (!refreshResp.ok) {
-        // Refresh failed — clear session
         clearAuthTokens();
         notifyAuthFailure();
-        refreshPromise = null;
         return null;
       }
 
       const body = await refreshResp.json();
+      // { success: true, data: { accessToken }, ... } or a flat { accessToken }.
+      const payload = body && typeof body === "object" ? (body.data && typeof body.data === "object" ? body.data : body) : null;
+      const accessToken: string | undefined =
+        payload?.accessToken || payload?.access_token || payload?.token;
 
-      // Defensive parsing of the refresh response.
-      // The NestJS backend typically returns:
-      //   { success: true, statusCode: 200, data: { accessToken, refreshToken }, ... }
-      // Or a flat: { accessToken, refreshToken }.
-      let accessToken: string | undefined;
-      let newRefreshToken: string | undefined;
-
-      if (body && typeof body === "object") {
-        if (body.data && typeof body.data === "object") {
-          const data = body.data;
-          accessToken = data.accessToken || data.access_token || data.token;
-          newRefreshToken = data.refreshToken || data.refresh_token || data.refresh;
-        } else {
-          accessToken = body.accessToken || body.access_token || body.token;
-          newRefreshToken = body.refreshToken || body.refresh_token || body.refresh;
-        }
-      }
-
-      if (accessToken) {
-        // Persist new tokens
-        persistAuthTokens(accessToken, newRefreshToken ?? refreshToken);
-        refreshPromise = null;
-        return accessToken;
-      } else {
-        // Unrecognized response shape — treat as failure
+      if (!accessToken) {
         clearAuthTokens();
         notifyAuthFailure();
-        refreshPromise = null;
         return null;
       }
-    } catch (err) {
-      // Network or unexpected error during refresh
-      clearAuthTokens();
-      notifyAuthFailure();
+      setAccessToken(accessToken);
+      return accessToken;
+    } catch (error) {
+      // The server could not be reached. That says nothing about the session,
+      // so keep it (the cookie is still valid) and let the caller treat this as
+      // a network failure instead of signing the user out.
+      throw error;
+    } finally {
       refreshPromise = null;
-      return null;
     }
-  })();
+  });
 
   return refreshPromise;
 }
@@ -235,6 +223,7 @@ async function fetchApi(
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
+      ...WEB_CLIENT_HEADERS,
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {}),
     },

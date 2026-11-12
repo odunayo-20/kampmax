@@ -16,16 +16,20 @@ vi.mock("@/services/auth", () => ({
 }));
 vi.mock("@/lib/api-client", () => ({
   onAuthFailure: vi.fn(() => () => {}),
+  refreshAuth: vi.fn(),
 }));
 
 import * as authService from "@/services/auth";
+import { refreshAuth } from "@/lib/api-client";
 import { AuthProvider, useAuth } from "../auth-context";
 import {
-  ACCESS_TOKEN_KEY,
   AUTH_USER_KEY,
-  REFRESH_TOKEN_KEY,
+  LEGACY_TOKEN_KEYS,
   clearAuthTokens,
+  getAccessToken,
   getRememberedUser,
+  purgeLegacyTokens,
+  setAccessToken,
   setRememberedUser,
 } from "../auth-storage";
 
@@ -66,7 +70,9 @@ function pendingSession() {
 
 beforeEach(() => {
   localStorage.clear();
+  setAccessToken(null);
   vi.mocked(authService.getCurrentSession).mockReset();
+  vi.mocked(refreshAuth).mockReset();
 });
 
 afterEach(cleanup);
@@ -84,83 +90,112 @@ describe("remembered user storage", () => {
     expect(getRememberedUser()).toBeNull();
   });
 
-  it("is cleared together with the tokens", () => {
-    localStorage.setItem(ACCESS_TOKEN_KEY, "a");
+  it("is cleared together with the access token", () => {
+    setAccessToken("a");
     setRememberedUser(ada);
     clearAuthTokens();
     expect(getRememberedUser()).toBeNull();
+    expect(getAccessToken()).toBeNull();
+  });
+});
+
+describe("token storage security", () => {
+  it("keeps the access token in memory only, never in localStorage", () => {
+    setAccessToken("secret-access-token");
+    expect(getAccessToken()).toBe("secret-access-token");
+    const everything = JSON.stringify({ ...localStorage });
+    expect(everything).not.toContain("secret-access-token");
+    expect(localStorage.length).toBe(0);
+  });
+
+  it("deletes tokens that older builds left in localStorage", () => {
+    for (const key of LEGACY_TOKEN_KEYS) localStorage.setItem(key, "old-token");
+    purgeLegacyTokens();
+    for (const key of LEGACY_TOKEN_KEYS) expect(localStorage.getItem(key)).toBeNull();
   });
 });
 
 describe("AuthProvider session restore", () => {
-  it("is signed out straight away without a token", () => {
+  it("is signed out straight away when nobody is remembered, with no network call", () => {
     expect(renderProvider().textContent).toBe("unauthenticated:-");
+    expect(refreshAuth).not.toHaveBeenCalled();
     expect(authService.getCurrentSession).not.toHaveBeenCalled();
   });
 
-  it("shows the remembered user before the session check finishes, then applies the server's answer", async () => {
-    localStorage.setItem(ACCESS_TOKEN_KEY, "token");
+  it("restores a remembered user by trading the refresh cookie, then applies the server's answer", async () => {
     setRememberedUser(ada);
-    const resolve = pendingSession();
-
-    const out = renderProvider();
-    expect(out.textContent).toBe("authenticated:Ada");
-
-    resolve({ success: true, message: null, user: { ...ada, name: "Ada L." } });
-    await waitFor(() => expect(out.textContent).toBe("authenticated:Ada L."));
-    expect(getRememberedUser()?.name).toBe("Ada L.");
-  });
-
-  it("waits for the session check when nobody is remembered", async () => {
-    localStorage.setItem(ACCESS_TOKEN_KEY, "token");
+    vi.mocked(refreshAuth).mockImplementation(async () => {
+      setAccessToken("fresh");
+      return "fresh";
+    });
     const resolve = pendingSession();
 
     const out = renderProvider();
     expect(out.textContent).toBe("loading:-");
 
+    await waitFor(() => expect(authService.getCurrentSession).toHaveBeenCalledWith("fresh"));
+    resolve({ success: true, message: null, user: { ...ada, name: "Ada L." } });
+    await waitFor(() => expect(out.textContent).toBe("authenticated:Ada L."));
+    expect(getRememberedUser()?.name).toBe("Ada L.");
+  });
+
+  it("does not refresh again when an access token is already in memory", async () => {
+    setAccessToken("in-memory");
+    setRememberedUser(ada);
+    const resolve = pendingSession();
+
+    const out = renderProvider();
     resolve({ success: true, message: null, user: ada });
+    await waitFor(() => expect(out.textContent).toBe("authenticated:Ada"));
+    expect(refreshAuth).not.toHaveBeenCalled();
+  });
+
+  it("signs out and forgets everything when there is no valid session cookie", async () => {
+    setRememberedUser(ada);
+    vi.mocked(refreshAuth).mockResolvedValue(null);
+
+    const out = renderProvider();
+
+    await waitFor(() => expect(out.textContent).toBe("unauthenticated:-"));
+    expect(getAccessToken()).toBeNull();
+    expect(getRememberedUser()).toBeNull();
+    expect(authService.getCurrentSession).not.toHaveBeenCalled();
+  });
+
+  it("signs out when the server rejects the session", async () => {
+    setRememberedUser(ada);
+    vi.mocked(refreshAuth).mockResolvedValue("fresh");
+    const resolve = pendingSession();
+
+    const out = renderProvider();
+    await waitFor(() => expect(authService.getCurrentSession).toHaveBeenCalled());
+    resolve({ success: false, message: "Unauthorized" });
+
+    await waitFor(() => expect(out.textContent).toBe("unauthenticated:-"));
+    expect(getRememberedUser()).toBeNull();
+  });
+
+  it("keeps the remembered user when the server can't be reached during the refresh", async () => {
+    setRememberedUser(ada);
+    vi.mocked(refreshAuth).mockRejectedValue(new TypeError("Failed to fetch"));
+
+    const out = renderProvider();
+
     await waitFor(() => expect(out.textContent).toBe("authenticated:Ada"));
     expect(getRememberedUser()).toEqual(ada);
   });
 
-  it("signs out and forgets everything when the server rejects the session", async () => {
-    localStorage.setItem(ACCESS_TOKEN_KEY, "token");
-    localStorage.setItem(REFRESH_TOKEN_KEY, "refresh");
+  it("keeps a remembered session when the session check can't reach the server", async () => {
     setRememberedUser(ada);
+    vi.mocked(refreshAuth).mockResolvedValue("fresh");
     const resolve = pendingSession();
 
     const out = renderProvider();
-    resolve({ success: false, message: "Unauthorized" });
-
-    await waitFor(() => expect(out.textContent).toBe("unauthenticated:-"));
-    expect(localStorage.getItem(ACCESS_TOKEN_KEY)).toBeNull();
-    expect(localStorage.getItem(REFRESH_TOKEN_KEY)).toBeNull();
-    expect(getRememberedUser()).toBeNull();
-  });
-
-  it("keeps a remembered session when the server can't be reached", async () => {
-    localStorage.setItem(ACCESS_TOKEN_KEY, "token");
-    setRememberedUser(ada);
-    const resolve = pendingSession();
-
-    const out = renderProvider();
-    // act() flushes the provider's reaction to the result before we look at it.
+    await waitFor(() => expect(authService.getCurrentSession).toHaveBeenCalled());
     await act(async () => {
       resolve({ success: false, message: "Network request failed", unreachable: true });
     });
 
     expect(out.textContent).toBe("authenticated:Ada");
-    expect(localStorage.getItem(ACCESS_TOKEN_KEY)).toBe("token");
-  });
-
-  it("stops waiting, but keeps the token, when it can't be reached and nobody is remembered", async () => {
-    localStorage.setItem(ACCESS_TOKEN_KEY, "token");
-    const resolve = pendingSession();
-
-    const out = renderProvider();
-    resolve({ success: false, message: "Network request failed", unreachable: true });
-
-    await waitFor(() => expect(out.textContent).toBe("unauthenticated:-"));
-    expect(localStorage.getItem(ACCESS_TOKEN_KEY)).toBe("token");
   });
 });

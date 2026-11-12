@@ -11,13 +11,12 @@ import {
 } from "react";
 import { AuthUser, AuthStatus } from "@/types";
 import * as authService from "@/services/auth";
-import { onAuthFailure } from "@/lib/api-client";
+import { onAuthFailure, refreshAuth } from "@/lib/api-client";
 import {
   clearAuthTokens,
   getAccessToken,
-  getRefreshToken,
   getRememberedUser,
-  persistAuthTokens,
+  setAccessToken as storeAccessToken,
   setRememberedUser,
 } from "@/lib/auth-storage";
 import { setCurrentAuthUser } from "@/lib/current-user-store";
@@ -26,7 +25,6 @@ interface AuthState {
   status: AuthStatus;
   user: AuthUser | null;
   accessToken: string | null;
-  refreshToken: string | null;
   login: (email: string, password: string) => Promise<authService.AuthResult>;
   register: (data: {
     email: string;
@@ -58,7 +56,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [user, setUser] = useState<AuthUser | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [refreshToken, setRefreshToken] = useState<string | null>(null);
 
   // Keep the synchronous current-user bridge (read by mock data services
   // outside React) in lockstep with the real authenticated user. A layout effect
@@ -69,10 +66,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /** Marks the user as signed in and remembers them for the next page load. */
   const applySession = useCallback(
-    (nextUser: AuthUser | null, access: string | null, refresh: string | null) => {
+    (nextUser: AuthUser | null, access: string | null) => {
       setUser(nextUser);
       setAccessToken(access);
-      setRefreshToken(refresh);
       setRememberedUser(nextUser);
       setStatus("authenticated");
     },
@@ -83,45 +79,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const endSession = useCallback(() => {
     clearAuthTokens();
     setAccessToken(null);
-    setRefreshToken(null);
     setUser(null);
     setStatus("unauthenticated");
   }, []);
 
   // Restore the session on mount.
   //
-  // If we remember who signed in, show the signed-in app immediately and confirm
-  // the session in the background — a refresh no longer waits on /auth/me. When the
-  // server says the session is invalid, the user is signed out; when it can't be
-  // reached, the session is kept (a network blip must not sign anyone out).
+  // The access token only lives in memory, so after a page load it is gone. If a
+  // user was remembered here (a display hint, not a credential), ask the API to
+  // trade the httpOnly refresh cookie for a new access token, then confirm the
+  // session with /auth/me. Nobody remembered means nobody to restore: no request
+  // is made. When the server says the session is invalid, the user is signed out;
+  // when it can't be reached, the remembered user is kept (a network blip must
+  // not sign anyone out).
   // NOTE: /auth/me returns the user object only — no new tokens.
   useLayoutEffect(() => {
-    const stored = getAccessToken();
-    if (!stored) {
+    const remembered = getRememberedUser();
+    if (!remembered && !getAccessToken()) {
       setStatus("unauthenticated");
       return;
     }
 
-    const remembered = getRememberedUser();
-    if (remembered) applySession(remembered, stored, getRefreshToken());
-
     let cancelled = false;
-    authService
-      .getCurrentSession(stored)
-      .then((result) => {
+    (async () => {
+      let token: string | null;
+      try {
+        token = getAccessToken() ?? (await refreshAuth());
+      } catch {
+        // Server unreachable: not a verdict on the session. Keep who we know.
         if (cancelled) return;
-        if (result.success && result.user) {
-          // Read the tokens again: the check may have refreshed them.
-          applySession(result.user, getAccessToken() ?? stored, getRefreshToken());
-        } else if (result.unreachable) {
-          if (!remembered) setStatus("unauthenticated");
-        } else {
-          endSession();
-        }
-      })
-      .catch(() => {
-        if (!cancelled) endSession();
-      });
+        if (remembered) applySession(remembered, null);
+        else setStatus("unauthenticated");
+        return;
+      }
+      if (cancelled) return;
+      if (!token) {
+        endSession(); // no valid session cookie
+        return;
+      }
+      const result = await authService.getCurrentSession(token);
+      if (cancelled) return;
+      if (result.success && result.user) {
+        applySession(result.user, getAccessToken() ?? token);
+      } else if (result.unreachable) {
+        if (remembered) applySession(remembered, getAccessToken() ?? token);
+        else setStatus("unauthenticated");
+      } else {
+        endSession();
+      }
+    })().catch(() => {
+      if (!cancelled) endSession();
+    });
 
     return () => {
       cancelled = true;
@@ -135,9 +143,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (email: string, password: string) => {
       const result = await authService.login({ email, password });
       if (result.success && result.user && result.accessToken) {
-        const refresh = result.refreshToken ?? getRefreshToken() ?? "";
-        persistAuthTokens(result.accessToken, refresh);
-        applySession(result.user, result.accessToken, refresh);
+        storeAccessToken(result.accessToken);
+        applySession(result.user, result.accessToken);
       }
       return result;
     },
@@ -155,9 +162,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }) => {
       const result = await authService.register(data);
       if (result.success && result.accessToken) {
-        const refresh = result.refreshToken ?? getRefreshToken() ?? "";
-        persistAuthTokens(result.accessToken, refresh);
-        applySession(result.user ?? null, result.accessToken, refresh);
+        storeAccessToken(result.accessToken);
+        applySession(result.user ?? null, result.accessToken);
       }
       return result;
     },
@@ -198,7 +204,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         status,
         user,
         accessToken,
-        refreshToken,
         login,
         register,
         logout,

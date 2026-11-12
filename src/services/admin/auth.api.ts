@@ -3,17 +3,17 @@
 //
 // Operators sign in with their normal platform credentials; the backend
 // only lets SUPER_ADMIN / ADMIN accounts through and returns their profile
-// plus the permission slugs the API will enforce. The access/refresh tokens
-// go into the shared auth storage, so every API call the console makes (for
-// example the taxonomy admin endpoints) is authenticated as that operator
-// and the API client's silent token refresh keeps working.
+// plus the permission slugs the API will enforce. The access token is kept in
+// memory by the shared auth storage (the refresh token is an httpOnly cookie),
+// so every API call the console makes is authenticated as that operator and
+// the API client's silent token refresh keeps working.
 //
 // No impersonation: the backend has no account switching, so those parts of
 // the interface report "unavailable".
 // ============================================================
 
 import { apiClient, type ApiError } from "@/lib/api-client";
-import { clearAuthTokens, getRefreshToken, persistAuthTokens } from "@/lib/auth-storage";
+import { clearAuthTokens, setAccessToken } from "@/lib/auth-storage";
 import type { AdminProfile, AdminRole } from "@/types/admin";
 import type { AdminAuthResult, AdminAuthService } from "./auth.service";
 
@@ -30,7 +30,8 @@ interface BackendOperator {
 
 interface LoginResponse {
   admin: BackendOperator;
-  tokens: { accessToken: string; refreshToken: string };
+  // The refresh token is an httpOnly cookie; the body only carries the access token.
+  tokens: { accessToken: string };
 }
 
 function toProfile(op: BackendOperator): AdminProfile {
@@ -87,7 +88,7 @@ export function createApiAdminAuthService(): AdminAuthService {
       const { data, error } = response;
       if (error || !data?.admin || !data.tokens) return failure(error);
 
-      persistAuthTokens(data.tokens.accessToken, data.tokens.refreshToken);
+      setAccessToken(data.tokens.accessToken);
       return { success: true, admin: toProfile(data.admin), token: data.tokens.accessToken };
     },
 
@@ -100,17 +101,15 @@ export function createApiAdminAuthService(): AdminAuthService {
         return { admin: toProfile(data.admin) };
       } catch {
         // API unreachable: treat as signed out so the console shows the login page
-        // instead of crashing; the stored tokens are kept for the next attempt.
+        // instead of crashing; the session is kept for the next attempt.
         return null;
       }
     },
 
     async logout() {
-      const refreshToken = getRefreshToken();
       try {
-        if (refreshToken) {
-          await apiClient.post<Record<string, unknown>, unknown>("/auth/logout", { refreshToken });
-        }
+        // Revokes the session behind the httpOnly refresh cookie and clears it.
+        await apiClient.post<Record<string, unknown>, unknown>("/auth/logout", {});
       } catch {
         // Revoking server-side is best effort; the operator is signed out locally regardless.
       } finally {

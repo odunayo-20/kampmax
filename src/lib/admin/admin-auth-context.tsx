@@ -26,9 +26,13 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import type { AdminProfile } from "@/types/admin";
 import { adminAuthService } from "@/services/admin";
+import { getAccessToken, hasAdminSessionHint, setAdminSessionHint } from "@/lib/auth-storage";
 import { adminKeys } from "@/lib/query-keys";
 
-export const ADMIN_SESSION_STORAGE_KEY = "kampmax_admin_token";
+/** Stand-in "token" for a session restored from the httpOnly refresh cookie.
+ * The real access token lives in memory inside the API client; the console
+ * only needs to know a session exists. */
+const COOKIE_SESSION = "cookie-session";
 
 export type AdminAuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -59,19 +63,18 @@ export interface AdminSessionValue {
 
 const AdminSessionContext = createContext<AdminSessionValue | null>(null);
 
-function getStoredToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(ADMIN_SESSION_STORAGE_KEY);
+// Only a non-secret "an operator signed in here" hint is persisted (never a
+// token), so a reload knows to ask the API for the session via the cookie.
+function hasStoredSession(): boolean {
+  return hasAdminSessionHint();
 }
 
-function persistToken(token: string) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(ADMIN_SESSION_STORAGE_KEY, token);
+function persistToken(_token: string) {
+  setAdminSessionHint(true);
 }
 
 function clearStoredToken() {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
+  setAdminSessionHint(false);
 }
 
 export function AdminSessionProvider({ children }: { children: ReactNode }) {
@@ -87,15 +90,16 @@ export function AdminSessionProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     async function restoreSession() {
-      const stored = getStoredToken();
-      if (!stored) {
+      if (!hasStoredSession()) {
         setStatus("unauthenticated");
         return;
       }
-      const result = await adminAuthService.getCurrentSession(stored);
+      // No token in storage: the API client trades the refresh cookie for a
+      // fresh access token on the first 401.
+      const result = await adminAuthService.getCurrentSession(COOKIE_SESSION);
       if (cancelled) return;
       if (result) {
-        setToken(stored);
+        setToken(getAccessToken() ?? COOKIE_SESSION);
         setAdmin(result.admin);
         setBaseAdminId(result.admin.id);
         setAdmins(await adminAuthService.listActiveAdmins());
