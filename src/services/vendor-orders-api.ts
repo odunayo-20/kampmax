@@ -57,11 +57,18 @@ interface BackendVendorOrderListItem extends BackendVendorOrderBase {
   items: { productName: string; quantity: number }[];
 }
 
-interface BackendVendorOrderDetail extends BackendVendorOrderBase {
+export interface BackendVendorOrderDetail extends BackendVendorOrderBase {
   updatedAt: string;
   notes: string | null;
   customerPhone: string;
   settledAt?: string | null;
+  /** Present once the customer (or Kampmax) has opened a dispute; reason is one line. */
+  dispute?: {
+    openedAt: string;
+    reason: string | null;
+    resolvedAt: string | null;
+    resolution: string | null;
+  } | null;
   paymentStatus: string | null;
   items: (BackendOrderItem & { id: string })[];
   address: {
@@ -225,7 +232,33 @@ export function mapVendorOrderDetail(raw: BackendVendorOrderDetail): VendorOrder
     })),
     paymentStatus: payment,
     deliveryAddress: deliveryAddress || undefined,
-    escrow: raw.settledAt
+    // While a dispute is open the payout is on hold, whatever the order status says.
+    dispute: raw.dispute
+      ? {
+          status: raw.dispute.resolvedAt ? "resolved" : "opened",
+          openedAt: raw.dispute.openedAt,
+          reason: raw.dispute.reason ?? undefined,
+          timeline: raw.dispute.resolvedAt
+            ? [
+                {
+                  id: "resolved",
+                  role: "support",
+                  title: "Reviewed by Kampmax Trust & Safety",
+                  detail: raw.dispute.resolution ?? undefined,
+                  at: raw.dispute.resolvedAt,
+                },
+              ]
+            : [],
+        }
+      : NO_DISPUTE,
+    escrow: raw.dispute && !raw.dispute.resolvedAt
+      ? {
+          state: "funds_held",
+          displayAmount: Number(raw.vendorPayout ?? raw.totalAmount),
+          updatedAt: raw.dispute.openedAt,
+          note: "On hold: the customer reported a problem with this order. The payout stays on hold until Kampmax has reviewed it.",
+        }
+      : raw.settledAt
       ? {
           state: "released",
           displayAmount: Number(raw.vendorPayout ?? 0),

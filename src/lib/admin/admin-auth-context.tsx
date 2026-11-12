@@ -96,7 +96,15 @@ export function AdminSessionProvider({ children }: { children: ReactNode }) {
       }
       // No token in storage: the API client trades the refresh cookie for a
       // fresh access token on the first 401.
-      const result = await adminAuthService.getCurrentSession(COOKIE_SESSION);
+      let result;
+      try {
+        result = await adminAuthService.getCurrentSession(COOKIE_SESSION);
+      } catch {
+        // Server unreachable or erroring: not a verdict on the session. Show the
+        // sign-in page but keep the hint so the next reload retries the restore.
+        if (!cancelled) setStatus("unauthenticated");
+        return;
+      }
       if (cancelled) return;
       if (result) {
         setToken(getAccessToken() ?? COOKIE_SESSION);

@@ -10,6 +10,9 @@ import { OpenDisputeModal } from "@/components/orders/OpenDisputeModal";
 import NotFound from "@/app/not-found";
 import type { Order } from "@/types";
 
+// axe is slow when the machine is busy.
+vi.setConfig({ testTimeout: 30_000 });
+
 vi.mock("next/link", () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
     <a href={href} {...rest}>

@@ -94,8 +94,12 @@ describe("live admin auth service", () => {
       message: expect.stringContaining("Can't reach the server"),
     });
 
+    // A failed session check is not "signed out": it throws so the console keeps the session.
     getMock.mockRejectedValue(new TypeError("Failed to fetch"));
-    expect(await service.getCurrentSession("t")).toBeNull();
+    await expect(service.getCurrentSession("t")).rejects.toThrow();
+
+    getMock.mockResolvedValue({ data: null, error: Object.assign(new Error("x"), { status: 503 }) });
+    await expect(service.getCurrentSession("t")).rejects.toThrow();
   });
 
   it("logs out on the server and clears local tokens even if the call fails", async () => {

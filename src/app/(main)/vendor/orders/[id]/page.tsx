@@ -19,7 +19,7 @@ import {
   DeliverySection,
   StoreLine,
 } from "@/components/vendor-orders/OrderDetailSections";
-import { EscrowPanel } from "@/components/vendor-orders/OrderStatusPanels";
+import { DisputePanel, EscrowPanel } from "@/components/vendor-orders/OrderStatusPanels";
 import type { VendorOrderActionView, VendorOrderResult } from "@/types/vendor-orders";
 
 const TRANSITION_KEYS: ReadonlySet<string> = new Set<VendorOrderTransitionKey>([
@@ -139,6 +139,8 @@ export default function VendorOrderDetailPage({ params }: { params: Promise<{ id
           {error}
         </div>
       )}
+
+      <DisputePanel order={order} />
 
       <SummarySection order={order} parent={null} />
 

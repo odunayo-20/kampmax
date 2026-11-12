@@ -373,7 +373,7 @@ export default function OrderDetailPage({
             <p className="text-[11px] text-amber-700">
               {displayOrder.dispute.resolvedAt
                 ? <>Outcome: <strong>{displayOrder.dispute.resolution || "Closed by Kampmax Trust & Safety"}</strong>.</>
-                : <>Reason: <strong>{displayOrder.dispute.reason}</strong>. Kampmax Trust &amp; Safety is reviewing it and you will be notified of the outcome.</>}
+                : <>Reason: <strong>{displayOrder.dispute.reason?.split("\n")[0]}</strong>. Kampmax Trust &amp; Safety is reviewing it and you will be notified of the outcome.</>}
             </p>
           </div>
         )}

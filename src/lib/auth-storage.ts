@@ -84,6 +84,8 @@ export function clearAuthTokens(): void {
     // so neither outlives it.
     s?.removeItem(AUTH_USER_KEY);
     s?.removeItem(QUERY_CACHE_KEY);
+    // Older builds kept the cache in localStorage; the current one uses sessionStorage.
+    if (typeof window !== "undefined") window.sessionStorage.removeItem(QUERY_CACHE_KEY);
     s?.removeItem(ADMIN_SESSION_HINT_KEY);
     purgeLegacyTokens();
   } catch {

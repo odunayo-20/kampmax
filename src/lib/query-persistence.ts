@@ -17,7 +17,8 @@ import { getCurrentAuthUser } from "@/lib/current-user-store";
  *    always one user's own. A new dashboard's keys must carry the user id to be saved
  *    (the vendor low-stock query is keyed by vendor id, so it is not);
  *  - nothing at all when nobody is signed in;
- *  - for `QUERY_CACHE_MAX_AGE_MS` at most.
+ *  - for `QUERY_CACHE_MAX_AGE_MS` at most;
+ *  - in sessionStorage, so it disappears when the tab or browser is closed.
  * It is removed together with the auth tokens (see `clearAuthTokens`), and
  * `QueryCacheOwnerGuard` empties the cache whenever the signed-in user changes.
  */
@@ -51,7 +52,10 @@ export function isPersistableQuery(
 /** `persistOptions` for `PersistQueryClientProvider`. Saves nothing on the server. */
 export function createQueryPersistOptions(): PersistQueryClientProviderProps["persistOptions"] {
   const persister = createAsyncStoragePersister({
-    storage: typeof window === "undefined" ? undefined : window.localStorage,
+    // sessionStorage, not localStorage: a refresh keeps the data (the point of this cache),
+    // but closing the tab or browser discards it. On a shared lab or library computer a
+    // student who forgets to sign out must not leave their dashboard figures behind.
+    storage: typeof window === "undefined" ? undefined : window.sessionStorage,
     key: QUERY_CACHE_KEY,
   });
 

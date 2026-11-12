@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useRef } from "react";
 import { useRovingToolbar } from "../use-roving-toolbar";
 import { a11yViolations } from "@/test/axe";
+
+// axe is slow when the machine is busy.
+vi.setConfig({ testTimeout: 30_000 });
 
 function Toolbar({ disabledSecond = false }: { disabledSecond?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);

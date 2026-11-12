@@ -68,6 +68,7 @@ describe("isPersistableQuery", () => {
 describe("saving and restoring the cache", () => {
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
     setCurrentAuthUser(null);
   });
 
@@ -87,7 +88,7 @@ describe("saving and restoring the cache", () => {
 
     await persistQueryClientSave({ queryClient: filledClient(), persister, dehydrateOptions });
 
-    const saved = JSON.parse(localStorage.getItem(QUERY_CACHE_KEY) ?? "{}");
+    const saved = JSON.parse(sessionStorage.getItem(QUERY_CACHE_KEY) ?? "{}");
     const savedKeys = saved.clientState.queries.map((q: { queryKey: unknown[] }) => q.queryKey);
     expect(savedKeys).toEqual([
       ["freelancer-dashboard", "overview", "u1"],
@@ -106,7 +107,7 @@ describe("saving and restoring the cache", () => {
 
     await persistQueryClientSave({ queryClient: filledClient(), persister, dehydrateOptions });
 
-    const saved = JSON.parse(localStorage.getItem(QUERY_CACHE_KEY) ?? "{}");
+    const saved = JSON.parse(sessionStorage.getItem(QUERY_CACHE_KEY) ?? "{}");
     expect(saved.clientState.queries).toEqual([]);
   });
 
@@ -115,24 +116,24 @@ describe("saving and restoring the cache", () => {
     const { persister, dehydrateOptions } = createQueryPersistOptions();
     await persistQueryClientSave({ queryClient: filledClient(), persister, dehydrateOptions });
 
-    const saved = JSON.parse(localStorage.getItem(QUERY_CACHE_KEY) ?? "{}");
+    const saved = JSON.parse(sessionStorage.getItem(QUERY_CACHE_KEY) ?? "{}");
     saved.timestamp = Date.now() - QUERY_CACHE_MAX_AGE_MS - 1000;
-    localStorage.setItem(QUERY_CACHE_KEY, JSON.stringify(saved));
+    sessionStorage.setItem(QUERY_CACHE_KEY, JSON.stringify(saved));
 
     const fresh = new QueryClient();
     await persistQueryClientRestore({ queryClient: fresh, persister, maxAge: QUERY_CACHE_MAX_AGE_MS });
     expect(fresh.getQueryCache().getAll()).toHaveLength(0);
-    expect(localStorage.getItem(QUERY_CACHE_KEY)).toBeNull();
+    expect(sessionStorage.getItem(QUERY_CACHE_KEY)).toBeNull();
   });
 
   it("is removed when the auth tokens are cleared", async () => {
     setCurrentAuthUser(user("u1"));
     const { persister, dehydrateOptions } = createQueryPersistOptions();
     await persistQueryClientSave({ queryClient: filledClient(), persister, dehydrateOptions });
-    expect(localStorage.getItem(QUERY_CACHE_KEY)).not.toBeNull();
+    expect(sessionStorage.getItem(QUERY_CACHE_KEY)).not.toBeNull();
 
     clearAuthTokens();
 
-    expect(localStorage.getItem(QUERY_CACHE_KEY)).toBeNull();
+    expect(sessionStorage.getItem(QUERY_CACHE_KEY)).toBeNull();
   });
 });

@@ -95,15 +95,16 @@ export function createApiAdminAuthService(): AdminAuthService {
     // The token argument is the console's marker; the API client sends the
     // stored access token itself (and refreshes it when it expires).
     async getCurrentSession() {
-      try {
-        const { data, error } = await apiClient.get<{ admin: BackendOperator }>("/admin/auth/session");
-        if (error || !data?.admin) return null;
-        return { admin: toProfile(data.admin) };
-      } catch {
-        // API unreachable: treat as signed out so the console shows the login page
-        // instead of crashing; the session is kept for the next attempt.
-        return null;
+      const { data, error } = await apiClient.get<{ admin: BackendOperator }>("/admin/auth/session");
+      if (error) {
+        // Only a definite "no valid session" answer ends the session. A network
+        // failure, throttle (429) or server error says nothing about it, so
+        // throw and let the caller keep the sign-in for the next attempt.
+        if (error.status === 401 || error.status === 403) return null;
+        throw error;
       }
+      if (!data?.admin) return null;
+      return { admin: toProfile(data.admin) };
     },
 
     async logout() {

@@ -18,3 +18,8 @@ Thumbs.db
 *.md
 *.txt
 
+
+# Logs, backups, TS build info
+*.log
+*.bak
+*.tsbuildinfo
