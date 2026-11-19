@@ -97,6 +97,15 @@ export function useAccommodationPayments(page = 1, enabled = true) {
   });
 }
 
+export function useAccommodationAgentOverview(enabled = true) {
+  const { status, user } = useAuth();
+  return useQuery({
+    queryKey: [...publicAccommodationKeys.all, "overview", user?.id] as const,
+    queryFn: () => accommodationApi.agentOverview(),
+    enabled: enabled && status === "authenticated" && Boolean(user?.id),
+  });
+}
+
 export function useAgentAccommodationListings(page = 1, enabled = true) {
   const { status, user } = useAuth();
   return useQuery({

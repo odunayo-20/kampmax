@@ -12,6 +12,7 @@ import {
   useUnsaveAccommodationListing,
 } from "@/hooks/use-accommodation";
 import { useAuth } from "@/lib/auth-context";
+import { replyChips } from "@/services/accommodation-overview";
 import { REPORT_REASON_LABELS, type ReportReason } from "@/types/accommodation";
 
 function money(amount: number, currency: string) {
@@ -244,6 +245,15 @@ export function AccommodationListingDetail({ id }: { id: string }) {
                 <p className="text-xs text-emerald-700">Verified accommodation agent</p>
               </div>
             </div>
+            {replyChips(item.agentProfile.reply).length > 0 && (
+              <ul className="mt-3 flex flex-wrap gap-2">
+                {replyChips(item.agentProfile.reply).map((chip) => (
+                  <li key={chip} className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800">
+                    {chip}
+                  </li>
+                ))}
+              </ul>
+            )}
             <p className="mt-3 text-xs text-kampmax-text-secondary">
               {item.agentProfile.activeListings} active listings
               {item.agentProfile.agencyName ? ` · ${item.agentProfile.agencyName}` : ""}

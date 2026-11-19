@@ -591,6 +591,12 @@ export interface PublicAccommodationListingDetail extends PublicAccommodationLis
     verified: true;
     memberSince: string | null;
     activeListings: number;
+    /** How quickly this agent answers. Null fields mean too few enquiries to say. */
+    reply?: {
+      received: number;
+      answeredRate: number | null;
+      typicalReplyHours: number | null;
+    };
   };
   lastAvailabilityConfirmedAt: string | null;
 }

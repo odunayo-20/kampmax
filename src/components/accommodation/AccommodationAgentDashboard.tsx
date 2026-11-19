@@ -25,6 +25,7 @@ import {
   useRemoveAccommodationDocument,
 } from "@/hooks/use-accommodation";
 import { accommodationApi, type CreateAccommodationProperty } from "@/services/accommodation";
+import { AccommodationAgentOverview } from "./AccommodationAgentOverview";
 import {
   AGENT_DOCUMENT_TYPE_LABELS,
   AGENT_STATUS_LABELS,
@@ -459,6 +460,8 @@ export function AccommodationAgentDashboard() {
         </div>
         <Link href="#agent-enquiries" className="rounded-lg border border-kampmax-border bg-white px-3 py-2 text-sm">Enquiries about my listings</Link>
       </div>
+
+      {approved && <AccommodationAgentOverview />}
 
       <section id="agent-profile" className="rounded-xl border border-kampmax-border bg-white p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">

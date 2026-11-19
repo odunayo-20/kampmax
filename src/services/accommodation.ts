@@ -1,6 +1,7 @@
 import { apiClient, type ApiError } from "@/lib/api-client";
 import { getApiBaseUrl } from "@/lib/api-config";
 import { getAccessToken } from "@/lib/auth-storage";
+import { readAgentOverview, type AgentOverview } from "@/services/accommodation-overview";
 import { uploadFileDirect } from "@/services/media";
 import type {
   AccommodationAgentProfile,
@@ -330,6 +331,11 @@ export const accommodationApi = {
     return unwrap(
       apiClient.delete<{ archived: true }>(`/accommodation/listings/${encodeURIComponent(id)}`)
     );
+  },
+
+  /** An approved agent's today: rooms to confirm, next renewal, reply speed, views and saves. */
+  async agentOverview(): Promise<AgentOverview> {
+    return readAgentOverview(await unwrap(apiClient.get<unknown>("/accommodation/agent/dashboard")));
   },
 
   confirmAvailability(id: string, availabilityStatus?: AccommodationUnit["availabilityStatus"]) {
