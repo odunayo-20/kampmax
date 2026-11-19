@@ -85,6 +85,58 @@ export const PROFILE_DEFINITIONS: ProfileDefinition[] = [
   },
 ];
 
+export interface ProfileVisualTheme {
+  iconBg: string;
+  iconColor: string;
+  badgeBg: string;
+  badgeText: string;
+  borderActive: string;
+  valueProp: string;
+}
+
+export const PROFILE_THEMES: Record<ProfileId, ProfileVisualTheme> = {
+  vendor: {
+    iconBg: "bg-sky-50 dark:bg-sky-950/40",
+    iconColor: "text-sky-600 dark:text-sky-400",
+    badgeBg: "bg-sky-50 dark:bg-sky-950/40",
+    badgeText: "text-sky-700 dark:text-sky-300",
+    borderActive: "border-sky-200 dark:border-sky-800",
+    valueProp: "Sell products to students on campus",
+  },
+  freelancer: {
+    iconBg: "bg-purple-50 dark:bg-purple-950/40",
+    iconColor: "text-purple-600 dark:text-purple-400",
+    badgeBg: "bg-purple-50 dark:bg-purple-950/40",
+    badgeText: "text-purple-700 dark:text-purple-300",
+    borderActive: "border-purple-200 dark:border-purple-800",
+    valueProp: "Offer skills and win campus gigs",
+  },
+  service: {
+    iconBg: "bg-teal-50 dark:bg-teal-950/40",
+    iconColor: "text-teal-600 dark:text-teal-400",
+    badgeBg: "bg-teal-50 dark:bg-teal-950/40",
+    badgeText: "text-teal-700 dark:text-teal-300",
+    borderActive: "border-teal-200 dark:border-teal-800",
+    valueProp: "Get booked for local campus services",
+  },
+  employer: {
+    iconBg: "bg-amber-50 dark:bg-amber-950/40",
+    iconColor: "text-amber-600 dark:text-amber-400",
+    badgeBg: "bg-amber-50 dark:bg-amber-950/40",
+    badgeText: "text-amber-700 dark:text-amber-300",
+    borderActive: "border-amber-200 dark:border-amber-800",
+    valueProp: "Post jobs and hire student talent",
+  },
+  agent: {
+    iconBg: "bg-emerald-50 dark:bg-emerald-950/40",
+    iconColor: "text-emerald-600 dark:text-emerald-400",
+    badgeBg: "bg-emerald-50 dark:bg-emerald-950/40",
+    badgeText: "text-emerald-700 dark:text-emerald-300",
+    borderActive: "border-emerald-200 dark:border-emerald-800",
+    valueProp: "List student rooms, hostels & apartments",
+  },
+};
+
 /** What we know about one profile: held (with its display name), not held, or couldn't tell. */
 export type ProfileState = { status: "active"; sub?: string } | { status: "none" } | { status: "error" };
 
