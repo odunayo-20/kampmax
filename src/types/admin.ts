@@ -4569,6 +4569,7 @@ export type ManagedJobApplicationStatus =
   | "submitted"
   | "under_review"
   | "shortlisted"
+  | "interviewing"
   | "accepted"
   | "rejected"
   | "withdrawn";

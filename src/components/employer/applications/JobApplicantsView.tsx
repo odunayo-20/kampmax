@@ -31,8 +31,10 @@ export function availableDecisions(status: ApplicationStatus): ApplicationDecisi
   switch (status) {
     case "SUBMITTED":
     case "VIEWED":
-      return ["SHORTLISTED", "REJECTED", "HIRED"];
+      return ["SHORTLISTED", "INTERVIEWING", "REJECTED", "HIRED"];
     case "SHORTLISTED":
+      return ["INTERVIEWING", "REJECTED", "HIRED"];
+    case "INTERVIEWING":
       return ["REJECTED", "HIRED"];
     default:
       return [];
@@ -47,6 +49,11 @@ const DECISION_COPY: Record<
     button: "Shortlist",
     title: "Shortlist this applicant?",
     body: () => "They are told they made your shortlist. You can still reject or hire them later.",
+  },
+  INTERVIEWING: {
+    button: "Interview",
+    title: "Move to the interview stage?",
+    body: () => "They are told you want to talk to them. You can still reject or hire them later.",
   },
   REJECTED: {
     button: "Not selected",

@@ -356,7 +356,7 @@ function UnitRow({
           disabled={archive.isPending}
           onClick={() => {
             if (window.confirm(`Archive ${unit.unitName}?`)) {
-              archive.mutate({ propertyId, unitId: unit.id });
+              archive.mutate({ propertyId, unitId: unit.id }, { onError: (error) => window.alert(error.message) });
             }
           }}
           className="rounded-md p-1.5 text-kampmax-text-secondary hover:bg-white hover:text-red-600"
@@ -396,7 +396,7 @@ function PropertyCard({ property }: { property: AccommodationProperty }) {
           disabled={archiveProperty.isPending}
           onClick={() => {
             if (window.confirm(`Archive ${property.title} and all its units?`)) {
-              archiveProperty.mutate(property.id);
+              archiveProperty.mutate(property.id, { onError: (error) => window.alert(error.message) });
             }
           }}
           className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"

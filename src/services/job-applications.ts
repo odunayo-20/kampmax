@@ -17,7 +17,7 @@
 //    GET    /applications/me           → my applications (?jobId= for one posting)
 //    POST   /applications/:id/withdraw → take one back
 //    GET    /jobs/me/:id/applications  → applicants to my posting (employer)
-//    PATCH  /applications/:id/status   → shortlist, reject or hire (employer)
+//    PATCH  /applications/:id/status   → shortlist, interview, reject or hire (employer)
 //    POST   /applications/:id/cv-link  → a few-minutes download address for the CV
 //
 // SECURITY: a CV has no public address. Every download goes through a signed
@@ -54,12 +54,13 @@ export type ApplicationStatus =
   | "SUBMITTED"
   | "VIEWED"
   | "SHORTLISTED"
+  | "INTERVIEWING"
   | "REJECTED"
   | "HIRED"
   | "WITHDRAWN";
 
 /** What an employer can do to an application. */
-export type ApplicationDecision = "SHORTLISTED" | "REJECTED" | "HIRED";
+export type ApplicationDecision = "SHORTLISTED" | "INTERVIEWING" | "REJECTED" | "HIRED";
 
 export interface MyApplication {
   id: string;

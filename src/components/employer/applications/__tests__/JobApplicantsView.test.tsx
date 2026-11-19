@@ -75,7 +75,7 @@ function result(items: Applicant[], over: Partial<JobApplicants> = {}): JobAppli
     job: { id: "job-1", title: "Marketing intern", openings: 2, hired: 0 },
     items,
     meta: { total: items.length, page: 1, limit: 20, totalPages: 1 },
-    counts: { ALL: items.length, SUBMITTED: items.length, VIEWED: 0, SHORTLISTED: 0, REJECTED: 0, HIRED: 0, WITHDRAWN: 0 },
+    counts: { ALL: items.length, SUBMITTED: items.length, VIEWED: 0, SHORTLISTED: 0, INTERVIEWING: 0, REJECTED: 0, HIRED: 0, WITHDRAWN: 0 },
     ...over,
   };
 }
@@ -89,11 +89,12 @@ const show = () =>
 
 describe("availableDecisions", () => {
   it("offers every decision on a new or seen application", () => {
-    expect(availableDecisions("SUBMITTED")).toEqual(["SHORTLISTED", "REJECTED", "HIRED"]);
-    expect(availableDecisions("VIEWED")).toEqual(["SHORTLISTED", "REJECTED", "HIRED"]);
+    expect(availableDecisions("SUBMITTED")).toEqual(["SHORTLISTED", "INTERVIEWING", "REJECTED", "HIRED"]);
+    expect(availableDecisions("VIEWED")).toEqual(["SHORTLISTED", "INTERVIEWING", "REJECTED", "HIRED"]);
   });
   it("does not offer to shortlist someone who is already shortlisted", () => {
-    expect(availableDecisions("SHORTLISTED")).toEqual(["REJECTED", "HIRED"]);
+    expect(availableDecisions("SHORTLISTED")).toEqual(["INTERVIEWING", "REJECTED", "HIRED"]);
+    expect(availableDecisions("INTERVIEWING")).toEqual(["REJECTED", "HIRED"]);
   });
   it("offers nothing once the decision is final", () => {
     for (const s of ["REJECTED", "HIRED", "WITHDRAWN"] as const) expect(availableDecisions(s)).toEqual([]);
@@ -157,7 +158,7 @@ describe("JobApplicantsView", () => {
 
   it("shows how many applicants are in each tab and asks the server for the chosen one", () => {
     state.data = result([applicant()], {
-      counts: { ALL: 5, SUBMITTED: 2, VIEWED: 1, SHORTLISTED: 1, REJECTED: 0, HIRED: 1, WITHDRAWN: 0 },
+      counts: { ALL: 5, SUBMITTED: 2, VIEWED: 1, SHORTLISTED: 1, INTERVIEWING: 1, REJECTED: 0, HIRED: 1, WITHDRAWN: 0 },
     });
     show();
 

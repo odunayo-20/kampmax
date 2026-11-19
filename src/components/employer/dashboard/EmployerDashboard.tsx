@@ -6,6 +6,7 @@ import { FreePostingsNotice } from "@/components/employer/billing/FreePostingsNo
 import { EmployerActionCenter } from "./EmployerActionCenter";
 import { EmployerApplicationsOverview } from "./EmployerApplicationsOverview";
 import { EmployerContractsOverview } from "./EmployerContractsOverview";
+import { EmployerHiringSnapshot } from "./EmployerHiringSnapshot";
 import { EmployerDashboardHeader } from "./EmployerDashboardHeader";
 import { EmployerJobsOverview } from "./EmployerJobsOverview";
 import { EmployerMessagesOverview } from "./EmployerMessagesOverview";
@@ -45,6 +46,7 @@ export function EmployerDashboard() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
+          <EmployerHiringSnapshot query={query} />
           <EmployerActionCenter query={query} />
           <EmployerJobsOverview query={query} />
           <EmployerApplicationsOverview query={query} />

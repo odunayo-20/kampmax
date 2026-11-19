@@ -65,6 +65,7 @@ const APPLICATION_LABELS: Record<ManagedJobApplicationStatus, string> = {
   submitted: "Submitted",
   under_review: "Under review",
   shortlisted: "Shortlisted",
+  interviewing: "Interviewing",
   accepted: "Accepted",
   rejected: "Rejected",
   withdrawn: "Withdrawn",
@@ -580,6 +581,7 @@ function barClass(status: ManagedJobApplicationStatus): string {
     case "accepted":
       return "bg-kampmax-success";
     case "shortlisted":
+    case "interviewing":
       return "bg-kampmax-gold";
     case "under_review":
       return "bg-kampmax-info";

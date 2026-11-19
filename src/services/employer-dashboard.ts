@@ -23,6 +23,7 @@ import {
   backendProfileCompletion,
   getEmployerProfileApi,
 } from "@/services/employer";
+import { getEmployerInsightsApi, type EmployerInsights } from "@/services/employer-insights";
 import { CONTRACT_STATUS } from "@/types/contract";
 import type { ContractStatus } from "@/types/contract";
 import type {
@@ -88,6 +89,8 @@ export interface EmployerDashboardSummary {
   };
   pendingActions: number;
   attention: EmployerAttentionItem[];
+  /** Where people stand across open postings, and how candidates see this employer. */
+  insights: EmployerInsights;
 }
 
 // ── Mapping helpers ──────────────────────────────────────────
@@ -207,11 +210,12 @@ export async function getEmployerDashboardApi(): Promise<EmployerDashboardSummar
   }
   if (!profile) return null;
 
-  const [jobs, apps, jobCounts, contracts] = await Promise.all([
+  const [jobs, apps, jobCounts, contracts, insights] = await Promise.all([
     getMyJobsApi(1, 5),
     getReceivedApplicationsApi({ page: 1, size: 5, sort: "newest" }),
     getMyJobCountsApi(),
     getEmployerContractsApi(),
+    getEmployerInsightsApi(),
   ]);
   for (const { error } of [jobs, apps, jobCounts]) if (error) throw error;
 
@@ -255,6 +259,7 @@ export async function getEmployerDashboardApi(): Promise<EmployerDashboardSummar
     },
     pendingActions: attention.length,
     attention,
+    insights,
   };
 }
 

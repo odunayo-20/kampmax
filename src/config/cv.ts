@@ -39,6 +39,11 @@ export const APPLICANT_STATUS_META: Record<
   SUBMITTED: { label: "Sent", tone: "info", hint: "Your application is with the employer." },
   VIEWED: { label: "Seen", tone: "info", hint: "The employer has opened your CV." },
   SHORTLISTED: { label: "Shortlisted", tone: "success", hint: "You made the shortlist." },
+  INTERVIEWING: {
+    label: "Interview stage",
+    tone: "success",
+    hint: "The employer wants to talk to you. Watch your messages.",
+  },
   REJECTED: { label: "Not selected", tone: "error", hint: "The employer went with someone else." },
   HIRED: { label: "Hired", tone: "success", hint: "Congratulations, you got the role." },
   WITHDRAWN: { label: "Withdrawn", tone: "default", hint: "You took this application back." },
@@ -52,6 +57,7 @@ export const EMPLOYER_STATUS_META: Record<
   SUBMITTED: { label: "New", tone: "info" },
   VIEWED: { label: "Seen", tone: "outline" },
   SHORTLISTED: { label: "Shortlisted", tone: "success" },
+  INTERVIEWING: { label: "Interviewing", tone: "success" },
   REJECTED: { label: "Not selected", tone: "error" },
   HIRED: { label: "Hired", tone: "success" },
   WITHDRAWN: { label: "Withdrawn", tone: "default" },
@@ -63,11 +69,17 @@ export const APPLICANT_FILTER_TABS: { value: ApplicationStatus | "ALL"; label: s
   { value: "SUBMITTED", label: "New" },
   { value: "VIEWED", label: "Seen" },
   { value: "SHORTLISTED", label: "Shortlisted" },
+  { value: "INTERVIEWING", label: "Interviewing" },
   { value: "HIRED", label: "Hired" },
   { value: "REJECTED", label: "Not selected" },
 ];
 
 /** True while an applicant can still take their application back. */
 export function canWithdraw(status: ApplicationStatus): boolean {
-  return status === "SUBMITTED" || status === "VIEWED" || status === "SHORTLISTED";
+  return (
+    status === "SUBMITTED" ||
+    status === "VIEWED" ||
+    status === "SHORTLISTED" ||
+    status === "INTERVIEWING"
+  );
 }
