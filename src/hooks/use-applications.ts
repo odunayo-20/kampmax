@@ -18,7 +18,6 @@ import {
 } from "@/services/proposals";
 import { openDirectConversation } from "@/services/messages-api";
 import type {
-  EmployerApplicationStatus,
   EmployerApplicationsPage,
   EmployerApplicationSummary,
 } from "@/types/opportunity";
@@ -76,23 +75,6 @@ export function useEmployerApplication(id: string) {
         throw Object.assign(new Error("Application not found"), { code: "NOT_FOUND" });
       }
       return application;
-    },
-  });
-}
-
-/** Per-status counts for the employer's filter tabs. */
-export function useEmployerApplicationsSummary() {
-  const { status, user } = useAuth();
-  const userId = user?.id ?? null;
-  const enabled = status === "authenticated" && !!userId;
-
-  return useQuery({
-    queryKey: applicationKeys.summary(userId ?? ""),
-    enabled,
-    queryFn: async (): Promise<Record<EmployerApplicationStatus | "all", number>> => {
-      const { page, error } = await getReceivedApplicationsApi({ size: 1 });
-      throwIfError(error);
-      return page.counts;
     },
   });
 }

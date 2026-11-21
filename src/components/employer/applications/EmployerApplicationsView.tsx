@@ -10,7 +10,7 @@ import {
   APPLICATION_SORT_OPTIONS,
   type EmployerApplicationSortKey,
 } from "@/config/applications";
-import { useEmployerApplications, useEmployerApplicationsSummary } from "@/hooks/use-applications";
+import { useEmployerApplications } from "@/hooks/use-applications";
 import { useEmployerJob } from "@/hooks/use-jobs";
 import { useDebounce } from "@/hooks/use-debounce";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
@@ -56,8 +56,8 @@ const EMPTY_COPY: Record<EmployerApplicationStatus | "all", string> = {
  * pagination. Navigation state (status/page/search/sort) is lifted to the
  * route; search is debounced client-side before it touches the URL.
  *
- * When `jobId` is provided the list is scoped to that owned job (used by
- * /employer/jobs/[jobId]/applications) and the heading shows the job title.
+ * One gig's proposals (/employer/jobs/[jobId]/applications); the heading shows
+ * the job title. Everyone across all postings is on the People page.
  */
 export function EmployerApplicationsView({
   status,
@@ -72,7 +72,7 @@ export function EmployerApplicationsView({
 }: {
   status: EmployerApplicationStatus | "all";
   page: number;
-  jobId?: string;
+  jobId: string;
   search: string;
   sort: EmployerApplicationSortKey;
   onStatusChange: (status: EmployerApplicationStatus | "all") => void;
@@ -90,8 +90,7 @@ export function EmployerApplicationsView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch]);
 
-  const jobQuery = useEmployerJob(jobId ?? "");
-  const summaryQuery = useEmployerApplicationsSummary();
+  const jobQuery = useEmployerJob(jobId);
   const listQuery = useEmployerApplications({
     jobId,
     status,
@@ -100,33 +99,25 @@ export function EmployerApplicationsView({
     page,
   });
 
-  const counts = jobId ? listQuery.data?.counts : summaryQuery.data;
+  const counts = listQuery.data?.counts;
   const total = listQuery.data?.total ?? 0;
-  const jobTitle = jobId ? jobQuery.data?.title : undefined;
+  const jobTitle = jobQuery.data?.title;
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
-          {jobId && (
-            <Link
-              href="/employer/jobs"
-              className="inline-flex items-center gap-1 rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
-              aria-label="Back to my jobs"
-            >
-              <ArrowLeft className="h-4 w-4" aria-hidden />
-            </Link>
-          )}
+          <Link
+            href="/employer/jobs"
+            className="inline-flex items-center gap-1 rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+            aria-label="Back to my jobs"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden />
+          </Link>
           <div className="min-w-0">
-            <h1 className="text-xl font-bold text-neutral-900">
-              {jobId ? "Applications" : "Applications & Hiring"}
-            </h1>
+            <h1 className="text-xl font-bold text-neutral-900">Applications</h1>
             <p className="mt-1 truncate text-sm text-neutral-500">
-              {jobId
-                ? jobTitle
-                  ? `${jobTitle} — review, shortlist or hire candidates`
-                  : "Loading this job…"
-                : "Review proposals on your jobs and hire the right talent."}
+              {jobTitle ? `${jobTitle} — review, shortlist or hire candidates` : "Loading this job…"}
             </p>
           </div>
         </div>

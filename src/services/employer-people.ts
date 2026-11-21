@@ -32,6 +32,31 @@ export const STAGE_EMPTY: Record<PeopleStage, string> = {
   DECLINED: "Nobody has been turned down.",
 };
 
+/** The address of the People list, optionally opened on one stage. */
+export function peopleHref(stage?: PeopleStage): string {
+  return stage ? `/employer/people?stage=${stage}` : "/employer/people";
+}
+
+/**
+ * The stage an old applications-page link meant. Links and bookmarks to `/employer/applications?status=…` still
+ * work: they land on the stage that status belongs to. A status with no stage (withdrawn) opens the list as it is.
+ */
+export function stageForOldStatus(status: string | null | undefined): PeopleStage | undefined {
+  switch (String(status ?? "").toLowerCase()) {
+    case "submitted":
+    case "under_review":
+      return "NEW";
+    case "shortlisted":
+      return "SHORTLISTED";
+    case "accepted":
+      return "HIRED";
+    case "rejected":
+      return "DECLINED";
+    default:
+      return undefined;
+  }
+}
+
 export type PersonKind = "APPLICATION" | "PROPOSAL";
 
 export interface Person {

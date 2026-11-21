@@ -23,14 +23,14 @@ import {
   backendProfileCompletion,
   getEmployerProfileApi,
 } from "@/services/employer";
-import { getEmployerInsightsApi, type EmployerInsights } from "@/services/employer-insights";
+import { getEmployerInsightsApi, type EmployerInsights, type HiringPipeline } from "@/services/employer-insights";
 import { CONTRACT_STATUS } from "@/types/contract";
 import type { ContractStatus } from "@/types/contract";
 import type {
-  EmployerApplicationStatus,
   EmployerApplicationSummary,
   OpportunityStatus,
 } from "@/types/opportunity";
+import { peopleHref } from "@/services/employer-people";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -77,7 +77,6 @@ export interface EmployerDashboardSummary {
     profileCompletion: number;
   };
   jobCounts: Record<OpportunityStatus, number> & { all: number };
-  appCounts: Record<EmployerApplicationStatus | "all", number>;
   recentJobs: EmployerDashboardJob[];
   recentApplications: EmployerApplicationSummary[];
   contracts: {
@@ -96,30 +95,30 @@ export interface EmployerDashboardSummary {
 // ── Mapping helpers ──────────────────────────────────────────
 
 function buildAttentionFrom(
-  appCounts: Record<EmployerApplicationStatus | "all", number>,
+  pipeline: HiringPipeline,
   contracts: { status: ContractStatus }[],
   jobCounts: Record<OpportunityStatus, number> & { all: number },
   profileCompletion: number
 ): EmployerAttentionItem[] {
   const items: EmployerAttentionItem[] = [];
 
-  if (appCounts.submitted > 0) {
+  if (pipeline.new > 0) {
     items.push({
       id: "new_applications",
       tone: "info",
       title: "Review new applications",
-      detail: `${appCounts.submitted} application${appCounts.submitted === 1 ? "" : "s"} waiting for your first review.`,
-      href: "/employer/applications?status=submitted",
+      detail: `${pipeline.new} ${pipeline.new === 1 ? "person is" : "people are"} waiting for your first look.`,
+      href: peopleHref("NEW"),
     });
   }
 
-  if (appCounts.shortlisted > 0) {
+  if (pipeline.shortlisted > 0) {
     items.push({
       id: "shortlisted",
       tone: "neutral",
       title: "Decide on shortlisted candidates",
-      detail: `${appCounts.shortlisted} candidate${appCounts.shortlisted === 1 ? "" : "s"} are shortlisted in your pipeline.`,
-      href: "/employer/applications?status=shortlisted",
+      detail: `${pipeline.shortlisted} ${pipeline.shortlisted === 1 ? "candidate is" : "candidates are"} shortlisted in your pipeline.`,
+      href: peopleHref("SHORTLISTED"),
     });
   }
 
@@ -219,11 +218,10 @@ export async function getEmployerDashboardApi(): Promise<EmployerDashboardSummar
   ]);
   for (const { error } of [jobs, apps, jobCounts]) if (error) throw error;
 
-  const appCounts = apps.page.counts;
   // Same calculation as the profile page, so the two always show one number.
   const profileCompletion = backendProfileCompletion(profile);
 
-  const attention = buildAttentionFrom(appCounts, contracts, jobCounts.counts, profileCompletion);
+  const attention = buildAttentionFrom(insights.pipeline, contracts, jobCounts.counts, profileCompletion);
 
   return {
     company: {
@@ -234,7 +232,6 @@ export async function getEmployerDashboardApi(): Promise<EmployerDashboardSummar
       profileCompletion,
     },
     jobCounts: jobCounts.counts,
-    appCounts,
     recentJobs: jobs.page.items.map((job) => ({
       id: job.id,
       title: job.title,

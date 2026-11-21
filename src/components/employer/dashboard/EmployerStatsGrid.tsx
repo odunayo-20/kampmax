@@ -3,6 +3,7 @@
 import { Briefcase, ClipboardList, FileText, Star, Users } from "lucide-react";
 import { Skeleton } from "@/components/home/Skeleton";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
+import { peopleHref } from "@/services/employer-people";
 import { EmployerStatCard } from "./EmployerStatCard";
 import type { EmployerDashboardQuerySource } from "./EmployerDashboardSection";
 
@@ -44,18 +45,18 @@ export function EmployerStatsGrid({ query }: { query: EmployerDashboardQuerySour
         href="/employer/jobs?status=open"
       />
       <EmployerStatCard
-        label="Applications"
-        value={s.appCounts.all}
-        context="across all your jobs"
+        label="New applicants"
+        value={s.insights.pipeline.new}
+        context="waiting for your first look"
         icon={Users}
-        href="/employer/applications"
+        href={peopleHref("NEW")}
       />
       <EmployerStatCard
         label="Shortlisted"
-        value={s.appCounts.shortlisted}
+        value={s.insights.pipeline.shortlisted}
         context="candidates in the pipeline"
         icon={Star}
-        href="/employer/applications?status=shortlisted"
+        href={peopleHref("SHORTLISTED")}
       />
       <EmployerStatCard
         label="Active contracts"

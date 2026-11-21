@@ -11,6 +11,7 @@
 // blocking statuses, and a draft (form data model) that maps 1:1 to the
 // fields a future NestJS employer-profile DTO would accept.
 
+import type { EmployerReputation } from "@/services/employer-insights";
 import type { Opportunity } from "./opportunity";
 
 // ── Onboarding status ───────────────────────────────────────
@@ -253,6 +254,8 @@ export interface EmployerPublicProfile {
   organizationSize?: string;
   verified: boolean;
   slug: string;
+  /** How the employer treats people who apply, or null when the server sent none. */
+  reputation: EmployerReputation | null;
   openJobs: Pick<
     Opportunity,
     "id" | "title" | "summary" | "budget" | "duration" | "experienceLevel" | "postedAt" | "location"

@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Building2, Clock, Package, Star } from "lucide-react";
+import { Building2, Clock, Eye, Package } from "lucide-react";
 import {
+  useAccommodationAgentOverview,
   useAccommodationAgentProfile,
   useAccommodationProperties,
   useAgentAccommodationListings,
@@ -14,6 +15,7 @@ import { AgentActionRequired } from "@/components/agent/AgentActionRequired";
 import { AgentQuickActions } from "@/components/agent/AgentQuickActions";
 import { AgentRecentInquiries } from "@/components/agent/AgentRecentInquiries";
 import { AgentProfileHealth } from "@/components/agent/AgentProfileHealth";
+import { pluralize } from "@/lib/utils";
 
 export default function AgentOverviewPage() {
   const router = useRouter();
@@ -23,6 +25,7 @@ export default function AgentOverviewPage() {
   const propertiesQuery = useAccommodationProperties(1, true);
   const listingsQuery = useAgentAccommodationListings(1, true);
   const enquiriesQuery = useAccommodationEnquiries("AGENT", 1);
+  const overviewQuery = useAccommodationAgentOverview();
 
   const agentName =
     accessQuery.data?.displayName ??
@@ -30,8 +33,9 @@ export default function AgentOverviewPage() {
     profileQuery.data?.fullName ??
     "Agent";
 
-  const totalProperties = propertiesQuery.data?.meta?.total ?? propertiesQuery.data?.items?.length ?? 21;
-  const totalListings = listingsQuery.data?.meta?.total ?? listingsQuery.data?.items?.length ?? 2;
+  const totalProperties = propertiesQuery.data?.meta?.total ?? propertiesQuery.data?.items?.length ?? 0;
+  const totalListings = listingsQuery.data?.meta?.total ?? listingsQuery.data?.items?.length ?? 0;
+  const interest = overviewQuery.data?.interest;
   const pendingInquiries = enquiriesQuery.data?.items?.filter((e) => e.status === "NEW").length ?? 0;
 
   return (
@@ -49,7 +53,6 @@ export default function AgentOverviewPage() {
         <AgentMetricCard
           label="Total properties"
           value={propertiesQuery.isPending ? "…" : totalProperties}
-          sublabel="4 active compounds"
           icon={Building2}
           tone="blue"
         />
@@ -61,17 +64,16 @@ export default function AgentOverviewPage() {
           tone="emerald"
         />
         <AgentMetricCard
-          label="Active listings"
+          label="Listings"
           value={listingsQuery.isPending ? "…" : totalListings}
-          sublabel={`${totalListings} total listings`}
           icon={Package}
           tone="indigo"
         />
         <AgentMetricCard
-          label="Agent rating"
-          value="4.9"
-          sublabel="12 reviews"
-          icon={Star}
+          label="Listing views"
+          value={overviewQuery.isPending ? "…" : interest?.views ?? 0}
+          sublabel={interest ? `${pluralize(interest.saves, "save")} · page opens, not people` : undefined}
+          icon={Eye}
           tone="amber"
         />
       </div>

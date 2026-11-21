@@ -34,6 +34,8 @@ export interface AgentAccess {
   status: AccommodationAgentStatus | null;
   canUseDashboard: boolean;
   message: string | null;
+  /** What the review team asked for, when they asked for more. */
+  infoRequest?: string | null;
   displayName?: string;
   agencyName?: string | null;
   operatingLocation?: string;
@@ -122,6 +124,7 @@ async function fetchAgentDashboardAccess(): Promise<AgentAccess> {
           status: "PENDING",
           canUseDashboard: true,
           message: `Administrator requested information: "${profile.infoRequest}"`,
+          infoRequest: profile.infoRequest,
           displayName,
           agencyName: profile.agencyName,
           operatingLocation: profile.operatingLocation,

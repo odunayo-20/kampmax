@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { employerResponseView, whenText } from "@/lib/interviews";
+import { FactChips } from "@/components/ui/FactChips";
 import { reputationChips, reputationHint } from "@/services/employer-insights";
 import type { EmployerDashboardQuerySource } from "./EmployerDashboardSection";
 
@@ -79,18 +80,7 @@ export function EmployerHiringSnapshot({ query }: { query: EmployerDashboardQuer
 
       <div className="mt-4 border-t border-kampmax-border pt-3">
         <p className="text-xs font-semibold text-kampmax-text-secondary">How candidates see you</p>
-        {chips.length > 0 && (
-          <ul className="mt-2 flex flex-wrap gap-2">
-            {chips.map((c) => (
-              <li
-                key={c}
-                className="rounded-full bg-kampmax-muted px-3 py-1 text-xs font-semibold text-kampmax-text"
-              >
-                {c}
-              </li>
-            ))}
-          </ul>
-        )}
+        <FactChips facts={chips} />
         {hint && <p className="mt-2 text-xs text-kampmax-text-secondary">{hint}</p>}
       </div>
     </section>

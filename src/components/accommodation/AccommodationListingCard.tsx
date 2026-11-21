@@ -1,14 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { PublicAccommodationListing } from "@/types/accommodation";
-
-function money(amount: number, currency: string) {
-  return new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
+import { formatMoney } from "@/lib/utils";
 
 export function AccommodationListingCard({
   listing,
@@ -50,7 +43,7 @@ export function AccommodationListingCard({
             {[listing.neighbourhood, listing.city, listing.state].filter(Boolean).join(", ")}
           </p>
           <p className="text-lg font-bold text-kampmax-blue">
-            {money(listing.rentAmount, listing.currency)}
+            {formatMoney(listing.rentAmount, listing.currency)}
             <span className="ml-1 text-xs font-normal text-kampmax-text-secondary">
               / {listing.paymentFrequency.toLowerCase()}
             </span>

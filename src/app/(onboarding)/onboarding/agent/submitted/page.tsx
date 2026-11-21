@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { CheckCircle2, Building2, Clock, ShieldCheck, ArrowRight } from "lucide-react";
+import { CheckCircle2, ArrowRight } from "lucide-react";
 import { useAccommodationAgentStatus } from "@/hooks/use-accommodation";
 import { AgentStatusBadge } from "@/components/agent/AgentStatusBadge";
+import { ApplicationProgress } from "@/components/agent/ApplicationProgress";
+import { agentStatusView, applicationSteps } from "@/services/agent-application";
 
 export default function AgentSubmittedPage() {
   const statusQuery = useAccommodationAgentStatus();
@@ -28,49 +30,11 @@ export default function AgentSubmittedPage() {
           </p>
         </div>
 
-        {/* What Happens Next Card */}
         <div className="mt-8 rounded-2xl border border-kampmax-border bg-white p-6 text-left shadow-xs">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-kampmax-blue">
+          <h2 className="mb-4 text-xs font-bold uppercase tracking-wider text-kampmax-blue">
             What Happens Next
           </h2>
-
-          <div className="mt-4 space-y-4 text-xs">
-            <div className="flex items-start gap-3">
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-kampmax-blue/10 text-kampmax-blue font-bold">
-                1
-              </div>
-              <div>
-                <p className="font-semibold text-kampmax-text">Document Review</p>
-                <p className="mt-0.5 text-kampmax-text-secondary">
-                  Our verification team validates your government ID and authority-to-lease documents.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-kampmax-blue/10 text-kampmax-blue font-bold">
-                2
-              </div>
-              <div>
-                <p className="font-semibold text-kampmax-text">Prepare Properties & Units</p>
-                <p className="mt-0.5 text-kampmax-text-secondary">
-                  You don&apos;t have to wait! You can add your properties, configure rooms, and write drafts in your workspace right away.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-kampmax-blue/10 text-kampmax-blue font-bold">
-                3
-              </div>
-              <div>
-                <p className="font-semibold text-kampmax-text">Publish & Receive Inquiries</p>
-                <p className="mt-0.5 text-kampmax-text-secondary">
-                  Upon approval, your verified trust badge is granted and you can publish your room listings directly to campus students.
-                </p>
-              </div>
-            </div>
-          </div>
+          <ApplicationProgress steps={applicationSteps(agentStatusView(status).tone)} />
         </div>
 
         {/* Actions */}

@@ -17,7 +17,6 @@ export {
 export {
   useEmployerApplications,
   useEmployerApplication,
-  useEmployerApplicationsSummary,
   useReviewApplication,
   useShortlistApplication,
   useRejectApplication,

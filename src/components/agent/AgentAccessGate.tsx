@@ -1,21 +1,13 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import {
-  Building2,
-  Clock,
-  AlertCircle,
-  XCircle,
-  Ban,
-  ArrowRight,
-  Info,
-  LucideIcon,
-} from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Building2, XCircle, Ban, LucideIcon } from "lucide-react";
 import {
   AGENT_DASHBOARD_GATE,
   type AgentAccess,
 } from "@/services/agent-dashboard";
+import { showsPendingApplication } from "@/services/agent-application";
+import { PendingApplication, PendingNotice, viewOf } from "@/components/agent/PendingApplication";
 
 export function AgentAccessGate({
   access,
@@ -59,63 +51,28 @@ export function AgentAccessGate({
       );
 
     case AGENT_DASHBOARD_GATE.MORE_INFORMATION:
-      return (
-        <>
-          <aside
-            role="alert"
-            className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900"
-          >
-            <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
-                <span>
-                  <strong>Information Requested:</strong> {access.message}
-                </span>
-              </div>
-              <Link
-                href="/agent/verification"
-                className="shrink-0 font-bold underline underline-offset-2 hover:text-amber-950"
-              >
-                Update Verification Documents →
-              </Link>
-            </div>
-          </aside>
-          {children}
-        </>
-      );
-
     case AGENT_DASHBOARD_GATE.PENDING_REVIEW:
-      return (
-        <>
-          <aside
-            role="status"
-            className="border-b border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-900"
-          >
-            <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 shrink-0 text-blue-600" />
-                <span>
-                  <strong>Application Under Review:</strong> Our trust & verification team is reviewing
-                  your documents. You can set up your properties and units now; publishing listings
-                  will unlock upon approval.
-                </span>
-              </div>
-              <Link
-                href="/agent/verification"
-                className="shrink-0 font-bold underline underline-offset-2 hover:text-blue-950"
-              >
-                Check Documents →
-              </Link>
-            </div>
-          </aside>
-          {children}
-        </>
-      );
+      return <WaitingForReview access={access}>{children}</WaitingForReview>;
 
     case AGENT_DASHBOARD_GATE.APPROVED:
     default:
       return <>{children}</>;
   }
+}
+
+/**
+ * A pending agent: the overview and the pages that open after approval show where the application stands; profile,
+ * verification and settings stay usable under one notice.
+ */
+function WaitingForReview({ access, children }: { access: AgentAccess; children: React.ReactNode }) {
+  const pathname = usePathname();
+  if (showsPendingApplication(access.kind, pathname)) return <PendingApplication access={access} />;
+  return (
+    <>
+      <PendingNotice view={viewOf(access)} className="mb-4" />
+      {children}
+    </>
+  );
 }
 
 function Gate({

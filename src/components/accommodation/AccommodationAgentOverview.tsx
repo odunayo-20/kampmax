@@ -5,6 +5,7 @@ import {
   useAccommodationAgentOverview,
   useConfirmAccommodationAvailability,
 } from "@/hooks/use-accommodation";
+import { FactChips } from "@/components/ui/FactChips";
 import { interestLine, replyChips } from "@/services/accommodation-overview";
 
 const day = (iso: string | null) =>
@@ -89,13 +90,7 @@ export function AccommodationAgentOverview() {
       <div>
         <h3 className="text-sm font-semibold text-kampmax-text">How students see you</h3>
         {chips.length > 0 ? (
-          <ul className="mt-2 flex flex-wrap gap-2">
-            {chips.map((chip) => (
-              <li key={chip} className="rounded-full bg-kampmax-muted px-3 py-1 text-xs font-semibold text-kampmax-text">
-                {chip}
-              </li>
-            ))}
-          </ul>
+          <FactChips facts={chips} />
         ) : (
           <p className="mt-1 text-xs text-kampmax-text-secondary">
             Your reply speed shows to students once a few of them have written to you. Answer quickly and it shows.

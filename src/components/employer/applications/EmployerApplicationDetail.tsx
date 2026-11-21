@@ -20,6 +20,7 @@ import { ProposalStatusBadge } from "@/components/freelancer/opportunities/Statu
 import { useEmployerJob } from "@/hooks/use-jobs";
 import { ApplicationActions } from "./ApplicationActions";
 import { CandidateProfilePreview } from "./CandidateProfilePreview";
+import { peopleHref } from "@/services/employer-people";
 
 function deliveryText(value: number, unit: string): string {
   const label = unit === "days" ? "day" : unit === "weeks" ? "week" : "month";
@@ -63,9 +64,9 @@ export function EmployerApplicationDetail({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <Link
-            href="/employer/applications"
+            href={peopleHref()}
             className="inline-flex items-center gap-1 rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
-            aria-label="Back to applications"
+            aria-label="Back to people"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden />
           </Link>

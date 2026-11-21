@@ -182,8 +182,6 @@ export const applicationKeys = {
     ["applications", "list", userId, filters] as const,
   detail: (userId: string, id: string) =>
     ["applications", "detail", userId, id] as const,
-  summary: (userId: string) =>
-    ["applications", "summary", userId] as const,
 };
 
 /**

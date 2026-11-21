@@ -142,7 +142,7 @@ const CONTEXTUAL_LINKS: Record<FooterRole, FooterLink[]> = {
   employer: [
     { label: "Post Job", href: "/employer/jobs/create" },
     { label: "Manage Jobs", href: "/employer/jobs" },
-    { label: "Applications", href: "/employer/applications" },
+    { label: "People", href: "/employer/people" },
   ],
   ambassador: [],
 };

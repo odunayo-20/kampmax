@@ -5,8 +5,10 @@ import {
   defaultStage,
   offerLine,
   personActions,
+  peopleHref,
   personFrom,
   reviewHref,
+  stageForOldStatus,
 } from "@/services/employer-people";
 
 const raw = (over: Record<string, unknown> = {}) => ({
@@ -85,5 +87,28 @@ describe("what can be done in the list", () => {
     expect(offerLine({ cvLabel: "My CV", amount: null, currency: null }, n)).toBe("CV: My CV");
     expect(offerLine({ cvLabel: null, amount: 25000, currency: "NGN" }, n)).toBe("N25000");
     expect(offerLine({ cvLabel: null, amount: 40, currency: "USD" }, n)).toBe("40 USD");
+  });
+});
+
+describe("the old applications page", () => {
+  it("keeps old links working by landing on the stage the status belongs to", () => {
+    expect(stageForOldStatus("submitted")).toBe("NEW");
+    expect(stageForOldStatus("under_review")).toBe("NEW");
+    expect(stageForOldStatus("shortlisted")).toBe("SHORTLISTED");
+    expect(stageForOldStatus("accepted")).toBe("HIRED");
+    expect(stageForOldStatus("rejected")).toBe("DECLINED");
+    expect(stageForOldStatus("SHORTLISTED")).toBe("SHORTLISTED");
+  });
+
+  it("opens the list as it is for a status with no stage, or none at all", () => {
+    expect(stageForOldStatus("withdrawn")).toBeUndefined();
+    expect(stageForOldStatus("all")).toBeUndefined();
+    expect(stageForOldStatus("")).toBeUndefined();
+    expect(stageForOldStatus(undefined)).toBeUndefined();
+  });
+
+  it("writes the address of the list, on a stage or not", () => {
+    expect(peopleHref()).toBe("/employer/people");
+    expect(peopleHref("INTERVIEWING")).toBe("/employer/people?stage=INTERVIEWING");
   });
 });

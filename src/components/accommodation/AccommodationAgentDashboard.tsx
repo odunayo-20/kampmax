@@ -34,6 +34,7 @@ import {
   type AccommodationProperty,
   type AccommodationUnit,
 } from "@/types/accommodation";
+import { formatMoney } from "@/lib/utils";
 
 const DOCUMENT_TYPES: AgentDocumentType[] = [
   "IDENTITY",
@@ -42,14 +43,6 @@ const DOCUMENT_TYPES: AgentDocumentType[] = [
   "BUSINESS_REGISTRATION",
   "OTHER",
 ];
-
-function money(amount: number, currency = "NGN") {
-  return new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
 
 export function ApplyForm({ initial }: { initial?: { fullName?: string; phone?: string; email?: string; operatingLocation?: string; agencyName?: string | null; businessAddress?: string | null } }) {
   const apply = useApplyAsAccommodationAgent();
@@ -592,7 +585,7 @@ export function AccommodationAgentDashboard() {
                   {subscriptions.data.items.map((subscription) => (
                     <div key={subscription.id} className="flex flex-wrap justify-between gap-2 rounded-md bg-kampmax-bg p-3 text-sm">
                       <span>Listing subscription · {subscription.status.toLowerCase()} · {subscription.autoRenew ? "auto-renew on" : "auto-renew off"}</span>
-                      <span>{money(subscription.amount, subscription.currency)} / {subscription.durationDays} days</span>
+                      <span>{formatMoney(subscription.amount, subscription.currency)} / {subscription.durationDays} days</span>
                     </div>
                   ))}
                   {subscriptions.data.items.length === 0 && <p className="text-sm text-kampmax-text-secondary">No subscriptions yet.</p>}
@@ -601,7 +594,7 @@ export function AccommodationAgentDashboard() {
                   {payments.data.items.map((payment) => (
                     <div key={payment.id} className="flex flex-wrap justify-between gap-2 py-3 text-xs">
                       <span>{payment.paymentType.replaceAll("_", " ").toLowerCase()} · {payment.status.toLowerCase()} · {new Date(payment.createdAt).toLocaleDateString()}</span>
-                      <span>{money(payment.amount, payment.currency)}</span>
+                      <span>{formatMoney(payment.amount, payment.currency)}</span>
                     </div>
                   ))}
                   {payments.data.items.length === 0 && <p className="py-2 text-sm text-kampmax-text-secondary">No payments yet.</p>}

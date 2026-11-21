@@ -32,6 +32,7 @@ import {
 } from "@/types/employer";
 import { EMPLOYER_DASHBOARD_SECTIONS } from "@/config/employer-dashboard";
 import { EMPLOYER_GATE_EXEMPT_PATHS } from "@/config/employer-dashboard";
+import { type EmployerReputation, reputationFrom } from "@/services/employer-insights";
 
 // ── Access gate (role activation) ───────────────────────────
 // Mirrors getFreelancerDashboardAccess / getVendorAccess.
@@ -470,6 +471,7 @@ export async function getEmployerPublicProfileFromBackend(
     city: string | null;
     state: string | null;
     verificationStatus: string;
+    reputation?: Partial<EmployerReputation> | null;
   };
 
   const { jobs } = await listPublicJobs({ employerId: id, limit: 20 });
@@ -485,6 +487,7 @@ export async function getEmployerPublicProfileFromBackend(
     organizationSize: "",
     verified: String(raw.verificationStatus).toUpperCase() === "VERIFIED",
     slug: raw.id,
+    reputation: reputationFrom(raw.reputation),
     openJobs: jobs.map(jobToOpportunity).map((o) => ({
       id: o.id,
       title: o.title,

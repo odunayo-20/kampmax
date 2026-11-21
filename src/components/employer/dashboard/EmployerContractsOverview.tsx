@@ -12,6 +12,7 @@ import {
   EmployerDashboardSkeleton,
 } from "./EmployerDashboardSection";
 import type { EmployerDashboardQuerySource } from "./EmployerDashboardSection";
+import { peopleHref } from "@/services/employer-people";
 
 export function EmployerContractsOverview({
   query,
@@ -42,7 +43,7 @@ export function EmployerContractsOverview({
         <EmployerDashboardEmpty
           title="No contracts yet"
           detail="Contracts start automatically when you hire an applicant."
-          action={{ href: "/employer/applications", label: "Review applications" }}
+          action={{ href: peopleHref(), label: "Review applicants" }}
         />
       </EmployerDashboardSection>
     );

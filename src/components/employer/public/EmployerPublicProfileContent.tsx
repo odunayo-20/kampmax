@@ -3,6 +3,8 @@ import { BadgeCheck, Building2, Clock, Globe, MapPin, Users } from "lucide-react
 import { formatNaira } from "@/lib/utils";
 import { DURATION_LABEL } from "@/config/opportunity";
 import { Badge } from "@/components/ui";
+import { FactChips } from "@/components/ui/FactChips";
+import { reputationChips } from "@/services/employer-insights";
 import type { EmployerPublicProfile } from "@/types/employer";
 import { EmployerProfileActions } from "@/components/employer/public/EmployerProfileActions";
 
@@ -113,6 +115,8 @@ export function EmployerPublicProfileContent({
           </div>
         </div>
       </div>
+
+      <FactChips facts={reputationChips(profile.reputation)} className="mt-4" />
 
       <div className="mt-4 flex justify-end">
         <EmployerProfileActions employerUserId={profile.userId} />

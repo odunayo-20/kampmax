@@ -6,6 +6,7 @@ import { useEmployerApplication } from "@/hooks/use-applications";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
 import { Button } from "@/components/ui";
 import { EmployerApplicationDetail } from "@/components/employer/applications/EmployerApplicationDetail";
+import { peopleHref } from "@/services/employer-people";
 
 export default function EmployerApplicationDetailPage() {
   const router = useRouter();
@@ -41,9 +42,9 @@ export default function EmployerApplicationDetailPage() {
         <Button
           variant="outline"
           className="mt-5"
-          onClick={() => router.push("/employer/applications")}
+          onClick={() => router.push(peopleHref())}
         >
-          <ArrowLeft className="mr-1.5 h-4 w-4" aria-hidden /> Back to applications
+          <ArrowLeft className="mr-1.5 h-4 w-4" aria-hidden /> Back to people
         </Button>
       </div>
     );

@@ -58,6 +58,15 @@ export function formatNaira(amount: number): string {
   return `\u20A6${amount.toLocaleString("en-NG")}`;
 }
 
+/** A whole-number amount in its own currency (naira unless told otherwise), e.g. "₦450,000". */
+export function formatMoney(amount: number, currency = "NGN"): string {
+  return new Intl.NumberFormat("en-NG", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
 export function formatNairaCompact(amount: number): string {
   if (amount >= 1_000_000) {
     return `\u20A6${(amount / 1_000_000).toFixed(1)}M`;

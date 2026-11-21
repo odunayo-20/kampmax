@@ -12,12 +12,14 @@ import {
   ShieldCheck,
   MessageSquare,
   Settings,
+  Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LogoIcon } from "@/components/ui/Logo";
 import { NavLinkIcon } from "@/components/ui/NavLinkIcon";
 import { useUnreadMessageCount } from "@/hooks/use-messages";
 import type { AccommodationAgentStatus } from "@/types/accommodation";
+import { opensAfterApproval } from "@/services/agent-application";
 
 interface NavItem {
   href: string;
@@ -85,6 +87,7 @@ export function AgentSidebar({
   ];
 
   const initial = (agentName || "A").charAt(0).toUpperCase();
+  const approved = status === "APPROVED";
 
   return (
     <div className="flex h-full flex-col bg-kampmax-navy">
@@ -105,7 +108,7 @@ export function AgentSidebar({
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-white">{agentName}</p>
             <span className="mt-0.5 inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-xs text-white/90">
-              ✓ Approved
+              {approved ? "✓ Approved" : "In review"}
             </span>
           </div>
         </div>
@@ -122,6 +125,7 @@ export function AgentSidebar({
             <ul className="space-y-0.5">
               {section.items.map((item) => {
                 const active = isActive(pathname, item.href);
+                const locked = !approved && opensAfterApproval(item.href);
                 return (
                   <li key={item.href}>
                     <Link
@@ -136,6 +140,9 @@ export function AgentSidebar({
                     >
                       <NavLinkIcon icon={item.icon} />
                       <span className="flex-1 truncate">{item.label}</span>
+                      {locked && (
+                        <Lock className="h-3.5 w-3.5 shrink-0 text-white/40" aria-label="Opens after approval" />
+                      )}
                       {item.badge && (
                         <span className="rounded-full bg-kampmax-gold px-1.5 py-0.5 text-[10px] font-bold text-kampmax-navy">
                           {item.badge}

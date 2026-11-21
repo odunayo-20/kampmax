@@ -19,6 +19,7 @@ import {
   EmployerDashboardError,
   EmployerDashboardSkeleton,
 } from "./EmployerDashboardSection";
+import { peopleHref } from "@/services/employer-people";
 
 export function EmployerContracts() {
   const query = useEmployerContracts();
@@ -53,7 +54,7 @@ export function EmployerContracts() {
         <EmployerDashboardEmpty
           title="No contracts yet"
           detail="Hiring a freelancer starts a contract here. Fund it to start work, then approve the delivered work to release payment."
-          action={{ href: "/employer/applications", label: "Review applications" }}
+          action={{ href: peopleHref(), label: "Review applicants" }}
         />
       ) : (
         <ul className="space-y-3">

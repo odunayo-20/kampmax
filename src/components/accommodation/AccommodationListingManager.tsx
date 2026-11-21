@@ -12,20 +12,14 @@ import {
   useUpdateAccommodationListing,
 } from "@/hooks/use-accommodation";
 import { accommodationApi } from "@/services/accommodation";
+import { listingInterest } from "@/services/accommodation-overview";
 import type {
   AccommodationAmenityOption,
   AccommodationListing,
   AccommodationPackage,
   AccommodationUnit,
 } from "@/types/accommodation";
-
-function money(amount: number, currency = "NGN") {
-  return new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
+import { formatMoney } from "@/lib/utils";
 
 export function AccommodationListingManager({
   listing,
@@ -65,6 +59,7 @@ export function AccommodationListingManager({
     cancelRenewal.isPending ||
     enableRenewal.isPending ||
     renew.isPending;
+  const interest = listingInterest(listing);
   const canEdit = listing.moderationStatus !== "PENDING_APPROVAL" && listing.moderationStatus !== "ADMIN_SUSPENDED";
 
   async function saveEdits(event: FormEvent<HTMLFormElement>) {
@@ -130,8 +125,9 @@ export function AccommodationListingManager({
         <div className="min-w-0">
           <h3 className="font-medium text-kampmax-text">{listing.title}</h3>
           <p className="mt-1 text-xs text-kampmax-text-secondary">
-            {listing.property?.title} · {listing.unit?.unitName} · {money(listing.rentAmount, listing.currency)} / {listing.paymentFrequency.toLowerCase()} · {listing.moderationStatus.replaceAll("_", " ").toLowerCase()}
+            {listing.property?.title} · {listing.unit?.unitName} · {formatMoney(listing.rentAmount, listing.currency)} / {listing.paymentFrequency.toLowerCase()} · {listing.moderationStatus.replaceAll("_", " ").toLowerCase()}
           </p>
+          {interest && <p className="mt-1 text-xs font-medium text-kampmax-text">{interest}</p>}
           {listing.rejectionReason && <p className="mt-1 text-xs text-red-700">Review note: {listing.rejectionReason}</p>}
           {listing.subscription && (
             <p className="mt-1 text-xs text-kampmax-text-secondary">
@@ -146,7 +142,7 @@ export function AccommodationListingManager({
           {listing.moderationStatus === "DRAFT" && (
             <div className="flex flex-wrap items-center gap-2">
               <select aria-label={`Package for ${listing.title}`} value={packageId} onChange={(event) => setPackageId(event.target.value)} className="rounded-md border border-kampmax-border bg-white px-2 py-2 text-xs">
-                {packages.map((pkg) => <option key={pkg.id} value={pkg.id}>{pkg.name} · {money(pkg.price, pkg.currency)}</option>)}
+                {packages.map((pkg) => <option key={pkg.id} value={pkg.id}>{pkg.name} · {formatMoney(pkg.price, pkg.currency)}</option>)}
               </select>
               <button type="button" disabled={busy || packages.length === 0 || !termsAccepted} onClick={() => void startCheckout("initial")} className="rounded-md bg-kampmax-blue px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">
                 {subscribe.isPending ? "Starting…" : "Pay & submit"}

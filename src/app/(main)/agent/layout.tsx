@@ -17,6 +17,7 @@ import { AgentAccessGate } from "@/components/agent/AgentAccessGate";
 import { AgentSidebar } from "@/components/agent/AgentSidebar";
 import { AgentTopbar } from "@/components/agent/AgentTopbar";
 import { VerificationStatusBanner } from "@/components/verification/VerificationStatusBanner";
+import { isWaitingForReview } from "@/services/agent-application";
 import type { AccommodationAgentStatus } from "@/types/accommodation";
 
 const AGENT_OVERVIEW_PATH = "/agent";
@@ -57,26 +58,13 @@ export default function AgentLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  if (
-    !access.canUseDashboard &&
-    access.kind !== AGENT_DASHBOARD_GATE.PENDING_REVIEW &&
-    access.kind !== AGENT_DASHBOARD_GATE.MORE_INFORMATION
-  ) {
+  if (!access.canUseDashboard && !isWaitingForReview(access.kind)) {
     return <AgentAccessGate access={access}>{children}</AgentAccessGate>;
   }
 
   const agentName = access.displayName ?? "Accommodation Agent";
   const agencyName = access.agencyName ?? null;
   const agentStatus: AccommodationAgentStatus = access.status ?? "APPROVED";
-
-  const kycStatus =
-    agentStatus === "APPROVED"
-      ? "verified"
-      : agentStatus === "SUSPENDED" || agentStatus === "REVOKED"
-      ? "suspended"
-      : agentStatus === "REJECTED"
-      ? "rejected"
-      : "pending_review";
 
   return (
     <div className="min-h-screen bg-kampmax-bg">
@@ -146,9 +134,10 @@ export default function AgentLayout({ children }: { children: React.ReactNode })
           status={agentStatus}
         />
         <main className="mx-auto max-w-6xl px-4 py-6 lg:px-8 space-y-5">
-          {pathname !== "/agent/verification" && (
+          {/* A waiting agent gets the application notice from AgentAccessGate instead. */}
+          {access.kind === AGENT_DASHBOARD_GATE.APPROVED && pathname !== "/agent/verification" && (
             <VerificationStatusBanner
-              status={kycStatus}
+              status="verified"
               role="agent"
               verificationHref="/agent/verification"
             />

@@ -497,6 +497,13 @@ export type AccommodationPaymentFrequency =
   | "PER_SEMESTER"
   | "PER_NIGHT";
 
+/** How much interest a listing is getting. Views are page opens, not people. */
+export interface ListingStats {
+  views: number;
+  saves: number;
+  enquiries: number;
+}
+
 export interface AccommodationListing {
   id: string;
   propertyId: string;
@@ -530,6 +537,8 @@ export interface AccommodationListing {
     autoRenew: boolean;
     endsAt: string | null;
   } | null;
+  /** Only the agent's own list carries these. */
+  stats?: ListingStats;
   createdAt: string;
   updatedAt: string;
 }

@@ -43,6 +43,7 @@ export interface AgentOverview {
 
 import { countOf, maybeNumber, replyFacts } from "@/lib/reading";
 import { pluralize } from "@/lib/utils";
+import type { AccommodationListing, ListingStats } from "@/types/accommodation";
 
 type Bag = Record<string, unknown>;
 
@@ -103,8 +104,16 @@ export function replyChips(reply: Partial<AgentReplyStats> | null | undefined): 
 }
 
 /** "40 views · 6 saves · 3 enquiries". */
-export function interestLine(x: { views: number; saves: number; enquiries?: number }): string {
+export function interestLine(x: Pick<ListingStats, "views" | "saves"> & { enquiries?: number }): string {
   const parts = [pluralize(x.views, "view"), pluralize(x.saves, "save")];
   if (x.enquiries !== undefined) parts.push(pluralize(x.enquiries, "enquiry", "enquiries"));
   return parts.join(" · ");
+}
+
+/**
+ * What one of the agent's own listings is getting. Only a live listing can be looked at, so a draft, a review or
+ * a rejection says nothing rather than a row of zeros.
+ */
+export function listingInterest(listing: Pick<AccommodationListing, "moderationStatus" | "stats">): string | null {
+  return listing.moderationStatus === "APPROVED" && listing.stats ? interestLine(listing.stats) : null;
 }

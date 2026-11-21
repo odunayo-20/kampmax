@@ -5,7 +5,7 @@ import { Avatar } from "@/components/ui";
 import { ProposalStatusBadge } from "@/components/freelancer/opportunities/StatusBadges";
 import { formatNaira, timeAgo } from "@/lib/utils";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
-import { EMPLOYER_APPLICATION_STATUSES } from "@/types/opportunity";
+import { peopleHref } from "@/services/employer-people";
 import {
   EmployerDashboardEmpty,
   EmployerDashboardError,
@@ -19,12 +19,11 @@ export function EmployerApplicationsOverview({
 }: {
   query: EmployerDashboardQuerySource;
 }) {
-  const counts = query.data?.appCounts;
   const applications = query.data?.recentApplications ?? [];
 
   if (query.isPending && !query.data) {
     return (
-      <EmployerDashboardSection title="Applications" action={{ href: "/employer/applications", label: "All applications" }}>
+      <EmployerDashboardSection title="Applications" action={{ href: peopleHref(), label: "Everyone who applied" }}>
         <EmployerDashboardSkeleton rows={4} />
       </EmployerDashboardSection>
     );
@@ -32,27 +31,14 @@ export function EmployerApplicationsOverview({
 
   if (query.isError && !query.data) {
     return (
-      <EmployerDashboardSection title="Applications" action={{ href: "/employer/applications", label: "All applications" }}>
+      <EmployerDashboardSection title="Applications" action={{ href: peopleHref(), label: "Everyone who applied" }}>
         <EmployerDashboardError message={getFriendlyErrorMessage(query.error)} onRetry={query.refetch} />
       </EmployerDashboardSection>
     );
   }
 
   return (
-    <EmployerDashboardSection title="Applications" action={{ href: "/employer/applications", label: "All applications" }}>
-      <div className="mb-4 flex flex-wrap gap-2">
-        {EMPLOYER_APPLICATION_STATUSES.map((status) => (
-          <Link
-            key={status}
-            href={`/employer/applications?status=${status}`}
-            className="inline-flex items-center gap-1.5 rounded-full border border-kampmax-border bg-kampmax-bg px-2.5 py-1 text-xs font-medium text-kampmax-text hover:border-primary-300 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600"
-          >
-            <span className="capitalize">{status.replace(/_/g, " ")}</span>
-            <span className="font-bold text-kampmax-text-secondary">{counts?.[status] ?? 0}</span>
-          </Link>
-        ))}
-      </div>
-
+    <EmployerDashboardSection title="Applications" action={{ href: peopleHref(), label: "Everyone who applied" }}>
       {applications.length === 0 ? (
         <EmployerDashboardEmpty
           title="No applications yet"

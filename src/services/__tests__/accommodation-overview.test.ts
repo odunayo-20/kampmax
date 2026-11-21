@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { replyTimeText } from "@/lib/reading";
 import {
   interestLine,
+  listingInterest,
   readAgentOverview,
   replyChips,
 } from "@/services/accommodation-overview";
@@ -52,5 +53,23 @@ describe("how students see an agent", () => {
   it("reads interest as one short line", () => {
     expect(interestLine({ views: 40, saves: 6 })).toBe("40 views · 6 saves");
     expect(interestLine({ views: 1, saves: 1, enquiries: 1 })).toBe("1 view · 1 save · 1 enquiry");
+  });
+});
+
+describe("listingInterest", () => {
+  const stats = { views: 40, saves: 6, enquiries: 3 };
+
+  it("says what a live listing is getting", () => {
+    expect(listingInterest({ moderationStatus: "APPROVED", stats })).toBe("40 views · 6 saves · 3 enquiries");
+  });
+
+  it("says nothing about a listing nobody can see yet", () => {
+    for (const moderationStatus of ["DRAFT", "PENDING_APPROVAL", "REJECTED"] as const) {
+      expect(listingInterest({ moderationStatus, stats })).toBeNull();
+    }
+  });
+
+  it("says nothing when the server sent no numbers", () => {
+    expect(listingInterest({ moderationStatus: "APPROVED" })).toBeNull();
   });
 });

@@ -50,7 +50,7 @@ export function EmployerSidebar({
       items: [
         { label: "My Jobs", href: "/employer/jobs", icon: Briefcase },
         { label: "Post an Opportunity", href: "/employer/jobs/create", icon: FilePlus },
-        { label: "Applications", href: "/employer/applications", icon: Users },
+        { label: "People", href: "/employer/people", icon: Users },
         { label: "Contracts", href: "/employer/contracts", icon: FileText },
       ],
     },

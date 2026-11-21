@@ -12,16 +12,10 @@ import {
   useUnsaveAccommodationListing,
 } from "@/hooks/use-accommodation";
 import { useAuth } from "@/lib/auth-context";
+import { FactChips } from "@/components/ui/FactChips";
 import { replyChips } from "@/services/accommodation-overview";
 import { REPORT_REASON_LABELS, type ReportReason } from "@/types/accommodation";
-
-function money(amount: number, currency: string) {
-  return new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
+import { formatMoney } from "@/lib/utils";
 
 export function AccommodationListingDetail({ id }: { id: string }) {
   const { status } = useAuth();
@@ -148,11 +142,11 @@ export function AccommodationListingDetail({ id }: { id: string }) {
                 ["Other charges", item.charges.otherCharges],
               ].filter(([, amount]) => Number(amount) > 0).map(([label, amount]) => (
                 <div key={String(label)} className="flex justify-between gap-4 text-kampmax-text-secondary">
-                  <dt>{label}</dt><dd>{money(Number(amount), item.currency)}</dd>
+                  <dt>{label}</dt><dd>{formatMoney(Number(amount), item.currency)}</dd>
                 </div>
               ))}
               <div className="flex justify-between border-t border-kampmax-border pt-3 font-semibold text-kampmax-text">
-                <dt>Total upfront</dt><dd>{money(item.charges.totalUpfront, item.currency)}</dd>
+                <dt>Total upfront</dt><dd>{formatMoney(item.charges.totalUpfront, item.currency)}</dd>
               </div>
             </dl>
           </section>
@@ -162,7 +156,7 @@ export function AccommodationListingDetail({ id }: { id: string }) {
           <section className="rounded-xl border border-kampmax-border bg-white p-5 shadow-sm">
             <p className="text-sm text-kampmax-text-secondary">Rent</p>
             <p className="mt-1 text-2xl font-bold text-kampmax-blue">
-              {money(item.rentAmount, item.currency)}
+              {formatMoney(item.rentAmount, item.currency)}
               <span className="ml-1 text-xs font-normal text-kampmax-text-secondary">/ {item.paymentFrequency.toLowerCase()}</span>
             </p>
             {status === "authenticated" ? (
@@ -245,15 +239,7 @@ export function AccommodationListingDetail({ id }: { id: string }) {
                 <p className="text-xs text-emerald-700">Verified accommodation agent</p>
               </div>
             </div>
-            {replyChips(item.agentProfile.reply).length > 0 && (
-              <ul className="mt-3 flex flex-wrap gap-2">
-                {replyChips(item.agentProfile.reply).map((chip) => (
-                  <li key={chip} className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800">
-                    {chip}
-                  </li>
-                ))}
-              </ul>
-            )}
+            <FactChips facts={replyChips(item.agentProfile.reply)} tone="positive" className="mt-3" />
             <p className="mt-3 text-xs text-kampmax-text-secondary">
               {item.agentProfile.activeListings} active listings
               {item.agentProfile.agencyName ? ` · ${item.agentProfile.agencyName}` : ""}

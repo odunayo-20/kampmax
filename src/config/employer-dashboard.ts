@@ -11,6 +11,7 @@ export const EMPLOYER_DASHBOARD_SECTIONS = [
   "/employer/dashboard",
   "/employer/jobs",
   "/employer/applications",
+  "/employer/people",
   "/employer/contracts",
   "/employer/billing",
   "/employer/profile",
