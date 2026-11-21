@@ -60,6 +60,8 @@ interface BackendVendorOrderListItem extends BackendVendorOrderBase {
 export interface BackendVendorOrderDetail extends BackendVendorOrderBase {
   updatedAt: string;
   notes: string | null;
+  /** The buyer's user id, so the store can message them; older servers leave it out. */
+  customerId?: string;
   customerPhone: string;
   settledAt?: string | null;
   /** Present once the customer (or Kampmax) has opened a dispute; reason is one line. */
@@ -219,7 +221,7 @@ export function mapVendorOrderDetail(raw: BackendVendorOrderDetail): VendorOrder
   return {
     ...base,
     customer: {
-      buyerId: "",
+      buyerId: raw.customerId ?? "",
       displayName: raw.customerName,
       phone: raw.customerPhone || undefined,
       campusLabel: raw.address.campus ?? undefined,

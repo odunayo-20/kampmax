@@ -98,6 +98,8 @@ export default function OrderDetailPage({
   }, [id]);
 
   const vendor = order ? getVendorById(order.vendorId) : undefined;
+  // The order carries the store's name; the cached vendor list only adds a rating when it has the store.
+  const vendorName = vendor?.storeName || order?.vendorName || "Vendor";
 
   if (isLoading && !order) {
     return (
@@ -210,7 +212,7 @@ export default function OrderDetailPage({
     setReviewInitialTarget({
       type: "vendor",
       id: order.vendorId,
-      name: vendor?.storeName || "Vendor",
+      name: vendorName,
     });
     setReviewModalOpen(true);
   }
@@ -461,19 +463,19 @@ export default function OrderDetailPage({
         </div>
 
         {/* Vendor Card */}
-        {vendor && (
+        {order.vendorId && (
           <div className="bg-white rounded-xl border border-kampmax-border p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-kampmax-muted flex items-center justify-center font-bold text-xs text-kampmax-navy">
-                  {vendor.storeName?.slice(0, 2).toUpperCase()}
+                  {vendorName.slice(0, 2).toUpperCase()}
                 </div>
                 <div>
                   <h4 className="text-xs font-semibold text-kampmax-text">
-                    {vendor.storeName}
+                    {vendorName}
                   </h4>
                   <p className="text-[11px] text-kampmax-text-secondary">
-                    {vendor.rating ? `★ ${vendor.rating}` : "Verified Vendor"}
+                    {vendor?.rating ? `★ ${vendor.rating}` : "Questions about this order? Ask the seller."}
                   </p>
                 </div>
               </div>
@@ -540,7 +542,7 @@ export default function OrderDetailPage({
       <OrderReviewModal
         order={displayOrder}
         isOpen={reviewModalOpen}
-        vendorName={vendor?.storeName || "Vendor"}
+        vendorName={vendorName}
         initialTarget={reviewInitialTarget}
         onClose={() => setReviewModalOpen(false)}
         onSuccess={(type) => {

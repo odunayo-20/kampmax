@@ -158,6 +158,20 @@ export async function openVendorConversation(vendorId: string): Promise<string> 
   return c.id;
 }
 
+/**
+ * The store owner's side of that same thread: opens (or reopens) the chat with one of the
+ * store's customers. The server refuses anyone who has never ordered from the store.
+ */
+export async function openCustomerConversation(customerId: string): Promise<string> {
+  const c = await unwrap(
+    apiClient.post<{ type: "VENDOR"; customerId: string }, BackendConversation>("/conversations", {
+      type: "VENDOR",
+      customerId,
+    })
+  );
+  return c.id;
+}
+
 /** Opens (or reopens) a one-to-one chat with another user. Returns the conversation id. */
 export async function openDirectConversation(peerUserId: string): Promise<string> {
   const c = await unwrap(

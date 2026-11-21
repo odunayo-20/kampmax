@@ -2,6 +2,7 @@
 
 import { MapPin, Package, Store, Truck, CreditCard, Download, Copy } from "lucide-react";
 import { cn, formatNaira, formatDateTime } from "@/lib/utils";
+import { MessageCustomerButton } from "@/components/messages/MessageCustomerButton";
 import { PaymentBadge, DeliveryMethodTag, FulfillmentBadge } from "./OrderBadges";
 import type { VendorOrder, VendorParentOrder } from "@/types/vendor-orders";
 
@@ -48,6 +49,11 @@ export function CustomerSection({ order }: { order: VendorOrder }) {
         <Row label="Campus" value={order.customer.campusLabel ?? "—"} />
         <Row label="Phone" value={order.customer.phone ?? "Not shared"} />
       </dl>
+      {order.customer.buyerId && (
+        <div className="mt-3 flex justify-end">
+          <MessageCustomerButton customerId={order.customer.buyerId} />
+        </div>
+      )}
       <p className="mt-2 text-[11px] text-kampmax-text-secondary/80">
         Contact details are only provided for fulfillment when the buyer opts in during checkout.
       </p>
