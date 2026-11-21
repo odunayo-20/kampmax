@@ -2,6 +2,7 @@ import type { Metadata, ResolvingMetadata } from "next";
 import { notFound } from "next/navigation";
 import { fetchStorefrontBySlug } from "@/services/storefront";
 import { StorefrontView } from "@/components/storefront/StorefrontView";
+import { OpenInAppBar } from "@/components/shared/OpenInAppBar";
 import { getSiteBaseUrl } from "@/lib/utils";
 
 interface StorePageProps {
@@ -62,5 +63,10 @@ export default async function StorePage({ params }: StorePageProps) {
     notFound();
   }
 
-  return <StorefrontView store={store} />;
+  return (
+    <>
+      <OpenInAppBar screen={{ kind: "vendor", id: store.vendorId }} />
+      <StorefrontView store={store} />
+    </>
+  );
 }
