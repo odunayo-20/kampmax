@@ -10,6 +10,7 @@
 // posting's own screen, so they are not offered here.
 
 import { apiClient } from "@/lib/api-client";
+import { countOf } from "@/lib/reading";
 import type { ApiError } from "@/lib/api-client";
 
 export const PEOPLE_STAGES = ["NEW", "SHORTLISTED", "INTERVIEWING", "HIRED", "DECLINED"] as const;
@@ -67,8 +68,6 @@ export interface PeopleQuery {
 
 export const PEOPLE_PAGE_SIZE = 20;
 
-const count = (v: unknown): number =>
-  typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
 const str = (v: unknown): string => (typeof v === "string" ? v : "");
 const isStage = (v: unknown): v is PeopleStage => PEOPLE_STAGES.includes(v as PeopleStage);
 
@@ -83,12 +82,12 @@ export const EMPTY_COUNTS: PeopleCounts = {
 
 export function countsFrom(raw: Partial<Record<keyof PeopleCounts, unknown>> | null | undefined): PeopleCounts {
   return {
-    ALL: count(raw?.ALL),
-    NEW: count(raw?.NEW),
-    SHORTLISTED: count(raw?.SHORTLISTED),
-    INTERVIEWING: count(raw?.INTERVIEWING),
-    HIRED: count(raw?.HIRED),
-    DECLINED: count(raw?.DECLINED),
+    ALL: countOf(raw?.ALL),
+    NEW: countOf(raw?.NEW),
+    SHORTLISTED: countOf(raw?.SHORTLISTED),
+    INTERVIEWING: countOf(raw?.INTERVIEWING),
+    HIRED: countOf(raw?.HIRED),
+    DECLINED: countOf(raw?.DECLINED),
   };
 }
 
@@ -171,10 +170,10 @@ export async function listEmployerPeopleApi(
       items: (data.items ?? []).map(personFrom).filter((p): p is Person => p !== null),
       counts: countsFrom(data.counts),
       meta: {
-        total: count(data.meta?.total),
-        page: count(data.meta?.page) || q.page,
-        limit: count(data.meta?.limit) || PEOPLE_PAGE_SIZE,
-        totalPages: Math.max(1, count(data.meta?.totalPages)),
+        total: countOf(data.meta?.total),
+        page: countOf(data.meta?.page) || q.page,
+        limit: countOf(data.meta?.limit) || PEOPLE_PAGE_SIZE,
+        totalPages: Math.max(1, countOf(data.meta?.totalPages)),
       },
     },
   };

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { replyTimeText } from "@/lib/reading";
 import {
   interestLine,
   readAgentOverview,
   replyChips,
-  replyTimeText,
 } from "@/services/accommodation-overview";
 
 describe("readAgentOverview", () => {

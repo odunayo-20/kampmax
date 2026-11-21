@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Eye, PencilLine, Send, Ban, ExternalLink, RefreshCw, Users } from "lucide-react";
+import { Eye, PencilLine, Send, Ban, ExternalLink, RefreshCw, Users, CheckCheck, Copy } from "lucide-react";
 import type { Opportunity } from "@/types/opportunity";
 import { OPPORTUNITY_STATUS, isHiringType } from "@/types/opportunity";
 import { OPPORTUNITY_STATUS_META } from "@/config/opportunity";
@@ -11,6 +11,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { usePublishJob, useCloseJob } from "@/hooks/use-jobs";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
 import { cn } from "@/lib/utils";
+import { FillJobDialog } from "./FillJobDialog";
 import { PublishJobDialog } from "./PublishJobDialog";
 import { RenewJobDialog } from "./RenewJobDialog";
 
@@ -28,6 +29,19 @@ export function canRenew(job: Opportunity, now = Date.now()): boolean {
   );
 }
 
+/** A vacancy or internship that is open or has just lapsed can be marked filled; a gig is filled by accepting a proposal. */
+export function canFill(job: Opportunity): boolean {
+  return (
+    isHiringType(job.opportunityType) &&
+    (job.status === OPPORTUNITY_STATUS.OPEN || job.status === OPPORTUNITY_STATUS.EXPIRED)
+  );
+}
+
+/** Anything that has ended can be posted again as a fresh draft. */
+export function canPostAgain(job: Opportunity): boolean {
+  return job.status === OPPORTUNITY_STATUS.CLOSED || job.status === OPPORTUNITY_STATUS.EXPIRED;
+}
+
 const linkButtonClass =
   "inline-flex items-center justify-center gap-1.5 font-semibold rounded-md h-8 px-3 text-xs border border-neutral-300 bg-white text-neutral-800 hover:bg-neutral-100";
 
@@ -38,7 +52,7 @@ const linkButtonClass =
  * mapped to a friendly message.
  */
 export function EmployerJobActions({ job }: { job: Opportunity }) {
-  const [confirm, setConfirm] = useState<"publish" | "close" | "renew" | null>(null);
+  const [confirm, setConfirm] = useState<"publish" | "close" | "renew" | "fill" | null>(null);
   const hiring = isHiringType(job.opportunityType);
   const [error, setError] = useState<string | null>(null);
   const publishMutation = usePublishJob();
@@ -135,6 +149,18 @@ export function EmployerJobActions({ job }: { job: Opportunity }) {
             <RefreshCw className="mr-1 h-3.5 w-3.5" aria-hidden /> Renew
           </Button>
         )}
+
+        {canFill(job) && (
+          <Button variant="outline" size="sm" disabled={pending} onClick={() => setConfirm("fill")}>
+            <CheckCheck className="mr-1 h-3.5 w-3.5" aria-hidden /> Mark as filled
+          </Button>
+        )}
+
+        {canPostAgain(job) && (
+          <Link href={`/employer/jobs/create?from=${job.id}`} className={linkButtonClass}>
+            <Copy className="h-3.5 w-3.5" aria-hidden /> Post again
+          </Link>
+        )}
       </div>
 
       {error && (
@@ -151,6 +177,7 @@ export function EmployerJobActions({ job }: { job: Opportunity }) {
             onClose={dismiss}
           />
           <RenewJobDialog job={job} open={confirm === "renew"} onClose={dismiss} />
+          <FillJobDialog jobId={job.id} open={confirm === "fill"} onClose={dismiss} />
         </>
       ) : (
         <ConfirmDialog

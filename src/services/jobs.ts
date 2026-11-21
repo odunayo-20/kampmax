@@ -600,6 +600,25 @@ export async function closeJob(id: string): Promise<{
 }
 
 /**
+ * The role is filled: close a vacancy or internship and, if asked, turn down
+ * everyone still waiting, with a message. Endpoint: POST /jobs/me/:id/fill
+ */
+export async function fillJob(
+  id: string,
+  input: { declineRest: boolean; message?: string }
+): Promise<{ declined: number; error: ApiError | null }> {
+  const { data, error } = await apiClient.post<
+    { declineRest: boolean; message?: string },
+    { declined?: number }
+  >(`/jobs/me/${id}/fill`, {
+    declineRest: input.declineRest,
+    ...(input.message?.trim() ? { message: input.message.trim() } : {}),
+  });
+  if (error) return { declined: 0, error };
+  return { declined: typeof data?.declined === "number" ? data.declined : 0, error: null };
+}
+
+/**
  * Cancel a job (owner only).
  * Endpoint: POST /jobs/:id/cancel
  */

@@ -9,6 +9,8 @@
 // A failure here never breaks the dashboard: the snapshot just stays empty.
 
 import { apiClient } from "@/lib/api-client";
+import { countOf, replyFacts } from "@/lib/reading";
+import { pluralize } from "@/lib/utils";
 
 export interface HiringPipeline {
   /** Waiting for a decision: not yet looked at, or looked at and left. */
@@ -27,20 +29,58 @@ export interface EmployerReputation {
   hires: number;
 }
 
+export interface NextInterview {
+  applicationId: string;
+  jobId: string;
+  jobTitle: string;
+  /** ISO time. */
+  at: string;
+  /** Whether the applicant has said yes yet. A time they turned down is not "next": it needs a new one. */
+  response: "PROPOSED" | "CONFIRMED";
+  name: string;
+}
+
+export interface InterviewSummary {
+  /** Interviews still ahead that the applicant has not turned down. */
+  upcoming: number;
+  next: NextInterview | null;
+}
+
+export const NO_INTERVIEWS: InterviewSummary = { upcoming: 0, next: null };
+
 export interface EmployerInsights {
   pipeline: HiringPipeline;
   reputation: EmployerReputation | null;
+  interviews: InterviewSummary;
 }
 
-const count = (v: unknown): number =>
-  typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
+/** The interview summary the server sent, or "none" when it sent nothing usable. */
+export function interviewsFrom(raw: unknown): InterviewSummary {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const n = (r.next && typeof r.next === "object" ? r.next : null) as Record<string, unknown> | null;
+  const str = (v: unknown) => (typeof v === "string" ? v : "");
+  if (!n || !str(n.applicationId) || !str(n.jobId) || Number.isNaN(Date.parse(str(n.at)))) {
+    return NO_INTERVIEWS;
+  }
+  return {
+    upcoming: Math.max(1, countOf(r.upcoming)),
+    next: {
+      applicationId: str(n.applicationId),
+      jobId: str(n.jobId),
+      jobTitle: str(n.jobTitle),
+      at: str(n.at),
+      response: n.response === "CONFIRMED" ? "CONFIRMED" : "PROPOSED",
+      name: str(n.name).trim() || "a candidate",
+    },
+  };
+}
 
 export function pipelineFrom(raw: Partial<HiringPipeline> | null | undefined): HiringPipeline {
   return {
-    new: count(raw?.new),
-    shortlisted: count(raw?.shortlisted),
-    interviewing: count(raw?.interviewing),
-    hired: count(raw?.hired),
+    new: countOf(raw?.new),
+    shortlisted: countOf(raw?.shortlisted),
+    interviewing: countOf(raw?.interviewing),
+    hired: countOf(raw?.hired),
   };
 }
 
@@ -60,29 +100,18 @@ export function reputationFrom(
       ? Math.round(raw.typicalReplyHours)
       : null;
   return {
-    received: count(raw.received),
+    received: countOf(raw.received),
     responseRate: rate,
     typicalReplyHours: hours,
-    hires: count(raw.hires),
+    hires: countOf(raw.hires),
   };
-}
-
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-
-/** "within an hour", "within 5 hours", "in about 2 days". */
-export function replyTimeText(hours: number): string {
-  if (hours <= 1) return "within an hour";
-  if (hours < 24) return `within ${hours} hours`;
-  return `in about ${plural(Math.round(hours / 24), "day")}`;
 }
 
 /** The short facts candidates see, strongest first. A fact with too few people behind it is left out. */
 export function reputationChips(rep: EmployerReputation | null): string[] {
   if (!rep) return [];
-  const out: string[] = [];
-  if (rep.typicalReplyHours !== null) out.push(`Replies ${replyTimeText(rep.typicalReplyHours)}`);
-  if (rep.responseRate !== null) out.push(`${rep.responseRate}% answered`);
-  if (rep.hires > 0) out.push(`${plural(rep.hires, "person", "people")} hired`);
+  const out = replyFacts({ typicalReplyHours: rep.typicalReplyHours, rate: rep.responseRate });
+  if (rep.hires > 0) out.push(`${pluralize(rep.hires, "person", "people")} hired`);
   return out;
 }
 
@@ -96,11 +125,15 @@ export function reputationHint(rep: EmployerReputation | null): string | null {
 export async function getEmployerInsightsApi(): Promise<EmployerInsights> {
   const { data, error } = await apiClient.get<{
     pipeline?: Partial<HiringPipeline>;
+    interviews?: unknown;
     profile?: { reputation?: Partial<EmployerReputation> | null };
   }>("/employers/me/dashboard");
-  if (error || !data) return { pipeline: pipelineFrom(null), reputation: null };
+  if (error || !data) {
+    return { pipeline: pipelineFrom(null), reputation: null, interviews: NO_INTERVIEWS };
+  }
   return {
     pipeline: pipelineFrom(data.pipeline),
     reputation: reputationFrom(data.profile?.reputation),
+    interviews: interviewsFrom(data.interviews),
   };
 }

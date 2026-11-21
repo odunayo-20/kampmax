@@ -9,6 +9,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Skeleton } from "@/components/home/Skeleton";
 import { JobsPagination } from "@/components/jobs/JobsPagination";
 import { ReportDialog } from "@/components/jobs/ReportDialog";
+import { ScheduleInterviewDialog } from "./ScheduleInterviewDialog";
 import {
   APPLICANT_FILTER_TABS,
   APPLICATION_EMPLOYER_NOTE_MAX_CHARS,
@@ -16,6 +17,7 @@ import {
 } from "@/config/cv";
 import { useJobApplicants, useSetApplicationStatus } from "@/hooks/use-job-applications";
 import { getFriendlyErrorMessage, getRefusalMessage } from "@/lib/error-messages";
+import { employerResponseView, interviewLine } from "@/lib/interviews";
 import { jobApplicationKeys } from "@/lib/query-keys";
 import { cn, formatDate, timeAgo } from "@/lib/utils";
 import {
@@ -23,6 +25,7 @@ import {
   getApplicationCvLink,
   type Applicant,
   type ApplicationDecision,
+  interviewOf,
   type ApplicationStatus,
 } from "@/services/job-applications";
 
@@ -73,10 +76,12 @@ function ApplicantCard({
   applicant: a,
   openingsLeft,
   onDecide,
+  onSchedule,
 }: {
   applicant: Applicant;
   openingsLeft: number;
   onDecide: (applicant: Applicant, decision: ApplicationDecision) => void;
+  onSchedule: (applicant: Applicant) => void;
 }) {
   const queryClient = useQueryClient();
   const [opening, setOpening] = useState(false);
@@ -84,6 +89,7 @@ function ApplicantCard({
   const [error, setError] = useState<string | null>(null);
   const meta = EMPLOYER_STATUS_META[a.status];
   const decisions = availableDecisions(a.status);
+  const interview = a.status === "INTERVIEWING" ? interviewOf(a) : null;
 
   const openCv = async () => {
     setError(null);
@@ -139,6 +145,30 @@ function ApplicantCard({
             </div>
           ))}
         </dl>
+      )}
+
+      {a.status === "INTERVIEWING" && (
+        <div className="mt-3 rounded-lg bg-primary-50 p-3">
+          {interview ? (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-semibold text-neutral-900">Interview</p>
+                <Badge variant={employerResponseView(interview.response).tone}>
+                  {employerResponseView(interview.response).label}
+                </Badge>
+              </div>
+              <p className="mt-1 text-sm font-medium text-primary-700">{interviewLine(interview)}</p>
+              {interview.note && (
+                <p className="mt-1 text-xs text-neutral-600">Your note: {interview.note}</p>
+              )}
+            </>
+          ) : (
+            <p className="text-xs text-neutral-600">No interview time set yet. Pick one and they are told.</p>
+          )}
+          <Button size="sm" variant="outline" className="mt-2" onClick={() => onSchedule(a)}>
+            {interview ? "Change or call off the time" : "Set the interview time"}
+          </Button>
+        </div>
       )}
 
       {a.employerNote && (
@@ -209,6 +239,7 @@ export function JobApplicantsView({ jobId }: { jobId: string }) {
     null
   );
   const [note, setNote] = useState("");
+  const [scheduling, setScheduling] = useState<Applicant | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const query = useJobApplicants(jobId, { status: tab === "ALL" ? undefined : tab, page });
@@ -321,7 +352,12 @@ export function JobApplicantsView({ jobId }: { jobId: string }) {
                 key={a.id}
                 applicant={a}
                 openingsLeft={openingsLeft}
-                onDecide={(applicant, decision) => setDeciding({ applicant, decision })}
+                onDecide={(applicant, decision) =>
+                  decision === "INTERVIEWING"
+                    ? setScheduling(applicant)
+                    : setDeciding({ applicant, decision })
+                }
+                onSchedule={setScheduling}
               />
             ))}
           </ul>
@@ -333,6 +369,8 @@ export function JobApplicantsView({ jobId }: { jobId: string }) {
           />
         </>
       )}
+
+      <ScheduleInterviewDialog applicant={scheduling} onClose={() => setScheduling(null)} />
 
       <ConfirmDialog
         open={deciding !== null}

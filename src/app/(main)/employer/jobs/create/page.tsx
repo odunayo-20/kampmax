@@ -1,18 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { OpportunityInput } from "@/types/opportunity";
 import { isHiringType } from "@/types/opportunity";
 import { useAuth } from "@/lib/auth-context";
 import { getEmployerProfileApi } from "@/services/employer";
-import { useCreateJob, usePublishJob, useUpdateJob } from "@/hooks/use-jobs";
-import { JobForm, emptyJobFormValues } from "@/components/employer/jobs/JobForm";
+import { useCreateJob, useEmployerJob, usePublishJob, useUpdateJob } from "@/hooks/use-jobs";
+import { JobForm, emptyJobFormValues, repostInput } from "@/components/employer/jobs/JobForm";
 import { PublishJobDialog } from "@/components/employer/jobs/PublishJobDialog";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
 
-export default function CreateJobPage() {
+function CreateJob() {
   const router = useRouter();
+  // "Post again": the same job as a new draft, without the dates that have passed.
+  const from = useSearchParams().get("from") ?? "";
+  const original = useEmployerJob(from);
   const { user } = useAuth();
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   // A vacancy or internship is saved as a draft first, then published from the
@@ -78,7 +82,7 @@ export default function CreateJobPage() {
     }
   };
 
-  if (employer === undefined) {
+  if (employer === undefined || (from && original.isPending)) {
     return <div className="pt-8 text-center text-sm text-neutral-500">Loading…</div>;
   }
   if (employer === null) {
@@ -93,7 +97,8 @@ export default function CreateJobPage() {
     <>
       <JobForm
         mode="create"
-        initialValues={emptyJobFormValues()}
+        key={from || "new"}
+        initialValues={original.data ? repostInput(original.data) : emptyJobFormValues()}
         employerName={employerName}
         isSaving={createMutation.isPending || updateMutation.isPending}
         isPublishing={
@@ -112,5 +117,13 @@ export default function CreateJobPage() {
         />
       )}
     </>
+  );
+}
+
+export default function CreateJobPage() {
+  return (
+    <Suspense fallback={<div className="pt-8 text-center text-sm text-neutral-500">Loading…</div>}>
+      <CreateJob />
+    </Suspense>
   );
 }

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { replyTimeText } from "@/lib/reading";
 import {
+  interviewsFrom,
   pipelineFrom,
-  replyTimeText,
   reputationChips,
   reputationFrom,
   reputationHint,
@@ -63,5 +64,33 @@ describe("reply times and chips", () => {
     expect(
       reputationHint({ received: 9, responseRate: 80, typicalReplyHours: null, hires: 0 })
     ).toBeNull();
+  });
+});
+
+describe("interviewsFrom", () => {
+  const next = {
+    applicationId: "a1",
+    jobId: "j1",
+    jobTitle: "Barista",
+    at: "2026-12-05T13:00:00.000Z",
+    response: "CONFIRMED",
+    name: "Tolu Bello",
+  };
+
+  it("reads the next interview and how many are ahead", () => {
+    expect(interviewsFrom({ upcoming: 3, next })).toEqual({ upcoming: 3, next });
+  });
+
+  it("reads nothing usable as none", () => {
+    expect(interviewsFrom(null)).toEqual({ upcoming: 0, next: null });
+    expect(interviewsFrom({ upcoming: 2, next: { jobId: "j" } })).toEqual({ upcoming: 0, next: null });
+    expect(interviewsFrom({ upcoming: 2, next: { ...next, at: "nope" } }).next).toBeNull();
+  });
+
+  it("reads an unanswered time as proposed and a missing name kindly", () => {
+    const r = interviewsFrom({ upcoming: 0, next: { ...next, response: "WEIRD", name: "  " } });
+    expect(r.next?.response).toBe("PROPOSED");
+    expect(r.next?.name).toBe("a candidate");
+    expect(r.upcoming).toBe(1);
   });
 });

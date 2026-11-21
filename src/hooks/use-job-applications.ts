@@ -5,11 +5,14 @@ import { useAuth } from "@/lib/auth-context";
 import { cvKeys, dashboardKeys, jobApplicationKeys } from "@/lib/query-keys";
 import {
   applyToJob,
+  cancelInterview,
   deleteCv,
   listCvs,
   listJobApplicants,
   listMyApplications,
   renameCv,
+  respondToInterview,
+  scheduleInterview,
   setApplicationStatus,
   uploadCv,
   withdrawApplication,
@@ -21,6 +24,7 @@ import {
   type MyApplication,
 } from "@/services/job-applications";
 import { APPLICANTS_PAGE_SIZE, APPLICATIONS_PAGE_SIZE } from "@/config/cv";
+import type { InterviewBody } from "@/lib/interviews";
 
 /** A failure from a service call, thrown so React Query can show its message. */
 function fail(error: { message?: string } | null, fallback: string): never {
@@ -184,5 +188,52 @@ export function useSetApplicationStatus() {
       void queryClient.invalidateQueries({ queryKey: jobApplicationKeys.all });
       void queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
     },
+  });
+}
+
+// ── Interviews ──────────────────────────────────────────────
+
+function refreshApplications(queryClient: ReturnType<typeof useQueryClient>) {
+  void queryClient.invalidateQueries({ queryKey: jobApplicationKeys.all });
+  void queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
+  void queryClient.invalidateQueries({ queryKey: ["employer-people"] });
+}
+
+/** The employer picks (or changes) an interview time. */
+export function useScheduleInterview() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, body }: { id: string; body: InterviewBody }) => {
+      const { applicant, error } = await scheduleInterview(id, body);
+      if (error || !applicant) fail(error, "The interview time could not be saved.");
+      return applicant;
+    },
+    onSuccess: () => refreshApplications(queryClient),
+  });
+}
+
+/** The employer calls the interview time off. */
+export function useCancelInterview() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { applicant, error } = await cancelInterview(id);
+      if (error || !applicant) fail(error, "The interview time could not be cancelled.");
+      return applicant;
+    },
+    onSuccess: () => refreshApplications(queryClient),
+  });
+}
+
+/** The applicant confirms the interview time, or says it does not work. */
+export function useRespondToInterview() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, action, note }: { id: string; action: "CONFIRM" | "DECLINE"; note?: string }) => {
+      const { application, error } = await respondToInterview(id, action, note);
+      if (error || !application) fail(error, "Your answer could not be sent.");
+      return application;
+    },
+    onSuccess: () => refreshApplications(queryClient),
   });
 }

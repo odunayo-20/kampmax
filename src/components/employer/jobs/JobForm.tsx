@@ -111,6 +111,20 @@ export function opportunityToInput(o: Opportunity): OpportunityInput {
   };
 }
 
+/**
+ * A fresh draft from a job that has ended: everything that was written, but not
+ * the dates, which have passed. The deadline is left for the employer to pick
+ * and the start date is cleared.
+ */
+export function repostInput(o: Opportunity): OpportunityInput {
+  const input = opportunityToInput(o);
+  return {
+    ...input,
+    deadline: "",
+    hiring: input.hiring ? { ...input.hiring, startDate: undefined } : input.hiring,
+  };
+}
+
 /** Client-side mirror of the backend `validateJobInput` DTO checks. */
 export function validateJobFormValues(values: OpportunityInput): Record<string, string> {
   const errors: Record<string, string> = {};

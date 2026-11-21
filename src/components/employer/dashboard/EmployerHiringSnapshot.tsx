@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { employerResponseView, whenText } from "@/lib/interviews";
 import { reputationChips, reputationHint } from "@/services/employer-insights";
 import type { EmployerDashboardQuerySource } from "./EmployerDashboardSection";
 
@@ -19,7 +20,8 @@ export function EmployerHiringSnapshot({ query }: { query: EmployerDashboardQuer
   const insights = query.data?.insights;
   if (!insights) return null;
 
-  const { pipeline, reputation } = insights;
+  const { pipeline, reputation, interviews } = insights;
+  const next = interviews.next;
   const chips = reputationChips(reputation);
   const hint = reputationHint(reputation);
 
@@ -57,6 +59,23 @@ export function EmployerHiringSnapshot({ query }: { query: EmployerDashboardQuer
           </li>
         ))}
       </ul>
+
+      {next && (
+        <Link
+          href={`/employer/jobs/${next.jobId}/applications`}
+          className="mt-3 block rounded-lg bg-kampmax-muted px-3 py-2.5 hover:opacity-90"
+        >
+          <span className="block text-xs font-semibold text-kampmax-text-secondary">
+            Next interview{interviews.upcoming > 1 ? ` (${interviews.upcoming} coming up)` : ""}
+          </span>
+          <span className="block text-sm font-semibold text-kampmax-text">
+            {whenText(next.at)} with {next.name}
+          </span>
+          <span className="block text-xs text-kampmax-text-secondary">
+            {next.jobTitle} · {employerResponseView(next.response).label}
+          </span>
+        </Link>
+      )}
 
       <div className="mt-4 border-t border-kampmax-border pt-3">
         <p className="text-xs font-semibold text-kampmax-text-secondary">How candidates see you</p>

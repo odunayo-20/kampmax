@@ -10,6 +10,8 @@ import { JobsPagination } from "@/components/jobs/JobsPagination";
 import { OpportunityTypeBadge } from "@/components/employer/jobs/OpportunityTypeBadge";
 import { APPLICANT_STATUS_META, canWithdraw } from "@/config/cv";
 import { useMyApplications, useWithdrawApplication } from "@/hooks/use-job-applications";
+import { interviewOf } from "@/services/job-applications";
+import { InterviewPanel } from "./InterviewPanel";
 import { getFriendlyErrorMessage, getRefusalMessage } from "@/lib/error-messages";
 import { formatDate } from "@/lib/utils";
 import type { OpportunityType } from "@/types/opportunity";
@@ -29,6 +31,7 @@ function ApplicationCard({ application: a }: { application: MyApplication }) {
   const [error, setError] = useState<string | null>(null);
   const meta = APPLICANT_STATUS_META[a.status];
   const where = [a.job.city, a.job.state].filter(Boolean).join(", ");
+  const interview = a.status === "INTERVIEWING" ? interviewOf(a) : null;
 
   return (
     <li className="rounded-xl border border-neutral-200 bg-white p-5">
@@ -71,6 +74,8 @@ function ApplicationCard({ application: a }: { application: MyApplication }) {
       </dl>
 
       <p className="mt-2 text-xs text-neutral-500">{meta.hint}</p>
+
+      {interview && <InterviewPanel applicationId={a.id} interview={interview} />}
 
       {a.employerNote && (
         <p className="mt-3 rounded-lg bg-neutral-50 px-3 py-2 text-sm text-neutral-700">

@@ -28,6 +28,7 @@ import { apiClient } from "@/lib/api-client";
 import type { ApiError } from "@/lib/api-client";
 import { getApiBaseUrl } from "@/lib/api-config";
 import { getAccessToken } from "@/lib/auth-storage";
+import { interviewFrom, type Interview, type InterviewBody } from "@/lib/interviews";
 import type { PaginatedResult } from "@/services/jobs";
 
 // ── Shapes ──────────────────────────────────────────────────
@@ -71,6 +72,8 @@ export interface MyApplication {
   createdAt: string;
   updatedAt: string;
   decidedAt: string | null;
+  /** The time the employer picked, while I am being interviewed. */
+  interview?: Interview | null;
   job: {
     id: string;
     title: string;
@@ -96,6 +99,8 @@ export interface Applicant {
   createdAt: string;
   viewedAt: string | null;
   decidedAt: string | null;
+  /** The time the employer picked, while the person is being interviewed. */
+  interview?: Interview | null;
   applicant: { id: string; name: string; username: string; avatar: string | null };
 }
 
@@ -288,3 +293,44 @@ export async function downloadCv(
   window.location.assign(cvLinkUrl(link));
   return { error: null };
 }
+
+// ── Interviews ──────────────────────────────────────────────
+
+/**
+ * The employer picks a time and place. Moves a new or shortlisted applicant to
+ * the interview stage and asks them to confirm. Endpoint: PUT /applications/:id/interview
+ */
+export async function scheduleInterview(
+  id: string,
+  body: InterviewBody
+): Promise<{ applicant: Applicant | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.put<InterviewBody, Applicant>(
+    `/applications/${id}/interview`,
+    body
+  );
+  return error ? { applicant: null, error } : { applicant: data, error: null };
+}
+
+/** The employer calls the time off. Endpoint: DELETE /applications/:id/interview */
+export async function cancelInterview(
+  id: string
+): Promise<{ applicant: Applicant | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.delete<Applicant>(`/applications/${id}/interview`);
+  return error ? { applicant: null, error } : { applicant: data, error: null };
+}
+
+/** The applicant confirms, or says it does not work. Endpoint: POST /applications/:id/interview/respond */
+export async function respondToInterview(
+  id: string,
+  action: "CONFIRM" | "DECLINE",
+  note?: string
+): Promise<{ application: MyApplication | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.post<{ action: string; note?: string }, MyApplication>(
+    `/applications/${id}/interview/respond`,
+    { action, ...(note?.trim() ? { note: note.trim() } : {}) }
+  );
+  return error ? { application: null, error } : { application: data, error: null };
+}
+
+/** The interview on an application from the API, or null. */
+export const interviewOf = (a: { interview?: unknown }): Interview | null => interviewFrom(a.interview);

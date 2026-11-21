@@ -6,6 +6,7 @@ import {
   EmployerJobListQuery,
   JobListQuery,
   dashboardKeys,
+  jobApplicationKeys,
   jobKeys,
   postingKeys,
 } from "@/lib/query-keys";
@@ -19,7 +20,7 @@ import {
   renewJobApi,
   updateJobApi,
 } from "@/services/opportunity";
-import { getJobById, listPublicJobs, listSavedJobIds, saveJob, unsaveJob } from "@/services/jobs";
+import { fillJob, getJobById, listPublicJobs, listSavedJobIds, saveJob, unsaveJob } from "@/services/jobs";
 import { jobListFiltersToQuery, jobToOpportunity } from "@/lib/job-api-mapping";
 import type {
   Opportunity,
@@ -204,6 +205,31 @@ export function useRenewJob() {
     mutationFn: async ({ id, applicationDeadline }: { id: string; applicationDeadline?: string }) =>
       throwIfJobError(await renewJobApi(id, applicationDeadline)),
     onSuccess: () => invalidateAllJobs(queryClient),
+  });
+}
+
+/** The role is filled: close it and optionally tell everyone still waiting. */
+export function useFillJob() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      declineRest,
+      message,
+    }: {
+      id: string;
+      declineRest: boolean;
+      message?: string;
+    }) => {
+      const { declined, error } = await fillJob(id, { declineRest, message });
+      if (error) throw error;
+      return declined;
+    },
+    onSuccess: () => {
+      invalidateAllJobs(queryClient);
+      void queryClient.invalidateQueries({ queryKey: jobApplicationKeys.all });
+      void queryClient.invalidateQueries({ queryKey: ["employer-people"] });
+    },
   });
 }
 
