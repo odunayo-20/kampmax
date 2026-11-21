@@ -23,7 +23,6 @@ const PROTECTED_PREFIXES = [
   "/profile",
   "/notifications",
   "/customer",
-  "/accommodation/agent",
   "/accommodation/saved",
   "/accommodation/my-enquiries",
   "/scan",
@@ -69,14 +68,12 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   // Dashboard sections render their own full-screen shell (sidebar/header)
   const isVendorSection = pathname.startsWith("/vendor");
   const isAgentSection = pathname.startsWith("/agent");
-  const isAccommodationAgentSection = pathname.startsWith("/accommodation/agent");
   const isServiceProviderSection = isServiceProviderDashboardPath(pathname);
   const isFreelancerSection = isFreelancerDashboardPath(pathname);
   const isEmployerSection = isEmployerDashboardPath(pathname);
   const isDashboardSection =
     isVendorSection ||
     isAgentSection ||
-    isAccommodationAgentSection ||
     isServiceProviderSection ||
     isFreelancerSection ||
     isEmployerSection;

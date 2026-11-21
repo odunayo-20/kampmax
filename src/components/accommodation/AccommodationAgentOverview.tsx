@@ -7,6 +7,7 @@ import {
 } from "@/hooks/use-accommodation";
 import { FactChips } from "@/components/ui/FactChips";
 import { interestLine, replyChips } from "@/services/accommodation-overview";
+import { formatMoney } from "@/lib/utils";
 
 const day = (iso: string | null) =>
   iso
@@ -14,9 +15,9 @@ const day = (iso: string | null) =>
     : "";
 
 /**
- * An approved agent's today: rooms they must confirm before they vanish from
- * the site, what keeping the listings costs next, how students see their reply
- * speed, and which rooms people open and save.
+ * An approved agent's today, on the /agent overview: rooms they must confirm
+ * before they vanish from the site, what keeping the listings costs next, how
+ * students see their reply speed, and which rooms people open and save.
  */
 export function AccommodationAgentOverview() {
   const overview = useAccommodationAgentOverview();
@@ -28,10 +29,14 @@ export function AccommodationAgentOverview() {
   const { needsConfirming: rooms, nextRenewal: renewal } = data;
 
   return (
-    <section aria-labelledby="agent-today" className="space-y-4 rounded-xl border border-kampmax-border bg-white p-5">
-      <h2 id="agent-today" className="text-lg font-bold text-kampmax-text">
+    <section aria-labelledby="agent-today" className="space-y-4 rounded-xl border border-kampmax-border bg-white p-4">
+      <h2 id="agent-today" className="text-sm font-semibold text-kampmax-text">
         Today
       </h2>
+
+      {rooms.count === 0 && !renewal && (
+        <p className="text-sm text-kampmax-text-secondary">Nothing to confirm today. Your rooms are up to date.</p>
+      )}
 
       {rooms.count > 0 && (
         <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-4">
@@ -80,9 +85,9 @@ export function AccommodationAgentOverview() {
         <p className="text-sm text-kampmax-text-secondary">
           Next {renewal.autoRenew ? "renewal" : "expiry"}: <span className="font-medium text-kampmax-text">{renewal.title}</span>{" "}
           on {day(renewal.expiresAt)}
-          {renewal.amount > 0 ? ` · ₦${renewal.amount.toLocaleString("en-NG")}` : ""}.{" "}
-          <Link href="#agent-listings" className="text-kampmax-blue hover:underline">
-            See listings
+          {renewal.amount > 0 ? ` · ${formatMoney(renewal.amount)}` : ""}.{" "}
+          <Link href="/agent/billing" className="text-kampmax-blue hover:underline">
+            {renewal.autoRenew ? "See billing" : "Renew"}
           </Link>
         </p>
       )}
@@ -102,7 +107,7 @@ export function AccommodationAgentOverview() {
         <div>
           <h3 className="text-sm font-semibold text-kampmax-text">How your rooms are doing</h3>
           <p className="mt-1 text-xs text-kampmax-text-secondary">
-            {interestLine(data.interest)} across all your listings. Views are page opens, not people.
+            Your busiest rooms. Views are page opens, not people.
           </p>
           <ul className="mt-2 divide-y divide-kampmax-border">
             {data.topListings.map((t) => (

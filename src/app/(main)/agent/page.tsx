@@ -11,7 +11,7 @@ import {
 } from "@/hooks/use-accommodation";
 import { useAgentAccess } from "@/hooks/use-agent-dashboard";
 import { AgentMetricCard } from "@/components/agent/AgentMetricCard";
-import { AgentActionRequired } from "@/components/agent/AgentActionRequired";
+import { AccommodationAgentOverview } from "@/components/accommodation/AccommodationAgentOverview";
 import { AgentQuickActions } from "@/components/agent/AgentQuickActions";
 import { AgentRecentInquiries } from "@/components/agent/AgentRecentInquiries";
 import { AgentProfileHealth } from "@/components/agent/AgentProfileHealth";
@@ -72,16 +72,16 @@ export default function AgentOverviewPage() {
         <AgentMetricCard
           label="Listing views"
           value={overviewQuery.isPending ? "…" : interest?.views ?? 0}
-          sublabel={interest ? `${pluralize(interest.saves, "save")} · page opens, not people` : undefined}
+          sublabel={interest ? pluralize(interest.saves, "save") : undefined}
           icon={Eye}
           tone="amber"
         />
       </div>
 
-      {/* 2-Column Split: Left = Actions & Recent Inquiries; Right = Quick Actions & Profile Health */}
+      {/* 2-Column Split: Left = Today & Recent Inquiries; Right = Quick Actions & Profile Health */}
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="space-y-4">
-          <AgentActionRequired />
+          <AccommodationAgentOverview />
           <AgentRecentInquiries />
         </div>
         <div className="space-y-4">
