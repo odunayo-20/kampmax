@@ -33,28 +33,30 @@ export function EmployerHiringSnapshot({ query }: { query: EmployerDashboardQuer
           Your hiring
         </h2>
         <Link
-          href="/employer/applications"
+          href="/employer/people"
           className="text-xs font-semibold text-kampmax-blue hover:underline"
         >
           Review applicants
         </Link>
       </div>
 
-      <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {STAGES.map((s) => (
-          <div
-            key={s.key}
-            className={
-              s.key === "new" && pipeline.new > 0
-                ? "rounded-lg border border-kampmax-gold bg-kampmax-muted px-3 py-2.5"
-                : "rounded-lg border border-kampmax-border px-3 py-2.5"
-            }
-          >
-            <dd className="text-xl font-bold text-kampmax-text">{pipeline[s.key]}</dd>
-            <dt className="text-xs text-kampmax-text-secondary">{s.label}</dt>
-          </div>
+          <li key={s.key}>
+            <Link
+              href={`/employer/people?stage=${s.key.toUpperCase()}`}
+              className={
+                s.key === "new" && pipeline.new > 0
+                  ? "block rounded-lg border border-kampmax-gold bg-kampmax-muted px-3 py-2.5 hover:opacity-90"
+                  : "block rounded-lg border border-kampmax-border px-3 py-2.5 hover:bg-kampmax-muted"
+              }
+            >
+              <span className="block text-xl font-bold text-kampmax-text">{pipeline[s.key]}</span>
+              <span className="block text-xs text-kampmax-text-secondary">{s.label}</span>
+            </Link>
+          </li>
         ))}
-      </dl>
+      </ul>
 
       <div className="mt-4 border-t border-kampmax-border pt-3">
         <p className="text-xs font-semibold text-kampmax-text-secondary">How candidates see you</p>
