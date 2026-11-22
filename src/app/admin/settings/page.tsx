@@ -25,6 +25,7 @@ import {
   NotificationsSectionForm,
   OrdersSectionForm,
   PostingsSectionForm,
+  ReferralsSectionForm,
   SecuritySectionForm,
 } from "@/components/admin/settings/section-forms";
 import {
@@ -42,6 +43,14 @@ import type {
   PlatformSettingsConfig,
   SettingsSectionKey,
 } from "@/types/admin";
+
+/** How the confirmation dialogs name each high-risk section. */
+const HIGH_RISK_LABEL: Partial<Record<SettingsSectionKey, string>> = {
+  financial: "financial settings",
+  postings: "posting fees",
+  referrals: "invite-friends credit",
+  security: "security settings",
+};
 
 export default function AdminSettingsPage() {
   return <SettingsConsole />;
@@ -375,6 +384,15 @@ function SettingsConsole() {
               onDirtyChange={setDirty}
             />
           )}
+          {section === "referrals" && (
+            <ReferralsSectionForm
+              value={config.referrals}
+              onSave={(v) => saveSection("referrals", v)}
+              onReset={() => resetSection("referrals")}
+              disabled={readOnly}
+              onDirtyChange={setDirty}
+            />
+          )}
           {section === "loyalty" && (
             <LoyaltySectionForm
               value={config.loyalty}
@@ -426,13 +444,7 @@ function SettingsConsole() {
       <ConfirmDialog
         open={pendingSave !== null}
         tone="danger"
-        title={
-          pendingSave?.section === "security"
-            ? "Change security settings?"
-            : pendingSave?.section === "postings"
-              ? "Change posting fees?"
-              : "Change financial settings?"
-        }
+        title={`Change ${HIGH_RISK_LABEL[pendingSave?.section ?? "financial"] ?? "financial settings"}?`}
         message="These settings affect sensitive platform controls. Applying them is recorded in the audit trail against your admin account."
         confirmLabel="Save changes"
         loading={saveMutation.isPending}
@@ -448,13 +460,7 @@ function SettingsConsole() {
       <ConfirmDialog
         open={pendingReset !== null}
         tone="warning"
-        title={
-          pendingReset === "security"
-            ? "Reset security settings?"
-            : pendingReset === "postings"
-              ? "Reset posting fees?"
-              : "Reset financial settings?"
-        }
+        title={`Reset ${HIGH_RISK_LABEL[pendingReset ?? "financial"] ?? "financial settings"}?`}
         message="This restores the default values for this section. Any tuned values are lost and the section falls back to platform defaults."
         confirmLabel="Reset to defaults"
         loading={resetMutation.isPending}

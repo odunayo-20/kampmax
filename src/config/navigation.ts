@@ -186,6 +186,13 @@ export const MORE_MENU_SECTIONS: NavSectionConfig[] = [
         description: "Saved products, services & bookmarks",
       },
       {
+        id: "followed-stores",
+        label: "Stores I Follow",
+        href: "/profile/following",
+        icon: Store,
+        description: "New items and offers from stores you follow",
+      },
+      {
         id: "saved-accommodation",
         label: "Saved Accommodation",
         href: "/accommodation/saved",

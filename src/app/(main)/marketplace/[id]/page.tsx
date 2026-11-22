@@ -16,6 +16,10 @@ import { useApp } from "@/lib/app-context";
 import { useWishlist } from "@/services/wishlist";
 import { addRecentlyViewed } from "@/services/recently-viewed";
 import { fetchReviewEligibility } from "@/services/reviews";
+import { ProductQuestions } from "@/components/questions/ProductQuestions";
+import { PausedStoreNotice } from "@/components/storefront/PausedStoreNotice";
+import { usePausedStores } from "@/hooks/use-paused-stores";
+import { pausedStoreText } from "@/lib/paused-stores";
 import { ProductReviewsSection } from "@/components/reviews";
 import { formatNaira, calculateDiscountPercentage } from "@/lib/utils";
 import { EMPTY_CAMPUS } from "@/services/campus";
@@ -84,6 +88,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
   // Seller and related items come from the live API, not whatever happens to be cached.
   useEnsureVendors(product ? [product.vendorId] : []);
+  const paused = usePausedStores(product ? [product.vendorId] : []).size > 0;
   const relatedQuery = useQuery({
     queryKey: ["marketplace", "related", product?.categoryId, product?.id],
     enabled: !!product?.categoryId,
@@ -215,7 +220,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const lowStock = inStock && variantStock <= 3;
   const maxQty = Math.min(10, variantStock || 10);
 
-  const canAddToCart = !isUnavailable && inStock && allVariantsSelected && quantity >= 1 && quantity <= maxQty;
+  const canAddToCart = !isUnavailable && !paused && inStock && allVariantsSelected && quantity >= 1 && quantity <= maxQty;
 
   const missingGroups = variantGroups.filter((g) => !selectedVariants[g.id]).map((g) => g.name);
 
@@ -324,6 +329,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
             <QuantitySelector quantity={quantity} maxQty={maxQty} onChange={setQuantity} />
 
+            {paused && (
+              <PausedStoreNotice
+                text={pausedStoreText(vendor?.storeName ?? "This seller")}
+                hint="You can message the seller or save this for later."
+              />
+            )}
+
             <PurchaseActions
               canAddToCart={canAddToCart}
               isUnavailable={isUnavailable}
@@ -366,6 +378,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             isVerifiedBuyer={eligibilityQuery.data?.eligible ?? false}
             productTitle={product.title}
           />
+          <ProductQuestions productId={product.id} />
 
           <RelatedProducts products={similar} currentCategoryId={product.categoryId} />
 

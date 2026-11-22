@@ -2,6 +2,7 @@ import {
   BellRing,
   BriefcaseBusiness,
   Coins,
+  Gift,
   Settings,
   ShieldCheck,
   ShoppingBag,
@@ -47,6 +48,12 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     label: "Posting fees",
     description: "What employers pay to publish vacancies and internships.",
     icon: BriefcaseBusiness,
+  },
+  {
+    key: "referrals",
+    label: "Invite friends",
+    description: "Credit for inviting friends: rewards, hold, caps and budget.",
+    icon: Gift,
   },
   {
     key: "loyalty",

@@ -57,6 +57,7 @@ const SEGMENT_TO_KEY: Record<string, AdminNavItemKey> = {
   security: "security",
   support: "support",
   "contact-messages": "contactMessages",
+  referrals: "referrals",
   blog: "blog",
 };
 

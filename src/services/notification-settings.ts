@@ -20,7 +20,7 @@ export const NOTIFICATION_GROUPS: { id: string; label: string; description: stri
   { id: "store", label: "Your store", description: "Store alerts for sellers", types: ["VENDOR"] },
   { id: "work", label: "Jobs & contracts", description: "Proposals, jobs and engagements", types: ["JOB", "PROPOSAL", "ENGAGEMENT"] },
   { id: "reviews", label: "Reviews", description: "New reviews and replies", types: ["REVIEW"] },
-  { id: "community", label: "Community", description: "Follows, likes and comments", types: ["FOLLOW", "LIKE", "COMMENT"] },
+  { id: "community", label: "Community", description: "Follows, likes, comments and news from stores you follow", types: ["FOLLOW", "LIKE", "COMMENT"] },
   { id: "events", label: "Events", description: "Tickets and event reminders", types: ["EVENT"] },
   { id: "rewards", label: "Rewards", description: "Loyalty points and offers", types: ["LOYALTY"] },
   { id: "account", label: "Account & safety", description: "Verification, profile and platform notices", types: ["VERIFICATION", "PROFILE", "ADMIN", "SYSTEM"] },

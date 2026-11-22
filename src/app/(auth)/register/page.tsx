@@ -16,6 +16,7 @@ import {
   NigerianPhoneInput,
   CampusSafetyAgreement,
   ReferralCodeInput,
+  validateReferralCode,
   VerifiedStudentBadgeNotice,
   PostRegistrationWelcomeModal,
   detectCampusFromEmail,
@@ -149,7 +150,8 @@ function RegisterForm() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [referralCode, setReferralCode] = useState("");
+  // An invite link (?ref=KAMP-...) fills the code in.
+  const [referralCode, setReferralCode] = useState(() => (searchParams.get("ref") ?? "").toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 20));
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
 
@@ -257,17 +259,15 @@ function RegisterForm() {
         lastName: lastName.trim(),
         password,
         phone: phone.trim(),
+        ...(validateReferralCode(referralCode).isValid ? { referralCode: referralCode.trim().toUpperCase() } : {}),
       });
 
       if (result.success) {
         // Sync selected campus across the app
         setSelectedCampus(chosenCampus);
 
-        // Store referral preferences and queued verified student badge in localStorage
+        // Queue the verified student badge in localStorage
         if (typeof window !== "undefined") {
-          if (referralCode.trim()) {
-            localStorage.setItem("kampmax_referral_code", referralCode.trim());
-          }
           if (emailDetection.badgeQueued) {
             localStorage.setItem("kampmax_verified_student_queued", "true");
             localStorage.setItem("kampmax_institutional_email", email.trim().toLowerCase());

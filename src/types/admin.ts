@@ -656,6 +656,8 @@ export interface ManagedProduct {
   categoryId: string;
   categoryName: string;
   campusId: string;
+  /** Short campus name for tables; empty when the campus is unknown. */
+  campusShortName: string;
   price: number;
   originalPrice: number | null;
   condition: AdminProduct["condition"] | "Refurbished";
@@ -3484,6 +3486,7 @@ export type SettingsSectionKey =
   | "orders"
   | "financial"
   | "postings"
+  | "referrals"
   | "loyalty"
   | "notifications"
   | "security";
@@ -3587,12 +3590,34 @@ export interface SecuritySettings {
   lockoutAfterFailedAttempts: number;
 }
 
+/** Invite-a-friend credit. Off until switched on. Amounts are in naira. */
+export interface ReferralSettings {
+  enabled: boolean;
+  /** Days after joining a friend can still enter a code. */
+  attachDays: number;
+  /** Days after entering a code the friend has to make a qualifying purchase. */
+  windowDays: number;
+  /** Days a qualifying purchase must stand before credit is paid. */
+  holdDays: number;
+  minOrder: number;
+  minFreelanceAmount: number;
+  marketplace: { referrerReward: number; referredReward: number };
+  freelance: { referrerReward: number; referredReward: number };
+  referrerMonthlyCap: number;
+  ambassadorMonthlyCap: number;
+  campusMonthlyBudget: number;
+  creditExpiryDays: number;
+  /** Share of an order credit may pay for, in percent. */
+  maxCreditPercent: number;
+}
+
 export interface PlatformSettingsConfig {
   general: GeneralSettings;
   marketplace: MarketplaceSettings;
   orders: OrdersSettings;
   financial: FinancialSettings;
   postings: PostingSettings;
+  referrals: ReferralSettings;
   loyalty: LoyaltySettings;
   notifications: NotificationPreferences;
   security: SecuritySettings;

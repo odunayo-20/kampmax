@@ -155,42 +155,31 @@ describe("ResidenceHallSelector Component", () => {
 }, 20000);
 
 describe("ReferralCode Validation & Component", () => {
-  it("validates official campus ambassador codes", () => {
-    const res = validateReferralCode("AMB-UNILAG");
-    expect(res.isValid).toBe(true);
-    expect(res.type).toBe("ambassador");
-    expect(res.note).toContain("campus ambassador");
+  it("accepts anything shaped like an invite code and leaves the checking to the server", () => {
+    expect(validateReferralCode("KAMP-1A2B3C4D").isValid).toBe(true);
+    expect(validateReferralCode(" kamp-1a2b3c4d ").isValid).toBe(true);
   });
 
-  it("validates peer referral codes (e.g. KM-8492)", () => {
-    const res = validateReferralCode("KM-8492");
-    expect(res.isValid).toBe(true);
-    expect(res.type).toBe("peer");
-    expect(res.note).toContain("linked to your inviter");
-  });
-
-  it("rejects empty or very short invalid codes", () => {
+  it("rejects empty or very short codes", () => {
     expect(validateReferralCode("").isValid).toBe(false);
     expect(validateReferralCode("abc").isValid).toBe(false);
   });
 
-  it("expands accordion and allows typing referral code", () => {
+  it("expands accordion and allows typing an invite code", () => {
     const onChange = vi.fn();
     render(<ReferralCodeInput value="" onChange={onChange} />);
 
     // Initially collapsed
-    expect(screen.queryByPlaceholderText(/KM-8492/i)).toBeNull();
+    expect(screen.queryByPlaceholderText(/KAMP-/i)).toBeNull();
 
-    // Click accordion trigger
-    const trigger = screen.getByText(/Have a referral or ambassador code/i);
-    fireEvent.click(trigger);
+    fireEvent.click(screen.getByText(/Have a friend's invite code/i));
+    const input = screen.getByPlaceholderText(/KAMP-/i);
 
-    const input = screen.getByPlaceholderText(/KM-8492/i);
-    expect(input).toBeTruthy();
+    fireEvent.change(input, { target: { value: "kamp-1a2b3c4d" } });
 
-    fireEvent.change(input, { target: { value: "amb-unilag" } });
-
-    expect(onChange).toHaveBeenCalledWith("AMB-UNILAG", true);
-    expect(screen.getByText(/Official Campus Ambassador/i)).toBeTruthy();
+    expect(onChange).toHaveBeenCalledWith("KAMP-1A2B3C4D", true);
+    // It must not claim the code was verified: only the server can say that.
+    expect(screen.queryByText(/verified/i)).toBeNull();
+    expect(screen.getByText(/We check it when you create your account/i)).toBeTruthy();
   });
 }, 20000);

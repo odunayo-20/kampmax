@@ -50,6 +50,7 @@ export type AdminNavItemKey =
   | "security"
   | "support"
   | "contactMessages"
+  | "referrals"
   | "eventOrganizers"
   | "blog";
 

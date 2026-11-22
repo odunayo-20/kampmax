@@ -30,6 +30,7 @@ import {
   Boxes,
   ClipboardList,
   Fingerprint,
+  Gift,
   Flag,
   Headphones,
   Mail,
@@ -138,6 +139,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       { key: "payouts", href: "/admin/payouts", label: "Payouts", icon: Send },
       { key: "wallet", href: "/admin/wallet", label: "Wallets", icon: Wallet },
       { key: "withdrawals", href: "/admin/withdrawals", label: "Withdrawals", icon: Landmark },
+      { key: "referrals", href: "/admin/referrals", label: "Invite credit", icon: Gift },
     ],
   },
   {

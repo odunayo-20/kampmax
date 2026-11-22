@@ -1,14 +1,7 @@
 "use client";
 
 import { useState, useId } from "react";
-import {
-  Gift,
-  ChevronDown,
-  CheckCircle2,
-  X,
-  Award,
-  Tag,
-} from "lucide-react";
+import { Gift, ChevronDown, X, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ReferralCodeInputProps {
@@ -17,46 +10,9 @@ interface ReferralCodeInputProps {
   className?: string;
 }
 
-export interface ReferralValidationResult {
-  isValid: boolean;
-  type?: "ambassador" | "peer";
-  note?: string;
-  badgeLabel?: string;
-}
-
-export function validateReferralCode(rawCode: string): ReferralValidationResult {
-  const code = rawCode.trim().toUpperCase();
-  if (!code) {
-    return { isValid: false };
-  }
-
-  // Ambassador codes (starts with AMB- or matches platform keys)
-  if (
-    code.startsWith("AMB-") ||
-    code === "AMBASSADOR" ||
-    code === "KAMPMAX-VIP" ||
-    code === "CAMPUS-LEAD"
-  ) {
-    return {
-      isValid: true,
-      type: "ambassador",
-      badgeLabel: "Official Campus Ambassador",
-      note: "Your registration will be linked with your campus ambassador.",
-    };
-  }
-
-  // General peer referral codes: format KM-XXXX or 5+ alphanumeric characters
-  const peerRegex = /^(KM-)?[A-Z0-9]{4,10}$/;
-  if (peerRegex.test(code) && code.length >= 5) {
-    return {
-      isValid: true,
-      type: "peer",
-      badgeLabel: "Student Referral Code",
-      note: "Referral code verified and linked to your inviter.",
-    };
-  }
-
-  return { isValid: false };
+/** Whether this looks like an invite code. Whether it is a real one is for the server to say when the account is made. */
+export function validateReferralCode(rawCode: string): { isValid: boolean } {
+  return { isValid: /^[A-Z0-9-]{4,20}$/.test(rawCode.trim().toUpperCase()) };
 }
 
 export function ReferralCodeInput({
@@ -106,7 +62,7 @@ export function ReferralCodeInput({
           <span className="font-semibold">
             {value && validation.isValid
               ? "Referral Code Applied"
-              : "Have a referral or ambassador code?"}
+              : "Have a friend's invite code?"}
           </span>
           {value && validation.isValid && (
             <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">
@@ -135,10 +91,10 @@ export function ReferralCodeInput({
             <input
               id={inputId}
               type="text"
-              placeholder="e.g. KM-8492 or AMB-UNILAG"
+              placeholder="e.g. KAMP-1A2B3C4D"
               value={inputValue}
               onChange={(e) => handleInputChange(e.target.value)}
-              maxLength={15}
+              maxLength={20}
               className={cn(
                 "w-full pl-8.5 pr-8 py-2 text-xs font-mono tracking-wider rounded-lg border bg-white uppercase transition-all",
                 validation.isValid
@@ -158,31 +114,17 @@ export function ReferralCodeInput({
             )}
           </div>
 
-          {/* Validation Banner */}
           {validation.isValid ? (
-            <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200/80 flex items-start gap-2 text-xs text-emerald-800">
-              {validation.type === "ambassador" ? (
-                <Award className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-              ) : (
-                <Gift className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-              )}
-              <div className="min-w-0">
-                <p className="font-semibold text-emerald-900 flex items-center gap-1.5">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 inline" />
-                  {validation.badgeLabel}
-                </p>
-                <p className="text-[11px] text-emerald-700 mt-0.5 leading-snug">
-                  {validation.note}
-                </p>
-              </div>
-            </div>
+            <p className="text-[11px] text-emerald-700 leading-tight">
+              Code added. We check it when you create your account, and you both get credit after your first purchase.
+            </p>
           ) : inputValue.length > 0 ? (
             <p className="text-[11px] text-neutral-500">
-              Code not recognized, but you can still proceed with registration without one.
+              That does not look like an invite code. You can still sign up without one.
             </p>
           ) : (
             <p className="text-[11px] text-kampmax-text-secondary leading-tight">
-              Enter an invite code from a fellow student or campus ambassador if you have one.
+              A friend can share their code from the Kampmax app.
             </p>
           )}
         </div>

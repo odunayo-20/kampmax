@@ -33,6 +33,7 @@ describe("settings permission helpers (Module 50)", () => {
     expect([...HIGH_RISK_SETTINGS_SECTIONS].sort()).toEqual([
       "financial",
       "postings",
+      "referrals",
       "security",
     ]);
     expect(isHighRiskSettingsSection("financial")).toBe(true);

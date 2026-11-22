@@ -183,14 +183,14 @@ function extractUserFromMeResponse(raw: unknown): AuthUser | null {
  * Register a new user.
  * POST /api/v1/auth/register
  * 
- * The backend RegisterDto accepts: email, username, firstName, lastName, password, phone (required, unique).
+ * The backend RegisterDto accepts: email, username, firstName, lastName, password, phone (required, unique), referralCode (optional invite code).
  * DO NOT send: campusId, role, department, level — the backend uses its own RBAC system
  * and will reject requests with unsupported properties (whitelist: true, forbidNonWhitelisted: true).
  */
-export async function register(data: { email: string; username: string; firstName: string; lastName: string; password: string; phone?: string }): Promise<AuthResult> {
+export async function register(data: { email: string; username: string; firstName: string; lastName: string; password: string; phone?: string; referralCode?: string }): Promise<AuthResult> {
   await delay();
 
-  const result = await apiClient.post<{ email: string; username: string; firstName: string; lastName: string; password: string; phone?: string }, unknown>("/auth/register", data);
+  const result = await apiClient.post<{ email: string; username: string; firstName: string; lastName: string; password: string; phone?: string; referralCode?: string }, unknown>("/auth/register", data);
 
   // If the API client reports an error, return a failure immediately
   if (result.error) {

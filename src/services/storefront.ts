@@ -190,6 +190,38 @@ async function changeFollow(vendorId: string, follow: boolean): Promise<FollowSt
   return data;
 }
 
+/** Whether buyers can order from one store right now (it can pause new orders and still be browsed). */
+export async function fetchAcceptingOrders(vendorId: string): Promise<boolean> {
+  const { data, error } = await apiClient.get<{ acceptingOrders?: boolean }>(`/vendors/${vendorId}`);
+  if (!data) throw error ?? new Error("Could not check the store.");
+  return data.acceptingOrders !== false;
+}
+
+export interface FollowedStore {
+  id: string;
+  slug: string;
+  storeName: string;
+  logo: string | null;
+  verified: boolean;
+  muted: boolean;
+  /** Items listed in the last week. */
+  newItems: number;
+}
+
+/** The stores the signed-in user follows, newest follow first. */
+export async function fetchFollowedStores(): Promise<FollowedStore[]> {
+  const { data, error } = await apiClient.get<FollowedStore[]>("/vendors/me/following");
+  if (!data) throw error ?? new Error("Could not load the stores you follow.");
+  return data;
+}
+
+/** Stop or resume news from a followed store, without unfollowing it. */
+export async function setStoreMuted(vendorId: string, muted: boolean): Promise<{ muted: boolean }> {
+  const { data, error } = await apiClient.patch<{ muted: boolean }>(`/vendors/${vendorId}/follow`, { muted });
+  if (error || !data) throw error ?? new Error("Could not update this store.");
+  return data;
+}
+
 export const followVendor = (vendorId: string) => changeFollow(vendorId, true);
 export const unfollowVendor = (vendorId: string) => changeFollow(vendorId, false);
 

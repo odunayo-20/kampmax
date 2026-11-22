@@ -7,6 +7,8 @@ import { useCart } from "@/lib/cart-context";
 import { useApp } from "@/lib/app-context";
 import { getVendorById } from "@/services/users";
 import { useEnsureVendors } from "@/hooks/use-vendor-cache";
+import { usePausedStores } from "@/hooks/use-paused-stores";
+import { pausedCartProblem } from "@/lib/paused-stores";
 import { formatNaira } from "@/lib/utils";
 import { PageContainer } from "@/components/layout";
 import { Button } from "@/components/atoms/Button";
@@ -64,6 +66,12 @@ export default function CartPage() {
     return cache;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendorGroups, savedItems, vendorsLoaded]);
+
+  // Stores that paused new orders keep their lines here, but checkout waits until they are removed.
+  const pausedIds = usePausedStores(vendorGroups.map((g) => g.vendorId));
+  const pausedProblem = pausedCartProblem(
+    vendorGroups.filter((g) => pausedIds.has(g.vendorId)).map((g) => vendorNameCache[g.vendorId]?.name || g.vendorName)
+  );
 
   // Re-validate cart lines against the current catalog on mount.
   useEffect(() => {
@@ -143,6 +151,7 @@ export default function CartPage() {
                     onRemove={removeItem}
                     onSaveForLater={saveForLater}
                     pendingId={pendingId}
+                    paused={pausedIds.has(group.vendorId)}
                   />
                 ))}
               </div>
@@ -169,8 +178,14 @@ export default function CartPage() {
           {activeItems.length > 0 && (
             <aside className="lg:sticky lg:top-20 space-y-4 mt-6 lg:mt-0">
               <CartSummary summary={summary} />
+              {pausedProblem && (
+                <p role="alert" className="text-xs text-kampmax-error">
+                  {pausedProblem}
+                </p>
+              )}
               <Button
                 onClick={() => router.push("/checkout")}
+                disabled={!!pausedProblem}
                 className="w-full bg-kampmax-blue text-white hover:bg-kampmax-blue/90 h-12 text-base font-semibold"
               >
                 Proceed to Checkout · {formatNaira(summary.total)}
@@ -196,6 +211,7 @@ export default function CartPage() {
             </div>
             <Button
               onClick={() => router.push("/checkout")}
+              disabled={!!pausedProblem}
               className="bg-kampmax-blue text-white hover:bg-kampmax-blue/90 h-11 px-6 flex-1 max-w-[240px]"
             >
               Checkout

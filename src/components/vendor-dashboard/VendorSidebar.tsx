@@ -19,6 +19,7 @@ import {
   MessageSquare,
   ShieldCheck,
   ScanLine,
+  MessageCircleQuestion,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { VendorPermissions } from "@/types/vendor-dashboard";
@@ -66,6 +67,7 @@ export function VendorSidebar({ storeName, permissions, status }: VendorSidebarP
         { href: "/scan", label: "Scan pickup", icon: ScanLine, permission: "canManageOrders" },
         { href: "/vendor/customers", label: "Customers", icon: Users, permission: "canManageCustomers" },
         { href: "/vendor/reviews", label: "Reviews", icon: Star, permission: "canManageReviews" },
+        { href: "/vendor/questions", label: "Questions", icon: MessageCircleQuestion, permission: "canManageReviews" },
       ],
     },
     {

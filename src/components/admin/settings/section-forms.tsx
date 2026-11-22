@@ -21,6 +21,7 @@ import type {
   OrderCancellationPolicy,
   PayoutSchedule,
   PostingSettings,
+  ReferralSettings,
   SecuritySettings,
 } from "@/types/admin";
 
@@ -948,6 +949,153 @@ export function LoyaltySectionForm({
           but existing balances keep their original expiry dates.
         </p>
       )}
+    </SectionForm>
+  );
+}
+
+// ============================================================
+// INVITE FRIENDS (referral credit)
+// ============================================================
+
+type ReferralField = {
+  label: string;
+  /** Where the value lives: a top-level key, or `group.key` for the reward pairs. */
+  path: string;
+  prefix?: string;
+  suffix?: string;
+  min: number;
+  max: number;
+  step?: number;
+  whole?: boolean;
+  hint?: string;
+};
+
+const REFERRAL_GROUPS: { title: string; fields: ReferralField[] }[] = [
+  {
+    title: "Rewards",
+    fields: [
+      { label: "Shopping: inviter gets", path: "marketplace.referrerReward", prefix: "₦", min: 0, max: 5000, step: 50 },
+      { label: "Shopping: friend gets", path: "marketplace.referredReward", prefix: "₦", min: 0, max: 5000, step: 50 },
+      { label: "Freelance: inviter gets", path: "freelance.referrerReward", prefix: "₦", min: 0, max: 10000, step: 50 },
+      { label: "Freelance: friend gets", path: "freelance.referredReward", prefix: "₦", min: 0, max: 10000, step: 50 },
+    ],
+  },
+  {
+    title: "What counts as a first purchase",
+    fields: [
+      { label: "Smallest order", path: "minOrder", prefix: "₦", min: 0, max: 100000, step: 500, hint: "A delivered order of at least this much." },
+      { label: "Smallest freelance job", path: "minFreelanceAmount", prefix: "₦", min: 0, max: 1000000, step: 500, hint: "A completed contract worth at least this much." },
+      { label: "Join window", path: "attachDays", suffix: "days", min: 1, max: 90, whole: true, hint: "How long after signing up a friend can enter a code." },
+      { label: "Purchase window", path: "windowDays", suffix: "days", min: 7, max: 180, whole: true, hint: "How long a friend has to make that first purchase." },
+      { label: "Hold before paying", path: "holdDays", suffix: "days", min: 3, max: 60, whole: true, hint: "The purchase must stand (no refund) this long." },
+    ],
+  },
+  {
+    title: "Limits and spending",
+    fields: [
+      { label: "Rewarded invites per person", path: "referrerMonthlyCap", suffix: "per month", min: 1, max: 100, whole: true },
+      { label: "Rewarded invites per ambassador", path: "ambassadorMonthlyCap", suffix: "per month", min: 1, max: 500, whole: true },
+      { label: "Credit budget per campus", path: "campusMonthlyBudget", prefix: "₦", suffix: "per month", min: 0, max: 10000000, step: 10000, hint: "Inviter and friend credit together." },
+      { label: "Credit expires after", path: "creditExpiryDays", suffix: "days", min: 30, max: 365, whole: true },
+      { label: "Most of an order credit can pay", path: "maxCreditPercent", suffix: "% of order", min: 0, max: 100, step: 5, hint: "The seller is still paid in full; Kampmax covers the credit." },
+    ],
+  },
+];
+
+const readReferral = (form: ReferralSettings, path: string): number => {
+  const [a, b] = path.split(".");
+  const group = (form as unknown as Record<string, unknown>)[a];
+  return num(b ? (group as Record<string, number>)[b] : group);
+};
+
+const writeReferral = (form: ReferralSettings, path: string, value: number): ReferralSettings => {
+  const [a, b] = path.split(".");
+  if (!b) return { ...form, [a]: value };
+  const group = (form as unknown as Record<string, Record<string, number>>)[a];
+  return { ...form, [a]: { ...group, [b]: value } };
+};
+
+export function ReferralsSectionForm({
+  value,
+  onSave,
+  onReset,
+  disabled,
+  onDirtyChange,
+}: {
+  value: ReferralSettings;
+  onSave: (v: ReferralSettings) => Promise<boolean>;
+  onReset: () => void;
+  disabled?: boolean;
+  onDirtyChange?: (dirty: boolean) => void;
+}) {
+  const [form, setForm] = useState(value);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+
+  useSectionDirty(value, form, onDirtyChange, disabled);
+
+  useEffect(() => setForm(value), [value]);
+
+  function validate(): boolean {
+    const e: Record<string, string> = {};
+    for (const field of REFERRAL_GROUPS.flatMap((g) => g.fields)) {
+      const n = readReferral(form, field.path);
+      const err = rangeError(n, field.label, field.min, field.max);
+      if (err) e[field.path] = err;
+      else if (field.whole && !Number.isInteger(n)) e[field.path] = `${field.label} must be a whole number.`;
+    }
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
+  async function handleSave() {
+    if (!validate()) return;
+    setSaving(true);
+    await onSave(form);
+    setSaving(false);
+  }
+
+  return (
+    <SectionForm onSubmit={() => void handleSave()} saving={saving} errorCount={Object.keys(errors).length} disabled={disabled}>
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="text-sm font-semibold text-kampmax-text">Invite friends</h2>
+        <ResetButton onReset={onReset} disabled={disabled} />
+      </div>
+      <p className="text-xs text-kampmax-text-secondary">
+        Everyone gets an invite code. When a friend makes their first real purchase and it stands for
+        the hold period, both get Kampmax credit, once. Credit cannot be withdrawn, and Kampmax pays
+        for it, never the seller. Nothing is paid while this is off.
+      </p>
+
+      <ToggleField
+        label="Turn on invite credit"
+        hint="Friends can enter codes and credit is paid out. Off by default."
+        checked={form.enabled}
+        onChange={(v) => setForm((f) => ({ ...f, enabled: v }))}
+      />
+
+      {REFERRAL_GROUPS.map((group) => (
+        <div key={group.title} className="space-y-2">
+          <h3 className="text-xs font-semibold text-kampmax-text">{group.title}</h3>
+          <FieldGrid>
+            {group.fields.map((field) => (
+              <NumberField
+                key={field.path}
+                label={field.label}
+                value={readReferral(form, field.path)}
+                prefix={field.prefix}
+                suffix={field.suffix}
+                min={field.min}
+                max={field.max}
+                step={field.step}
+                hint={field.hint}
+                onChange={(v) => setForm((f) => writeReferral(f, field.path, v))}
+                error={errors[field.path]}
+              />
+            ))}
+          </FieldGrid>
+        </div>
+      ))}
     </SectionForm>
   );
 }

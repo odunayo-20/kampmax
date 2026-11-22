@@ -13,7 +13,6 @@ export { ResidenceHallSelector } from "./ResidenceHallSelector";
 export {
   ReferralCodeInput,
   validateReferralCode,
-  type ReferralValidationResult,
 } from "./ReferralCodeInput";
 export { VerifiedStudentBadgeNotice } from "./VerifiedStudentBadgeNotice";
 export {
