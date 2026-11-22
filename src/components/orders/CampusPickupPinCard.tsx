@@ -148,7 +148,7 @@ export function CampusPickupPinCard({ order }: CampusPickupPinCardProps) {
       <div className="flex items-start gap-1.5 text-[11px] text-primary-200/90 leading-tight">
         <Info className="w-3.5 h-3.5 shrink-0 text-emerald-400 mt-0.5" />
         <span>
-          Show this QR code or PIN to the vendor/runner <strong>only when you physically receive your item</strong> to release payment.
+          Show this QR code or PIN to the seller/runner <strong>only when you physically receive your item</strong>. It confirms the handover.
         </span>
       </div>
 
@@ -195,7 +195,7 @@ export function CampusPickupPinCard({ order }: CampusPickupPinCardProps) {
                 {code.pin}
               </p>
               <p className="text-[11px] text-neutral-500 mt-1">
-                Present to the vendor or runner at the pickup point. Don&apos;t share this with anyone else.
+                Present to the seller or runner at the pickup point. Don&apos;t share this with anyone else.
               </p>
             </div>
           </div>

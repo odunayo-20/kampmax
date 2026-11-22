@@ -61,22 +61,22 @@ export function orderMoneyTimeline(order: Pick<Order, "status" | "total" | "disp
     {
       id: "held",
       title: "Kampmax holds your payment",
-      detail: "The vendor can see the order is paid, but they are not paid yet. Your money is held safely.",
+      detail: "The seller can see the order is paid, but they are not paid yet. Your money is held safely.",
     },
     {
       id: "handover",
-      title: "The vendor hands over your order",
+      title: "The seller hands over your order",
       detail: "You get it by delivery or by showing your pickup code on campus.",
     },
     {
-      id: "confirm",
-      title: "You confirm you received it",
-      detail: "This is when the vendor is paid. If something is wrong, report it before you confirm.",
+      id: "window",
+      title: "3 days to ask for a refund",
+      detail: "After delivery, Kampmax keeps holding your payment for 3 days. If something is wrong, ask the seller for a refund or return in that time.",
     },
     {
       id: "paid",
-      title: "The vendor is paid",
-      detail: "The money moves from Kampmax to the vendor. After this, a problem goes through support.",
+      title: "The seller is paid",
+      detail: "When the 3 days are up (or your refund request is settled), the money moves to the seller. After this, a problem goes through support.",
     },
   ];
 
@@ -98,10 +98,10 @@ export function orderMoneyTimeline(order: Pick<Order, "status" | "total" | "disp
       ...steps[3],
       title: "Dispute open: payout on hold",
       detail:
-        "The vendor will not be paid while Kampmax Trust & Safety reviews your report. If your claim is upheld, the refund goes to your wallet.",
+        "The seller will not be paid while Kampmax Trust & Safety reviews your report. If your claim is upheld, the refund goes to your wallet.",
     };
     return {
-      headline: "Your report is being reviewed. The vendor has not been paid.",
+      headline: "Your report is being reviewed. The seller has not been paid.",
       steps: steps.map((s, i) => (i > 3 ? { ...s, state: "upcoming" as const } : s)),
     };
   }
@@ -110,11 +110,11 @@ export function orderMoneyTimeline(order: Pick<Order, "status" | "total" | "disp
 
   const headlines = [
     "You haven't paid yet, so no money has moved.",
-    "Your payment is held safely by Kampmax. The vendor is not paid yet.",
-    "Your payment is held safely by Kampmax until you confirm you received your order.",
-    "Your payment is still held. Confirm receipt to pay the vendor.",
+    "Your payment is held safely by Kampmax. The seller is not paid yet.",
+    "Your payment is held safely by Kampmax until your order is delivered.",
+    "Your payment is still held for 3 days after delivery, in case something is wrong.",
     "",
-    "The vendor has been paid. This order is complete.",
+    "The seller has been paid. This order is complete.",
   ];
   return { headline: headlines[current] || headlines[3], steps: mark(base, current) };
 }

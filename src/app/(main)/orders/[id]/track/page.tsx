@@ -101,8 +101,8 @@ export default function OrderTrackingPage({
     },
     {
       key: "confirmed",
-      title: "Vendor Confirmed",
-      desc: "Vendor accepted your order and is preparing items",
+      title: "Seller Confirmed",
+      desc: "Seller accepted your order and is preparing items",
       isDone: ["confirmed", "preparing", "processing", "ready", "ready_for_pickup", "out_for_delivery", "delivered"].includes(order.status as string),
     },
     {
@@ -284,7 +284,7 @@ export default function OrderTrackingPage({
               </div>
               <div>
                 <h4 className="text-xs font-semibold text-kampmax-text">{vendor.storeName}</h4>
-                <p className="text-[11px] text-kampmax-text-secondary">Fulfilled & Dispatched by Vendor</p>
+                <p className="text-[11px] text-kampmax-text-secondary">Sent by the seller</p>
               </div>
             </div>
             <Link
@@ -292,7 +292,7 @@ export default function OrderTrackingPage({
               className="inline-flex items-center gap-1 text-xs font-medium text-kampmax-navy bg-kampmax-muted hover:bg-kampmax-border px-3 py-1.5 rounded-lg transition-colors"
             >
               <MessageCircle className="w-3.5 h-3.5" />
-              Chat Vendor
+              Message seller
             </Link>
           </div>
         )}

@@ -25,7 +25,7 @@ export function CheckoutHeader({ itemCount, vendorCount }: CheckoutHeaderProps) 
           </h1>
           <p className="text-xs text-kampmax-text-secondary">
             {itemCount} {itemCount === 1 ? "item" : "items"}
-            {vendorCount > 1 && ` · ${vendorCount} vendors`}
+            {vendorCount > 1 && ` · ${vendorCount} sellers`}
           </p>
         </div>
       </div>

@@ -20,6 +20,7 @@ import {
   StoreLine,
 } from "@/components/vendor-orders/OrderDetailSections";
 import { DisputePanel, EscrowPanel } from "@/components/vendor-orders/OrderStatusPanels";
+import { VendorReturnPanel } from "@/components/vendor-orders/VendorReturnPanel";
 import type { VendorOrderActionView, VendorOrderResult } from "@/types/vendor-orders";
 
 const TRANSITION_KEYS: ReadonlySet<string> = new Set<VendorOrderTransitionKey>([
@@ -140,7 +141,8 @@ export default function VendorOrderDetailPage({ params }: { params: Promise<{ id
         </div>
       )}
 
-      <DisputePanel order={order} />
+      {/* An escalated refund request is a dispute too; its own panel says so. */}
+      {order.returnRequest ? <VendorReturnPanel order={order} /> : <DisputePanel order={order} />}
 
       <SummarySection order={order} parent={null} />
 

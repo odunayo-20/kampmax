@@ -24,7 +24,7 @@ const STEPS: Step[] = [
   {
     key: "confirmed",
     label: "Confirmed",
-    description: "Vendor accepted",
+    description: "Seller accepted",
     statuses: ["confirmed", "preparing", "ready", "out_for_delivery", "delivered"],
   },
   {

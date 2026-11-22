@@ -117,14 +117,16 @@ export function createApiOrderManagementService(): AdminOrderManagementService {
       return data;
     },
 
-    async resolveDispute(id, outcome, note) {
+    async resolveDispute(id, outcome, note, amount) {
       if (!note.trim()) throw new Error("A ruling note is required.");
+      if (amount !== undefined && !(amount > 0)) throw new Error("Enter a refund amount above zero, or leave it blank.");
       const { data, error } = await apiClient.patch<
-        { outcome: string; note: string },
+        { outcome: string; note: string; amount?: number },
         ManagedOrderDetail
       >(`/admin/orders/${encodeURIComponent(id)}/dispute/resolve`, {
         outcome,
         note: note.trim(),
+        ...(outcome === "refund" && amount !== undefined ? { amount } : {}),
       });
       if (error) fail(error, "Couldn't resolve the dispute.");
       return data;

@@ -103,6 +103,9 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
   const [cancelOpen, setCancelOpen] = useState(false);
   const [disputeOpen, setDisputeOpen] = useState(false);
   const [resolving, setResolving] = useState<"refund" | "dismiss" | null>(null);
+  // Delivered orders and refund requests only: blank refunds the buyer's ask, or the whole order.
+  const [refundAmount, setRefundAmount] = useState("");
+  const refundValue = refundAmount.trim() ? Number(refundAmount.replace(/[,\s₦]/g, "")) : undefined;
   const [acting, setActing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -283,6 +286,19 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
           <p className="font-medium">Dispute open since {formatDateTime(dispute.openedAt)}</p>
           <p className="mt-1">{dispute.reason}</p>
           <p className="mt-1 text-xs">The vendor payout is on hold until this is resolved.</p>
+          <label className="mt-3 block text-xs font-medium text-kampmax-text">
+            Refund amount (delivered orders and refund requests)
+            <input
+              inputMode="decimal"
+              value={refundAmount}
+              onChange={(e) => setRefundAmount(e.target.value)}
+              placeholder="Blank: the buyer's request, or the whole order"
+              className="mt-1 block h-8 w-full max-w-xs rounded-md border border-kampmax-border bg-white px-2 text-sm text-kampmax-text"
+            />
+            <span className="mt-1 block font-normal text-kampmax-text-secondary">
+              Ignored for orders not yet delivered: those are cancelled and refunded in full.
+            </span>
+          </label>
           <div className="mt-3 flex flex-wrap gap-2">
             {order.status === "disputed" && (
               <>
@@ -575,7 +591,9 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
         title={resolving === "refund" ? "Uphold the dispute?" : "Dismiss the dispute?"}
         message={
           resolving === "refund"
-            ? "The order is cancelled and the customer is refunded to their Kampmax wallet."
+            ? refundValue !== undefined
+              ? `A delivered order refunds ${formatNaira(refundValue)} to the customer's Kampmax wallet and releases the rest of the payout. An undelivered order is cancelled and refunded in full.`
+              : "An undelivered order is cancelled and refunded in full. A delivered order refunds the buyer's request (or the whole order) to their Kampmax wallet and releases the rest of the payout."
             : "The dispute is closed with no change. A delivered order's held payout is released to the vendor."
         }
         confirmLabel={resolving === "refund" ? "Refund customer" : "Dismiss dispute"}
@@ -583,7 +601,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
         loading={acting}
         reasonLabel="Ruling (recorded on the order)"
         onConfirm={(note) =>
-          void run(() => orderManagementService.resolveDispute(order.id, resolving ?? "dismiss", note))
+          void run(() => orderManagementService.resolveDispute(order.id, resolving ?? "dismiss", note, refundValue))
         }
         onCancel={() => setResolving(null)}
       />

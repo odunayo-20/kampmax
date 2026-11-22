@@ -2,6 +2,7 @@
 
 import { Link2, MapPin, Truck } from "lucide-react";
 import { StatusBadge } from "@/components/admin/StatusBadge";
+import { isOpenReturn, isReturnStatus, RETURN_STATUS_LABEL } from "@/lib/returns";
 import {
   fulfillmentStatusLabel,
   fulfillmentStatusVariant,
@@ -12,6 +13,14 @@ import type { VendorFulfillmentStatus, VendorPaymentStatus, VendorDeliveryMethod
 
 export function FulfillmentBadge({ status }: { status: VendorFulfillmentStatus }) {
   return <StatusBadge variant={fulfillmentStatusVariant(status)} label={fulfillmentStatusLabel(status)} />;
+}
+
+/** Where the buyer's refund request stands, on list rows; nothing when there is none. */
+export function ReturnBadge({ status }: { status?: string | null }) {
+  if (!isReturnStatus(status)) return null;
+  const variant =
+    status === "REQUESTED" || status === "AWAITING_RETURN" ? "warning" : isOpenReturn(status) ? "info" : "neutral";
+  return <StatusBadge variant={variant} label={RETURN_STATUS_LABEL[status]} />;
 }
 
 export function PaymentBadge({ status }: { status: VendorPaymentStatus }) {

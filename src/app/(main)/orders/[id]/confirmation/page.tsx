@@ -86,7 +86,7 @@ export default function OrderConfirmationPage({
           </div>
           <h1 className="text-2xl font-bold">Order Confirmed!</h1>
           <p className="mt-1 text-xs text-emerald-100 sm:text-sm">
-            Thank you for your order. We've generated a digital receipt and notified the vendor.
+            Thank you for your order. We've generated a digital receipt and notified the seller.
           </p>
           <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-mono font-medium text-white">
             Order Reference: #{order.id}

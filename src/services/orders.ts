@@ -1,6 +1,7 @@
 import { Order, OrderStatus, DeliveryMethod, PaymentMethod, PaymentStatus, OrderTimelineEntry, CartItem, Product } from "@/types";
 import { getProductById } from "@/services/products";
 import { apiClient, ApiError } from "@/lib/api-client";
+import { toReturnRequest } from "@/lib/returns";
 import type { CheckoutDeliveryMethod, VendorDeliveryOffer } from "@/types/checkout";
 
 // ============================================================
@@ -77,6 +78,9 @@ export interface BackendOrderDetail extends BackendOrderListItem {
     resolution: string | null;
   } | null;
   settled?: boolean;
+  deliveredAt?: string | null;
+  returnWindowEndsAt?: string | null;
+  returnRequest?: unknown;
 }
 
 export interface BackendPaginatedOrders {
@@ -282,7 +286,27 @@ export function mapBackendOrderToFrontend(
         }
       : undefined,
     settled: raw.settled === true,
+    deliveredAt: raw.deliveredAt ?? undefined,
+    returnWindowEndsAt: raw.returnWindowEndsAt ?? null,
+    returnRequest: toReturnRequest(raw.returnRequest),
   };
+}
+
+/**
+ * Maps an order the server just returned and keeps the local copy in step, so
+ * every page that reads the cache sees the change. Errors pass through.
+ */
+function cacheResult(
+  id: string,
+  data: BackendOrderDetail | null,
+  error: ApiError | null
+): { data: Order | null; error: ApiError | null } {
+  if (error || !data || !data.id) return { data: null, error };
+  const mapped = mapBackendOrderToFrontend(data);
+  const idx = cachedOrders.findIndex((o) => o.id === mapped.id || o.id === id);
+  if (idx >= 0) cachedOrders[idx] = mapped;
+  else cachedOrders.unshift(mapped);
+  return { data: mapped, error: null };
 }
 
 // ============================================================
@@ -458,7 +482,8 @@ export async function completePickupApi(
 }
 
 /**
- * Customer confirms they received a shipped order; releases escrow to the vendor.
+ * Customer confirms they received a shipped order. The vendor is paid when the
+ * 3-day return window ends (or the buyer's refund request is settled).
  * PATCH /api/v1/orders/:id/confirm-receipt
  */
 export async function confirmOrderReceiptApi(
@@ -468,19 +493,7 @@ export async function confirmOrderReceiptApi(
     `/orders/${id}/confirm-receipt`,
     {}
   );
-
-  if (error || !data || !data.id) {
-    return { data: null, error };
-  }
-
-  const mapped = mapBackendOrderToFrontend(data);
-  const idx = cachedOrders.findIndex((o) => o.id === mapped.id || o.id === id);
-  if (idx >= 0) {
-    cachedOrders[idx] = mapped;
-  } else {
-    cachedOrders.unshift(mapped);
-  }
-  return { data: mapped, error: null };
+  return cacheResult(id, data, error);
 }
 
 /**
@@ -497,14 +510,38 @@ export async function openOrderDisputeApi(
     `/orders/${id}/dispute`,
     { reason, statement }
   );
-  if (error || !data || !data.id) {
-    return { data: null, error };
-  }
-  const mapped = mapBackendOrderToFrontend(data);
-  const idx = cachedOrders.findIndex((o) => o.id === mapped.id || o.id === id);
-  if (idx >= 0) cachedOrders[idx] = mapped;
-  else cachedOrders.unshift(mapped);
-  return { data: mapped, error: null };
+  return cacheResult(id, data, error);
+}
+
+/**
+ * Ask for a refund (and maybe a return) on a delivered order, within the
+ * 3-day window. Once per order; the vendor's payout waits until it is settled.
+ * POST /api/v1/orders/:id/return
+ */
+export async function requestReturnApi(
+  id: string,
+  input: { items: { orderItemId: string; quantity: number }[]; reason: string; statement?: string }
+): Promise<{ data: Order | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.post<typeof input, BackendOrderDetail>(`/orders/${id}/return`, input);
+  return cacheResult(id, data, error);
+}
+
+export type BuyerReturnStep = "accept-offer" | "escalate" | "withdraw";
+
+/**
+ * The buyer's next step on their refund request: take the vendor's offer, ask
+ * Kampmax to decide, or withdraw it.
+ * POST /api/v1/orders/:id/return/{accept-offer|escalate|withdraw}
+ */
+export async function moveReturnApi(
+  id: string,
+  step: BuyerReturnStep
+): Promise<{ data: Order | null; error: ApiError | null }> {
+  const { data, error } = await apiClient.post<Record<string, never>, BackendOrderDetail>(
+    `/orders/${id}/return/${step}`,
+    {}
+  );
+  return cacheResult(id, data, error);
 }
 
 /**
@@ -518,18 +555,7 @@ export async function cancelOrderApi(
     `/orders/${id}/cancel`,
     {}
   );
-
-  if (error || !data || !data.id) {
-    return { data: null, error };
-  }
-
-  const mapped = mapBackendOrderToFrontend(data);
-  const idx = cachedOrders.findIndex((o) => o.id === id || o.id === mapped.id);
-  if (idx >= 0) {
-    cachedOrders[idx] = mapped;
-  }
-
-  return { data: mapped, error: null };
+  return cacheResult(id, data, error);
 }
 
 /**

@@ -79,7 +79,7 @@ export function OrderReview({
 
         <div>
           <p className="text-xs font-semibold text-kampmax-text-secondary uppercase tracking-wide mb-1">
-            Delivery method per vendor
+            Delivery method per seller
           </p>
           {vendorDeliveries.length === 0 ? (
             <p className="text-kampmax-warning text-xs">

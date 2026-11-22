@@ -1,7 +1,7 @@
 import type { BadgeVariant } from "@/components/admin/StatusBadge";
 import type { VendorFulfillmentStatus, VendorPaymentStatus } from "@/types/vendor-orders";
-import { VENDOR_ESCROW_STATE, VENDOR_DISPUTE_STATUS, VENDOR_REFUND_STATUS } from "@/types/vendor-orders";
-import type { VendorEscrowState, VendorDisputeStatus, VendorRefundStatus } from "@/types/vendor-orders";
+import { VENDOR_ESCROW_STATE, VENDOR_DISPUTE_STATUS } from "@/types/vendor-orders";
+import type { VendorEscrowState, VendorDisputeStatus } from "@/types/vendor-orders";
 
 export const FULFILLMENT_LABELS: Record<VendorFulfillmentStatus, string> = {
   pending: "Pending",
@@ -115,38 +115,6 @@ export function disputeStatusLabel(status: VendorDisputeStatus): string {
   return DISPUTE_LABELS[status] ?? status.replace(/_/g, " ");
 }
 
-export const REFUND_LABELS: Record<VendorRefundStatus, string> = {
-  none: "No refund",
-  requested: "Requested",
-  pending: "Pending",
-  approved: "Approved",
-  processing: "Processing",
-  refunded: "Refunded",
-  rejected: "Rejected",
-};
-
-export function refundStatusLabel(status: VendorRefundStatus): string {
-  return REFUND_LABELS[status] ?? status.replace(/_/g, " ");
-}
-
-export function refundStatusVariant(status: VendorRefundStatus): BadgeVariant {
-  switch (status) {
-    case "pending":
-    case "processing":
-      return "info";
-    case "approved":
-      return "blue";
-    case "refunded":
-      return "success";
-    case "rejected":
-      return "error";
-    case "requested":
-      return "warning";
-    case "none":
-      return "neutral";
-  }
-}
-
 export const ISSUE_TYPE_LABELS: Record<string, string> = {
   delay: "Delay",
   stock_shortage: "Stock shortage",
@@ -162,4 +130,4 @@ export function issueTypeLabel(type: string): string {
   return ISSUE_TYPE_LABELS[type] ?? type.replace(/_/g, " ");
 }
 
-export { VENDOR_ESCROW_STATE, VENDOR_DISPUTE_STATUS, VENDOR_REFUND_STATUS };
+export { VENDOR_ESCROW_STATE, VENDOR_DISPUTE_STATUS };

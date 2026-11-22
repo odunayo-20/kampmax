@@ -2,7 +2,7 @@
 
 import { Package, ChevronRight } from "lucide-react";
 import { formatNaira, timeAgo } from "@/lib/utils";
-import { FulfillmentBadge, PaymentBadge, DeliveryMethodTag, ParentOrderTag } from "./OrderBadges";
+import { FulfillmentBadge, ReturnBadge, PaymentBadge, DeliveryMethodTag, ParentOrderTag } from "./OrderBadges";
 import type { VendorOrder } from "@/types/vendor-orders";
 
 interface OrdersGridProps {
@@ -27,7 +27,10 @@ export function OrdersGrid({ orders, onView }: OrdersGridProps) {
                 <span className="text-sm font-bold text-kampmax-text">{order.orderNumber ?? order.id}</span>
                 {multiVendor && <ParentOrderTag label="Multi-vendor order" />}
               </div>
-              <FulfillmentBadge status={order.fulfillmentStatus} />
+              <div className="flex flex-wrap justify-end gap-1">
+                <FulfillmentBadge status={order.fulfillmentStatus} />
+                <ReturnBadge status={order.returnStatus} />
+              </div>
             </div>
 
             <p className="text-sm font-medium text-kampmax-text">{order.customer.displayName}</p>

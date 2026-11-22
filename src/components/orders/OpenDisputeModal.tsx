@@ -16,7 +16,7 @@ interface OpenDisputeModalProps {
 const DISPUTE_REASONS = [
   { id: "damaged", label: "Item is damaged, defective, or broken" },
   { id: "wrong_item", label: "Received wrong item or size" },
-  { id: "not_delivered", label: "Item not received / Vendor no-show" },
+  { id: "not_delivered", label: "Item not received / seller no-show" },
   { id: "missing_parts", label: "Missing accessories or incomplete package" },
   { id: "other", label: "Other issue" },
 ];
@@ -101,7 +101,7 @@ export function OpenDisputeModal({
             <div>
               <h3 className="text-xl font-bold text-neutral-900">Dispute filed. Payout on hold</h3>
               <p className="text-xs text-neutral-500 mt-1">
-                Your claim for order <strong className="text-neutral-900">#{order.id}</strong> has been received. The vendor will not be paid while Kampmax Trust &amp; Safety reviews it. You will be notified of the outcome, and you can follow it on this order.
+                Your claim for order <strong className="text-neutral-900">#{order.id}</strong> has been received. The seller will not be paid while Kampmax Trust &amp; Safety reviews it. You will be notified of the outcome, and you can follow it on this order.
               </p>
             </div>
             <Button
@@ -162,7 +162,7 @@ export function OpenDisputeModal({
             </p>
 
             <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 text-[11px] leading-tight">
-              <span className="font-bold">What happens next:</span> the vendor is not paid while we review. Kampmax Trust &amp; Safety decides, and a refund goes back to your wallet if the claim is upheld.
+              <span className="font-bold">What happens next:</span> the seller is not paid while we review. Kampmax Trust &amp; Safety decides, and a refund goes back to your wallet if the claim is upheld.
             </div>
 
             {error && (

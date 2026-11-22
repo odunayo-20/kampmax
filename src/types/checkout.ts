@@ -22,7 +22,7 @@ export type CheckoutDeliveryMethod =
 export const CHECKOUT_DELIVERY_METHOD_LABELS: Record<CheckoutDeliveryMethod, string> = {
   campus_delivery: "Campus Delivery",
   campus_pickup: "Campus Pickup",
-  vendor_pickup: "Vendor Pickup",
+  vendor_pickup: "Seller Pickup",
 };
 
 export type DeliveryOptionState = "loading" | "available" | "unavailable" | "error";

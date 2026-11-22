@@ -1,3 +1,4 @@
+import type { ReturnRequest } from "@/lib/returns";
 // ============================================================
 // CORE SCALAR TYPES
 // ============================================================
@@ -333,6 +334,10 @@ export interface Order {
   dispute?: OrderDispute;
   /** True once the vendor has been paid; a dispute can no longer hold the money. */
   settled?: boolean;
+  /** Until when a refund can be asked for after delivery; absent outside the return window. */
+  returnWindowEndsAt?: string | null;
+  /** The buyer's refund / return request after delivery, when there is one. */
+  returnRequest?: ReturnRequest | null;
 }
 
 export interface OrderDispute {

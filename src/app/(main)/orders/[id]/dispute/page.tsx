@@ -1,13 +1,14 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowLeft, Clock, Loader2, MessageCircle, ShieldAlert, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Clock, MessageCircle, RotateCcw, ShieldAlert, ShieldCheck } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Breadcrumbs, BreadcrumbItem } from "@/components/layout/Breadcrumbs";
+import { BuyerOrderGate, useBuyerOrder } from "@/components/orders/BuyerOrderGate";
 import { OpenDisputeModal } from "@/components/orders/OpenDisputeModal";
 import { HelpAndDisputeCard } from "@/components/trust/HelpAndDisputeCard";
-import { fetchOrderById, openOrderDisputeApi } from "@/services/orders";
+import { openOrderDisputeApi } from "@/services/orders";
 import { Order } from "@/types";
 import { formatDate, formatNaira } from "@/lib/utils";
 
@@ -19,27 +20,8 @@ import { formatDate, formatNaira } from "@/lib/utils";
 export default function CustomerDisputePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
 
-  const [order, setOrder] = useState<Order | null>(null);
-  const [loadState, setLoadState] = useState<"loading" | "ready" | "missing" | "error">("loading");
+  const { order, setOrder, loadState } = useBuyerOrder(id);
   const [modalOpen, setModalOpen] = useState(false);
-
-  useEffect(() => {
-    let mounted = true;
-    fetchOrderById(id)
-      .then(({ data, error }) => {
-        if (!mounted) return;
-        if (data) {
-          setOrder(data);
-          setLoadState("ready");
-        } else {
-          setLoadState(error?.status === 404 ? "missing" : "error");
-        }
-      })
-      .catch(() => mounted && setLoadState("error"));
-    return () => {
-      mounted = false;
-    };
-  }, [id]);
 
   async function fileDispute(reason: string, statement: string): Promise<{ ok: boolean; message?: string }> {
     const { data, error } = await openOrderDisputeApi(order!.backendId ?? order!.id, reason, statement);
@@ -50,41 +32,30 @@ export default function CustomerDisputePage({ params }: { params: Promise<{ id: 
     return { ok: true };
   }
 
-  if (loadState === "loading") {
-    return (
-      <PageContainer>
-        <div role="status" className="flex flex-col items-center justify-center py-24 text-center">
-          <Loader2 className="mb-3 h-8 w-8 animate-spin text-kampmax-blue" aria-hidden />
-          <p className="text-sm text-kampmax-text-secondary">Loading your order…</p>
-        </div>
-      </PageContainer>
-    );
-  }
+  return (
+    <BuyerOrderGate loadState={loadState} order={order}>
+      {(o) => <DisputeView order={o} modalOpen={modalOpen} setModalOpen={setModalOpen} fileDispute={fileDispute} />}
+    </BuyerOrderGate>
+  );
+}
 
-  if (loadState !== "ready" || !order) {
-    return (
-      <PageContainer>
-        <div role="alert" className="mx-auto max-w-md space-y-3 py-16 text-center">
-          <h1 className="text-xl font-bold text-kampmax-text">
-            {loadState === "missing" ? "We couldn't find that order" : "We couldn't load your order"}
-          </h1>
-          <p className="text-sm text-kampmax-text-secondary">
-            {loadState === "missing"
-              ? "It may belong to a different account."
-              : "Check your connection and try again. Nothing has been changed."}
-          </p>
-          <Link href="/orders" className="inline-flex items-center gap-1 text-sm font-semibold text-primary-600 hover:underline">
-            <ArrowLeft className="h-4 w-4" aria-hidden /> Back to my orders
-          </Link>
-        </div>
-      </PageContainer>
-    );
-  }
-
+function DisputeView({
+  order,
+  modalOpen,
+  setModalOpen,
+  fileDispute,
+}: {
+  order: Order;
+  modalOpen: boolean;
+  setModalOpen: (open: boolean) => void;
+  fileDispute: (reason: string, statement: string) => Promise<{ ok: boolean; message?: string }>;
+}) {
   const dispute = order.dispute;
   const unpaid = order.status === "placed";
   const cancelled = order.status === "cancelled";
-  const canReport = !dispute && !order.settled && !unpaid && !cancelled;
+  // After delivery, a refund request takes the place of a report (the server refuses one).
+  const delivered = order.status === "delivered";
+  const canReport = !dispute && !order.settled && !unpaid && !cancelled && !delivered;
 
   const breadcrumbs: BreadcrumbItem[] = [
     { label: "Orders", href: "/orders" },
@@ -131,7 +102,7 @@ export default function CustomerDisputePage({ params }: { params: Promise<{ id: 
             {!dispute.resolvedAt && (
               <p className="flex items-start gap-2 text-xs">
                 <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-                The vendor will not be paid while we review. You will be notified of the outcome. A refund goes
+                The seller will not be paid while we review. You will be notified of the outcome. A refund goes
                 back to your wallet if your claim is upheld.
               </p>
             )}
@@ -142,8 +113,8 @@ export default function CustomerDisputePage({ params }: { params: Promise<{ id: 
               <ShieldCheck className="h-4 w-4 text-emerald-600" aria-hidden /> Before you report
             </h2>
             <ul className="list-disc space-y-1 pl-5 text-xs text-kampmax-text-secondary">
-              <li>Try messaging the vendor first. Most problems are sorted in one reply.</li>
-              <li>If you report, the vendor&apos;s payout is put on hold while Kampmax Trust &amp; Safety decides.</li>
+              <li>Try messaging the seller first. Most problems are sorted in one reply.</li>
+              <li>If you report, the seller&apos;s payout is put on hold while Kampmax Trust &amp; Safety decides.</li>
               <li>If your claim is upheld, the refund goes to your Kampmax wallet.</li>
             </ul>
             <button
@@ -161,8 +132,18 @@ export default function CustomerDisputePage({ params }: { params: Promise<{ id: 
                 ? "This order was cancelled, so there is nothing to dispute."
                 : unpaid
                   ? "This order has not been paid yet. You can cancel it from the order page."
-                  : "The vendor has already been paid for this order."}
+                  : order.settled
+                    ? "The seller has already been paid for this order."
+                    : "This order was delivered. Ask the seller for a refund or return instead; if you disagree with their answer, Kampmax decides."}
             </p>
+            {delivered && !order.settled && (
+              <Link
+                href={`/orders/${order.id}/return`}
+                className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-kampmax-navy px-4 py-2 text-xs font-bold text-white hover:bg-kampmax-navy/90"
+              >
+                <RotateCcw className="h-3.5 w-3.5" aria-hidden /> Ask for a refund
+              </Link>
+            )}
             {order.settled && (
               <p>If something is still wrong, contact support and we will look into it.</p>
             )}

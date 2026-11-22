@@ -292,7 +292,7 @@ export function OrderReviewModal({
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 disabled={isAlreadyReviewed}
-                placeholder="Write your review here. How was the item quality, delivery time, or vendor communication?"
+                placeholder="Write your review here. How was the item quality, delivery time, or seller communication?"
                 rows={4}
                 maxLength={500}
                 className="w-full px-3 py-2 text-sm bg-white border border-kampmax-border rounded-lg focus:outline-none focus:border-kampmax-blue focus:ring-1 focus:ring-kampmax-blue resize-none disabled:bg-slate-100 disabled:text-slate-400"

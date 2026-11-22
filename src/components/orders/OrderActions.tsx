@@ -55,7 +55,7 @@ export function OrderActions({
         )}
       >
         <MessageCircle className="w-3.5 h-3.5" />
-        Contact Vendor
+        Message
       </button>
 
       {/* Cancel — only for placed/confirmed */}
@@ -76,14 +76,14 @@ export function OrderActions({
       {!isActive && (
         <button
           onClick={onReorder}
-          title="Add items back to cart and proceed to checkout"
+          title="Put these items back in your cart at today's price"
           className={cn(
             "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors",
             "border-kampmax-navy bg-kampmax-navy text-white hover:bg-kampmax-navy/90"
           )}
         >
           <RotateCcw className="w-3.5 h-3.5" />
-          Reorder (Checkout)
+          Buy again
         </button>
       )}
 
@@ -112,7 +112,7 @@ export function OrderActions({
           )}
         >
           <Star className={cn("w-3.5 h-3.5", isReviewed && "fill-current")} />
-          {isReviewed ? "Reviewed" : "Review"}
+          {isReviewed ? "Reviewed" : "Rate the seller"}
         </button>
       )}
     </div>

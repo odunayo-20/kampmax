@@ -115,7 +115,7 @@ export function OrderSummary({
 
       <div className="flex items-center gap-2 text-[11px] text-kampmax-text-secondary">
         <Truck className="w-3.5 h-3.5 text-kampmax-blue shrink-0" />
-        Delivery estimate shown per vendor in the items list.
+        Delivery estimate shown per seller in the items list.
       </div>
     </section>
   );

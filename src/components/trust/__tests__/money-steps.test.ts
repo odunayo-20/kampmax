@@ -15,25 +15,26 @@ describe("orderMoneyTimeline", () => {
     expect(m.steps[0].detail).toContain("12,500");
   });
 
-  it("says the money is held (vendor not paid) once paid", () => {
+  it("says the money is held (seller not paid) once paid", () => {
     const m = orderMoneyTimeline(order({ status: "preparing" }));
     expect(m.headline).toMatch(/held safely/i);
     expect(m.headline).toMatch(/not paid/i);
     expect(states(m)).toEqual(["done", "current", "upcoming", "upcoming", "upcoming"]);
   });
 
-  it("explains that confirming receipt is what pays the vendor", () => {
+  it("explains the seller is paid only after the 3-day refund window", () => {
     const m = orderMoneyTimeline(order({ status: "out_for_delivery" }));
-    expect(m.steps.find((s) => s.id === "confirm")?.detail).toMatch(/vendor is paid/i);
+    expect(m.steps.find((s) => s.id === "window")?.detail).toMatch(/3 days/i);
     expect(m.steps.find((s) => s.id === "handover")?.state).toBe("current");
   });
 
-  it("only says the vendor was paid when the server says it settled", () => {
+  it("only says the seller was paid when the server says it settled", () => {
     const delivered = orderMoneyTimeline(order({ status: "delivered", settled: false }));
-    expect(delivered.headline).toMatch(/confirm receipt|still held/i);
+    expect(delivered.headline).toMatch(/still held for 3 days/i);
+    expect(delivered.steps.find((s) => s.id === "window")?.state).toBe("current");
     expect(states(delivered)).not.toContain("blocked");
     const settled = orderMoneyTimeline(order({ status: "delivered", settled: true }));
-    expect(settled.headline).toMatch(/vendor has been paid/i);
+    expect(settled.headline).toMatch(/seller has been paid/i);
     expect(states(settled).every((s) => s === "done")).toBe(true);
   });
 

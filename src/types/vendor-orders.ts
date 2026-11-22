@@ -1,3 +1,4 @@
+import type { ReturnRequest } from "@/lib/returns";
 import type { PaymentMethod } from "@/types";
 
 // ============================================================
@@ -125,28 +126,6 @@ export interface VendorOrderFlag {
   severity: VendorIssueSeverity;
   status: VendorIssueStatus;
   createdAt: string;
-}
-
-// ── Refund readiness (read-only states) ──────────────────────
-
-export const VENDOR_REFUND_STATUS = {
-  NONE: "none",
-  REQUESTED: "requested",
-  PENDING: "pending",
-  APPROVED: "approved",
-  PROCESSING: "processing",
-  REFUNDED: "refunded",
-  REJECTED: "rejected",
-} as const;
-
-export type VendorRefundStatus = ValuesOf<typeof VENDOR_REFUND_STATUS>;
-
-export interface VendorRefundInfo {
-  status: VendorRefundStatus;
-  amount?: number;
-  reason?: string;
-  requestedAt?: string;
-  updatedAt?: string;
 }
 
 // ── Shipment / pickup / delivery details ─────────────────────
@@ -286,7 +265,10 @@ export interface VendorOrder {
   shipment?: VendorShipmentInfo;
   escrow: VendorEscrowInfo;
   dispute: VendorDisputeInfo;
-  refund: VendorRefundInfo;
+  /** The buyer's refund / return request after delivery (detail only), when there is one. */
+  returnRequest?: ReturnRequest | null;
+  /** Where that request stands, on list rows. */
+  returnStatus?: string | null;
   flags: VendorOrderFlag[];
   notes: VendorOrderNote[];
   conversation?: VendorConversationRef;

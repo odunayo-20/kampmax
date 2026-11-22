@@ -10,13 +10,13 @@ const ITEMS = [
   },
   {
     icon: Truck,
-    title: "Vendor-based delivery",
-    text: "Each vendor handles their own delivery. See estimates per vendor.",
+    title: "Seller-based delivery",
+    text: "Each seller handles their own delivery. See estimates per seller.",
   },
   {
     icon: RotateCcw,
-    title: "Multi-vendor checkout",
-    text: "Pay once for all items from every vendor in a single parent order.",
+    title: "One checkout, many sellers",
+    text: "Pay once for all items from every seller in a single order.",
   },
 ];
 

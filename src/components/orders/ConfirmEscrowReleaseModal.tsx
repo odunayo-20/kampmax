@@ -63,7 +63,7 @@ export function ConfirmEscrowReleaseModal({
         <div className="flex items-center justify-between p-4 border-b border-neutral-100 bg-emerald-50/50">
           <div className="flex items-center gap-2 text-emerald-800">
             <ShieldCheck className="w-5 h-5 text-emerald-600" />
-            <h2 className="text-base font-bold text-neutral-900">Confirm Receipt & Release Funds</h2>
+            <h2 className="text-base font-bold text-neutral-900">I received my order</h2>
           </div>
           <button
             onClick={onClose}
@@ -80,9 +80,9 @@ export function ConfirmEscrowReleaseModal({
               <CheckCircle className="w-8 h-8" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-neutral-900">Escrow Funds Released!</h3>
+              <h3 className="text-xl font-bold text-neutral-900">Receipt Confirmed!</h3>
               <p className="text-xs text-neutral-500 mt-1">
-                Thank you for confirming receipt of Order <strong className="text-neutral-900">#{order.id}</strong>. <strong className="text-emerald-700">{formatNaira(order.total)}</strong> has been credited to the seller.
+                Thank you for confirming receipt of Order <strong className="text-neutral-900">#{order.id}</strong>. Kampmax holds <strong className="text-emerald-700">{formatNaira(order.total)}</strong> for 3 more days, then pays the seller. If something turns out to be wrong, ask for a refund from your order before then.
               </p>
             </div>
             {reviewNote && (
@@ -140,7 +140,7 @@ export function ConfirmEscrowReleaseModal({
                 className="mt-0.5 h-4 w-4 text-emerald-600 focus:ring-emerald-500 rounded"
               />
               <span className="text-neutral-700 leading-tight">
-                I confirm that I have received and inspected my ordered items and authorize Kampmax to release escrow payment to the seller.
+                I confirm that I have received my order. I understand the seller is paid 3 days from now unless I ask for a refund before then.
               </span>
             </label>
 
@@ -163,7 +163,7 @@ export function ConfirmEscrowReleaseModal({
                 disabled={!confirmed || releasing}
                 className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-xl text-xs disabled:opacity-50"
               >
-                {releasing ? "Releasing Escrow..." : "Confirm & Release Funds"}
+                {releasing ? "Confirming..." : "Yes, I got it"}
               </Button>
             </div>
           </div>

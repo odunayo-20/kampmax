@@ -315,7 +315,7 @@ export function PickupScanner() {
           </p>
 
           <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
-            Only confirm after you have handed over every item. Confirming marks the order delivered and pays the vendor.
+            Only confirm after you have handed over every item. Confirming marks the order delivered and pays the seller.
           </p>
 
           {error && (
@@ -352,7 +352,7 @@ export function PickupScanner() {
           <div>
             <h2 className="text-lg font-bold text-emerald-900">Handover complete</h2>
             <p className="mt-1 text-sm text-emerald-800">
-              Order <strong>#{preview.orderNumber}</strong> is marked delivered and the vendor has been paid.
+              Order <strong>#{preview.orderNumber}</strong> is marked delivered. Your payout is released 3 days from now, unless the buyer asks for a refund before then.
             </p>
           </div>
           <button

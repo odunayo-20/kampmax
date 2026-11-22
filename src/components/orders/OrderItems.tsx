@@ -110,7 +110,7 @@ export function OrderItems({
                         className="text-amber-600 hover:text-amber-700 hover:underline inline-flex items-center gap-0.5 font-medium"
                       >
                         <Star className="w-3 h-3" />
-                        Review Item
+                        Rate
                       </button>
                     )}
                   </>

@@ -1,4 +1,5 @@
 import { apiClient, type ApiError } from "@/lib/api-client";
+import { toReturnRequest } from "@/lib/returns";
 import type {
   VendorFulfillmentStatus,
   VendorOrder,
@@ -54,6 +55,7 @@ interface BackendVendorOrderBase {
 
 interface BackendVendorOrderListItem extends BackendVendorOrderBase {
   paymentStatus: string | null;
+  returnStatus?: string | null;
   items: { productName: string; quantity: number }[];
 }
 
@@ -62,6 +64,7 @@ export interface BackendVendorOrderDetail extends BackendVendorOrderBase {
   notes: string | null;
   /** The buyer's user id, so the store can message them; older servers leave it out. */
   customerId?: string;
+  returnRequest?: unknown;
   customerPhone: string;
   settledAt?: string | null;
   /** Present once the customer (or Kampmax) has opened a dispute; reason is one line. */
@@ -157,7 +160,6 @@ const STATUS_EVENT: Record<BackendOrderStatus, VendorOrder["timeline"][number]["
 // ── Mapping ──────────────────────────────────────────────────
 
 const NO_DISPUTE: VendorOrder["dispute"] = { status: "none", timeline: [] };
-const NO_REFUND: VendorOrder["refund"] = { status: "none" };
 
 function mapBase(raw: BackendVendorOrderBase): Omit<VendorOrder, "items" | "timeline" | "updatedAt"> {
   const itemsSubtotal = Number(raw.subtotal);
@@ -188,7 +190,6 @@ function mapBase(raw: BackendVendorOrderBase): Omit<VendorOrder, "items" | "time
     deliveryMethod: "campus_pickup",
     escrow: { state: "none" },
     dispute: NO_DISPUTE,
-    refund: NO_REFUND,
     flags: [],
     notes: [],
     createdAt: raw.createdAt,
@@ -206,6 +207,7 @@ export function mapVendorOrderListItem(raw: BackendVendorOrderListItem): VendorO
       unitPrice: 0,
     })),
     paymentStatus: toPayment(raw.paymentStatus),
+    returnStatus: raw.returnStatus ?? null,
     timeline: [],
     updatedAt: raw.createdAt,
     orderNumber: raw.orderNumber,
@@ -233,6 +235,7 @@ export function mapVendorOrderDetail(raw: BackendVendorOrderDetail): VendorOrder
       unitPrice: Number(i.unitPrice),
     })),
     paymentStatus: payment,
+    returnRequest: toReturnRequest(raw.returnRequest),
     deliveryAddress: deliveryAddress || undefined,
     // While a dispute is open the payout is on hold, whatever the order status says.
     dispute: raw.dispute
@@ -337,6 +340,25 @@ export async function fetchVendorOrderCounts(): Promise<VendorOrderCounts> {
     paymentPending: 0,
     withIssues: 0,
   };
+}
+
+export type VendorReturnAnswer =
+  | { action: "refund" | "return_first"; note?: string }
+  | { action: "offer"; amount: number; note?: string }
+  | { action: "decline"; note: string };
+
+/** Answers the buyer's refund request: refund now, ask for the items back, offer less, or decline. */
+export async function answerVendorReturn(id: string, answer: VendorReturnAnswer): Promise<VendorOrder> {
+  return mapVendorOrderDetail(
+    await unwrap(apiClient.post<VendorReturnAnswer, BackendVendorOrderDetail>(`/orders/vendor/${id}/return/respond`, answer))
+  );
+}
+
+/** The returned items are back (refunds the buyer), or ask Kampmax to decide. */
+export async function moveVendorReturn(id: string, step: "received" | "escalate"): Promise<VendorOrder> {
+  return mapVendorOrderDetail(
+    await unwrap(apiClient.post<Record<string, never>, BackendVendorOrderDetail>(`/orders/vendor/${id}/return/${step}`, {}))
+  );
 }
 
 /** Moves an order to `status`; the backend validates the transition. */

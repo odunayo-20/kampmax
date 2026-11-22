@@ -30,6 +30,7 @@ import { OrderItems } from "@/components/orders/OrderItems";
 import { OrderFees } from "@/components/orders/OrderFees";
 import { OrderActions } from "@/components/orders/OrderActions";
 import { OrderReviewModal } from "@/components/orders/OrderReviewModal";
+import { BuyerReturnCard } from "@/components/orders/BuyerReturnCard";
 import { CampusPickupPinCard } from "@/components/orders/CampusPickupPinCard";
 import { OrderProgressStepper } from "@/components/orders/OrderProgressStepper";
 import { OpenDisputeModal } from "@/components/orders/OpenDisputeModal";
@@ -157,6 +158,14 @@ export default function OrderDetailPage({
     cancelReason: cancelReason || order.cancelReason,
   };
 
+  // Report a problem before hand-over; after delivery, a refund request takes its place.
+  const canReport =
+    !displayOrder.dispute &&
+    !displayOrder.settled &&
+    currentStatus !== "cancelled" &&
+    currentStatus !== "placed" &&
+    currentStatus !== "delivered";
+
   const DELIVERY_ICONS: Record<string, typeof Package> = {
     campus_pickup: Store,
     meetup: MapPinned,
@@ -203,8 +212,8 @@ export default function OrderDetailPage({
       });
     });
 
-    // Reorder action directly leads to checkout
-    router.push("/checkout");
+    // Like mobile: the cart shows today's prices and anything that could not be added back.
+    router.push("/cart");
   }
 
   function handleReview() {
@@ -325,22 +334,22 @@ export default function OrderDetailPage({
           </div>
 
           <div className="flex items-center gap-2">
-            {!displayOrder.dispute && !displayOrder.settled && currentStatus !== "cancelled" && currentStatus !== "placed" && (
+            {canReport && (
               <button
                 onClick={() => setDisputeModalOpen(true)}
                 className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-error-50 hover:bg-error-100 text-error-700 border border-error-200 text-xs font-semibold transition-colors"
               >
-                <ShieldAlert className="w-3.5 h-3.5" /> Report Issue
+                <ShieldAlert className="w-3.5 h-3.5" /> Report a problem
               </button>
             )}
 
-            {/* Receipt can only be confirmed once the vendor has shipped it. */}
+            {/* Receipt can only be confirmed once the seller has shipped it. */}
             {currentStatus === "out_for_delivery" && (
               <button
                 onClick={() => setReleaseModalOpen(true)}
                 className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition-colors"
               >
-                <CheckCircle className="w-3.5 h-3.5" /> Confirm Receipt
+                <CheckCircle className="w-3.5 h-3.5" /> I received my order
               </button>
             )}
           </div>
@@ -362,14 +371,14 @@ export default function OrderDetailPage({
         )}
 
         {/* Dispute state comes from the server, never from a local guess */}
-        {displayOrder.dispute && (
+        {displayOrder.dispute && !displayOrder.returnRequest && (
           <div role="status" className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-1">
             <div className="flex items-center gap-2 font-bold text-amber-800">
               <AlertTriangle className="w-4 h-4 text-amber-600" aria-hidden />
               <span>
                 {displayOrder.dispute.resolvedAt
                   ? "Dispute reviewed"
-                  : "Dispute open. The vendor payout is on hold"}
+                  : "Dispute open. The seller's payout is on hold"}
               </span>
             </div>
             <p className="text-[11px] text-amber-700">
@@ -382,6 +391,9 @@ export default function OrderDetailPage({
 
         {/* Order Progress Stepper */}
         <OrderProgressStepper status={currentStatus} />
+
+        {/* Refund or return after delivery */}
+        <BuyerReturnCard order={displayOrder} onChange={setOrder} />
 
         {/* Where the money is, in plain words */}
         <MoneyTimeline model={orderMoneyTimeline(displayOrder)} />
@@ -484,7 +496,7 @@ export default function OrderDetailPage({
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-kampmax-navy bg-kampmax-muted hover:bg-kampmax-border rounded-lg transition-colors"
               >
                 <MessageCircle className="w-3.5 h-3.5" />
-                Chat
+                Message
               </button>
             </div>
           </div>
@@ -510,9 +522,7 @@ export default function OrderDetailPage({
         <HelpAndDisputeCard
           context="order"
           reference={displayOrder.id}
-          showDispute={
-            !displayOrder.dispute && !displayOrder.settled && currentStatus !== "cancelled" && currentStatus !== "placed"
-          }
+          showDispute={canReport}
         />
 
         {/* Actions */}

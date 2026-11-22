@@ -103,10 +103,10 @@ export function buildVendorDeliveryOptions(
   offer?: VendorDeliveryOffer
 ): VendorDeliveryOption[] {
   const pickupState = offer?.pickupAvailable === false ? "unavailable" : "available";
-  const pickupMessage = pickupState === "unavailable" ? "This vendor doesn't offer pickup" : undefined;
+  const pickupMessage = pickupState === "unavailable" ? "This seller doesn't offer pickup" : undefined;
   const deliveryState = offer?.deliveryAvailable ? "available" : "unavailable";
   const deliveryMessage = offer
-    ? "This vendor doesn't offer delivery"
+    ? "This seller doesn't offer delivery"
     : "Delivery details couldn't be loaded";
   return [
     {
@@ -130,11 +130,11 @@ export function buildVendorDeliveryOptions(
     {
       id: `${vendorId}:vendor_pickup`,
       method: "vendor_pickup",
-      label: "Vendor Pickup",
+      label: "Seller Pickup",
       fee: 0,
       estimatedDelivery: offer?.pickupLocation
         ? `Collect at ${offer.pickupLocation}`
-        : "Vendor will confirm the pickup spot",
+        : "The seller will confirm the pickup spot",
       state: pickupState,
       message: pickupMessage,
     },
@@ -550,7 +550,7 @@ export function couponStatusLabel(status: CouponCheckoutStatus): string {
     expired: "This promo code has expired.",
     minimum_not_reached:
       "This promo requires a minimum order value that wasn't reached.",
-    vendor_specific: "This promo only applies to specific vendors.",
+    vendor_specific: "This promo only applies to specific sellers.",
     product_specific: "This promo only applies to specific products.",
     already_used: "This promo code has already been used.",
     not_applicable: "This promo code can't be applied to this order.",

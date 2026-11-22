@@ -2,7 +2,7 @@
 
 import { Package, ExternalLink } from "lucide-react";
 import { formatNaira, formatDate } from "@/lib/utils";
-import { FulfillmentBadge, PaymentBadge, DeliveryMethodTag } from "./OrderBadges";
+import { FulfillmentBadge, ReturnBadge, PaymentBadge, DeliveryMethodTag } from "./OrderBadges";
 import type { VendorOrder } from "@/types/vendor-orders";
 
 interface OrdersTableProps {
@@ -51,7 +51,10 @@ export function OrdersTable({ orders, onView }: OrdersTableProps) {
                 {formatNaira(order.totals.customerTotal)}
               </td>
               <td className="px-4 py-3">
-                <FulfillmentBadge status={order.fulfillmentStatus} />
+                <div className="flex flex-wrap gap-1">
+                  <FulfillmentBadge status={order.fulfillmentStatus} />
+                  <ReturnBadge status={order.returnStatus} />
+                </div>
               </td>
               <td className="px-4 py-3">
                 <PaymentBadge status={order.paymentStatus} />
