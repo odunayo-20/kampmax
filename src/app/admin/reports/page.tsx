@@ -19,7 +19,7 @@ import {
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { LoadingSkeleton } from "@/components/admin/LoadingSkeleton";
 import { StatCard } from "@/components/admin/StatCard";
-import { ChartCard, nairaAxis, type ChartDatum } from "@/components/admin/ChartCard";
+import { ChartCard } from "@/components/admin/ChartCard";
 import { Select } from "@/components/ui/Select";
 import { cn, formatNaira, formatNairaCompact } from "@/lib/utils";
 import { ExportButton } from "@/components/admin/analytics/ExportButton";
@@ -130,12 +130,6 @@ function ReportsConsole() {
     (p: Partial<AnalyticsQuery>) => setQuery((q) => ({ ...q, ...p })),
     []
   );
-
-  function toChartData(
-    series: { label: string; value: number; secondary?: number }[]
-  ): ChartDatum[] {
-    return series.map((s) => ({ label: s.label, value: s.value, secondary: s.secondary }));
-  }
 
   return (
     <>
@@ -288,7 +282,6 @@ function ReportsConsole() {
               value={report.kpis.newUsers.toLocaleString("en-NG")}
               icon={UserPlus}
               deltaPct={report.kpis.newUsersDelta}
-              hint={`${report.retention.day30}% return after 30 days`}
             />
             <StatCard
               label="Active vendors"
@@ -345,53 +338,18 @@ function ReportsConsole() {
           {/* ---------------- MARKETPLACE ---------------- */}
           {section === "marketplace" && (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                <ChartCard
-                  title="Revenue"
-                  subtitle={`Gross merchandise value · ${report.previousRangeLabel}`}
-                  type="area"
-                  accent="blue"
-                  data={toChartData(report.revenueSeries)}
-                  formatValue={nairaAxis}
-                  height={220}
-                />
-                <ChartCard
-                  title="Orders"
-                  subtitle="Completed checkouts per period"
-                  type="bar"
-                  accent="navy"
-                  data={toChartData(
-                    report.revenueSeries.map((s) => ({
-                      label: s.label,
-                      value: s.secondary ?? 0,
-                    }))
-                  )}
-                  height={220}
-                />
-              </div>
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                <ChartCard
-                  title="Average order value"
-                  subtitle="Revenue divided by orders"
-                  type="line"
-                  accent="green"
-                  data={toChartData(report.aovSeries)}
-                  formatValue={(v) => formatNairaCompact(v)}
-                  height={200}
-                />
-                <ChartCard
-                  title="Top categories"
-                  subtitle="By revenue share"
-                  type="hbar"
-                  accent="gold"
-                  data={report.categories.map((c) => ({
-                    label: c.name,
-                    value: c.revenue,
-                    secondary: `${c.sharePct}%`,
-                  }))}
-                  formatValue={(v) => formatNairaCompact(v)}
-                />
-              </div>
+              <ChartCard
+                title="Top categories"
+                subtitle="By revenue share"
+                type="hbar"
+                accent="gold"
+                data={report.categories.map((c) => ({
+                  label: c.name,
+                  value: c.revenue,
+                  secondary: `${c.sharePct}%`,
+                }))}
+                formatValue={(v) => formatNairaCompact(v)}
+              />
               <section aria-label="Top products">
                 <h2 className="mb-2 mt-6 text-sm font-semibold text-kampmax-text">
                   Top products
@@ -404,49 +362,6 @@ function ReportsConsole() {
           {/* ---------------- USERS ---------------- */}
           {section === "users" && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                <StatCard
-                  label="Day-1 retention"
-                  value={`${report.retention.day1}%`}
-                  hint="Return next day after signup"
-                  tone="success"
-                />
-                <StatCard
-                  label="Day-7 retention"
-                  value={`${report.retention.day7}%`}
-                  hint="Return within a week"
-                  tone="blue"
-                />
-                <StatCard
-                  label="Day-30 retention"
-                  value={`${report.retention.day30}%`}
-                  hint="Return within a month"
-                />
-                <StatCard
-                  label="Returning vs churned"
-                  value={`${report.retention.returningUsers.toLocaleString("en-NG")} / ${report.retention.churnedUsers.toLocaleString("en-NG")}`}
-                  hint="Active this period vs lapsed"
-                  tone="warning"
-                />
-              </div>
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                <ChartCard
-                  title="Registrations"
-                  subtitle="New user signups per period"
-                  type="area"
-                  accent="green"
-                  data={toChartData(report.registrationsSeries)}
-                  height={220}
-                />
-                <ChartCard
-                  title="Active users"
-                  subtitle="Averaged daily actives in the period"
-                  type="line"
-                  accent="blue"
-                  data={toChartData(report.activeUsersSeries)}
-                  height={220}
-                />
-              </div>
               <ChartCard
                 title="Users by campus"
                 subtitle="Registered students per campus"
@@ -466,28 +381,18 @@ function ReportsConsole() {
           {/* ---------------- VENDORS ---------------- */}
           {section === "vendors" && (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                <ChartCard
-                  title="New vendors"
-                  subtitle="Store registrations per period"
-                  type="bar"
-                  accent="gold"
-                  data={toChartData(report.newVendorsSeries)}
-                  height={220}
-                />
-                <ChartCard
-                  title="Vendor sales"
-                  subtitle="Top stores by revenue in range"
-                  type="hbar"
-                  accent="blue"
-                  data={report.vendors.slice(0, 8).map((v) => ({
-                    label: v.storeName,
-                    value: v.revenue,
-                    secondary: `${v.orders.toLocaleString("en-NG")} orders`,
-                  }))}
-                  formatValue={(v) => formatNairaCompact(v)}
-                />
-              </div>
+              <ChartCard
+                title="Vendor sales"
+                subtitle="Top stores by revenue in range"
+                type="hbar"
+                accent="blue"
+                data={report.vendors.slice(0, 8).map((v) => ({
+                  label: v.storeName,
+                  value: v.revenue,
+                  secondary: `${v.orders.toLocaleString("en-NG")} orders`,
+                }))}
+                formatValue={(v) => formatNairaCompact(v)}
+              />
               <section aria-label="Vendor performance">
                 <h2 className="mb-2 text-sm font-semibold text-kampmax-text">
                   Vendor performance
@@ -570,16 +475,6 @@ function ReportsConsole() {
                   hint={`${formatNairaCompact(report.financials.withdrawalsPendingAmount)} still pending`}
                 />
               </div>
-
-              <ChartCard
-                title="Daily gross sales"
-                subtitle="Basis for every financial figure above"
-                type="area"
-                accent="blue"
-                data={toChartData(report.revenueSeries)}
-                formatValue={nairaAxis}
-                height={240}
-              />
 
               <ChartCard
                 title="Money movement breakdown"

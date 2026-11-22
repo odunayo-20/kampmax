@@ -26,7 +26,8 @@ describe("createApiDashboardService (live dashboard)", () => {
               users: 1540,
               activeUsers: 890,
               vendors: 120,
-              activeVendors: 95,
+              activeVendors: 99,
+              verifiedVendors: 95,
               campuses: 6,
               orders: 4320,
               deliveredOrdersValue: 48500000,
@@ -215,8 +216,8 @@ describe("createApiDashboardService (live dashboard)", () => {
           items: [
             {
               id: "p1",
-              name: "MacBook Air M2",
-              storeName: "Apple Hub",
+              title: "MacBook Air M2",
+              vendorName: "Apple Hub",
               campusShortName: "UNILAG",
               salesCount: 15,
               revenue: 18500000,
@@ -249,10 +250,10 @@ describe("createApiDashboardService (live dashboard)", () => {
           items: [
             {
               id: "p2",
-              name: "Casio Calculator fx-991EX",
-              storeName: "Campus Stationery",
+              title: "Casio Calculator fx-991EX",
+              vendorName: "Campus Stationery",
               stock: 3,
-              uiStatus: "active",
+              status: "active",
             },
           ],
         },
@@ -308,51 +309,6 @@ describe("createApiDashboardService (live dashboard)", () => {
     });
   });
 
-  describe("getCampusSales", () => {
-    it("computes sales share per campus from analytics endpoints", async () => {
-      getMock.mockImplementation((url: string) => {
-        if (url.includes("/analytics/admin/campuses")) {
-          return Promise.resolve({
-            data: {
-              ordersPerCampus: [
-                {
-                  campusId: "c1",
-                  campusName: "University of Lagos",
-                  count: 75,
-                },
-                {
-                  campusId: "c2",
-                  campusName: "Obafemi Awolowo University",
-                  count: 25,
-                },
-              ],
-            },
-            error: null,
-          });
-        }
-        if (url.includes("/analytics/admin/marketplace?range=thisMonth")) {
-          return Promise.resolve({
-            data: { gmv: 1000000 },
-            error: null,
-          });
-        }
-        return Promise.resolve({ data: null, error: null });
-      });
-
-      const sales = await service.getCampusSales();
-      expect(sales).toHaveLength(2);
-      expect(sales[0].campusId).toBe("c1");
-      expect(sales[0].orders).toBe(75);
-      expect(sales[0].revenue).toBe(750000);
-      expect(sales[0].sharePct).toBe(75);
-
-      expect(sales[1].campusId).toBe("c2");
-      expect(sales[1].orders).toBe(25);
-      expect(sales[1].revenue).toBe(250000);
-      expect(sales[1].sharePct).toBe(25);
-    });
-  });
-
   describe("getActivity", () => {
     it("maps backend audit logs to ActivityFeedItem and categorizes them", async () => {
       getMock.mockResolvedValue({
@@ -401,37 +357,6 @@ describe("createApiDashboardService (live dashboard)", () => {
       const filtered = await service.getActivity({ kind: "vendor_application" });
       expect(filtered.items).toHaveLength(1);
       expect(filtered.items[0].id).toBe("audit-1");
-    });
-  });
-
-  describe("getRevenueSeries & getGrowth", () => {
-    it("generates revenue series bounded by real backend GMV and order totals", async () => {
-      getMock.mockResolvedValue({
-        data: { gmv: 700000, totalOrders: 70 },
-        error: null,
-      });
-
-      const series = await service.getRevenueSeries("7d");
-      expect(series).toHaveLength(7);
-      const totalRev = series.reduce((sum, p) => sum + p.revenue, 0);
-      expect(totalRev).toBe(700000);
-      const totalOrd = series.reduce((sum, p) => sum + p.orders, 0);
-      expect(totalOrd).toBe(70);
-    });
-
-    it("generates cumulative growth series ending at real total platform counts", async () => {
-      getMock.mockResolvedValue({
-        data: { users: 2400, vendors: 150 },
-        error: null,
-      });
-
-      const userGrowth = await service.getGrowth("users");
-      expect(userGrowth).toHaveLength(12);
-      expect(userGrowth[userGrowth.length - 1].total).toBe(2400);
-
-      const vendorGrowth = await service.getGrowth("vendors");
-      expect(vendorGrowth).toHaveLength(12);
-      expect(vendorGrowth[vendorGrowth.length - 1].total).toBe(150);
     });
   });
 });

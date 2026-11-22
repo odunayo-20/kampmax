@@ -11,7 +11,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { adminKeys } from "@/lib/query-keys";
-import { dashboardService, type ChartRange } from "@/services/admin";
+import { dashboardService } from "@/services/admin";
 import type { ActivityFeedItem } from "@/types/admin";
 
 export function useAdminDashboardOverview(scopeCampusId?: string | null) {
@@ -25,27 +25,6 @@ export function useAdminDashboardStats(scopeCampusId?: string | null) {
   return useQuery({
     queryKey: adminKeys.dashboard.stats(scopeCampusId),
     queryFn: () => dashboardService.getStats(scopeCampusId ?? null),
-  });
-}
-
-export function useAdminDashboardRevenue(range: ChartRange = "30d") {
-  return useQuery({
-    queryKey: adminKeys.dashboard.revenue(range),
-    queryFn: () => dashboardService.getRevenueSeries(range),
-  });
-}
-
-export function useAdminDashboardGrowth(kind: "users" | "vendors") {
-  return useQuery({
-    queryKey: adminKeys.dashboard.growth(kind),
-    queryFn: () => dashboardService.getGrowth(kind),
-  });
-}
-
-export function useAdminDashboardCampusSales() {
-  return useQuery({
-    queryKey: adminKeys.dashboard.campusSales(),
-    queryFn: () => dashboardService.getCampusSales(),
   });
 }
 

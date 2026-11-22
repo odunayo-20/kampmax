@@ -93,6 +93,9 @@ describe("createApiAnalyticsService (live analytics)", () => {
               totalOrders: 100,
               averageOrderValue: 5000,
               totalVendors: 25,
+              revenueByCategory: [
+                { categoryId: "cat1", categoryName: "Electronics", orders: 30, revenue: 150000 },
+              ],
             },
           });
         }
@@ -175,8 +178,8 @@ describe("createApiAnalyticsService (live analytics)", () => {
               items: [
                 {
                   id: "p1",
-                  name: "Scientific Calculator",
-                  storeName: "Campus Gadgets",
+                  title: "Scientific Calculator",
+                  vendorName: "Campus Gadgets",
                   campusShortName: "UNILAG",
                   categoryName: "Electronics",
                   salesCount: 30,
@@ -225,9 +228,15 @@ describe("createApiAnalyticsService (live analytics)", () => {
       expect(report.vendors).toHaveLength(1);
       expect(report.vendors[0].storeName).toBe("Campus Gadgets");
       expect(report.topProducts).toHaveLength(1);
-      expect(report.topProducts[0].title).toBe("Scientific Calculator");
-      expect(report.categories).toHaveLength(1);
-      expect(report.categories[0].name).toBe("Electronics");
+      expect(report.topProducts[0]).toMatchObject({
+        title: "Scientific Calculator",
+        vendorName: "Campus Gadgets",
+        campusShortName: "UNILAG",
+        category: "Electronics",
+      });
+      expect(report.categories).toEqual([
+        { categoryId: "cat1", name: "Electronics", orders: 30, revenue: 150000, sharePct: 100 },
+      ]);
     });
 
     it("passes campusId and categoryId query parameters when provided", async () => {

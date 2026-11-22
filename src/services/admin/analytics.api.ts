@@ -11,11 +11,8 @@
 //   Categories chart (top N by revenue)
 //   Filter dropdowns (campuses, vendors, categories)
 //
-// WHAT STAYS MOCK (no backend time-series endpoint):
-//   revenueSeries, registrationsSeries, activeUsersSeries,
-//   newVendorsSeries, aovSeries — shapes are seeded from real KPI totals
-//   so charts trend correctly and don't look wildly wrong.
-//   Retention metrics (day1/day7/day30) — no cohort endpoint exists.
+// NOT SHOWN (no backend time-series or cohort endpoint yet): trend charts and retention. They were removed
+// rather than drawn from invented numbers; add them back when the backend can return real daily rows.
 //
 // RANGE MAPPING:
 //   UI   → backend preset
@@ -34,10 +31,11 @@ import type {
   AnalyticsQuery,
   AnalyticsRange,
   AnalyticsReport,
-  AnalyticsSeriesPoint,
   AnalyticsVendorRow,
+  ManagedProduct,
 } from "@/types/admin";
 import { type AdminAnalyticsService } from "./analytics.service";
+import { toTopProductRow } from "./product-rows";
 
 // ---- range helpers -----------------------------------------------------------
 
@@ -87,6 +85,14 @@ interface MktResponse {
   totalVendors: number;
   ordersByStatus: { status: string; count: number }[];
   ordersByCampus: { campusId: string | null; campusName: string; count: number }[];
+  revenueByCategory: CategoryRevenueRow[];
+}
+
+interface CategoryRevenueRow {
+  categoryId: string | null;
+  categoryName: string;
+  orders: number;
+  revenue: number;
 }
 
 interface UsersResponse {
@@ -135,20 +141,6 @@ interface VendorRow {
   createdAt: string;
 }
 
-interface ProductRow {
-  id: string;
-  name: string;
-  vendorId: string;
-  storeName: string;
-  campusId: string | null;
-  campusShortName: string | null;
-  categoryName: string;
-  salesCount: number;
-  revenue: number;
-  price: number;
-  uiStatus: string;
-}
-
 interface CampusListRow {
   id: string;
   name: string;
@@ -161,72 +153,6 @@ interface CategoryListRow {
   id: string;
   name: string;
   status: string;
-}
-
-// ---- series synthesis -------------------------------------------------------
-// Builds a plausible time-series distribution from a known total, matching
-// the shape the mock uses. We don't have per-day rows from the backend so
-// we fabricate a smooth trend — honest "no real time-series" fallback.
-
-function syntheticSeries(
-  range: AnalyticsRange,
-  total: number,
-  secondaryTotal?: number
-): AnalyticsSeriesPoint[] {
-  const days = range === "7d" ? 7 : range === "30d" ? 30 : range === "90d" ? 90 : 12;
-  const isMonthly = range === "12m";
-  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-  const points: AnalyticsSeriesPoint[] = [];
-
-  // Simple smooth distribution: weight increases toward the present
-  const weights: number[] = [];
-  for (let i = 0; i < days; i++) {
-    // slight upward trend + small deterministic noise
-    weights.push(0.5 + (i / days) * 0.5 + ((i * 37) % 17) / 170);
-  }
-  const wSum = weights.reduce((a, w) => a + w, 0);
-
-  for (let i = 0; i < days; i++) {
-    const share = weights[i] / wSum;
-    const value = Math.round(total * share);
-    const secondary = secondaryTotal !== undefined
-      ? Math.round(secondaryTotal * share)
-      : undefined;
-
-    let label: string;
-    if (isMonthly) {
-      const now = new Date();
-      const d = new Date(now.getFullYear(), now.getMonth() - (days - 1 - i), 1);
-      label = MONTHS[d.getMonth()];
-    } else {
-      const d = new Date();
-      d.setDate(d.getDate() - (days - 1 - i));
-      label = `${d.getDate()} ${MONTHS[d.getMonth()]}`;
-    }
-
-    points.push({ label, value, secondary });
-  }
-
-  // For monthly, de-dupe (multiple days can land in same month bucket)
-  if (isMonthly) {
-    const buckets = new Map<string, { value: number; secondary: number; idx: number }>();
-    points.forEach((p) => {
-      const b = buckets.get(p.label) ?? { value: 0, secondary: 0, idx: buckets.size };
-      b.value += p.value;
-      if (p.secondary !== undefined) b.secondary += p.secondary;
-      buckets.set(p.label, b);
-    });
-    return [...buckets.entries()]
-      .sort((a, b) => a[1].idx - b[1].idx)
-      .map(([label, b]) => ({
-        label,
-        value: b.value,
-        secondary: secondaryTotal !== undefined ? b.secondary : undefined,
-      }));
-  }
-
-  return points;
 }
 
 // ---- campus short name derivation -------------------------------------------
@@ -301,7 +227,7 @@ export function createApiAnalyticsService(): AdminAnalyticsService {
         apiClient.get<FinancialResponse>(`/analytics/admin/financial?${qs}`),
         apiClient.get<CampusesResponse>("/analytics/admin/campuses"),
         apiClient.get<PaginatedResult<VendorRow>>(vendorUrl),
-        apiClient.get<PaginatedResult<ProductRow>>(productUrl),
+        apiClient.get<PaginatedResult<ManagedProduct>>(productUrl),
         apiClient.get<PaginatedResult<unknown>>("/admin/withdrawals?status=completed&limit=1"),
       ]);
 
@@ -340,29 +266,8 @@ export function createApiAnalyticsService(): AdminAnalyticsService {
       const vendors = buildVendorTable(vendorsRes.data?.items ?? [], aov);
 
       // ---- top products ----
-      const topProducts = buildProductTable(productsRes.data?.items ?? []);
-
-      // ---- categories (derived from ordersByCampus proxy — best available) ----
-      // The backend has no category-revenue endpoint; we synthesise from
-      // the products list grouped by categoryName.
-      const categories = buildCategories(productsRes.data?.items ?? []);
-
-      // ---- synthetic time-series (no backend time-series endpoint) ----
-      const revenueSeries = syntheticSeries(range, grossSales, orders);
-      const registrationsSeries = syntheticSeries(range, newUsers);
-      const activeUsersSeries = syntheticSeries(range, activeUsers);
-      const newVendorsSeries = syntheticSeries(range, Math.max(1, Math.round(activeVendors * 0.06)));
-      const aovSeries = syntheticSeries(range, aov);
-
-      // ---- retention (approximated; no cohort endpoint) ----
-      const retBase = range === "7d" ? 46 : range === "30d" ? 41 : range === "90d" ? 37 : 33;
-      const retention = {
-        day1: Math.min(85, retBase + 22),
-        day7: Math.min(70, retBase + 9),
-        day30: retBase,
-        returningUsers: Math.round(activeUsers * 0.62),
-        churnedUsers: Math.round(activeUsers * 0.38),
-      };
+      const topProducts = (productsRes.data?.items ?? []).map(toProductRow);
+      const categories = buildCategories(mktCurr.data?.revenueByCategory ?? []);
 
       return {
         range,
@@ -383,16 +288,10 @@ export function createApiAnalyticsService(): AdminAnalyticsService {
           platformFees,
           refunds,
         },
-        revenueSeries,
-        registrationsSeries,
-        activeUsersSeries,
-        newVendorsSeries,
-        aovSeries,
         campuses,
         vendors,
         topProducts,
         categories,
-        retention,
         financials: {
           grossSales,
           platformFees,
@@ -483,35 +382,18 @@ function buildVendorTable(
   });
 }
 
-function buildProductTable(items: ProductRow[]): AnalyticsProductRow[] {
-  return items.map((p) => ({
-    productId: p.id,
-    title: p.name,
-    vendorName: p.storeName,
-    campusShortName: p.campusShortName ? deriveShortName(p.campusShortName) : "",
-    category: p.categoryName ?? "",
-    unitsSold: p.salesCount ?? 0,
-    revenue: p.revenue ?? 0,
-  }));
+function toProductRow(p: ManagedProduct): AnalyticsProductRow {
+  return { ...toTopProductRow(p), category: p.categoryName };
 }
 
-function buildCategories(items: ProductRow[]): AnalyticsCategoryRow[] {
-  const map = new Map<string, AnalyticsCategoryRow>();
-  for (const p of items) {
-    const key = p.categoryName ?? "Uncategorised";
-    const row = map.get(key) ?? {
-      categoryId: key,
-      name: key,
-      orders: 0,
-      revenue: 0,
-      sharePct: 0,
-    };
-    row.orders += p.salesCount ?? 0;
-    row.revenue += p.revenue ?? 0;
-    map.set(key, row);
-  }
-  const rows = [...map.values()].sort((a, b) => b.revenue - a.revenue).slice(0, 8);
-  const total = rows.reduce((a, r) => a + r.revenue, 0) || 1;
-  rows.forEach((r) => (r.sharePct = Math.round((r.revenue / total) * 100)));
-  return rows;
+/** Category ranking from the backend's delivered-sales totals, with each category's share of the listed total. */
+function buildCategories(rows: CategoryRevenueRow[]): AnalyticsCategoryRow[] {
+  const total = rows.reduce((sum, r) => sum + r.revenue, 0) || 1;
+  return rows.map((r) => ({
+    categoryId: r.categoryId ?? "uncategorised",
+    name: r.categoryName,
+    orders: r.orders,
+    revenue: r.revenue,
+    sharePct: Math.round((r.revenue / total) * 100),
+  }));
 }

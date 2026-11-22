@@ -6,26 +6,20 @@ import {
   AdminReview,
   AdminVendor,
   Campus,
-  CampusSalesRow,
   ContentReport,
   DashboardStats,
   Dispute,
-  GrowthPoint,
   ListQuery,
   LowStockRow,
   Paginated,
   PaymentRecord,
   PlatformOverview,
   PlatformUser,
-  RevenuePoint,
   TopProductRow,
   WithdrawalRequest,
 } from "@/types/admin";
 import { apiDelay } from "@/lib/admin/api";
-import {
-  DailyMetric,
-  GrowthSeriesPoint,
-} from "@/data/admin/system";
+import { DailyMetric } from "@/data/admin/system";
 
 // ------------------------------------------------------------
 // CONTRACT (future NestJS resources under /admin/dashboard/*)
@@ -36,9 +30,6 @@ export type ChartRange = "7d" | "30d" | "90d";
 export interface DashboardService {
   getStats(scopeCampusId?: string | null): Promise<DashboardStats>;
   getOverview(scopeCampusId?: string | null): Promise<PlatformOverview>;
-  getRevenueSeries(range?: ChartRange): Promise<RevenuePoint[]>;
-  getGrowth(kind: "users" | "vendors"): Promise<GrowthPoint[]>;
-  getCampusSales(): Promise<CampusSalesRow[]>;
   getTopProducts(limit?: number): Promise<TopProductRow[]>;
   getLowStock(limit?: number): Promise<LowStockRow[]>;
   getRecentOrders(limit?: number): Promise<AdminOrder[]>;
@@ -72,8 +63,6 @@ export interface MockDashboardSources {
   reports: ContentReport[];
   campuses: Campus[];
   dailyMetrics: DailyMetric[];
-  growthSeries: GrowthSeriesPoint[];
-  campusSales: CampusSalesRow[];
   topProducts: TopProductRow[];
   lowStock: LowStockRow[];
   recentOrders: AdminOrder[];
@@ -94,25 +83,6 @@ function sumOrderTotals(rows: readonly AdminOrder[]): number {
 function pctDelta(current: number, previous: number): number {
   if (previous <= 0) return 0;
   return Math.round(((current - previous) / previous) * 1000) / 10;
-}
-
-function toRevenuePoints(metrics: DailyMetric[]): RevenuePoint[] {
-  return metrics.map((m) => ({
-    label: m.label,
-    revenue: m.revenue,
-    orders: m.orders,
-  }));
-}
-
-function toGrowthPoints(series: GrowthSeriesPoint[], kind: "users" | "vendors"): GrowthPoint[] {
-  return series.map((p) => ({
-    label: p.label,
-    total: kind === "users" ? p.usersTotal : p.vendorsTotal,
-    added:
-      kind === "users"
-        ? Math.max(0, p.usersTotal - (series[0]?.usersTotal ?? p.usersTotal))
-        : Math.max(0, p.vendorsTotal - (series[0]?.vendorsTotal ?? p.vendorsTotal)),
-  }));
 }
 
 const PLATFORM_FEE_RATE = 0.08;
@@ -270,21 +240,6 @@ export function createMockDashboardService(
         },
         operations: operationsQueue(scopeCampusId),
       };
-    },
-
-    async getRevenueSeries(range = "30d") {
-      await apiDelay(150);
-      return toRevenuePoints(slice(range));
-    },
-
-    async getGrowth(kind) {
-      await apiDelay(150);
-      return toGrowthPoints(sources.growthSeries, kind);
-    },
-
-    async getCampusSales() {
-      await apiDelay(150);
-      return sources.campusSales;
     },
 
     async getTopProducts(limit = 6) {

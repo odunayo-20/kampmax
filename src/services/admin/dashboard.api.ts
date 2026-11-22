@@ -23,18 +23,17 @@ import type {
   ActivityFeedItem,
   ActivityKind,
   AdminOrder,
-  CampusSalesRow,
   DashboardStats,
-  GrowthPoint,
   ListQuery,
   LowStockRow,
+  ManagedProduct,
   Paginated,
   PlatformOverview,
-  RevenuePoint,
   TopProductRow,
 } from "@/types/admin";
 import type { ChartRange, DashboardService, MockDashboardSources } from "./dashboard.service";
 import { createMockDashboardService } from "./dashboard.service";
+import { toLowStockRow, toTopProductRow } from "./product-rows";
 
 // ---- backend response shapes -------------------------------------------------
 
@@ -43,6 +42,7 @@ interface AnalyticsOverviewResponse {
   activeUsers: number;
   vendors: number;
   activeVendors: number;
+  verifiedVendors: number;
   freelancers: number;
   employers: number;
   serviceProviders: number;
@@ -84,44 +84,6 @@ interface AnalyticsFinancialResponse {
   completedBookingValue: number;
 }
 
-interface AnalyticsCampusResponse {
-  usersPerCampus: Array<{
-    campusId: string | null;
-    campusName: string;
-    count: number;
-  }>;
-  vendorsPerCampus: Array<{
-    campusId: string | null;
-    campusName: string;
-    count: number;
-  }>;
-  productsPerCampus: Array<{
-    campusId: string | null;
-    campusName: string;
-    count: number;
-  }>;
-  ordersPerCampus: Array<{
-    campusId: string | null;
-    campusName: string;
-    count: number;
-  }>;
-  jobsPerCampus: Array<{
-    campusId: string | null;
-    campusName: string;
-    count: number;
-  }>;
-  engagementsPerCampus: Array<{
-    campusId: string | null;
-    campusName: string;
-    count: number;
-  }>;
-  serviceBookingsPerCampus: Array<{
-    campusId: string | null;
-    campusName: string;
-    count: number;
-  }>;
-}
-
 interface BackendOrderRow {
   id: string;
   customerId: string;
@@ -145,21 +107,6 @@ interface BackendOrderRow {
 interface BackendPaginatedResult<T> {
   items: T[];
   meta: { total: number; page: number; limit: number; totalPages: number };
-}
-
-interface BackendProductRow {
-  id: string;
-  name: string;
-  stock: number;
-  revenue: number;
-  salesCount: number;
-  vendorId: string;
-  storeName: string;
-  campusId: string | null;
-  campusShortName: string | null;
-  categoryName: string;
-  price: number;
-  uiStatus: string;
 }
 
 interface WithdrawalCountsResponse {
@@ -240,61 +187,6 @@ function mapOrders(items: BackendOrderRow[]): AdminOrder[] {
   }));
 }
 
-function mapTopProducts(items: BackendProductRow[]): TopProductRow[] {
-  return items.map((p) => ({
-    productId: p.id,
-    title: p.name,
-    vendorName: p.storeName,
-    campusShortName: p.campusShortName ?? "",
-    unitsSold: p.salesCount ?? 0,
-    revenue: p.revenue ?? 0,
-  }));
-}
-
-function mapLowStock(items: BackendProductRow[]): LowStockRow[] {
-  return items.map((p) => ({
-    productId: p.id,
-    title: p.name,
-    vendorName: p.storeName,
-    status: (p.uiStatus ?? "active") as LowStockRow["status"],
-    stock: p.stock,
-  }));
-}
-
-function buildCampusSales(
-  campuses: AnalyticsCampusResponse,
-  gmv: number
-): CampusSalesRow[] {
-  const ordersPerCampus = campuses.ordersPerCampus ?? [];
-  const totalOrders =
-    ordersPerCampus.reduce((a, c) => a + c.count, 0) || 1;
-
-  return [...ordersPerCampus]
-    .filter((c) => c.campusId !== null && c.count > 0)
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 8)
-    .map((c) => {
-      const revenue = Math.round((c.count / totalOrders) * gmv);
-      const sharePct =
-        gmv > 0 ? Math.round((revenue / gmv) * 100) : 0;
-      const shortName = c.campusName
-        .replace(
-          /\b(University|College|Institute|Federal|State|of|and|the)\b/gi,
-          ""
-        )
-        .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, 10);
-      return {
-        campusId: c.campusId!,
-        shortName,
-        orders: c.count,
-        revenue,
-        sharePct,
-      };
-    });
-}
-
 function mapAuditToActivity(row: BackendAuditLogRow): ActivityFeedItem {
   let kind: ActivityKind = "order";
   const act = (row.action || "").toLowerCase();
@@ -347,71 +239,6 @@ function mapAuditToActivity(row: BackendAuditLogRow): ActivityFeedItem {
   };
 }
 
-function generateRevenueSeries(
-  range: ChartRange,
-  totalGmv: number,
-  totalOrders: number
-): RevenuePoint[] {
-  const days = range === "7d" ? 7 : range === "30d" ? 30 : 90;
-  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const points: RevenuePoint[] = [];
-
-  const weights: number[] = [];
-  for (let i = 0; i < days; i++) {
-    weights.push(0.6 + (i / days) * 0.4 + ((i * 31) % 13) / 130);
-  }
-  const wSum = weights.reduce((a, b) => a + b, 0) || 1;
-
-  let accRevenue = 0;
-  let accOrders = 0;
-
-  for (let i = 0; i < days; i++) {
-    const isLast = i === days - 1;
-    const share = weights[i] / wSum;
-    const revenue = isLast ? Math.max(0, totalGmv - accRevenue) : Math.round(totalGmv * share);
-    const orders = isLast ? Math.max(0, totalOrders - accOrders) : Math.max(0, Math.round(totalOrders * share));
-
-    accRevenue += revenue;
-    accOrders += orders;
-
-    const d = new Date();
-    d.setDate(d.getDate() - (days - 1 - i));
-    const label = `${d.getDate()} ${MONTHS[d.getMonth()]}`;
-    points.push({ label, revenue, orders });
-  }
-
-  return points;
-}
-
-function generateGrowthSeries(
-  kind: "users" | "vendors",
-  totalCount: number
-): GrowthPoint[] {
-  const weeks = 12;
-  const points: GrowthPoint[] = [];
-  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-  const startFraction = 0.4;
-  const base = Math.round(totalCount * startFraction);
-  const remaining = totalCount - base;
-
-  for (let i = 0; i < weeks; i++) {
-    const progress = (i + 1) / weeks;
-    const curve = progress * progress * (3 - 2 * progress);
-    const total = i === weeks - 1 ? totalCount : Math.round(base + remaining * curve);
-    const prev = i === 0 ? base : points[i - 1].total;
-    const added = Math.max(0, total - prev);
-
-    const d = new Date();
-    d.setDate(d.getDate() - (weeks - 1 - i) * 7);
-    const label = `${d.getDate()} ${MONTHS[d.getMonth()]}`;
-
-    points.push({ label, total, added });
-  }
-
-  return points;
-}
-
 // ---- factory -----------------------------------------------------------------
 
 export function createApiDashboardService(
@@ -431,8 +258,6 @@ export function createApiDashboardService(
         reports: fallbackSources.reports ?? [],
         campuses: fallbackSources.campuses ?? [],
         dailyMetrics: fallbackSources.dailyMetrics ?? [],
-        growthSeries: fallbackSources.growthSeries ?? [],
-        campusSales: fallbackSources.campusSales ?? [],
         topProducts: fallbackSources.topProducts ?? [],
         lowStock: fallbackSources.lowStock ?? [],
         recentOrders: fallbackSources.recentOrders ?? [],
@@ -500,7 +325,7 @@ export function createApiDashboardService(
           users: ov?.users ?? 0,
           activeUsers: ov?.activeUsers ?? 0,
           vendors: ov?.vendors ?? 0,
-          verifiedVendors: ov?.activeVendors ?? 0,
+          verifiedVendors: ov?.verifiedVendors ?? 0,
           campuses: ov?.campuses ?? 0,
           products: mktMonth?.totalProducts ?? 0,
           orders: ov?.orders ?? 0,
@@ -575,95 +400,31 @@ export function createApiDashboardService(
     },
 
     // ------------------------------------------------------------------
-    // getRevenueSeries — dynamically built from real range totals
-    // ------------------------------------------------------------------
-    async getRevenueSeries(range: ChartRange = "30d"): Promise<RevenuePoint[]> {
-      const rangePreset = range === "7d" ? "last7d" : range === "30d" ? "last30d" : "custom";
-      let url = `/analytics/admin/marketplace?range=${rangePreset}`;
-      if (rangePreset === "custom") {
-        const end = new Date();
-        const start = new Date();
-        start.setDate(end.getDate() - 90);
-        url = `/analytics/admin/marketplace?range=custom&startDate=${start.toISOString().slice(0, 10)}&endDate=${end.toISOString().slice(0, 10)}`;
-      }
-
-      const res = await apiClient.get<AnalyticsMarketplaceResponse>(url);
-      if (res.error && mockFallback) {
-        return mockFallback.getRevenueSeries(range);
-      }
-
-      const totalGmv = res.data?.gmv ?? 0;
-      const totalOrders = res.data?.totalOrders ?? 0;
-
-      return generateRevenueSeries(range, totalGmv, totalOrders);
-    },
-
-    // ------------------------------------------------------------------
-    // getGrowth — user/vendor growth series pegged to live platform counts
-    // ------------------------------------------------------------------
-    async getGrowth(kind: "users" | "vendors"): Promise<GrowthPoint[]> {
-      const res = await apiClient.get<AnalyticsOverviewResponse>(
-        "/analytics/admin/overview"
-      );
-      if (res.error && mockFallback) {
-        return mockFallback.getGrowth(kind);
-      }
-
-      const total =
-        kind === "users" ? (res.data?.users ?? 0) : (res.data?.vendors ?? 0);
-      return generateGrowthSeries(kind, total);
-    },
-
-    // ------------------------------------------------------------------
-    // getCampusSales — derived from /analytics/admin/campuses
-    // ------------------------------------------------------------------
-    async getCampusSales(): Promise<CampusSalesRow[]> {
-      const [campusRes, mktRes] = await Promise.all([
-        apiClient.get<AnalyticsCampusResponse>(
-          "/analytics/admin/campuses"
-        ),
-        apiClient.get<AnalyticsMarketplaceResponse>(
-          "/analytics/admin/marketplace?range=thisMonth"
-        ),
-      ]);
-
-      if (campusRes.error || !campusRes.data) {
-        if (mockFallback) return mockFallback.getCampusSales();
-        return [];
-      }
-
-      return buildCampusSales(
-        campusRes.data,
-        mktRes.data?.gmv ?? 0
-      );
-    },
-
-    // ------------------------------------------------------------------
     // getTopProducts — real data from /admin/products sorted by revenue
     // ------------------------------------------------------------------
     async getTopProducts(limit = 6): Promise<TopProductRow[]> {
-      const res = await apiClient.get<BackendPaginatedResult<BackendProductRow>>(
+      const res = await apiClient.get<BackendPaginatedResult<ManagedProduct>>(
         `/admin/products?sortBy=revenue&sortDir=desc&limit=${limit}`
       );
       if (res.error || !res.data?.items) {
         if (mockFallback) return mockFallback.getTopProducts(limit);
         return [];
       }
-      return mapTopProducts(res.data.items.slice(0, limit));
+      return res.data.items.slice(0, limit).map(toTopProductRow);
     },
 
     // ------------------------------------------------------------------
     // getLowStock — real data from /admin/products with stock=low filter
     // ------------------------------------------------------------------
     async getLowStock(limit = 6): Promise<LowStockRow[]> {
-      const res = await apiClient.get<BackendPaginatedResult<BackendProductRow>>(
+      const res = await apiClient.get<BackendPaginatedResult<ManagedProduct>>(
         `/admin/products?stock=low&sortBy=stock&sortDir=asc&limit=${limit}`
       );
       if (res.error || !res.data?.items) {
         if (mockFallback) return mockFallback.getLowStock(limit);
         return [];
       }
-      return mapLowStock(res.data.items.slice(0, limit));
+      return res.data.items.slice(0, limit).map(toLowStockRow);
     },
 
     // ------------------------------------------------------------------

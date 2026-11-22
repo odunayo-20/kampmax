@@ -1137,12 +1137,6 @@ export interface DashboardStats {
   commissionToday: number;
 }
 
-export interface RevenuePoint {
-  label: string;
-  revenue: number;
-  orders: number;
-}
-
 export interface TopVendorRow {
   vendorId: string;
   storeName: string;
@@ -1214,13 +1208,6 @@ export interface SeriesPoint {
   secondary?: number;
 }
 
-/** Cumulative growth series (users/vendors) over weeks. */
-export interface GrowthPoint {
-  label: string;
-  total: number;
-  added: number;
-}
-
 export interface TopProductRow {
   productId: string;
   title: string;
@@ -1228,14 +1215,6 @@ export interface TopProductRow {
   campusShortName: string;
   unitsSold: number;
   revenue: number;
-}
-
-export interface CampusSalesRow {
-  campusId: string;
-  shortName: string;
-  orders: number;
-  revenue: number;
-  sharePct: number;
 }
 
 export interface LowStockRow {
@@ -3018,14 +2997,6 @@ export interface AnalyticsQuery {
   categoryId?: string | "all";
 }
 
-export interface AnalyticsSeriesPoint {
-  label: string;
-  /** Primary metric (revenue, registrations, orders…). */
-  value: number;
-  /** Optional companion metric rendered in tooltips. */
-  secondary?: number;
-}
-
 export interface AnalyticsCampusRow {
   campusId: string;
   shortName: string;
@@ -3085,14 +3056,6 @@ export interface AnalyticsFinancials {
   commissionRate: number;
 }
 
-export interface AnalyticsRetention {
-  day1: number;
-  day7: number;
-  day30: number;
-  returningUsers: number;
-  churnedUsers: number;
-}
-
 export interface AnalyticsReport {
   range: AnalyticsRange;
   previousRangeLabel: string;
@@ -3114,17 +3077,11 @@ export interface AnalyticsReport {
     refunds: number;
   };
   // Time series
-  revenueSeries: AnalyticsSeriesPoint[];
-  registrationsSeries: AnalyticsSeriesPoint[];
-  activeUsersSeries: AnalyticsSeriesPoint[];
-  newVendorsSeries: AnalyticsSeriesPoint[];
-  aovSeries: AnalyticsSeriesPoint[];
   // Tables / ranked lists
   campuses: AnalyticsCampusRow[];
   vendors: AnalyticsVendorRow[];
   topProducts: AnalyticsProductRow[];
   categories: AnalyticsCategoryRow[];
-  retention: AnalyticsRetention;
   financials: AnalyticsFinancials;
 }
 

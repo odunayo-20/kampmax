@@ -6,7 +6,11 @@ import { RouteProgress } from "@/components/ui/RouteProgress";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Kampmax - Your Campus Marketplace & Freelance Hub",
+  // Same tagline as kampmax.com; pages set their own short title.
+  title: {
+    default: "Kampmax — The campus ecosystem, connected.",
+    template: "%s | Kampmax",
+  },
   description: "A campus-focused digital marketplace, services, and freelance platform for Nigerian university students",
   icons: {
     icon: "/logo-icon.svg",

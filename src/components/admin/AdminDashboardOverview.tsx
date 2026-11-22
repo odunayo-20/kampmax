@@ -27,7 +27,6 @@ import {
   Users,
 } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
-import { ChartCard } from "@/components/admin/ChartCard";
 import { EmptyState } from "@/components/admin/EmptyState";
 import { ErrorState } from "@/components/admin/ErrorState";
 import { LoadingSkeleton } from "@/components/admin/LoadingSkeleton";
@@ -35,15 +34,11 @@ import { MiniStat, StatCard } from "@/components/admin/StatCard";
 import { StatusBadge, orderStatusVariant } from "@/components/admin/StatusBadge";
 import { cn, formatNaira, formatNairaCompact, timeAgo } from "@/lib/utils";
 import { useAdminSession } from "@/lib/admin/admin-auth-context";
-import type { ChartRange } from "@/services/admin";
 import {
   useAdminDashboardActivity,
-  useAdminDashboardCampusSales,
-  useAdminDashboardGrowth,
   useAdminDashboardLowStock,
   useAdminDashboardOverview,
   useAdminDashboardRecentOrders,
-  useAdminDashboardRevenue,
   useAdminDashboardTopProducts,
 } from "@/hooks/admin/use-admin-dashboard";
 import type {
@@ -62,11 +57,6 @@ export function AdminDashboardOverview() {
   const scopeCampusId = admin?.role === "CAMPUS_ADMIN" ? admin.campusId : null;
 
   const overview = useAdminDashboardOverview(scopeCampusId);
-  const [range, setRange] = useState<ChartRange>("30d");
-  const revenueSeries = useAdminDashboardRevenue(range);
-  const usersGrowth = useAdminDashboardGrowth("users");
-  const vendorsGrowth = useAdminDashboardGrowth("vendors");
-  const campusSales = useAdminDashboardCampusSales();
   const topProducts = useAdminDashboardTopProducts();
   const lowStock = useAdminDashboardLowStock();
   const recentOrders = useAdminDashboardRecentOrders(8);
@@ -156,102 +146,6 @@ export function AdminDashboardOverview() {
         ) : overviewData ? (
           <Financials financial={overviewData.financial} marketplace={overviewData.marketplace} onNavigate={router.push} />
         ) : null}
-      </section>
-
-      {/* ---------------- Revenue & orders over time ---------------- */}
-      <section
-        aria-label="Commerce trends"
-        className="mb-4 grid grid-cols-1 gap-3 xl:grid-cols-2"
-      >
-        <ChartCard
-          title="Revenue over time"
-          subtitle={`GMV across campuses · last ${range}`}
-          type="bar"
-          accent="blue"
-          loading={revenueSeries.isPending}
-          data={
-            revenueSeries.data?.map((p) => ({ label: p.label, value: p.revenue })) ?? []
-          }
-          formatValue={(v) => formatNaira(v)}
-          height={190}
-          toolbar={
-            <RangeTabs
-              value={range}
-              onChange={(r) => setRange(r)}
-            />
-          }
-        />
-        <ChartCard
-          title="Orders over time"
-          subtitle={`Completed + open orders · last ${range}`}
-          type="line"
-          accent="navy"
-          loading={revenueSeries.isPending}
-          data={
-            revenueSeries.data?.map((p) => ({
-              label: p.label,
-              value: p.orders,
-              secondary: undefined,
-            })) ?? []
-          }
-          formatValue={(v) => `${v.toLocaleString("en-NG")} orders`}
-          height={190}
-          toolbar={
-            <RangeTabs
-              value={range}
-              onChange={(r) => setRange(r)}
-            />
-          }
-        />
-      </section>
-
-      {/* ---------------- Growth & campus sales ---------------- */}
-      <section
-        aria-label="Growth and campus distribution"
-        className="mb-4 grid grid-cols-1 gap-3 xl:grid-cols-3"
-      >
-        <ChartCard
-          title="User growth"
-          subtitle="Cumulative registered users · weekly"
-          type="area"
-          accent="green"
-          loading={usersGrowth.isPending}
-          data={
-            usersGrowth.data?.map((p) => ({ label: p.label, value: p.total })) ?? []
-          }
-          formatValue={(v) => v.toLocaleString("en-NG")}
-          height={170}
-          showXLabelsEvery={3}
-        />
-        <ChartCard
-          title="Vendor growth"
-          subtitle="Cumulative onboarded stores · weekly"
-          type="area"
-          accent="gold"
-          loading={vendorsGrowth.isPending}
-          data={
-            vendorsGrowth.data?.map((p) => ({ label: p.label, value: p.total })) ?? []
-          }
-          formatValue={(v) => v.toLocaleString("en-NG")}
-          height={170}
-          showXLabelsEvery={3}
-        />
-        <ChartCard
-          title="Sales by campus"
-          subtitle="GMV share this month"
-          type="hbar"
-          accent="navy"
-          loading={campusSales.isPending}
-          data={
-            campusSales.data?.map((c) => ({
-              label: c.shortName,
-              value: c.revenue,
-              secondary: `${c.sharePct}%`,
-            })) ?? []
-          }
-          formatValue={(v) => formatNairaCompact(v)}
-          height={170}
-        />
       </section>
 
       {/* ---------------- Marketplace analytics lists ---------------- */}
@@ -650,7 +544,7 @@ function TotalsGrid({ totals }: { totals: OverviewTotals }) {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <StatCard label="Total users" value={totals.users.toLocaleString("en-NG")} icon={Users} hint="registered accounts" />
-      <StatCard label="Active users (30d)" value={totals.activeUsers.toLocaleString("en-NG")} icon={BadgeCheck} tone="success" hint="active today" />
+      <StatCard label="Active users (30d)" value={totals.activeUsers.toLocaleString("en-NG")} icon={BadgeCheck} tone="success" hint="signed in, last 30 days" />
       <StatCard label="Verified vendors" value={`${totals.verifiedVendors.toLocaleString("en-NG")} of ${totals.vendors.toLocaleString("en-NG")}`} icon={Store} hint={`${verifiedPct}% of all stores`} />
       <StatCard label="Total GMV" value={formatNairaCompact(totals.revenue)} icon={Landmark} tone="gold" hint="sum of completed orders" />
       <StatCard label="Total products" value={totals.products.toLocaleString("en-NG")} icon={Package} hint="listings across campuses" />
@@ -774,39 +668,6 @@ function PanelHeader({
           <ArrowRight className="h-3 w-3" />
         </Link>
       )}
-    </div>
-  );
-}
-
-function RangeTabs({
-  value,
-  onChange,
-}: {
-  value: ChartRange;
-  onChange: (r: ChartRange) => void;
-}) {
-  return (
-    <div
-      className="flex rounded-md border border-kampmax-border bg-kampmax-bg p-0.5"
-      role="group"
-      aria-label="Date range"
-    >
-      {(["7d", "30d", "90d"] as const).map((r) => (
-        <button
-          key={r}
-          type="button"
-          onClick={() => onChange(r)}
-          aria-pressed={value === r}
-          className={cn(
-            "rounded px-2.5 py-1 text-xs font-medium transition-colors",
-            value === r
-              ? "bg-white text-kampmax-text shadow-sm ring-1 ring-kampmax-border"
-              : "text-kampmax-text-secondary hover:text-kampmax-text"
-          )}
-        >
-          {r.toUpperCase()}
-        </button>
-      ))}
     </div>
   );
 }

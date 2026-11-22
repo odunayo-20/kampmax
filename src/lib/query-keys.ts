@@ -258,9 +258,6 @@ export const adminKeys = {
   dashboard: {
     overview: (scopeCampusId?: string | null) =>
       ["admin", "dashboard", "overview", scopeCampusId ?? "platform"] as const,
-    revenue: (range: string) => ["admin", "dashboard", "revenue", range] as const,
-    growth: (kind: string) => ["admin", "dashboard", "growth", kind] as const,
-    campusSales: () => ["admin", "dashboard", "campus-sales"] as const,
     topProducts: (limit: number) =>
       ["admin", "dashboard", "top-products", limit] as const,
     lowStock: (limit: number) =>

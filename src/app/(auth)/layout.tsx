@@ -15,7 +15,7 @@ export default function AuthLayout({
       </div>
       <div className="px-6 pb-6 text-center">
         <p className="text-xs text-kampmax-text-secondary">
-          Kampmax — Campus Marketplace, Services & Freelancing
+          Kampmax — The campus ecosystem, connected.
         </p>
       </div>
     </div>
