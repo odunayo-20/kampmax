@@ -141,7 +141,7 @@ export function ConversationList({
             <p className="text-xs text-kampmax-text-secondary mt-1">
               {search
                 ? "Try a different search term"
-                : "Start a conversation from a product page or vendor profile"}
+                : "Start a conversation from a product page or a seller's store"}
             </p>
           </div>
         ) : (

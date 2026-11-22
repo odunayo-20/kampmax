@@ -43,7 +43,7 @@ export function StoreDelivery({ store }: StoreDeliveryProps) {
         <DeliveryOption
           icon={<Store className="h-5 w-5" />}
           title="Pickup"
-          description={d?.pickupAvailable ? "Collect your order at the vendor's collection point." : "Not offered"}
+          description={d?.pickupAvailable ? "Collect your order at the seller's collection point." : "Not offered"}
           available={!!d?.pickupAvailable}
         />
       </div>

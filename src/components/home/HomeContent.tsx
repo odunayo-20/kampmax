@@ -244,11 +244,11 @@ export function HomeContent() {
 
       {/* 10. Campus Vendors */}
       {vendorsQuery.isPending ? (
-        <ScrollRowSkeleton label="campus vendors" item="vendor" />
+        <ScrollRowSkeleton label="campus sellers" item="vendor" />
       ) : vendors.length > 0 && (
-        <section aria-label="Campus vendors" className="space-y-3">
+        <section aria-label="Campus sellers" className="space-y-3">
           <SectionHeader
-            title="Campus vendors"
+            title="Campus sellers"
             subtitle={`Shops at ${selectedCampus.abbreviation}`}
             icon={<StoreIcon className="h-4 w-4 text-primary-600" aria-hidden />}
             action={{ label: "View all", href: "/marketplace" }}

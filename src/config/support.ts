@@ -48,7 +48,7 @@ export const SUPPORT_CATEGORY_OPTIONS: SupportCategoryOption[] = [
     value: "marketplace",
     title: "Orders & Marketplace",
     description:
-      "Orders, products, vendors, delivery status, cancellations and refunds.",
+      "Orders, products, sellers, delivery status, cancellations and refunds.",
   },
   {
     value: "payments",

@@ -36,7 +36,7 @@ export interface StorefrontMeta {
 
 /** Verification state that maps to a customer-facing label without exposing reasons. */
 export const VERIFICATION_LABEL: Record<StoreVerificationStatus, string> = {
-  verified: "Verified Vendor",
+  verified: "Verified Seller",
   pending: "Pending Verification",
   unverified: "Unverified",
   restricted: "Restricted",

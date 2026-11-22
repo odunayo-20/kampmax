@@ -21,7 +21,7 @@ export function useEnsureVendors(vendorIds: string[]): number {
       queryFn: async () => {
         if (getVendorById(id)) return id;
         const { data, error } = await fetchVendorById(id);
-        if (!data) throw error ?? new Error("Vendor not found");
+        if (!data) throw error ?? new Error("Seller not found");
         return id;
       },
     })),

@@ -43,7 +43,7 @@ export function SearchInput({
   value,
   onValueChange,
   onSubmit,
-  placeholder = "Search products, services, jobs, vendors…",
+  placeholder = "Search products, services, jobs, sellers…",
   autoFocus,
   className,
 }: SearchInputProps) {

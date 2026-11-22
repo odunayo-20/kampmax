@@ -65,7 +65,7 @@ export interface BlogCtaConfig {
 
 const DEFAULT_CTA: BlogCtaConfig = {
   heading: "Everything campus, in one place",
-  body: "Shop from student vendors, find services and discover opportunities near you.",
+  body: "Shop from student sellers, find services and discover opportunities near you.",
   href: "/marketplace",
   label: "Explore Kampmax",
 };

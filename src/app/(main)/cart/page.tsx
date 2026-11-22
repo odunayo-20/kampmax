@@ -48,7 +48,7 @@ export default function CartPage() {
     vendorGroups.forEach((g) => {
       const vendor = getVendorById(g.vendorId);
       cache[g.vendorId] = {
-        name: vendor?.storeName || "Unknown Vendor",
+        name: vendor?.storeName || "Unknown seller",
         verified: vendor?.verified || false,
       };
     });
@@ -56,7 +56,7 @@ export default function CartPage() {
       if (!cache[item.product.vendorId]) {
         const vendor = getVendorById(item.product.vendorId);
         cache[item.product.vendorId] = {
-          name: vendor?.storeName || "Unknown Vendor",
+          name: vendor?.storeName || "Unknown seller",
           verified: vendor?.verified || false,
         };
       }
@@ -102,7 +102,7 @@ export default function CartPage() {
                   {summary.itemCount}{" "}
                   {summary.itemCount === 1 ? "item" : "items"}
                   {vendorGroups.length > 1 &&
-                    ` from ${vendorGroups.length} vendors`}
+                    ` from ${vendorGroups.length} sellers`}
                 </>
               )}
             </p>
@@ -136,7 +136,7 @@ export default function CartPage() {
                     key={group.vendorId || `vendor-group-${index}`}
                     group={group}
                     vendorName={
-                      vendorNameCache[group.vendorId]?.name || "Unknown Vendor"
+                      vendorNameCache[group.vendorId]?.name || "Unknown seller"
                     }
                     vendorVerified={vendorNameCache[group.vendorId]?.verified}
                     onUpdateQuantity={updateQuantity}

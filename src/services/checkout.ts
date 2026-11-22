@@ -194,7 +194,7 @@ export function createCheckoutSession(options: CheckoutSessionOptions): Checkout
     const defaultDelivery = pickDefaultDelivery(v.vendorId, optionsList);
     return {
       vendorId: v.vendorId,
-      vendorName: vendor?.storeName || "Unknown Vendor",
+      vendorName: vendor?.storeName || "Unknown seller",
       vendorVerified: vendor?.verified || false,
       items: v.items,
       subtotal: v.subtotal,

@@ -112,7 +112,7 @@ export function ReviewCard({ review, onRefresh }: ReviewCardProps) {
         {review.vendorResponse && (
           <div className="mt-3 bg-kampmax-blue/5 rounded-lg p-3 border border-kampmax-blue/10">
             <div className="flex items-center gap-1.5 mb-1.5">
-              <span className="text-xs font-semibold text-kampmax-blue">Vendor Reply</span>
+              <span className="text-xs font-semibold text-kampmax-blue">Reply from the store</span>
               <span className="text-[10px] text-kampmax-text-secondary">
                 {timeAgo(review.vendorResponse.createdAt)}
               </span>

@@ -127,7 +127,7 @@ export interface RoleCard {
 export const HOMEPAGE_ROLE_CARDS: RoleCard[] = [
   {
     title: "Shop",
-    tagline: "Buy products from vendors.",
+    tagline: "Buy products from sellers.",
     cta: "Start Shopping",
     icon: ShoppingBag,
     href: () => "/marketplace",

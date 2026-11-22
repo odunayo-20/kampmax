@@ -3,7 +3,7 @@
 import { Shield, Award, Package } from "lucide-react";
 
 interface TrustSignalsProps {
-  /** Only claim "Verified Vendor" for a store that is actually verified. */
+  /** Only claim "Verified Seller" for a store that is actually verified. */
   vendorVerified?: boolean;
   /** Whether this listing offers campus pickup. */
   pickupAvailable?: boolean;
@@ -12,7 +12,7 @@ interface TrustSignalsProps {
 export function TrustSignals({ vendorVerified = false, pickupAvailable = true }: TrustSignalsProps) {
   const signals = [
     { icon: Shield, title: "Buyer Protection", description: "Secure checkout", color: "text-success-600", show: true },
-    { icon: Award, title: "Verified Vendor", description: "Identity checked", color: "text-primary-600", show: vendorVerified },
+    { icon: Award, title: "Verified Seller", description: "Identity checked", color: "text-primary-600", show: vendorVerified },
     { icon: Package, title: "Campus Pickup", description: "Collect on campus", color: "text-neutral-600", show: pickupAvailable },
   ].filter((s) => s.show);
 

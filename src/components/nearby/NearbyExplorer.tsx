@@ -407,7 +407,7 @@ export function NearbyExplorer() {
     <div className="mx-auto max-w-[1280px] space-y-3 px-4 py-4 lg:px-6 lg:py-6">
       <header>
         <h1 className="text-xl font-bold text-neutral-900">Nearby</h1>
-        <p className="text-sm text-neutral-500">Vendors, freelancers, services and events on Kampmax close to you.</p>
+        <p className="text-sm text-neutral-500">Sellers, freelancers, services and events on Kampmax close to you.</p>
       </header>
 
       {originBar}
@@ -431,7 +431,7 @@ export function NearbyExplorer() {
                 aria-label="Search Kampmax nearby"
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder="Search vendors, services, events…"
+                placeholder="Search sellers, services, events…"
                 leftIcon={<Search className="h-4 w-4" aria-hidden />}
                 maxLength={100}
                 autoComplete="off"

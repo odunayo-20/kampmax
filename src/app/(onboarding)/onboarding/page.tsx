@@ -46,7 +46,7 @@ const TOUR_SLIDES: TourSlide[] = [
     title: "Buy & Sell Directly On Campus",
     subtitle: "Trade safely with peers",
     description:
-      "Find textbooks, tech gear, fashion, and dorm appliances from verified students and approved campus vendors with safe on-campus pickup spots.",
+      "Find textbooks, tech gear, fashion, and dorm appliances from verified students and approved campus sellers with safe on-campus pickup spots.",
     icon: ShoppingBag,
     color: "text-kampmax-blue",
     accentBg: "bg-kampmax-blue/10",
@@ -107,7 +107,7 @@ const TOUR_SLIDES: TourSlide[] = [
     title: "Exclusive Events & Student Deals",
     subtitle: "Your campus social pass",
     description:
-      "Discover faculty dinners, hackathons, concerts, and sports fests. Grab digital passes and enjoy exclusive vendor discounts reserved for students.",
+      "Discover faculty dinners, hackathons, concerts, and sports fests. Grab digital passes and enjoy exclusive seller discounts reserved for students.",
     icon: Ticket,
     color: "text-emerald-600",
     accentBg: "bg-emerald-500/10",

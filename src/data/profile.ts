@@ -11,13 +11,13 @@ export const faqItems = [
     id: "faq2",
     question: "How does campus pickup work?",
     answer:
-      "When you select campus pickup at checkout, you'll be shown available pickup points on your campus. After the vendor confirms your order, collect it at the designated location.",
+      "When you select campus pickup at checkout, you'll be shown available pickup points on your campus. After the seller confirms your order, collect it at the designated location.",
   },
   {
     id: "faq3",
     question: "Can I cancel an order?",
     answer:
-      "Yes, you can cancel orders that are in 'Placed' or 'Confirmed' status. Once the vendor starts preparing your order, cancellation is no longer available. Contact support for special cases.",
+      "Yes, you can cancel orders that are in 'Placed' or 'Confirmed' status. Once the seller starts preparing your order, cancellation is no longer available. Contact support for special cases.",
   },
   {
     id: "faq4",

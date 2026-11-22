@@ -292,7 +292,7 @@ export default function OrderDetailPage({
       return {
         ok: true,
         reviewNote: alreadyReviewed
-          ? "You've already reviewed this vendor, so your rating wasn't added again."
+          ? "You've already rated this seller, so your rating wasn't added again."
           : "Your receipt is confirmed, but we couldn't save your rating.",
       };
     }

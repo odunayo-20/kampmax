@@ -12,7 +12,7 @@ interface SearchBarProps {
 }
 
 export function SearchBar({
-  placeholder = "Search products, vendors...",
+  placeholder = "Search products, sellers...",
   value,
   onChange,
   onFilterClick,

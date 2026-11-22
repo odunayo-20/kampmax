@@ -122,7 +122,7 @@ export function CartDrawer() {
           <h2 id="cart-drawer-title" className="flex items-center gap-2 text-base font-bold text-neutral-900">
             <ShoppingBag className="h-5 w-5 text-primary-600" />
             {summary.itemCount} {summary.itemCount === 1 ? "item" : "items"}
-            {vendorGroups.length > 1 && ` · ${vendorGroups.length} vendors`}
+            {vendorGroups.length > 1 && ` · ${vendorGroups.length} sellers`}
           </h2>
           <button
             onClick={closeCart}

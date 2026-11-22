@@ -34,7 +34,7 @@ export function CampusDelivery({
           </h3>
           <p className="text-sm font-medium text-neutral-900 mt-1">{campus.name}</p>
           {campus.location && <p className="text-xs text-neutral-600">{campus.location}</p>}
-          <p className="mt-2 text-[11px] text-neutral-500">Privacy: exact vendor address is not shown.</p>
+          <p className="mt-2 text-[11px] text-neutral-500">Privacy: exact seller address is not shown.</p>
         </div>
       )}
 
