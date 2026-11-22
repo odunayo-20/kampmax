@@ -15,7 +15,22 @@ import {
 } from "@/hooks/use-accommodation";
 import type { AccommodationProperty, AccommodationUnit } from "@/types/accommodation";
 import type { CreateAccommodationProperty } from "@/services/accommodation";
+import { PropertyPin, type Pin } from "@/components/agent/PropertyPin";
 import { Skeleton } from "@/components/ui/Skeleton";
+
+const EMPTY_FORM = {
+  title: "",
+  categoryId: "",
+  address: "",
+  state: "",
+  city: "",
+  neighbourhood: "",
+  description: "",
+  unitName: "",
+  unitType: "Single Room",
+  bedrooms: "1",
+  bathrooms: "1",
+};
 
 function PropertyForm({
   categories,
@@ -25,19 +40,8 @@ function PropertyForm({
   onSuccess?: () => void;
 }) {
   const create = useCreateAccommodationProperty();
-  const [data, setData] = useState({
-    title: "",
-    categoryId: "",
-    address: "",
-    state: "",
-    city: "",
-    neighbourhood: "",
-    description: "",
-    unitName: "",
-    unitType: "Single Room",
-    bedrooms: "1",
-    bathrooms: "1",
-  });
+  const [data, setData] = useState(EMPTY_FORM);
+  const [pin, setPin] = useState<Pin | null>(null);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -49,6 +53,7 @@ function PropertyForm({
       city: data.city.trim(),
       neighbourhood: data.neighbourhood.trim() || undefined,
       description: data.description.trim() || undefined,
+      ...pin,
       units: [
         {
           unitName: data.unitName.trim(),
@@ -60,19 +65,8 @@ function PropertyForm({
     };
     create.mutate(input, {
       onSuccess: () => {
-        setData({
-          title: "",
-          categoryId: "",
-          address: "",
-          state: "",
-          city: "",
-          neighbourhood: "",
-          description: "",
-          unitName: "",
-          unitType: "Single Room",
-          bedrooms: "1",
-          bathrooms: "1",
-        });
+        setData(EMPTY_FORM);
+        setPin(null);
         onSuccess?.();
       },
     });
@@ -161,6 +155,10 @@ function PropertyForm({
             className="mt-1 block w-full rounded-xl border border-kampmax-border px-3.5 py-2 text-sm text-kampmax-text focus:border-kampmax-blue focus:outline-none"
           />
         </label>
+
+        <div className="sm:col-span-2">
+          <PropertyPin value={pin} onChange={setPin} />
+        </div>
 
         <label className="text-xs font-semibold text-kampmax-text sm:col-span-2">
           General Property Description
@@ -375,6 +373,11 @@ function PropertyCard({ property }: { property: AccommodationProperty }) {
   const [unitType, setUnitType] = useState("Single Room");
   const addUnit = useAddAccommodationUnit();
   const archiveProperty = useArchiveAccommodationProperty();
+  const updateProperty = useUpdateAccommodationProperty();
+  const pin: Pin | null =
+    property.latitude !== null && property.longitude !== null
+      ? { latitude: property.latitude, longitude: property.longitude }
+      : null;
 
   return (
     <article className="rounded-2xl border border-kampmax-border bg-white p-5 shadow-xs">
@@ -404,6 +407,14 @@ function PropertyCard({ property }: { property: AccommodationProperty }) {
           <Trash2 className="h-3 w-3" />
           <span>Archive</span>
         </button>
+      </div>
+
+      <div className="mt-4">
+        <PropertyPin
+          value={pin}
+          saving={updateProperty.isPending}
+          onChange={(next) => updateProperty.mutateAsync({ id: property.id, input: next })}
+        />
       </div>
 
       {/* Units List */}
