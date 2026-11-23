@@ -48,7 +48,7 @@ describe("security headers", () => {
 
     it("limits images to the API, the storage hosts and the configured media hosts", () => {
       const img = directive("img-src");
-      for (const host of ["https://api.kampmax.com", "https://res.cloudinary.com", "https://cdn.kampmax.com", "https://pub-abc.r2.dev"]) {
+      for (const host of ["https://api.kampmax.com", "https://cdn.kampmax.com", "https://pub-abc.r2.dev"]) {
         expect(img).toContain(host);
       }
       expect(img).not.toMatch(/ \*( |$)/);

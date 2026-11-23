@@ -16,7 +16,6 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       ...extraMediaHosts,
       { protocol: "https", hostname: "images.unsplash.com" },
-      { protocol: "https", hostname: "res.cloudinary.com" },
       { protocol: "https", hostname: "*.r2.cloudflarestorage.com" },
       { protocol: "https", hostname: "*.r2.dev" },
       // Locally stored uploads in development (backend STORAGE_PROVIDER=local).

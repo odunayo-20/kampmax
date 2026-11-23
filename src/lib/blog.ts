@@ -183,7 +183,7 @@ export function breadcrumbJsonLd(article: ArticleListItem) {
 
 // ── Images ─────────────────────────────────────────────────
 
-const OPTIMIZABLE_HOSTS = new Set(["images.unsplash.com", "res.cloudinary.com", "localhost"]);
+const OPTIMIZABLE_HOSTS = new Set(["images.unsplash.com", "localhost"]);
 
 /** True when next/image is configured to optimise this source (see next.config.ts). */
 export function isOptimizableImage(src: string): boolean {

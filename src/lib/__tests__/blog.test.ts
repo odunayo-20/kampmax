@@ -118,7 +118,7 @@ describe("structured data", () => {
 
 describe("isOptimizableImage", () => {
   it("allows configured hosts and site paths only", () => {
-    expect(isOptimizableImage("https://res.cloudinary.com/a.jpg")).toBe(true);
+    expect(isOptimizableImage("https://images.unsplash.com/a.jpg")).toBe(true);
     expect(isOptimizableImage("/uploads/a.jpg")).toBe(true);
     expect(isOptimizableImage("https://random.example/a.jpg")).toBe(false);
     expect(isOptimizableImage("not a url")).toBe(false);
