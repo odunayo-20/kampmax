@@ -19,6 +19,19 @@ describe("HomeSearch", () => {
     expect(screen.getByRole("button", { name: "Search" })).toBeTruthy();
   });
 
+  it("keeps the Search button off until something is typed", () => {
+    render(<HomeSearch />);
+
+    const button = screen.getByRole("button", { name: "Search" }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+
+    fireEvent.change(screen.getByLabelText("Search Kampmax"), { target: { value: "   " } });
+    expect(button.disabled).toBe(true);
+
+    fireEvent.change(screen.getByLabelText("Search Kampmax"), { target: { value: "laptop" } });
+    expect(button.disabled).toBe(false);
+  });
+
   it("offers popular searches to a newcomer, each opening Explore already searching", () => {
     render(<HomeSearch />);
 

@@ -71,7 +71,7 @@ export function YourProfilesStrip() {
 
         <Link
           href="/account/profiles"
-          className="flex shrink-0 items-center gap-0.5 text-xs font-semibold text-primary-600 transition-colors hover:text-primary-700"
+          className="-my-2 flex min-h-11 shrink-0 items-center gap-0.5 pl-2 text-xs font-semibold text-primary-600 transition-colors hover:text-primary-700"
         >
           <span>Manage all</span>
           <ChevronRight className="h-3.5 w-3.5" aria-hidden />

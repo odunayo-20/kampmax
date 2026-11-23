@@ -23,7 +23,7 @@ export function NearbyStoryReel({ vendors, campusAbbreviation }: NearbyStoryReel
         </h2>
         <Link
           href="/nearby"
-          className="text-xs font-semibold text-primary-600 hover:text-primary-700 flex items-center gap-0.5 transition-colors"
+          className="-my-2 flex min-h-11 items-center gap-0.5 pl-2 text-xs font-semibold text-primary-600 transition-colors hover:text-primary-700"
         >
           See nearby <ChevronRight className="h-3.5 w-3.5" />
         </Link>

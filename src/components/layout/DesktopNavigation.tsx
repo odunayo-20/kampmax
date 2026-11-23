@@ -36,10 +36,10 @@ export function DesktopNavigation() {
 
   return (
     <header className="hidden lg:block sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-neutral-200/90 shadow-2xs">
-      <div className="max-w-[1280px] mx-auto flex items-center justify-between h-[60px] px-6">
+      <div className="max-w-[1280px] mx-auto flex items-center justify-between gap-4 h-[60px] px-6">
         {/* Left: Brand Logo + 4 Core Primary Navigation Links */}
-        <div className="flex items-center gap-8">
-          <div className="mr-2">
+        <div className="flex min-w-0 items-center gap-4 xl:gap-8">
+          <div className="mr-2 shrink-0">
             <Logo size="md" href="/home" />
           </div>
 
@@ -73,7 +73,7 @@ export function DesktopNavigation() {
         </div>
 
         {/* Right: Actions, Wallet, Campus & Profile */}
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {/* Universal Search */}
           <Link
             href="/search"
@@ -159,7 +159,7 @@ export function DesktopNavigation() {
                 href="/profile"
                 aria-label="User Profile"
                 className={cn(
-                  "flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-xl transition-colors",
+                  "flex min-w-0 items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-xl transition-colors",
                   "hover:bg-neutral-100",
                   isActive("/profile") && "bg-primary-50"
                 )}
@@ -169,7 +169,7 @@ export function DesktopNavigation() {
                   size="sm"
                   className="h-7 w-7 text-[11px]"
                 />
-                <span className="text-xs font-semibold text-neutral-900 max-w-[110px] truncate">
+                <span className="text-xs font-semibold text-neutral-900 max-w-[110px] xl:max-w-[160px] truncate">
                   {user.name}
                 </span>
               </Link>

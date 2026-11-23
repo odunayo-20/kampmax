@@ -81,7 +81,7 @@ export function ServiceFavoriteButton({ serviceId, className, variant = "card" }
       aria-pressed={favorited}
       aria-label={favorited ? "Remove from saved services" : "Save service"}
       className={cn(
-        "p-1.5 rounded-full bg-white/90 backdrop-blur-sm border border-neutral-200 hover:bg-white hover:border-neutral-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600",
+        "relative p-1.5 rounded-full after:absolute after:-inset-2.5 after:content-[''] bg-white/90 backdrop-blur-sm border border-neutral-200 hover:bg-white hover:border-neutral-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600",
         className
       )}
     >

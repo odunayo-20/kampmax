@@ -4,20 +4,7 @@ import { Suspense, useMemo, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import {
-  Search,
-  SlidersHorizontal,
-  Calendar,
-  MapPin,
-  ArrowRight,
-  Store,
-  Wrench,
-  Briefcase,
-  Ticket,
-  GraduationCap,
-  ChevronRight,
-  Star,
-} from "lucide-react";
+import { Search, Calendar, MapPin, ArrowRight, Wrench, Briefcase, Ticket, ShoppingBag } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { listEventsApi } from "@/services/event-tickets";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -28,6 +15,8 @@ import { listPublicJobs } from "@/services/jobs";
 import { fetchServicePage } from "@/services/service-marketplace";
 import { fetchPublicServices } from "@/services/freelancer-services";
 import { FreelanceServiceRow } from "@/components/explore/FreelanceServiceRow";
+import { EXPLORE_TONES, ExploreCard, ExploreRow, ExploreThumb } from "@/components/explore/ExploreRow";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { useAuth } from "@/lib/auth-context";
 import { useMyLocation } from "@/hooks/use-location";
 import { fetchNearby, formatDistance, roundCoordinate } from "@/services/nearby-api";
@@ -52,6 +41,9 @@ function formatCount(n: number): string {
 /** A few freelancer services in the mixed view; more once that filter is chosen. */
 const FREELANCE_PREVIEW = 3;
 const FREELANCE_FULL = 10;
+
+/** Keep the last results (and so the filter counts) on screen while a new search loads. */
+const KEEP_PREVIOUS = { placeholderData: keepPreviousData };
 
 type Origin = { latitude: number; longitude: number };
 
@@ -85,6 +77,7 @@ function ExploreContent() {
       const page = await listEventsApi({ q: search, limit: 20 });
       return { items: page.items, total: page.meta.total };
     },
+    ...KEEP_PREVIOUS,
   });
   const productsQuery = useQuery({
     queryKey: ["explore", "products", search],
@@ -93,10 +86,12 @@ function ExploreContent() {
       if (res.error) throw res.error;
       return { items: res.data, total: res.total };
     },
+    ...KEEP_PREVIOUS,
   });
   const servicesQuery = useQuery({
     queryKey: ["explore", "services", search],
     queryFn: () => fetchServicePage({ q: search, pageSize: 3 }),
+    ...KEEP_PREVIOUS,
   });
   const freelanceLimit = selectedCategory === "freelance" ? FREELANCE_FULL : FREELANCE_PREVIEW;
   const freelanceQuery = useQuery({
@@ -106,8 +101,7 @@ function ExploreContent() {
       if (page.failed) throw new Error("Couldn't load freelancer services.");
       return page;
     },
-    // Switching to the Freelance pill loads more rows; keep the count steady meanwhile.
-    placeholderData: keepPreviousData,
+    ...KEEP_PREVIOUS,
   });
   const jobsQuery = useQuery({
     queryKey: ["explore", "jobs", search],
@@ -116,6 +110,7 @@ function ExploreContent() {
       if (res.error) throw res.error;
       return { items: res.jobs, total: res.total };
     },
+    ...KEEP_PREVIOUS,
   });
 
   const filteredEvents = eventsQuery.data?.items ?? [];
@@ -204,8 +199,12 @@ function ExploreContent() {
     );
   };
 
-  const failed = [eventsQuery, productsQuery, servicesQuery, freelanceQuery, jobsQuery].some((q) => q.isError);
-  const loading = [eventsQuery, productsQuery, servicesQuery, freelanceQuery, jobsQuery].some((q) => q.isLoading);
+  const verticalQueries = [eventsQuery, productsQuery, servicesQuery, freelanceQuery, jobsQuery];
+  const failed = verticalQueries.some((q) => q.isError);
+  const loading = verticalQueries.some((q) => q.isLoading);
+  // Swapping to a new search keeps the old results up (dimmed) until the new ones land.
+  const refreshing = verticalQueries.some((q) => q.isPlaceholderData);
+  const retryFailed = () => verticalQueries.filter((q) => q.isError).forEach((q) => q.refetch());
   const showEvents = selectedCategory === "all" || selectedCategory === "events";
   const showProducts = selectedCategory === "all" || selectedCategory === "products";
   const showServices = selectedCategory === "all" || selectedCategory === "services";
@@ -301,13 +300,23 @@ function ExploreContent() {
       </div>
 
       {/* Mixed Multi-Vertical Results Stream */}
-      <div className="space-y-3.5">
+      <div className={cn("space-y-3.5 transition-opacity", refreshing && "opacity-60")} aria-busy={loading || refreshing}>
         {failed && (
-          <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            Some results could not be loaded. Please try again.
-          </p>
+          <div
+            role="alert"
+            className="flex items-center justify-between gap-3 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800"
+          >
+            <span>Some results could not be loaded.</span>
+            <button
+              type="button"
+              onClick={retryFailed}
+              className="shrink-0 rounded-lg px-2 py-1 font-semibold text-amber-900 underline hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600"
+            >
+              Try again
+            </button>
+          </div>
         )}
-        {loading && <p className="text-xs text-neutral-500">Loading…</p>}
+        {loading && <ResultsSkeleton />}
         {empty && !failed && (
           <p className="py-8 text-center text-sm text-neutral-500">
             Nothing found{debouncedQ ? ` for "${debouncedQ}"` : ""}.
@@ -317,138 +326,88 @@ function ExploreContent() {
         {/* Events Vertical */}
         {showEvents &&
           filteredEvents.map((event) => (
-            <div
-              key={`event-${event.id}`}
-              className="group flex flex-col sm:flex-row items-start sm:items-center justify-between p-3.5 bg-white border border-neutral-200/90 rounded-2xl shadow-xs hover:shadow-md transition-all gap-3"
-            >
-              <div className="flex items-center gap-3">
-                <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-neutral-900 shrink-0">
-                  <img
-                    src={
-                      event.coverImageUrl ||
-                      "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&auto=format&fit=crop&q=80"
-                    }
-                    alt={event.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-bold text-neutral-900 line-clamp-1">
-                      {event.title}
-                    </h3>
-                  </div>
-                  <p className="text-xs text-neutral-500 line-clamp-1">{event.location}</p>
+            <ExploreCard key={`event-${event.id}`} className="flex-col items-start sm:flex-row sm:items-center">
+              <div className="flex min-w-0 items-center gap-3">
+                <ExploreThumb
+                  src={event.coverImageUrl}
+                  alt={event.title}
+                  tone={EXPLORE_TONES.event}
+                  fallback={<Ticket className="h-6 w-6 text-white/60" aria-hidden />}
+                />
+                <div className="min-w-0 space-y-1">
+                  <h3 className="line-clamp-1 text-sm font-bold text-neutral-900">{event.title}</h3>
+                  <p className="line-clamp-1 text-xs text-neutral-500">{event.location}</p>
                   <div className="flex items-center gap-2 text-[11px] text-neutral-500">
                     <span className="inline-flex items-center gap-1">
-                      <Calendar className="h-3 w-3 text-amber-500" />
+                      <Calendar className="h-3 w-3 text-amber-500" aria-hidden />
                       <span>{eventDate(event.startsAt)} · {eventTime(event.startsAt)}</span>
                     </span>
-                    {distanceLabel("EVENT", event.id) && (
-                      <span>{distanceLabel("EVENT", event.id)}</span>
-                    )}
-                    <span className="px-1.5 py-0.2 rounded bg-rose-50 text-rose-600 font-semibold text-[10px]">
-                      Event
-                    </span>
+                    {distanceLabel("EVENT", event.id) && <span>{distanceLabel("EVENT", event.id)}</span>}
+                    <span className={cn("rounded px-1.5 text-[10px] font-semibold", EXPLORE_TONES.event.tag)}>Event</span>
                   </div>
                 </div>
               </div>
 
               <Link
                 href={`/events/${event.id}`}
-                className="w-full sm:w-auto text-center px-4 py-1.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold shadow-xs transition-colors"
+                className="w-full rounded-xl bg-primary-600 px-4 py-2.5 text-center text-xs font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 sm:w-auto"
               >
                 {event.minPrice > 0 ? `Get Ticket (${priceLabel(event)})` : "Register"}
               </Link>
-            </div>
+            </ExploreCard>
           ))}
 
         {/* Products Vertical */}
         {showProducts &&
           filteredProducts.map((product) => (
-            <Link
+            <ExploreRow
               key={`product-${product.id}`}
               href={`/marketplace/${product.id}`}
-              className="group flex items-center justify-between p-3.5 bg-white border border-neutral-200/90 rounded-2xl shadow-xs hover:shadow-md transition-all gap-3"
+              tone={EXPLORE_TONES.product}
+              title={product.title}
+              tag="Product"
+              thumb={
+                <ExploreThumb
+                  src={product.images[0]}
+                  alt={product.title}
+                  tone={EXPLORE_TONES.product}
+                  fallback={<ShoppingBag className="h-6 w-6 text-neutral-300" aria-hidden />}
+                />
+              }
+              aside={<Distance label={distanceLabel("VENDOR", product.vendorId)} />}
             >
-              <div className="flex items-center gap-3">
-                <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-neutral-100 shrink-0 border border-neutral-100">
-                  <img
-                    src={product.images[0]}
-                    alt={product.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                  />
-                </div>
-                <div className="space-y-0.5">
-                  <h3 className="text-sm font-bold text-neutral-900 line-clamp-1 group-hover:text-primary-600">
-                    {product.title}
-                  </h3>
-                  <p className="text-xs text-neutral-500 capitalize">
-                    {product.condition}
-                    {product.location ? ` · ${product.location}` : ""}
-                  </p>
-                  <p className="text-xs font-extrabold text-neutral-900">
-                    ₦{product.price.toLocaleString()}
-                  </p>
-                </div>
-              </div>
-
-              <div className="text-right flex flex-col items-end gap-1">
-                <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-semibold text-[10px]">
-                  Product
-                </span>
-                {distanceLabel("VENDOR", product.vendorId) && (
-                  <span className="text-[11px] text-neutral-400">
-                    {distanceLabel("VENDOR", product.vendorId)}
-                  </span>
-                )}
-              </div>
-            </Link>
+              <p className="text-xs capitalize text-neutral-500">
+                {product.condition}
+                {product.location ? ` · ${product.location}` : ""}
+              </p>
+              <p className="text-xs font-extrabold text-neutral-900">₦{product.price.toLocaleString()}</p>
+            </ExploreRow>
           ))}
 
         {/* Services Vertical */}
         {showServices &&
           filteredServices.map((service) => (
-            <Link
+            <ExploreRow
               key={`service-${service.id}`}
               href={`/services/${service.id}`}
-              className="group flex items-center justify-between p-3.5 bg-white border border-neutral-200/90 rounded-2xl shadow-xs hover:shadow-md transition-all gap-3"
+              tone={EXPLORE_TONES.service}
+              title={service.name}
+              tag="Service"
+              thumb={
+                <ExploreThumb
+                  src={service.imageUrl}
+                  alt={service.name}
+                  tone={EXPLORE_TONES.service}
+                  fallback={<Wrench className="h-6 w-6 text-purple-300" aria-hidden />}
+                />
+              }
+              aside={<Distance label={distanceLabel("SERVICE_PROVIDER", service.providerId)} />}
             >
-              <div className="flex items-center gap-3">
-                <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-purple-50 shrink-0 border border-purple-100">
-                  <img
-                    src={
-                      service.imageUrl ||
-                      "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=600&auto=format&fit=crop&q=80"
-                    }
-                    alt={service.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                  />
-                </div>
-                <div className="space-y-0.5">
-                  <h3 className="text-sm font-bold text-neutral-900 line-clamp-1 group-hover:text-purple-600">
-                    {service.name}
-                  </h3>
-                  <p className="text-xs text-neutral-500">
-                    {service.durationMinutes ? `${service.durationMinutes} min` : "Campus service"}
-                  </p>
-                  <p className="text-xs font-extrabold text-neutral-900">
-                    ₦{service.price.toLocaleString()}
-                  </p>
-                </div>
-              </div>
-
-              <div className="text-right flex flex-col items-end gap-1">
-                <span className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-600 font-semibold text-[10px]">
-                  Service
-                </span>
-                {distanceLabel("SERVICE_PROVIDER", service.providerId) && (
-                  <span className="text-[11px] text-neutral-400">
-                    {distanceLabel("SERVICE_PROVIDER", service.providerId)}
-                  </span>
-                )}
-              </div>
-            </Link>
+              <p className="text-xs text-neutral-500">
+                {service.durationMinutes ? `${service.durationMinutes} min` : "Campus service"}
+              </p>
+              <p className="text-xs font-extrabold text-neutral-900">₦{service.price.toLocaleString()}</p>
+            </ExploreRow>
           ))}
 
         {/* Freelance Vertical */}
@@ -463,7 +422,7 @@ function ExploreContent() {
             ))}
             <Link
               href={`/freelancers/services${search ? `?q=${encodeURIComponent(search)}` : ""}`}
-              className="flex items-center justify-center gap-1 rounded-2xl border border-dashed border-indigo-200 py-2.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-50"
+              className="flex items-center justify-center gap-1 rounded-2xl border border-dashed border-indigo-200 py-3 text-xs font-semibold text-indigo-600 hover:bg-indigo-50"
             >
               See all {freelanceTotal} freelancer service{freelanceTotal === 1 ? "" : "s"}
               <ArrowRight className="h-3.5 w-3.5" aria-hidden />
@@ -474,40 +433,55 @@ function ExploreContent() {
         {/* Jobs Vertical */}
         {showJobs &&
           filteredJobs.map((job) => (
-            <Link
+            <ExploreRow
               key={`job-${job.id}`}
               href={`/jobs/${job.id}`}
-              className="group flex items-center justify-between p-3.5 bg-white border border-neutral-200/90 rounded-2xl shadow-xs hover:shadow-md transition-all gap-3"
+              tone={EXPLORE_TONES.job}
+              title={job.title}
+              tag="Job"
+              thumb={
+                <ExploreThumb
+                  src={null}
+                  alt=""
+                  tone={EXPLORE_TONES.job}
+                  fallback={
+                    <span className="text-lg font-black text-teal-600" aria-hidden>
+                      {job.employer.displayName.charAt(0)}
+                    </span>
+                  }
+                />
+              }
             >
-              <div className="flex items-center gap-3">
-                <div className="w-14 h-14 rounded-xl bg-teal-50 border border-teal-100 flex items-center justify-center text-teal-600 font-black text-lg shrink-0">
-                  {(job.employer.displayName).charAt(0)}
-                </div>
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-1.5">
-                    <h3 className="text-sm font-bold text-neutral-900 line-clamp-1 group-hover:text-teal-600">
-                      {job.title}
-                    </h3>
-                  </div>
-                  <p className="text-xs text-neutral-500">
-                    {job.employer.displayName}
-                  </p>
-                  <p className="text-xs font-bold text-teal-700">
-                    {job.budgetMax || job.budgetMin
-                      ? `₦${Number(job.budgetMax ?? job.budgetMin).toLocaleString()}`
-                      : "Budget negotiable"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="text-right flex flex-col items-end gap-1">
-                <span className="px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 font-semibold text-[10px]">
-                  Job
-                </span>
-              </div>
-            </Link>
+              <p className="text-xs text-neutral-500">{job.employer.displayName}</p>
+              <p className="text-xs font-bold text-teal-700">
+                {job.budgetMax || job.budgetMin
+                  ? `₦${Number(job.budgetMax ?? job.budgetMin).toLocaleString()}`
+                  : "Budget negotiable"}
+              </p>
+            </ExploreRow>
           ))}
       </div>
     </PageContainer>
+  );
+}
+
+function Distance({ label }: { label: string }) {
+  return label ? <span className="text-[11px] text-neutral-400">{label}</span> : null;
+}
+
+/** Placeholder rows while the first results load, the same shape as the real ones. */
+function ResultsSkeleton() {
+  return (
+    <div role="status" aria-label="Loading results" className="space-y-3.5">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3 rounded-2xl border border-neutral-200/90 bg-white p-3.5">
+          <Skeleton className="h-14 w-14 shrink-0 rounded-xl" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-3.5 w-2/3" />
+            <Skeleton className="h-3 w-1/3" />
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }

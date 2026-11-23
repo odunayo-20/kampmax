@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Clock, Search } from "lucide-react";
 import { useRecentSearches } from "@/hooks/use-recent-searches";
@@ -9,16 +10,18 @@ const SUGGESTIONS = ["Logo design", "Laptop repair", "Hair braiding", "Tutoring"
 const RECENT_SHOWN = 5;
 
 const chipClass =
-  "inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-3 py-1 text-xs font-medium text-neutral-600 transition-colors hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600";
+  "inline-flex items-center gap-1.5 rounded-full bg-neutral-100 min-h-11 px-3 text-xs font-medium text-neutral-600 transition-colors hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600";
 
 /**
  * The home page's search: type, press Enter, and land on Explore with the search filled
  * in and results showing. A plain GET form, so it still works without JavaScript; with
  * it, each search is remembered here, and offered back next time in place of the
- * generic suggestions.
+ * generic suggestions. The button stays off until something is typed, so an empty
+ * search can't send anyone to a blank Explore page.
  */
 export function HomeSearch() {
   const { searches, record, clear } = useRecentSearches();
+  const [text, setText] = useState("");
   const hasRecent = searches.length > 0;
   const chips = hasRecent ? searches.slice(0, RECENT_SHOWN) : SUGGESTIONS;
 
@@ -38,6 +41,8 @@ export function HomeSearch() {
         <input
           type="search"
           name="q"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
           maxLength={100}
           autoComplete="off"
           placeholder="Search for events, products, services, jobs..."
@@ -46,7 +51,8 @@ export function HomeSearch() {
         />
         <button
           type="submit"
-          className="absolute right-1.5 top-1/2 h-9 -translate-y-1/2 rounded-xl bg-primary-600 px-4 text-xs font-semibold text-white transition-colors hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2"
+          disabled={!text.trim()}
+          className="absolute right-1.5 top-1/2 h-9 -translate-y-1/2 rounded-xl bg-primary-600 px-4 text-xs font-semibold text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2"
         >
           Search
         </button>
@@ -69,7 +75,7 @@ export function HomeSearch() {
             <button
               type="button"
               onClick={clear}
-              className="rounded-full px-2 py-1 text-xs font-medium text-neutral-400 hover:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600"
+              className="rounded-full min-h-11 px-3 text-xs font-medium text-neutral-400 hover:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600"
             >
               Clear
             </button>
