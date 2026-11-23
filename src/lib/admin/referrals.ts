@@ -59,7 +59,7 @@ export const reasonText = (reason: string | null): string => (reason ? (REASON_T
 
 /** Where an invite stands, for the status column. */
 export function referralStatusText(r: Pick<AdminReferral, "status" | "vertical">): string {
-  const kind = r.vertical === "FREELANCE" ? "freelance job" : "order";
+  const kind = r.vertical === "FREELANCE" ? "freelance job" : "purchase";
   switch (r.status) {
     case "PENDING":
       return "Waiting for a first purchase";

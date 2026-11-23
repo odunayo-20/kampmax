@@ -11,7 +11,7 @@ describe("invite credit wording", () => {
 
   it("says what kind of purchase an invite is waiting on or was paid for", () => {
     expect(referralStatusText({ status: "PENDING", vertical: null })).toMatch(/Waiting/);
-    expect(referralStatusText({ status: "HOLDING", vertical: "MARKETPLACE" })).toBe("First order made, in the hold");
+    expect(referralStatusText({ status: "HOLDING", vertical: "MARKETPLACE" })).toBe("First purchase made, in the hold");
     expect(referralStatusText({ status: "REWARDED", vertical: "FREELANCE" })).toBe("Paid after a freelance job");
   });
 
