@@ -39,7 +39,7 @@ export function RefundStatusCard({
       badgeColor: "bg-emerald-200 text-emerald-900",
       icon: CheckCircle2,
       desc: `Funds have been successfully refunded to your ${
-        payoutMethod === "kampmax_wallet" ? "Kampmax Wallet" : "Original Payment Account"
+        payoutMethod === "kampmax_wallet" ? "Kampmax Pay" : "Original Payment Account"
       }.`,
     },
     rejected: {

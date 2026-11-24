@@ -346,8 +346,11 @@ export async function fetchOrders(
   }
 
   const mapped = data.items.map(mapBackendOrderToFrontend);
-  // Update cache
-  cachedOrders = mapped;
+  // Update cache: the first page replaces it, later pages are added to it so earlier orders stay known.
+  cachedOrders =
+    params.page && params.page > 1
+      ? [...cachedOrders, ...mapped.filter((m) => !cachedOrders.some((o) => o.id === m.id))]
+      : mapped;
 
   return {
     data: mapped,

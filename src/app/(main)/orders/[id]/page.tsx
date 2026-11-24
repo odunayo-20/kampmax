@@ -6,11 +6,8 @@ import Link from "next/link";
 import {
   ArrowLeft,
   MapPin,
-  Clock,
   Package,
-  Store,
   Truck,
-  MapPinned,
   MessageCircle,
   AlertTriangle,
   LifeBuoy,
@@ -48,8 +45,9 @@ import { openVendorConversation } from "@/services/messages-api";
 import { useAuth } from "@/lib/auth-context";
 import { useCart } from "@/lib/cart-context";
 import { useMyReviewedTargets, reviewedKey } from "@/hooks/use-target-reviews";
-import { PICKUP_LOCATION_LABELS, PickupLocation, Order } from "@/types";
+import { Order } from "@/types";
 import { formatDate } from "@/lib/utils";
+import { nextStepText } from "@/lib/buyer-orders";
 
 export default function OrderDetailPage({
   params,
@@ -158,6 +156,8 @@ export default function OrderDetailPage({
     cancelReason: cancelReason || order.cancelReason,
   };
 
+  const nextStep = nextStepText(currentStatus);
+
   // Report a problem before hand-over; after delivery, a refund request takes its place.
   const canReport =
     !displayOrder.dispute &&
@@ -165,13 +165,6 @@ export default function OrderDetailPage({
     currentStatus !== "cancelled" &&
     currentStatus !== "placed" &&
     currentStatus !== "delivered";
-
-  const DELIVERY_ICONS: Record<string, typeof Package> = {
-    campus_pickup: Store,
-    meetup: MapPinned,
-    delivery: Truck,
-  };
-  const DeliveryIcon = DELIVERY_ICONS[order.deliveryMethod] || Package;
 
   function handleCancel() {
     setShowCancelModal(true);
@@ -391,6 +384,7 @@ export default function OrderDetailPage({
 
         {/* Order Progress Stepper */}
         <OrderProgressStepper status={currentStatus} />
+        {nextStep && <p className="text-sm text-kampmax-text-secondary">{nextStep}</p>}
 
         {/* Refund or return after delivery */}
         <BuyerReturnCard order={displayOrder} onChange={setOrder} />
@@ -402,18 +396,6 @@ export default function OrderDetailPage({
         {currentStatus !== "cancelled" && currentStatus !== "delivered" && (
           <CampusPickupPinCard order={displayOrder} />
         )}
-
-        {/* Estimated delivery banner */}
-        {currentStatus !== "delivered" &&
-          currentStatus !== "cancelled" &&
-          order.estimatedDelivery && (
-            <div className="flex items-center gap-2.5 p-3 rounded-xl bg-kampmax-blue/5 border border-kampmax-blue/20">
-              <Clock className="w-4 h-4 text-kampmax-blue shrink-0" />
-              <span className="text-xs text-kampmax-blue font-medium">
-                Estimated delivery: {order.estimatedDelivery}
-              </span>
-            </div>
-          )}
 
         {/* Cancelled notice */}
         {currentStatus === "cancelled" && (
@@ -445,33 +427,18 @@ export default function OrderDetailPage({
         {/* Delivery / Pickup Info */}
         <div className="bg-white rounded-xl border border-kampmax-border p-4 space-y-3">
           <div className="flex items-center gap-2">
-            <DeliveryIcon className="w-4 h-4 text-kampmax-navy" />
+            <Truck className="w-4 h-4 text-kampmax-navy" />
             <span className="text-xs font-semibold text-kampmax-text uppercase tracking-wide">
-              {order.deliveryMethod === "campus_pickup"
-                ? "Pickup Information"
-                : order.deliveryMethod === "meetup"
-                ? "Meetup Details"
-                : "Delivery Details"}
+              Delivery
             </span>
           </div>
 
-          <div className="text-xs space-y-1 text-kampmax-text">
-            {order.deliveryAddress && (
-              <p className="flex items-center gap-1.5 text-kampmax-text-secondary">
-                <MapPin className="w-3.5 h-3.5 shrink-0" />
-                <span>{order.deliveryAddress}</span>
-              </p>
-            )}
-            {order.pickupLocation && (
-              <p className="text-kampmax-text-secondary">
-                Pickup point:{" "}
-                <span className="font-medium text-kampmax-text">
-                  {PICKUP_LOCATION_LABELS[order.pickupLocation as PickupLocation] ||
-                    order.pickupLocation}
-                </span>
-              </p>
-            )}
-          </div>
+          {order.deliveryAddress && (
+            <p className="flex items-center gap-1.5 text-xs text-kampmax-text-secondary">
+              <MapPin className="w-3.5 h-3.5 shrink-0" />
+              <span>{order.deliveryAddress}</span>
+            </p>
+          )}
         </div>
 
         {/* Vendor Card */}
@@ -514,7 +481,6 @@ export default function OrderDetailPage({
           deliveryFee={displayOrder.deliveryFee}
           discountAmount={displayOrder.discountAmount}
           total={displayOrder.total}
-          paymentMethod={displayOrder.paymentMethod}
           paymentStatus={displayOrder.paymentStatus}
         />
 

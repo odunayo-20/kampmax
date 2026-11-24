@@ -29,7 +29,7 @@ export default function PaymentMethodsPage() {
       <SettingsGroup title="How you pay">
         <SettingsRow
           icon={<Wallet className="h-5 w-5" />}
-          label="Kampmax Wallet"
+          label="Kampmax Pay"
           description="Pay from your balance, top up, or withdraw to a bank account"
           onClick={() => router.push("/profile/wallet")}
         />

@@ -12,6 +12,7 @@ import {
 import { Order } from "@/types";
 import { formatNaira, formatDate, getOrderProgress, cn } from "@/lib/utils";
 import { OrderStatusBadge } from "@/components/atoms/Badge";
+import { nextStepText } from "@/lib/buyer-orders";
 
 interface OrderCardProps {
   order: Order;
@@ -33,6 +34,7 @@ export function OrderCard({ order, vendorName, className }: OrderCardProps) {
   const isCancelled = order.status === "cancelled";
   const isActive = !isCancelled && order.status !== "delivered";
   const DeliveryIcon = DELIVERY_ICONS[order.deliveryMethod] || Package;
+  const nextStep = nextStepText(order.status);
 
   return (
     <Link
@@ -89,15 +91,16 @@ export function OrderCard({ order, vendorName, className }: OrderCardProps) {
         </span>
       </div>
 
-      {/* Progress bar (active orders only) */}
+      {/* Progress bar and what happens next (active orders only) */}
       {isActive && (
-        <div className="mb-3">
+        <div className="mb-3 space-y-1.5">
           <div className="w-full h-1.5 bg-kampmax-muted rounded-full overflow-hidden">
             <div
               className="h-full bg-kampmax-blue rounded-full transition-all duration-500"
               style={{ width: `${progress}%` }}
             />
           </div>
+          {nextStep && <p className="text-xs text-kampmax-text-secondary">{nextStep}</p>}
         </div>
       )}
 

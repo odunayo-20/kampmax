@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   ChevronRight, LogOut, Store, Package, Heart, MapPin,
   CreditCard, Wallet, Bell, Shield, HelpCircle,
-  Settings, Star, ChevronDown, Pencil, Clock, Lock, ShieldCheck,
+  Settings, Star, ChevronDown, Pencil, Clock, ShieldCheck,
   Ticket, CalendarPlus, FileText, Send, UserCog,
 } from "lucide-react";
 import { Avatar } from "@/components/atoms/Avatar";
@@ -23,7 +23,6 @@ import { fetchWishlist } from "@/services/wishlist";
 import { fetchLoyaltyAccount } from "@/services/loyalty";
 import { useAuth } from "@/lib/auth-context";
 import { useApp } from "@/lib/app-context";
-import { useAddresses } from "@/hooks/use-addresses";
 import { fetchMyWallet } from "@/services/wallet";
 import { formatNaira } from "@/lib/utils";
 import { fetchMyProfile, mapBackendProfileToFrontend } from "@/services/profile";
@@ -36,7 +35,6 @@ export default function ProfilePage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const [showVendorCard, setShowVendorCard] = useState(true);
-  const addressesQuery = useAddresses();
   const isVendorUser = currentUser?.role === "vendor";
   const { data: vendor } = useQuery({
     queryKey: ["vendors", "me", currentUser?.id ?? ""],
@@ -92,7 +90,6 @@ export default function ProfilePage() {
   const orderCount = ordersQuery.data?.total;
   const wallet = walletQuery.data;
   const loyalty = loyaltyQuery.data;
-  const savedAddressesCount = addressesQuery.data?.length ?? 0;
 
   const activeOrders = orders.filter((o) =>
     ["placed", "confirmed", "preparing", "ready", "out_for_delivery"].includes(o.status)
@@ -333,31 +330,10 @@ export default function ProfilePage() {
         />
         <SettingsRow
           icon={<MapPin className="h-5 w-5" />}
-          label="Saved Addresses"
-          description={`${savedAddressesCount} saved location${savedAddressesCount === 1 ? "" : "s"}`}
-          action={<ChevronRight className="h-4 w-4 text-kampmax-text-secondary" />}
-          onClick={() => router.push("/profile/addresses")}
-        />
-        <SettingsRow
-          icon={<MapPin className="h-5 w-5" />}
           label="My Location"
           description="Set where you are based"
           action={<ChevronRight className="h-4 w-4 text-kampmax-text-secondary" />}
           onClick={() => router.push("/profile/location")}
-        />
-        <SettingsRow
-          icon={<CreditCard className="h-5 w-5" />}
-          label="Payment Methods"
-          description="How you pay on Kampmax"
-          action={<ChevronRight className="h-4 w-4 text-kampmax-text-secondary" />}
-          onClick={() => router.push("/profile/payment-methods")}
-        />
-        <SettingsRow
-          icon={<Wallet className="h-5 w-5" />}
-          label="Kampmax Wallet"
-          description={wallet ? `Balance: ${formatNaira(wallet.balance)}` : "Balance unavailable"}
-          action={<ChevronRight className="h-4 w-4 text-kampmax-text-secondary" />}
-          onClick={() => router.push("/profile/wallet")}
         />
         <SettingsRow
           icon={<Ticket className="h-5 w-5" />}
@@ -390,24 +366,6 @@ export default function ProfilePage() {
           description="Manage alerts and preferences"
           action={<ChevronRight className="h-4 w-4 text-kampmax-text-secondary" />}
           onClick={() => router.push("/profile/settings/notifications")}
-        />
-        <SettingsRow
-          icon={<Lock className="h-5 w-5" />}
-          label="Security Settings"
-          description="Change your password"
-          action={<ChevronRight className="h-4 w-4 text-kampmax-text-secondary" />}
-          onClick={() => router.push("/profile/settings/security")}
-        />
-      </SettingsGroup>
-
-      {/* Help */}
-      <SettingsGroup>
-        <SettingsRow
-          icon={<HelpCircle className="h-5 w-5" />}
-          label="Help & Support"
-          description="FAQ, contact us, report a problem"
-          action={<ChevronRight className="h-4 w-4 text-kampmax-text-secondary" />}
-          onClick={() => router.push("/profile/help")}
         />
       </SettingsGroup>
 

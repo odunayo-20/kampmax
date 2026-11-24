@@ -14,6 +14,8 @@ import { Order } from "@/types";
 import { getVendorById } from "@/services/users";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { OrderCard } from "@/components/orders/OrderCard";
+import { Button } from "@/components/ui";
+import { matchesOrder, ordersHeadline } from "@/lib/buyer-orders";
 import { EmptyOrdersState } from "@/components/orders/EmptyOrdersState";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +34,10 @@ export default function OrdersPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [liveOrders, setLiveOrders] = useState<Order[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  // Which page of orders is loaded, so older ones can be asked for.
+  const [paging, setPaging] = useState({ page: 1, totalPages: 1 });
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [moreFailed, setMoreFailed] = useState(false);
 
   const userId = user?.id || "u1";
 
@@ -39,9 +45,10 @@ export default function OrdersPage() {
     let mounted = true;
     if (status === "authenticated") {
       setIsLoading(true);
-      fetchOrders().then(({ data }) => {
+      fetchOrders().then(({ data, page, totalPages }) => {
         if (mounted) {
           setLiveOrders(data);
+          setPaging({ page, totalPages });
           setIsLoading(false);
         }
       });
@@ -50,6 +57,21 @@ export default function OrdersPage() {
       mounted = false;
     };
   }, [status]);
+
+  const hasMore = paging.page < paging.totalPages;
+
+  async function loadOlder() {
+    setLoadingMore(true);
+    setMoreFailed(false);
+    const res = await fetchOrders({ page: paging.page + 1 });
+    if (res.error) {
+      setMoreFailed(true);
+    } else {
+      setLiveOrders((prev) => [...(prev ?? []), ...res.data.filter((o) => !(prev ?? []).some((p) => p.id === o.id))]);
+      setPaging({ page: res.page, totalPages: res.totalPages });
+    }
+    setLoadingMore(false);
+  }
 
   const allUserOrders = useMemo(() => {
     return liveOrders || getOrdersByUser(userId);
@@ -75,17 +97,12 @@ export default function OrdersPage() {
     }
   }, [activeTab, allUserOrders]);
 
-  const filteredOrders = useMemo(() => {
-    if (!searchQuery.trim()) return orders;
-    const q = searchQuery.toLowerCase();
-    return orders.filter(
-      (o) =>
-        o.id.toLowerCase().includes(q) ||
-        o.items.some((i) =>
-          i.product.title.toLowerCase().includes(q)
-        )
-    );
-  }, [orders, searchQuery]);
+  const filteredOrders = useMemo(
+    () => (searchQuery.trim() ? orders.filter((o) => matchesOrder(o, searchQuery)) : orders),
+    [orders, searchQuery]
+  );
+
+  const headline = useMemo(() => ordersHeadline(allUserOrders.map((o) => o.status)), [allUserOrders]);
 
   const tabCounts = useMemo(() => ({
     all: allUserOrders.length,
@@ -132,6 +149,12 @@ export default function OrdersPage() {
           )}
         </div>
 
+        {headline && (
+          <p role="status" className="rounded-lg bg-accent-50 px-3 py-2 text-sm font-semibold text-accent-700">
+            {headline}
+          </p>
+        )}
+
         {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-kampmax-text-secondary" />
@@ -139,7 +162,7 @@ export default function OrdersPage() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by order ID or product name..."
+            placeholder="Search by order number, seller or product..."
             className="w-full h-10 pl-9 pr-4 text-sm bg-white border border-kampmax-border rounded-lg focus:outline-none focus:border-kampmax-blue focus:ring-1 focus:ring-kampmax-blue placeholder:text-kampmax-text-secondary"
           />
         </div>
@@ -190,6 +213,22 @@ export default function OrdersPage() {
                 vendorName={vendorCache[order.vendorId]}
               />
             ))}
+          </div>
+        )}
+
+        {hasMore && (
+          <div className="flex flex-col items-center gap-2 pt-2">
+            {searchQuery.trim() && (
+              <p className="text-xs text-kampmax-text-secondary">Only the orders loaded so far are searched.</p>
+            )}
+            {moreFailed && (
+              <p role="alert" className="text-xs text-kampmax-error">
+                Couldn&apos;t load older orders. Try again.
+              </p>
+            )}
+            <Button variant="outline" onClick={loadOlder} disabled={loadingMore}>
+              {loadingMore ? "Loading…" : "Load older orders"}
+            </Button>
           </div>
         )}
       </div>

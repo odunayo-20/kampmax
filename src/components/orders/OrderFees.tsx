@@ -8,25 +8,17 @@ interface OrderFeesProps {
   deliveryFee: number;
   discountAmount: number;
   total: number;
-  paymentMethod: string;
   paymentStatus: string;
 }
 
+/** The cost of an order and whether it is paid. How it was paid is not shown: the order data doesn't say. */
 export function OrderFees({
   subtotal,
   deliveryFee,
   discountAmount,
   total,
-  paymentMethod,
   paymentStatus,
 }: OrderFeesProps) {
-  const PAYMENT_LABELS: Record<string, string> = {
-    paystack: "Paystack",
-    bank_transfer: "Bank Transfer",
-    wallet: "Kampmax Wallet",
-    cod: "Cash on Pickup",
-  };
-
   const PAYMENT_STATUS_STYLES: Record<string, string> = {
     paid: "text-kampmax-success",
     pending: "text-kampmax-warning",
@@ -74,9 +66,7 @@ export function OrderFees({
       </div>
 
       <div className="flex items-center justify-between pt-1">
-        <span className="text-xs text-kampmax-text-secondary">
-          {PAYMENT_LABELS[paymentMethod] || paymentMethod}
-        </span>
+        <span className="text-xs text-kampmax-text-secondary">Payment</span>
         <span
           className={cn(
             "text-xs font-medium capitalize",

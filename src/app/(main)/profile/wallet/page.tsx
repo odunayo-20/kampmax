@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -14,7 +14,8 @@ import { FundingModal } from "@/components/wallet/FundingModal";
 import { WithdrawModal } from "@/components/wallet/WithdrawModal";
 import { FinancialIdentityCard } from "@/components/wallet/FinancialIdentityCard";
 import { useAuth } from "@/lib/auth-context";
-import { fetchMyWallet, fetchMyWalletTransactions, submitWithdrawal, type WithdrawPayload } from "@/services/wallet";
+import { fetchMyCredit, fetchMyWallet, fetchMyWalletTransactionsPage, submitWithdrawal, type WithdrawPayload } from "@/services/wallet";
+import { formatNaira } from "@/lib/utils";
 import { useWalletTopup } from "@/hooks/use-wallet-topup";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
 import { WalletTransaction, WalletTransactionType } from "@/types";
@@ -50,11 +51,19 @@ export default function WalletPage() {
     queryFn: fetchMyWallet,
     enabled: !!user,
   });
-  const txQuery = useQuery({
+  const txQuery = useInfiniteQuery({
     queryKey: [...WALLET_KEY, "transactions", user?.id],
-    queryFn: () => fetchMyWalletTransactions({ limit: 50 }),
+    queryFn: ({ pageParam }) => fetchMyWalletTransactionsPage({ page: pageParam, limit: 30 }),
+    initialPageParam: 1,
+    getNextPageParam: (last) => (last.page < last.totalPages ? last.page + 1 : undefined),
     enabled: !!user,
   });
+  const creditQuery = useQuery({
+    queryKey: [...WALLET_KEY, "credit", user?.id],
+    queryFn: fetchMyCredit,
+    enabled: !!user,
+  });
+  const credit = creditQuery.data ?? 0;
 
   async function withdraw(payload: WithdrawPayload) {
     await submitWithdrawal(payload);
@@ -95,7 +104,7 @@ export default function WalletPage() {
     );
   }
 
-  const txs = txQuery.data ?? [];
+  const txs = txQuery.data?.pages.flatMap((p) => p.items) ?? [];
   const filtered = txs.filter((tx) => {
     const matchType = filter === "all" || tx.type === filter;
     const matchStatus = statusFilter === "all" || tx.status === statusFilter;
@@ -116,7 +125,7 @@ export default function WalletPage() {
         >
           <ArrowLeft className="h-5 w-5 text-kampmax-text" />
         </button>
-        <h1 className="text-lg font-bold text-kampmax-text">Kampmax Wallet</h1>
+        <h1 className="text-lg font-bold text-kampmax-text">Kampmax Pay</h1>
       </div>
 
       {/* Balance */}
@@ -125,6 +134,16 @@ export default function WalletPage() {
         onTopUp={() => setShowFunding(true)}
         onWithdraw={() => setShowWithdraw(true)}
       />
+
+      {credit > 0 && (
+        <div className="rounded-xl border border-kampmax-border bg-white p-4">
+          <p className="text-xs text-kampmax-text-secondary">Kampmax credit</p>
+          <p className="text-xl font-bold text-primary-700 tabular-nums">{formatNaira(credit)}</p>
+          <p className="mt-1 text-xs text-kampmax-text-secondary">
+            Kampmax credit pays part of an order. It cannot be withdrawn and it expires.
+          </p>
+        </div>
+      )}
 
       {notice && (
         <p
@@ -209,6 +228,19 @@ export default function WalletPage() {
           </div>
         )}
       </div>
+
+      {txQuery.hasNextPage && (
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={() => void txQuery.fetchNextPage()}
+            disabled={txQuery.isFetchingNextPage}
+            className="rounded-lg border border-kampmax-border bg-white px-4 py-2 text-xs font-semibold text-kampmax-text hover:bg-kampmax-muted disabled:opacity-50"
+          >
+            {txQuery.isFetchingNextPage ? "Loading…" : "Load older transactions"}
+          </button>
+        </div>
+      )}
 
       {/* Transaction Detail Modal */}
       {selectedTx && (

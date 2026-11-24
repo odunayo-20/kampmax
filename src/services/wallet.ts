@@ -217,9 +217,9 @@ export async function fetchMyWallet(): Promise<Wallet> {
 }
 
 /** The signed-in user's real wallet transactions, newest first; throws on failure. */
-export async function fetchMyWalletTransactions(
+export async function fetchMyWalletTransactionsPage(
   params: { page?: number; limit?: number } = {},
-): Promise<WalletTransaction[]> {
+): Promise<{ items: WalletTransaction[]; page: number; totalPages: number }> {
   const searchParams = new URLSearchParams();
   if (params.page) searchParams.set("page", String(params.page));
   if (params.limit) searchParams.set("limit", String(params.limit));
@@ -230,7 +230,26 @@ export async function fetchMyWalletTransactions(
   if (error || !data || !Array.isArray(data.items)) {
     throw toFailure(error, "Could not load your transactions.");
   }
-  return data.items.map(mapBackendWalletTransactionToFrontend);
+  return {
+    items: data.items.map(mapBackendWalletTransactionToFrontend),
+    page: data.meta?.page ?? params.page ?? 1,
+    totalPages: data.meta?.totalPages ?? 1,
+  };
+}
+
+/** One page of transactions, without the paging details. */
+export async function fetchMyWalletTransactions(
+  params: { page?: number; limit?: number } = {},
+): Promise<WalletTransaction[]> {
+  return (await fetchMyWalletTransactionsPage(params)).items;
+}
+
+/** The buyer's Kampmax credit (GET /referrals/me); zero when there is none or it can't be read. */
+export async function fetchMyCredit(): Promise<number> {
+  const { data, error } = await apiClient.get<{ creditBalance?: number | string }>("/referrals/me");
+  if (error || !data) return 0;
+  const credit = Number(data.creditBalance ?? 0);
+  return Number.isFinite(credit) && credit > 0 ? credit : 0;
 }
 
 /** The signed-in user's real wallet balance; throws instead of showing a fake one. */
