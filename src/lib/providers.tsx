@@ -10,6 +10,7 @@ import { createQueryPersistOptions } from "@/lib/query-persistence";
 import { AnalyticsBridge } from "@/components/analytics/AnalyticsBridge";
 import { QueryCacheOwnerGuard } from "@/components/auth/QueryCacheOwnerGuard";
 import { NotificationSyncBridge } from "@/components/notifications/NotificationSyncBridge";
+import { DeviceLockGate } from "@/components/auth/DeviceLockGate";
 import { MessageSyncBridge } from "@/components/messages/MessageSyncBridge";
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -25,6 +26,7 @@ export function Providers({ children }: { children: ReactNode }) {
         <MessageSyncBridge />
         <AppProvider>
           <CartProvider>{children}</CartProvider>
+          <DeviceLockGate />
         </AppProvider>
       </PersistQueryClientProvider>
     </AuthProvider>

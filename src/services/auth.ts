@@ -440,20 +440,3 @@ export async function deactivateAccount(_token: string): Promise<AuthResult> {
       "Contact support to have your account deactivated.",
   };
 }
-
-/**
- * Permanently delete the current user's account.
- * NOTE: The backend does not expose a delete account endpoint.
- * This returns an honest error documenting the mismatch.
- */
-export async function deleteAccount(
-  _token: string,
-  _verifiedEmail: string
-): Promise<AuthResult> {
-  return {
-    success: false,
-    message:
-      "Account deletion is not yet supported by the backend. " +
-      "Contact support to have your account permanently deleted.",
-  };
-}

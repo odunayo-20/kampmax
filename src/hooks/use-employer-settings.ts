@@ -115,15 +115,3 @@ export function useDeactivateAccount() {
     },
   });
 }
-
-export function useDeleteAccount() {
-  const { accessToken } = useAuth();
-
-  return useMutation({
-    mutationFn: async (verifiedEmail: string) => {
-      if (!accessToken) throw new Error("Not authenticated.");
-      await delay(400);
-      return authService.deleteAccount(accessToken, verifiedEmail);
-    },
-  });
-}

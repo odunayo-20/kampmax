@@ -1,15 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { ArrowLeft, Key, Info, ChevronRight, Check } from "lucide-react";
-import { PageContainer } from "@/components/layout/PageContainer";
-import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
+import Link from "next/link";
+import { Key, Info, ChevronRight, Check } from "lucide-react";
+import { SettingsPageShell } from "@/components/settings/SettingsPageShell";
 import { SettingsGroup, SettingsRow } from "@/components/profile/SettingsGroup";
 import { useChangePassword } from "@/hooks/use-employer-settings";
 
 export default function SecuritySettingsPage() {
-  const router = useRouter();
   const changePassword = useChangePassword();
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -38,24 +36,7 @@ export default function SecuritySettingsPage() {
   }
 
   return (
-    <PageContainer className="space-y-4">
-      <Breadcrumbs
-        items={[
-          { label: "Profile", href: "/profile" },
-          { label: "Security Settings" },
-        ]}
-      />
-
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => router.back()}
-          className="w-9 h-9 rounded-lg bg-kampmax-muted flex items-center justify-center"
-        >
-          <ArrowLeft className="h-5 w-5 text-kampmax-text" />
-        </button>
-        <h1 className="text-lg font-bold text-kampmax-text">Security Settings</h1>
-      </div>
-
+    <SettingsPageShell title="Security Settings">
       {/* Password */}
       <SettingsGroup title="Password">
         <SettingsRow
@@ -122,8 +103,11 @@ export default function SecuritySettingsPage() {
       <div className="bg-kampmax-muted/50 rounded-xl p-4 flex items-start gap-2">
         <Info className="h-4 w-4 text-kampmax-text-secondary flex-shrink-0 mt-0.5" />
         <p className="text-xs text-kampmax-text-secondary leading-relaxed">
-          If you suspect unauthorized access, change your password immediately. Two-factor sign-in and device
-          management aren&apos;t available yet.
+          If you suspect unauthorized access, change your password immediately, then{" "}
+          <Link href="/profile/settings/sessions" className="underline">
+            sign out the devices you don&apos;t recognise
+          </Link>
+          . Two-factor sign-in isn&apos;t available yet.
         </p>
       </div>
 
@@ -134,6 +118,6 @@ export default function SecuritySettingsPage() {
           Password updated
         </div>
       )}
-    </PageContainer>
+    </SettingsPageShell>
   );
 }

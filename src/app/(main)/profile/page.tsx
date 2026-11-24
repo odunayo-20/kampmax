@@ -6,7 +6,7 @@ import {
   ChevronRight, LogOut, Store, Package, Heart, MapPin,
   CreditCard, Wallet, Bell, Shield, HelpCircle,
   Settings, Star, ChevronDown, Pencil, Clock, Lock, ShieldCheck,
-  Ticket, CalendarPlus, FileText, Send,
+  Ticket, CalendarPlus, FileText, Send, UserCog,
 } from "lucide-react";
 import { Avatar } from "@/components/atoms/Avatar";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -242,6 +242,7 @@ export default function ProfilePage() {
             icon: <Package className="h-5 w-5" />,
             label: "Orders",
             onClick: () => router.push("/orders"),
+            badge: activeOrders > 0 ? activeOrders : undefined,
           },
           {
             icon: <Heart className="h-5 w-5" />,
@@ -252,7 +253,6 @@ export default function ProfilePage() {
             icon: <Wallet className="h-5 w-5" />,
             label: "Wallet",
             onClick: () => router.push("/profile/wallet"),
-            badge: activeOrders > 0 ? activeOrders : undefined,
           },
           {
             icon: <MapPin className="h-5 w-5" />,
@@ -295,6 +295,20 @@ export default function ProfilePage() {
           description="View and manage feedback you've left"
           action={<ChevronRight className="h-4 w-4 text-kampmax-text-secondary" />}
           onClick={() => router.push("/profile/reviews")}
+        />
+        <SettingsRow
+          icon={<Store className="h-5 w-5" />}
+          label="Stores I Follow"
+          description="New items and offers from stores you follow"
+          action={<ChevronRight className="h-4 w-4 text-kampmax-text-secondary" />}
+          onClick={() => router.push("/profile/following")}
+        />
+        <SettingsRow
+          icon={<UserCog className="h-5 w-5" />}
+          label="Your Profiles"
+          description="Store, services, freelancing, hiring"
+          action={<ChevronRight className="h-4 w-4 text-kampmax-text-secondary" />}
+          onClick={() => router.push("/account/profiles")}
         />
         <SettingsRow
           icon={<FileText className="h-5 w-5" />}

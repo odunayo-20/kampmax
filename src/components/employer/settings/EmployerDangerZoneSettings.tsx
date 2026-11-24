@@ -7,14 +7,10 @@ import {
   LogOut,
   PauseCircle,
   Trash2,
-  AlertTriangle,
   ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import {
-  useDeactivateAccount,
-  useDeleteAccount,
-} from "@/hooks/use-employer-settings";
+import { useDeactivateAccount } from "@/hooks/use-employer-settings";
 import { SettingsGroup, SettingsRow } from "@/components/profile/SettingsGroup";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
@@ -23,25 +19,18 @@ import {
   SettingsNote,
 } from "./EmployerSettingsShared";
 
-type ConfirmAction = "logout" | "deactivate" | "delete" | null;
-type TerminalState = "deactivated" | "deleted" | null;
+type ConfirmAction = "logout" | "deactivate" | null;
 
 export function EmployerDangerZoneSettings() {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
   const deactivateMutate = useDeactivateAccount();
-  const deleteMutate = useDeleteAccount();
 
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
-  const [deleteEmail, setDeleteEmail] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [terminal, setTerminal] = useState<TerminalState>(null);
-  const [deletePanelOpen, setDeletePanelOpen] = useState(false);
-
-  const emailMatches =
-    deleteEmail.trim().toLowerCase() === (user?.email ?? "").trim().toLowerCase();
+  const [deactivated, setDeactivated] = useState(false);
 
   async function finishSession() {
     await logout();
@@ -66,36 +55,19 @@ export function EmployerDangerZoneSettings() {
         return;
       }
       await finishSession();
-      setTerminal("deactivated");
+      setDeactivated(true);
       router.push("/login");
     } catch (err) {
       setActionError(getFriendlyErrorMessage(err));
     }
   }
 
-  async function handleConfirmDelete() {
-    setConfirmAction(null);
-    setActionError(null);
-    try {
-      const result = await deleteMutate.mutateAsync(deleteEmail);
-      if (!result.success) {
-        setActionError(result.message);
-        return;
-      }
-      await finishSession();
-      setTerminal("deleted");
-      router.push("/login");
-    } catch (err) {
-      setActionError(getFriendlyErrorMessage(err));
-    }
-  }
-
-  if (terminal) {
+  if (deactivated) {
     return (
       <div className="space-y-5">
         <SettingsSectionHeader
           title="Danger Zone"
-          description={terminal === "deactivated" ? "Account deactivated" : "Account deleted"}
+          description="Account deactivated"
         />
         <div className="rounded-xl border border-kampmax-border bg-white p-8 text-center">
           <ShieldCheck
@@ -103,14 +75,10 @@ export function EmployerDangerZoneSettings() {
             aria-hidden
           />
           <h2 className="mt-3 text-base font-bold text-kampmax-text">
-            {terminal === "deactivated"
-              ? "Your account has been deactivated."
-              : "Your account has been deleted."}
+            Your account has been deactivated.
           </h2>
           <p className="mx-auto mt-1.5 max-w-sm text-sm text-kampmax-text-secondary">
-            {terminal === "deactivated"
-              ? "You've been signed out and your employer profile is paused. Contact Kampmax support at support@kampmax.com to reactivate."
-              : "You've been signed out and your account is gone. Thanks for using Kampmax — you can create a new account anytime."}
+            You've been signed out and your employer profile is paused. Contact Kampmax support at support@kampmax.com to reactivate.
           </p>
         </div>
       </div>
@@ -157,51 +125,15 @@ export function EmployerDangerZoneSettings() {
 
       <SettingsGroup
         title="Delete account"
-        description="Permanently remove your account and data."
+        description="Permanently remove your account."
       >
         <SettingsRow
           icon={<Trash2 className="h-5 w-5" />}
-          label="Delete account permanently"
-          description="Removes your account, employer profile, jobs and data. This can't be undone."
+          label="Close my account"
+          description="Checks anything still open, then asks for your password. This can't be undone."
           danger
-          onClick={() => {
-            setActionError(null);
-            setDeletePanelOpen((open) => !open);
-          }}
+          onClick={() => router.push("/profile/settings/close-account")}
         />
-        {deletePanelOpen && (
-          <div className="space-y-3 border-t border-kampmax-border bg-error-50/40 p-4">
-            <div className="flex items-start gap-2">
-              <AlertTriangle
-                className="mt-0.5 h-4 w-4 flex-shrink-0 text-kampmax-error"
-                aria-hidden
-              />
-              <p className="text-xs leading-relaxed text-kampmax-text-secondary">
-                Deleting is permanent. To continue, type the account email{" "}
-                <span className="font-semibold text-kampmax-text">
-                  {user?.email}
-                </span>{" "}
-                below.
-              </p>
-            </div>
-            <input
-              type="text"
-              value={deleteEmail}
-              onChange={(e) => setDeleteEmail(e.target.value)}
-              placeholder="Type your account email"
-              aria-label="Type your account email to confirm deletion"
-              className="w-full rounded-lg border border-kampmax-error/40 bg-white px-3 py-2.5 text-sm text-kampmax-text focus:border-kampmax-error focus:outline-none focus:ring-1 focus:ring-kampmax-error"
-            />
-            <button
-              type="button"
-              disabled={!emailMatches}
-              onClick={() => setConfirmAction("delete")}
-              className="w-full rounded-lg bg-kampmax-error py-2.5 text-sm font-semibold text-white transition-colors hover:bg-kampmax-error/90 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Continue to delete
-            </button>
-          </div>
-        )}
       </SettingsGroup>
 
       {actionError && (
@@ -233,16 +165,6 @@ export function EmployerDangerZoneSettings() {
         destructive
         pending={deactivateMutate.isPending}
         onConfirm={() => void handleConfirmDeactivate()}
-        onCancel={() => setConfirmAction(null)}
-      />
-      <ConfirmDialog
-        open={confirmAction === "delete"}
-        title="Delete your account permanently?"
-        body="This removes your account, employer profile, jobs and data from Kampmax. This can't be undone."
-        confirmLabel="Delete permanently"
-        destructive
-        pending={deleteMutate.isPending}
-        onConfirm={() => void handleConfirmDelete()}
         onCancel={() => setConfirmAction(null)}
       />
     </div>

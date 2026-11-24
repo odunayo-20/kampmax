@@ -138,12 +138,3 @@ export async function fetchPublicProfile(
   }
   return { data, error: null };
 }
-
-/**
- * Delete current user account.
- * DELETE /api/v1/users/me
- */
-export async function deleteAccountApi(): Promise<{ success: boolean; error: ApiError | null }> {
-  const { error } = await apiClient.delete("/users/me");
-  return { success: !error, error };
-}
