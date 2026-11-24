@@ -4,7 +4,7 @@ import { Suspense, useMemo, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Search, Calendar, MapPin, ArrowRight, Wrench, Briefcase, Ticket, ShoppingBag } from "lucide-react";
+import { Search, Calendar, MapPin, ArrowRight, Wrench, Briefcase, Ticket, ShoppingBag, UserRound } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { listEventsApi } from "@/services/event-tickets";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -14,6 +14,7 @@ import { fetchProducts } from "@/services/products";
 import { listPublicJobs } from "@/services/jobs";
 import { fetchServicePage } from "@/services/service-marketplace";
 import { fetchPublicServices } from "@/services/freelancer-services";
+import { listPublicFreelancers } from "@/services/freelancer";
 import { FreelanceServiceRow } from "@/components/explore/FreelanceServiceRow";
 import { EXPLORE_TONES, ExploreCard, ExploreRow, ExploreThumb } from "@/components/explore/ExploreRow";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -22,7 +23,7 @@ import { useMyLocation } from "@/hooks/use-location";
 import { fetchNearby, formatDistance, roundCoordinate } from "@/services/nearby-api";
 import { cn } from "@/lib/utils";
 
-type ExploreCategory = "all" | "events" | "products" | "services" | "freelance" | "jobs";
+type ExploreCategory = "all" | "events" | "products" | "services" | "freelance" | "freelancers" | "jobs";
 
 const CATEGORIES: { id: ExploreCategory; label: string }[] = [
   { id: "all", label: "All" },
@@ -30,6 +31,7 @@ const CATEGORIES: { id: ExploreCategory; label: string }[] = [
   { id: "products", label: "Products" },
   { id: "services", label: "Services" },
   { id: "freelance", label: "Freelance" },
+  { id: "freelancers", label: "Freelancers" },
   { id: "jobs", label: "Jobs" },
 ];
 
@@ -103,6 +105,16 @@ function ExploreContent() {
     },
     ...KEEP_PREVIOUS,
   });
+  // The people themselves (the Freelance filter lists what they sell).
+  const freelancersQuery = useQuery({
+    queryKey: ["explore", "freelancers", search],
+    queryFn: async () => {
+      const res = await listPublicFreelancers({ q: search, limit: 3 });
+      if (res.error) throw res.error;
+      return { items: res.profiles, total: res.total };
+    },
+    ...KEEP_PREVIOUS,
+  });
   const jobsQuery = useQuery({
     queryKey: ["explore", "jobs", search],
     queryFn: async () => {
@@ -118,6 +130,7 @@ function ExploreContent() {
   const filteredServices = servicesQuery.data?.items ?? [];
   const freelanceServices = freelanceQuery.data?.items ?? [];
   const freelanceTotal = freelanceQuery.data?.total ?? 0;
+  const filteredFreelancers = freelancersQuery.data?.items ?? [];
   const filteredJobs = jobsQuery.data?.items ?? [];
 
   // Totals for the pills. Undefined while loading or failed, so a pill shows no number
@@ -127,6 +140,7 @@ function ExploreContent() {
     products: productsQuery.data?.total,
     services: servicesQuery.data?.total,
     freelance: freelanceQuery.data?.total,
+    freelancers: freelancersQuery.data?.total,
     jobs: jobsQuery.data?.total,
   };
   const known = Object.values(verticalTotals);
@@ -199,7 +213,7 @@ function ExploreContent() {
     );
   };
 
-  const verticalQueries = [eventsQuery, productsQuery, servicesQuery, freelanceQuery, jobsQuery];
+  const verticalQueries = [eventsQuery, productsQuery, servicesQuery, freelanceQuery, freelancersQuery, jobsQuery];
   const failed = verticalQueries.some((q) => q.isError);
   const loading = verticalQueries.some((q) => q.isLoading);
   // Swapping to a new search keeps the old results up (dimmed) until the new ones land.
@@ -209,6 +223,7 @@ function ExploreContent() {
   const showProducts = selectedCategory === "all" || selectedCategory === "products";
   const showServices = selectedCategory === "all" || selectedCategory === "services";
   const showFreelance = selectedCategory === "all" || selectedCategory === "freelance";
+  const showFreelancers = selectedCategory === "all" || selectedCategory === "freelancers";
   const showJobs = selectedCategory === "all" || selectedCategory === "jobs";
   const empty =
     !loading &&
@@ -216,6 +231,7 @@ function ExploreContent() {
     (!showProducts || !filteredProducts.length) &&
     (!showServices || !filteredServices.length) &&
     (!showFreelance || !freelanceServices.length) &&
+    (!showFreelancers || !filteredFreelancers.length) &&
     (!showJobs || !filteredJobs.length);
 
   return (
@@ -429,6 +445,32 @@ function ExploreContent() {
             </Link>
           </>
         )}
+
+        {/* Freelancers Vertical (the people) */}
+        {showFreelancers &&
+          filteredFreelancers.map((person) => (
+            <ExploreRow
+              key={`freelancer-${person.id}`}
+              href={`/freelancers/${person.id}`}
+              tone={EXPLORE_TONES.freelance}
+              title={person.fullName}
+              tag="Freelancer"
+              thumb={
+                <ExploreThumb
+                  src={person.avatar}
+                  alt=""
+                  tone={EXPLORE_TONES.freelance}
+                  fallback={<UserRound className="h-6 w-6 text-indigo-300" aria-hidden />}
+                />
+              }
+              aside={<Distance label={distanceLabel("FREELANCER", person.id)} />}
+            >
+              {person.professionalTitle && <p className="line-clamp-1 text-xs text-neutral-500">{person.professionalTitle}</p>}
+              <p className="text-xs font-extrabold text-neutral-900">
+                {person.hourlyRate ? `₦${person.hourlyRate.toLocaleString()}/hr` : "Rate on request"}
+              </p>
+            </ExploreRow>
+          ))}
 
         {/* Jobs Vertical */}
         {showJobs &&
