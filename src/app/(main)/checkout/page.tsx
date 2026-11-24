@@ -33,7 +33,8 @@ export default function CheckoutPage() {
   );
   const checkout = useCheckout();
 
-  const [summaryCollapsed, setSummaryCollapsed] = useState(false);
+  /** The order summary above the pay button on a phone, closed until asked for. */
+  const [summaryOpen, setSummaryOpen] = useState(false);
 
   const {
     state,
@@ -234,13 +235,14 @@ export default function CheckoutPage() {
       {state !== CHECKOUT_STATES.ORDER_CONFIRMATION && (
         <div className="lg:hidden fixed inset-x-0 bottom-[60px] z-40 px-4 pb-3 bg-gradient-to-t from-white via-white/95 to-transparent pt-2">
           <Button
-            onClick={() => setSummaryCollapsed(true)}
+            onClick={() => setSummaryOpen((open) => !open)}
+            aria-expanded={summaryOpen}
             className="w-full mb-2 bg-kampmax-muted text-kampmax-text hover:bg-neutral-200"
             variant="secondary"
           >
-            {summaryCollapsed ? "Hide" : "Show"} order summary
+            {summaryOpen ? "Hide" : "Show"} order summary
           </Button>
-          {summaryCollapsed && (
+          {summaryOpen && (
             <div className="mb-2">
               <OrderSummary session={session} collapsed={false} />
             </div>

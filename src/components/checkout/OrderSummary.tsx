@@ -60,17 +60,13 @@ export function OrderSummary({
 
       {!collapsed && (
         <div className="space-y-2.5">
-          <p className="text-xs text-kampmax-text-secondary">
-            Display-only summary. The server is authoritative for all amounts.
-          </p>
-
           <Row label="Items subtotal" value={formatNaira(p.itemsSubtotal)} />
           <Row label="Delivery fee" value={formatNaira(p.deliveryTotal)} />
           {p.discountTotal > 0 && (
             <Row label="Promo discount" value={`-${formatNaira(p.discountTotal)}`} />
           )}
           {p.coinDeduction > 0 && (
-            <Row label="Kampmax coin" value={`-${formatNaira(p.coinDeduction)}`} />
+            <Row label="Kampmax credit" value={`-${formatNaira(p.coinDeduction)}`} />
           )}
           <Row label="Total items" value={String(p.itemCount)} />
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Trash2, ShoppingBag, Loader2 } from "lucide-react";
 import { useCart } from "@/lib/cart-context";
@@ -21,6 +22,7 @@ import {
 
 export default function CartPage() {
   const router = useRouter();
+  const [confirmClear, setConfirmClear] = useState(false);
   const { selectedCampus } = useApp();
   const {
     items,
@@ -119,7 +121,7 @@ export default function CartPage() {
 
         {activeItems.length > 0 && (
           <button
-            onClick={clearCart}
+            onClick={() => setConfirmClear(true)}
             className="flex items-center gap-1.5 text-xs text-kampmax-text-secondary hover:text-kampmax-error transition-colors"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -191,13 +193,25 @@ export default function CartPage() {
                 Proceed to Checkout · {formatNaira(summary.total)}
               </Button>
               <p className="text-center text-[11px] text-kampmax-text-muted">
-                Delivery and fees calculated at checkout. Backend validates the
-                final total.
+                Delivery and fees are worked out at checkout.
               </p>
             </aside>
           )}
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmClear}
+        title="Clear your cart?"
+        body="All items will be removed."
+        confirmLabel="Clear cart"
+        destructive
+        onConfirm={() => {
+          setConfirmClear(false);
+          clearCart();
+        }}
+        onCancel={() => setConfirmClear(false)}
+      />
 
       {/* Mobile sticky CTA (above the bottom navigation bar) */}
       {activeItems.length > 0 && (
