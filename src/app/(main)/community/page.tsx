@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
@@ -20,11 +21,15 @@ import { CommunityEventCard } from "@/components/community/EventCard";
 import { useAuth } from "@/lib/auth-context";
 import { useApp } from "@/lib/app-context";
 import { useCommunityFeed, useSavedPosts, useUpcomingEvents } from "@/hooks/use-community";
+import {
+  discussionsOf,
+  emptyFeedCopy,
+  sortAnnouncements,
+  type DiscussionFilter,
+  type FeedTab,
+} from "@/lib/community-feed";
 
-type CommunityMainTab = "discussions" | "announcements";
-type DiscussionSubTab = "all" | "POLL" | "LOST_FOUND" | "saved";
-
-const DISCUSSION_SUBTABS: { id: DiscussionSubTab; label: string; icon?: React.ElementType }[] = [
+const DISCUSSION_SUBTABS: { id: DiscussionFilter; label: string; icon?: React.ElementType }[] = [
   { id: "all", label: "All" },
   { id: "POLL", label: "Polls", icon: Vote },
   { id: "LOST_FOUND", label: "Lost & Found", icon: HelpCircle },
@@ -33,15 +38,15 @@ const DISCUSSION_SUBTABS: { id: DiscussionSubTab; label: string; icon?: React.El
 
 export default function CommunityFeedPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { status } = useAuth();
   const { selectedCampus } = useApp();
   const campusId = selectedCampus?.id ?? "";
 
   const feed = useCommunityFeed(campusId);
   const events = useUpcomingEvents(campusId);
 
-  const [mainTab, setMainTab] = useState<CommunityMainTab>("discussions");
-  const [discussionTab, setDiscussionTab] = useState<DiscussionSubTab>("all");
+  const [mainTab, setMainTab] = useState<FeedTab>("discussions");
+  const [discussionTab, setDiscussionTab] = useState<DiscussionFilter>("all");
 
   const saved = useSavedPosts(discussionTab === "saved");
 
@@ -49,12 +54,9 @@ export default function CommunityFeedPage() {
   const source = discussionTab === "saved" ? saved : feed;
   const rawPosts = discussionTab === "saved" ? (saved.data ?? []) : (feed.data?.items ?? []);
 
-  const discussionPosts =
-    discussionTab === "all" || discussionTab === "saved"
-      ? rawPosts.filter((p) => p.kind !== "ANNOUNCEMENT")
-      : rawPosts.filter((p) => p.kind === discussionTab);
-
-  const announcementPosts = (feed.data?.items ?? []).filter((p) => p.kind === "ANNOUNCEMENT");
+  const discussionPosts = discussionsOf(rawPosts, discussionTab);
+  const announcementPosts = sortAnnouncements((feed.data?.items ?? []).filter((p) => p.kind === "ANNOUNCEMENT"));
+  const empty = emptyFeedCopy(mainTab, discussionTab);
 
   return (
     <PageContainer className="space-y-4 pb-14">
@@ -115,21 +117,24 @@ export default function CommunityFeedPage() {
         </button>
       </div>
 
-      {mainTab === "discussions" && events.data && events.data.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-sm font-bold text-neutral-900">Upcoming campus events</h2>
-          <div className="space-y-2.5">
-            {events.data.slice(0, 2).map((event) => (
-              <CommunityEventCard key={event.id} event={event} />
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* ═══════════════════════════════════════════════════════
           TAB 2: DISCUSSIONS (Full Interactive Campus Feed)
           ═══════════════════════════════════════════════════════ */}
-      {mainTab === "discussions" && (
+      {status === "unauthenticated" ? (
+        <div className="space-y-2 rounded-2xl border border-neutral-200 bg-white p-12 text-center">
+          <Users className="mx-auto mb-3 h-12 w-12 text-neutral-300" aria-hidden />
+          <p className="text-sm font-bold text-neutral-900">Join the campus conversation</p>
+          <p className="text-xs text-neutral-500">
+            Sign in to view what students are saying, vote on polls, and share updates.
+          </p>
+          <Link
+            href="/login"
+            className="mt-2 inline-flex rounded-xl bg-primary-600 px-4 py-2 text-xs font-semibold text-white hover:bg-primary-700"
+          >
+            Sign in
+          </Link>
+        </div>
+      ) : mainTab === "discussions" ? (
         <div className="space-y-4">
           {/* Subcategory filter pills */}
           <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
@@ -154,8 +159,9 @@ export default function CommunityFeedPage() {
           {/* Upcoming Events preview when on "all" subtab */}
           {discussionTab === "all" && events.data && events.data.length > 0 && (
             <section className="space-y-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500 px-1">
-                Upcoming events
+              <h3 className="flex items-center gap-1.5 px-1 text-xs font-bold text-primary-700">
+                <Calendar className="h-3.5 w-3.5" aria-hidden />
+                Upcoming campus events
               </h3>
               {events.data.slice(0, 2).map((event) => (
                 <CommunityEventCard key={event.id} event={event} />
@@ -169,7 +175,7 @@ export default function CommunityFeedPage() {
           ) : source.isError ? (
             <div className="bg-white rounded-2xl border border-neutral-200 p-8 text-center space-y-2">
               <p className="text-sm font-medium text-neutral-900">
-                Couldn&apos;t load the community feed.
+                Couldn&apos;t load discussions.
               </p>
               <button
                 type="button"
@@ -182,12 +188,8 @@ export default function CommunityFeedPage() {
           ) : discussionPosts.length === 0 ? (
             <div className="bg-white rounded-2xl border border-neutral-200 p-12 text-center">
               <MessageCircle className="h-12 w-12 text-neutral-300 mx-auto mb-3" />
-              <p className="text-sm font-bold text-neutral-900">No discussions found</p>
-              <p className="text-xs text-neutral-500 mt-1">
-                {discussionTab === "saved"
-                  ? "You haven't bookmarked any posts yet."
-                  : "Be the first to post on your campus."}
-              </p>
+              <p className="text-sm font-bold text-neutral-900">{empty.title}</p>
+              <p className="text-xs text-neutral-500 mt-1">{empty.text}</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -197,12 +199,7 @@ export default function CommunityFeedPage() {
             </div>
           )}
         </div>
-      )}
-
-      {/* ═══════════════════════════════════════════════════════
-          TAB 3: ANNOUNCEMENTS (Official Updates Stream)
-          ═══════════════════════════════════════════════════════ */}
-      {mainTab === "announcements" && (
+      ) : (
         <div className="space-y-3.5">
           {/* Pinned Broadcast Banner */}
           <div className="p-4 bg-rose-50/60 border border-rose-100 rounded-2xl shadow-xs space-y-2">
@@ -225,10 +222,8 @@ export default function CommunityFeedPage() {
           ) : (
             <div className="p-8 text-center bg-white rounded-2xl border border-neutral-200 space-y-1">
               <Megaphone className="h-8 w-8 text-neutral-300 mx-auto mb-2" />
-              <p className="text-sm font-bold text-neutral-900">No announcements posted yet</p>
-              <p className="text-xs text-neutral-500">
-                Check back later for official campus news and updates.
-              </p>
+              <p className="text-sm font-bold text-neutral-900">{empty.title}</p>
+              <p className="text-xs text-neutral-500">{empty.text}</p>
             </div>
           )}
         </div>
