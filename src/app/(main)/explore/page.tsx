@@ -219,20 +219,15 @@ function ExploreContent() {
   // Swapping to a new search keeps the old results up (dimmed) until the new ones land.
   const refreshing = verticalQueries.some((q) => q.isPlaceholderData);
   const retryFailed = () => verticalQueries.filter((q) => q.isError).forEach((q) => q.refetch());
-  const showEvents = selectedCategory === "all" || selectedCategory === "events";
-  const showProducts = selectedCategory === "all" || selectedCategory === "products";
-  const showServices = selectedCategory === "all" || selectedCategory === "services";
-  const showFreelance = selectedCategory === "all" || selectedCategory === "freelance";
-  const showFreelancers = selectedCategory === "all" || selectedCategory === "freelancers";
-  const showJobs = selectedCategory === "all" || selectedCategory === "jobs";
+  const shows = (c: ExploreCategory) => selectedCategory === "all" || selectedCategory === c;
   const empty =
     !loading &&
-    (!showEvents || !filteredEvents.length) &&
-    (!showProducts || !filteredProducts.length) &&
-    (!showServices || !filteredServices.length) &&
-    (!showFreelance || !freelanceServices.length) &&
-    (!showFreelancers || !filteredFreelancers.length) &&
-    (!showJobs || !filteredJobs.length);
+    (!shows("events") || !filteredEvents.length) &&
+    (!shows("products") || !filteredProducts.length) &&
+    (!shows("services") || !filteredServices.length) &&
+    (!shows("freelance") || !freelanceServices.length) &&
+    (!shows("freelancers") || !filteredFreelancers.length) &&
+    (!shows("jobs") || !filteredJobs.length);
 
   return (
     <PageContainer className="space-y-4 pb-12">
@@ -340,7 +335,7 @@ function ExploreContent() {
         )}
 
         {/* Events Vertical */}
-        {showEvents &&
+        {shows("events") &&
           filteredEvents.map((event) => (
             <ExploreCard key={`event-${event.id}`} className="flex-col items-start sm:flex-row sm:items-center">
               <div className="flex min-w-0 items-center gap-3">
@@ -374,7 +369,7 @@ function ExploreContent() {
           ))}
 
         {/* Products Vertical */}
-        {showProducts &&
+        {shows("products") &&
           filteredProducts.map((product) => (
             <ExploreRow
               key={`product-${product.id}`}
@@ -401,7 +396,7 @@ function ExploreContent() {
           ))}
 
         {/* Services Vertical */}
-        {showServices &&
+        {shows("services") &&
           filteredServices.map((service) => (
             <ExploreRow
               key={`service-${service.id}`}
@@ -427,7 +422,7 @@ function ExploreContent() {
           ))}
 
         {/* Freelance Vertical */}
-        {showFreelance && freelanceServices.length > 0 && (
+        {shows("freelance") && freelanceServices.length > 0 && (
           <>
             {freelanceServices.map((service) => (
               <FreelanceServiceRow
@@ -447,7 +442,7 @@ function ExploreContent() {
         )}
 
         {/* Freelancers Vertical (the people) */}
-        {showFreelancers &&
+        {shows("freelancers") &&
           filteredFreelancers.map((person) => (
             <ExploreRow
               key={`freelancer-${person.id}`}
@@ -473,7 +468,7 @@ function ExploreContent() {
           ))}
 
         {/* Jobs Vertical */}
-        {showJobs &&
+        {shows("jobs") &&
           filteredJobs.map((job) => (
             <ExploreRow
               key={`job-${job.id}`}
