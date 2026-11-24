@@ -113,7 +113,7 @@ function LoginForm() {
         <Input
           label="Email address"
           type="email"
-          placeholder="you@example.com"
+          placeholder="you@school.edu.ng"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           error={errors.email}
@@ -130,14 +130,7 @@ function LoginForm() {
           autoComplete="current-password"
         />
 
-        <div className="flex items-center justify-between">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              className="w-4 h-4 rounded border-kampmax-border text-kampmax-blue focus:ring-kampmax-blue"
-            />
-            <span className="text-sm text-kampmax-text-secondary">Remember me</span>
-          </label>
+        <div className="flex items-center justify-end">
           <Link
             href="/forgot-password"
             className="text-sm font-medium text-kampmax-blue hover:text-kampmax-blue-dark transition-colors"
@@ -179,7 +172,7 @@ function LoginForm() {
           href="/home"
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-500 hover:text-neutral-900 transition-colors py-1.5 px-3 rounded-full hover:bg-neutral-100"
         >
-          <span>Explore as Guest</span>
+          <span>Explore as guest</span>
           <span aria-hidden>→</span>
         </Link>
       </div>

@@ -40,9 +40,9 @@ function formatCount(n: number): string {
   return n >= 1000 ? `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k` : String(n);
 }
 
-/** A few freelancer services in the mixed view; more once that filter is chosen. */
-const FREELANCE_PREVIEW = 3;
-const FREELANCE_FULL = 10;
+/** A few of each kind in the mixed view; more once its pill is chosen (as on the mobile app). */
+const PREVIEW_SIZE = { events: 3, products: 4, services: 3, freelance: 3, freelancers: 3, jobs: 3 };
+const FULL_SIZE = 20;
 
 /** Keep the last results (and so the filter counts) on screen while a new search loads. */
 const KEEP_PREVIOUS = { placeholderData: keepPreviousData };
@@ -73,33 +73,33 @@ function ExploreContent() {
   const search = debouncedQ || undefined;
 
   // Each vertical returns a few rows to show and the real total, which the filter pills display.
+  const size = (c: Exclude<ExploreCategory, "all">) => (selectedCategory === c ? FULL_SIZE : PREVIEW_SIZE[c]);
   const eventsQuery = useQuery({
-    queryKey: ["explore", "events", search],
+    queryKey: ["explore", "events", search, size("events")],
     queryFn: async () => {
-      const page = await listEventsApi({ q: search, limit: 20 });
+      const page = await listEventsApi({ q: search, limit: size("events") });
       return { items: page.items, total: page.meta.total };
     },
     ...KEEP_PREVIOUS,
   });
   const productsQuery = useQuery({
-    queryKey: ["explore", "products", search],
+    queryKey: ["explore", "products", search, size("products")],
     queryFn: async () => {
-      const res = await fetchProducts({ search, status: "ACTIVE", limit: 4 });
+      const res = await fetchProducts({ search, status: "ACTIVE", limit: size("products") });
       if (res.error) throw res.error;
       return { items: res.data, total: res.total };
     },
     ...KEEP_PREVIOUS,
   });
   const servicesQuery = useQuery({
-    queryKey: ["explore", "services", search],
-    queryFn: () => fetchServicePage({ q: search, pageSize: 3 }),
+    queryKey: ["explore", "services", search, size("services")],
+    queryFn: () => fetchServicePage({ q: search, pageSize: size("services") }),
     ...KEEP_PREVIOUS,
   });
-  const freelanceLimit = selectedCategory === "freelance" ? FREELANCE_FULL : FREELANCE_PREVIEW;
   const freelanceQuery = useQuery({
-    queryKey: ["explore", "freelance", search, freelanceLimit],
+    queryKey: ["explore", "freelance", search, size("freelance")],
     queryFn: async () => {
-      const page = await fetchPublicServices({ q: search, limit: freelanceLimit });
+      const page = await fetchPublicServices({ q: search, limit: size("freelance") });
       if (page.failed) throw new Error("Couldn't load freelancer services.");
       return page;
     },
@@ -107,18 +107,18 @@ function ExploreContent() {
   });
   // The people themselves (the Freelance filter lists what they sell).
   const freelancersQuery = useQuery({
-    queryKey: ["explore", "freelancers", search],
+    queryKey: ["explore", "freelancers", search, size("freelancers")],
     queryFn: async () => {
-      const res = await listPublicFreelancers({ q: search, limit: 3 });
+      const res = await listPublicFreelancers({ q: search, limit: size("freelancers") });
       if (res.error) throw res.error;
       return { items: res.profiles, total: res.total };
     },
     ...KEEP_PREVIOUS,
   });
   const jobsQuery = useQuery({
-    queryKey: ["explore", "jobs", search],
+    queryKey: ["explore", "jobs", search, size("jobs")],
     queryFn: async () => {
-      const res = await listPublicJobs({ search, limit: 3 });
+      const res = await listPublicJobs({ search, limit: size("jobs") });
       if (res.error) throw res.error;
       return { items: res.jobs, total: res.total };
     },
@@ -129,7 +129,6 @@ function ExploreContent() {
   const filteredProducts = productsQuery.data?.items ?? [];
   const filteredServices = servicesQuery.data?.items ?? [];
   const freelanceServices = freelanceQuery.data?.items ?? [];
-  const freelanceTotal = freelanceQuery.data?.total ?? 0;
   const filteredFreelancers = freelancersQuery.data?.items ?? [];
   const filteredJobs = jobsQuery.data?.items ?? [];
 
@@ -220,6 +219,21 @@ function ExploreContent() {
   const refreshing = verticalQueries.some((q) => q.isPlaceholderData);
   const retryFailed = () => verticalQueries.filter((q) => q.isError).forEach((q) => q.refetch());
   const shows = (c: ExploreCategory) => selectedCategory === "all" || selectedCategory === c;
+  /** "See all N" under a kind's rows in the mixed view: jumps to that kind's own filter. */
+  const seeAll = (c: Exclude<ExploreCategory, "all">, shown: number) => {
+    const total = counts[c];
+    if (selectedCategory !== "all" || total === undefined || total <= shown) return null;
+    return (
+      <button
+        type="button"
+        onClick={() => setSelectedCategory(c)}
+        className="flex w-full items-center justify-center gap-1 rounded-2xl border border-dashed border-neutral-200 py-3 text-xs font-semibold text-primary-600 hover:bg-primary-50"
+      >
+        See all {formatCount(total)}
+        <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+      </button>
+    );
+  };
   const empty =
     !loading &&
     (!shows("events") || !filteredEvents.length) &&
@@ -335,8 +349,9 @@ function ExploreContent() {
         )}
 
         {/* Events Vertical */}
-        {shows("events") &&
-          filteredEvents.map((event) => (
+        {shows("events") && (
+          <>
+          {filteredEvents.map((event) => (
             <ExploreCard key={`event-${event.id}`} className="flex-col items-start sm:flex-row sm:items-center">
               <div className="flex min-w-0 items-center gap-3">
                 <ExploreThumb
@@ -367,10 +382,14 @@ function ExploreContent() {
               </Link>
             </ExploreCard>
           ))}
+          {seeAll("events", filteredEvents.length)}
+          </>
+        )}
 
         {/* Products Vertical */}
-        {shows("products") &&
-          filteredProducts.map((product) => (
+        {shows("products") && (
+          <>
+          {filteredProducts.map((product) => (
             <ExploreRow
               key={`product-${product.id}`}
               href={`/marketplace/${product.id}`}
@@ -394,10 +413,14 @@ function ExploreContent() {
               <p className="text-xs font-extrabold text-neutral-900">₦{product.price.toLocaleString()}</p>
             </ExploreRow>
           ))}
+          {seeAll("products", filteredProducts.length)}
+          </>
+        )}
 
         {/* Services Vertical */}
-        {shows("services") &&
-          filteredServices.map((service) => (
+        {shows("services") && (
+          <>
+          {filteredServices.map((service) => (
             <ExploreRow
               key={`service-${service.id}`}
               href={`/services/${service.id}`}
@@ -420,9 +443,12 @@ function ExploreContent() {
               <p className="text-xs font-extrabold text-neutral-900">₦{service.price.toLocaleString()}</p>
             </ExploreRow>
           ))}
+          {seeAll("services", filteredServices.length)}
+          </>
+        )}
 
         {/* Freelance Vertical */}
-        {shows("freelance") && freelanceServices.length > 0 && (
+        {shows("freelance") && (
           <>
             {freelanceServices.map((service) => (
               <FreelanceServiceRow
@@ -431,19 +457,14 @@ function ExploreContent() {
                 distance={service.freelancer ? distanceLabel("FREELANCER", service.freelancer.id) : undefined}
               />
             ))}
-            <Link
-              href={`/freelancers/services${search ? `?q=${encodeURIComponent(search)}` : ""}`}
-              className="flex items-center justify-center gap-1 rounded-2xl border border-dashed border-indigo-200 py-3 text-xs font-semibold text-indigo-600 hover:bg-indigo-50"
-            >
-              See all {freelanceTotal} freelancer service{freelanceTotal === 1 ? "" : "s"}
-              <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-            </Link>
+            {seeAll("freelance", freelanceServices.length)}
           </>
         )}
 
         {/* Freelancers Vertical (the people) */}
-        {shows("freelancers") &&
-          filteredFreelancers.map((person) => (
+        {shows("freelancers") && (
+          <>
+          {filteredFreelancers.map((person) => (
             <ExploreRow
               key={`freelancer-${person.id}`}
               href={`/freelancers/${person.id}`}
@@ -466,10 +487,14 @@ function ExploreContent() {
               </p>
             </ExploreRow>
           ))}
+          {seeAll("freelancers", filteredFreelancers.length)}
+          </>
+        )}
 
         {/* Jobs Vertical */}
-        {shows("jobs") &&
-          filteredJobs.map((job) => (
+        {shows("jobs") && (
+          <>
+          {filteredJobs.map((job) => (
             <ExploreRow
               key={`job-${job.id}`}
               href={`/jobs/${job.id}`}
@@ -497,6 +522,9 @@ function ExploreContent() {
               </p>
             </ExploreRow>
           ))}
+          {seeAll("jobs", filteredJobs.length)}
+          </>
+        )}
       </div>
     </PageContainer>
   );

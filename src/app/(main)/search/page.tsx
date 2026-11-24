@@ -13,7 +13,6 @@ import {
   SearchInput,
   SearchResults,
   SearchResultsSkeleton,
-  TrendingSearches,
 } from "@/components/search";
 import { SEARCH_TYPE_FILTERS } from "@/components/search/SearchFilters";
 import { Pagination } from "@/components/marketplace/listing/Pagination";
@@ -23,7 +22,6 @@ import {
   addRecentSearch,
   clearRecentSearches,
   getRecentSearches,
-  getTrendingSearches,
   removeRecentSearch,
 } from "@/services/search";
 import {
@@ -91,7 +89,6 @@ function SearchPageInner() {
 
   const [query, setQuery] = useState(urlQuery);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
-  const [trending] = useState(getTrendingSearches());
 
   // The search term this page last put in the address (or read from it).
   const lastWrittenQ = useRef(urlQuery);
@@ -299,7 +296,6 @@ function SearchPageInner() {
               setRecentSearches([]);
             }}
           />
-          <TrendingSearches trending={trending} onSelect={handleRecentSelect} />
           <SearchCategoryBrowse />
         </div>
       ) : (
@@ -348,6 +344,7 @@ function SearchPageInner() {
                       items={data.items}
                       query={data.query}
                       onSeeAll={typeFilter === "all" ? handleTypeChange : undefined}
+                      onOpen={() => addRecentSearch(urlQuery)}
                     />
                     <Pagination
                       currentPage={page}

@@ -7,7 +7,6 @@ import { SearchFilters } from "./SearchFilters";
 import { SearchInput } from "./SearchInput";
 import { SearchResults } from "./SearchResults";
 import { SearchResultsSkeleton } from "./SearchSkeleton";
-import { TrendingSearches } from "./TrendingSearches";
 
 export {
   RecentSearches,
@@ -19,5 +18,4 @@ export {
   SearchInput,
   SearchResults,
   SearchResultsSkeleton,
-  TrendingSearches,
 };

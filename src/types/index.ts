@@ -1006,8 +1006,3 @@ export interface SearchPage {
   unavailable?: SearchEntityType[];
 }
 
-export interface TrendingSearch {
-  query: string;
-  count: number;
-  category?: string;
-}

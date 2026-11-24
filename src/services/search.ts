@@ -25,7 +25,6 @@ import {
   SearchSortOption,
   SearchSuggestion,
   SearchPage,
-  TrendingSearch,
 } from "@/types";
 import { fetchProducts } from "@/services/products";
 import { fetchVendors } from "@/services/users";
@@ -75,15 +74,6 @@ function toTimestamp(value: string | number | undefined | null): number {
 async function loadCampusNames(): Promise<Map<string, string>> {
   const { data } = await fetchCampuses({ limit: 100 });
   return new Map(data.map((c) => [c.id, c.abbreviation || c.name]));
-}
-
-// ── Trending ─────────────────────────────────────────────
-
-// No trending-search endpoint exists yet; never fabricate counts.
-const trendingSearches: TrendingSearch[] = [];
-
-export function getTrendingSearches(): TrendingSearch[] {
-  return trendingSearches;
 }
 
 // ── Suggestions ──────────────────────────────────────────

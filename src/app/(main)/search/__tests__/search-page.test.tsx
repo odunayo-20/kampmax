@@ -21,7 +21,6 @@ vi.mock("@/hooks/use-search", () => ({
 }));
 
 vi.mock("@/services/search", () => ({
-  getTrendingSearches: () => [],
   getRecentSearches: () => [],
   addRecentSearch: vi.fn(),
   removeRecentSearch: vi.fn(),

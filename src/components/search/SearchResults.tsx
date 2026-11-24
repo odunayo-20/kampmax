@@ -59,6 +59,8 @@ interface SearchResultsProps {
   savedJobIds?: string[];
   /** When given, each section offers "See all" to narrow the results to that type. */
   onSeeAll?: (type: SearchEntityType) => void;
+  /** Called when a result is opened, so the search can be remembered even without Enter. */
+  onOpen?: () => void;
   className?: string;
 }
 
@@ -70,7 +72,7 @@ interface SearchResultsProps {
  *   service → ServiceCard, provider → ProviderCard,
  *   vendor/category/post/event → dedicated rows.
  */
-export function SearchResults({ items, query, onSeeAll, className }: SearchResultsProps) {
+export function SearchResults({ items, query, onSeeAll, onOpen, className }: SearchResultsProps) {
   const grouped = useMemo(() => {
     const byType: Partial<Record<SearchEntityType, SearchResultItem[]>> = {};
     for (const item of items) {
@@ -116,13 +118,13 @@ export function SearchResults({ items, query, onSeeAll, className }: SearchResul
             {type === "vendor" && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {sectionItems.map((item) => (
-                  <VendorRow key={item.id} item={item} query={query} />
+                  <VendorRow key={item.id} item={item} query={query} onOpen={onOpen} />
                 ))}
               </div>
             )}
 
             {type !== "vendor" && (
-              <ResultsRows items={sectionItems} query={query} />
+              <ResultsRows items={sectionItems} query={query} onOpen={onOpen} />
             )}
           </section>
         );
@@ -134,10 +136,11 @@ export function SearchResults({ items, query, onSeeAll, className }: SearchResul
   );
 }
 
-function VendorRow({ item, query }: { item: SearchResultItem; query: string }) {
+function VendorRow({ item, query, onOpen }: { item: SearchResultItem; query: string; onOpen?: () => void }) {
   return (
     <Link
       href={item.url}
+      onClick={onOpen}
       className="group flex items-center gap-3 p-3 bg-white border border-neutral-200 rounded-xl hover:border-primary-300 hover:shadow-sm transition-all"
     >
       <Avatar name={item.title} size="md" />
@@ -162,13 +165,14 @@ function VendorRow({ item, query }: { item: SearchResultItem; query: string }) {
   );
 }
 
-function ResultsRows({ items, query }: { items: SearchResultItem[]; query: string }) {
+function ResultsRows({ items, query, onOpen }: { items: SearchResultItem[]; query: string; onOpen?: () => void }) {
   return (
     <div className="space-y-2">
       {items.map((item) => (
         <Link
           key={item.id}
           href={item.url}
+          onClick={onOpen}
           className="group flex items-center gap-3 p-3 bg-white border border-neutral-200 rounded-xl hover:border-primary-300 hover:shadow-sm transition-all"
         >
           <div className="w-12 h-12 rounded-lg overflow-hidden bg-neutral-100 shrink-0 relative flex items-center justify-center">
