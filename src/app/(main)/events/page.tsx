@@ -10,10 +10,13 @@ import { useEvents, useOrganizerStatus } from "@/hooks/use-events";
 import { clearAuthTokens } from "@/lib/auth-storage";
 import { cn } from "@/lib/utils";
 import {
+  emptyEventsCopy,
+  eventAction,
   eventDate,
   eventTime,
-  isBookable,
   priceLabel,
+  seatsUrgency,
+  startsIn,
 } from "@/components/events/event-format";
 import type { EventItem } from "@/types/event-ticketing";
 
@@ -30,6 +33,7 @@ export default function EventsPage() {
   const { selectedCampus } = useApp();
   const [filter, setFilter] = useState<TimeFilter>("all");
   const [search, setSearch] = useState("");
+  const [now] = useState(() => Date.now());
   const q = useDebounce(search.trim(), 300);
 
   const events = useEvents({
@@ -40,13 +44,20 @@ export default function EventsPage() {
   const organizer = useOrganizerStatus();
 
   const list = events.data ?? [];
-  const featured = list.find((e) => e.isFeatured) ?? list[0];
-  const rest = list.filter((e) => e.id !== featured?.id);
+  // The big card is for the unfiltered view; a search or time filter just lists what matches.
+  const filtered = !!q || filter !== "all";
+  const featured = filtered ? undefined : (list.find((e) => e.isFeatured) ?? list[0]);
+  const rest = featured ? list.filter((e) => e.id !== featured.id) : list;
+  const place = selectedCampus?.name || "Campus";
+  const empty = emptyEventsCopy(q, filter, place);
 
   return (
     <PageContainer className="space-y-4 pb-14">
       <div className="flex items-center justify-between gap-2">
-        <h1 className="text-xl font-bold text-neutral-900">Events</h1>
+        <div>
+          <h1 className="text-xl font-bold text-neutral-900">Events</h1>
+          <p className="text-xs text-neutral-500">Happening at {place}</p>
+        </div>
         <div className="flex items-center gap-2">
           <Link
             href="/tickets"
@@ -125,21 +136,23 @@ export default function EventsPage() {
       ) : list.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-neutral-300 bg-white p-10 text-center">
           <Calendar className="mx-auto h-10 w-10 text-neutral-300" />
-          <p className="mt-3 text-sm font-semibold text-neutral-800">
-            {q || filter !== "all" ? "No events match your search" : "No upcoming events yet"}
-          </p>
-          <p className="mt-1 text-xs text-neutral-500">
-            Check back soon, or host one yourself.
-          </p>
+          <p className="mt-3 text-sm font-semibold text-neutral-800">{empty.title}</p>
+          <p className="mt-1 text-xs text-neutral-500">{empty.text}</p>
+          <Link
+            href="/organizer"
+            className="mt-4 inline-flex rounded-full bg-primary-50 px-4 py-2 text-xs font-semibold text-primary-700 hover:bg-primary-100"
+          >
+            {organizer.data?.isOrganizer ? "Create an event" : "Host an event"}
+          </Link>
         </div>
       ) : (
         <>
-          {featured && <FeaturedEvent event={featured} />}
+          {featured && <FeaturedEvent event={featured} now={now} />}
           {rest.length > 0 && (
             <section className="space-y-3">
-              <h2 className="text-sm font-bold text-neutral-900">Upcoming Events</h2>
+              {featured && <h2 className="text-sm font-bold text-neutral-900">Upcoming Events</h2>}
               {rest.map((event) => (
-                <EventRow key={event.id} event={event} />
+                <EventRow key={event.id} event={event} now={now} />
               ))}
             </section>
           )}
@@ -149,7 +162,9 @@ export default function EventsPage() {
   );
 }
 
-function FeaturedEvent({ event }: { event: EventItem }) {
+function FeaturedEvent({ event, now }: { event: EventItem; now: number }) {
+  const seats = seatsUrgency(event.seatsLeft);
+  const bookable = eventAction(event, now).bookable;
   return (
     <Link
       href={`/events/${event.id}`}
@@ -180,10 +195,18 @@ function FeaturedEvent({ event }: { event: EventItem }) {
               {event.location}
             </span>
           </p>
+          <p className="flex items-center justify-between gap-2 text-xs text-neutral-300">
+            <span className="truncate">By {event.organizerName || "Campus Organizer"}</span>
+            {event.capacity !== null && (
+              <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold", seats.isUrgent ? "bg-red-500 text-white" : "bg-white/20")}>
+                {seats.label}
+              </span>
+            )}
+          </p>
           <div className="flex items-center justify-between pt-1">
             <span className="text-sm font-bold">{priceLabel(event)}</span>
             <span className="rounded-xl bg-primary-600 px-4 py-2 text-xs font-extrabold">
-              {isBookable(event) ? "Get Ticket" : "View"}
+              {bookable ? "Get Ticket" : "View"}
             </span>
           </div>
         </div>
@@ -192,9 +215,10 @@ function FeaturedEvent({ event }: { event: EventItem }) {
   );
 }
 
-function EventRow({ event }: { event: EventItem }) {
-  const free = event.minPrice <= 0;
-  const bookable = isBookable(event);
+function EventRow({ event, now }: { event: EventItem; now: number }) {
+  const free = event.minPrice <= 0 || event.tiers.length === 0;
+  const action = eventAction(event, now);
+  const soon = startsIn(event.startsAt, event.endsAt, now);
   return (
     <Link
       href={`/events/${event.id}`}
@@ -218,9 +242,9 @@ function EventRow({ event }: { event: EventItem }) {
           {event.category && (
             <p className="mt-0.5 text-[11px] text-neutral-500">{event.category.name}</p>
           )}
-          <p className="mt-1 flex items-center gap-1 text-[11px] text-neutral-500">
+          <p className={cn("mt-1 flex items-center gap-1 text-[11px]", soon ? "font-semibold text-primary-700" : "text-neutral-500")}>
             <Calendar className="h-3 w-3 shrink-0" />
-            {eventDate(event.startsAt)} &middot; {eventTime(event.startsAt)}
+            {soon ? `${soon} \u00b7 ` : ""}{eventDate(event.startsAt)} &middot; {eventTime(event.startsAt)}
           </p>
           <p className="flex items-center gap-1 truncate text-[11px] text-neutral-500">
             <MapPin className="h-3 w-3 shrink-0" />
@@ -231,7 +255,7 @@ function EventRow({ event }: { event: EventItem }) {
           <span className={cn("text-sm font-extrabold", free ? "text-emerald-600" : "text-primary-700")}>
             {priceLabel(event)}
           </span>
-          {bookable ? (
+          {action.bookable ? (
             <span
               className={cn(
                 "rounded-lg px-3 py-1.5 text-[11px] font-bold",
@@ -240,11 +264,16 @@ function EventRow({ event }: { event: EventItem }) {
                   : "bg-primary-600 text-white"
               )}
             >
-              {free ? "Register" : "Get Ticket"}
+              {action.label}
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-neutral-400">
-              <Users className="h-3 w-3" /> {event.seatsLeft === 0 ? "Sold out" : "Closed"}
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 text-[11px] font-semibold",
+                action.kind === "held" ? "text-emerald-600" : "text-neutral-400"
+              )}
+            >
+              <Users className="h-3 w-3" /> {action.label}
             </span>
           )}
         </div>
