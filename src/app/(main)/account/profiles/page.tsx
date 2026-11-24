@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, RefreshCw, Sparkles, AlertCircle } from "lucide-react";
+import { ArrowRight, RefreshCw, AlertCircle } from "lucide-react";
 import { PROFILE_DEFINITIONS, PROFILE_THEMES, useMyProfiles } from "@/hooks/use-my-profiles";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
@@ -267,7 +267,6 @@ export default function AccountProfilesPage() {
 
       {/* 6. Wallet Tip Banner */}
       <div className="flex items-center gap-3 rounded-xl border border-primary-100 bg-primary-50/60 p-4">
-        <Sparkles className="h-5 w-5 shrink-0 text-primary-600" />
         <p className="text-xs text-primary-950 font-medium">
           All campus earnings, client payouts, and vendor deposits go directly into your unified Kampmax Pay wallet.
         </p>
