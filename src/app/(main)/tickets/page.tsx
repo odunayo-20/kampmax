@@ -1,28 +1,33 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Calendar, ChevronRight, MapPin, Ticket } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { useMyTickets } from "@/hooks/use-events";
 import { cn } from "@/lib/utils";
-import { eventDate, eventTime } from "@/components/events/event-format";
+import { eventDate, eventOver, eventTime, startsIn } from "@/components/events/event-format";
 import type { MyTicket } from "@/types/event-ticketing";
 
-function badge(ticket: MyTicket): { label: string; cls: string } {
+function badge(ticket: MyTicket, now: number): { label: string; cls: string } {
   if (ticket.event.status === "CANCELLED") return { label: "Cancelled", cls: "bg-error-100 text-error-700" };
   if (ticket.status === "USED") return { label: "Used", cls: "bg-neutral-200 text-neutral-700" };
   if (ticket.status === "REFUNDED") return { label: "Refunded", cls: "bg-error-100 text-error-700" };
-  return { label: "Valid", cls: "bg-emerald-100 text-emerald-700" };
+  const soon = startsIn(ticket.event.startsAt, ticket.event.endsAt, now);
+  return { label: soon ?? "Valid", cls: "bg-emerald-100 text-emerald-700" };
 }
 
+const startOf = (t: MyTicket) => Date.parse(t.event.startsAt) || 0;
+
 export default function MyTicketsPage() {
-  const { data, isPending, isError, error, refetch } = useMyTickets();
+  const { data, isPending, isError, refetch } = useMyTickets();
   const tickets = data ?? [];
-  const now = Date.now();
-  const upcoming = tickets.filter(
-    (t) => t.status === "VALID" && t.event.status === "ACTIVE" && new Date(t.event.endsAt).getTime() > now
-  );
-  const past = tickets.filter((t) => !upcoming.includes(t));
+  const [now] = useState(() => Date.now());
+  const isUpcoming = (t: MyTicket) =>
+    t.status === "VALID" && t.event.status === "ACTIVE" && !eventOver(t.event, now);
+  // Soonest event first for what's coming; most recent first for what's done.
+  const upcoming = tickets.filter(isUpcoming).sort((a, b) => startOf(a) - startOf(b));
+  const past = tickets.filter((t) => !isUpcoming(t)).sort((a, b) => startOf(b) - startOf(a));
 
   return (
     <PageContainer narrow className="space-y-4 pb-14">
@@ -40,7 +45,7 @@ export default function MyTicketsPage() {
       ) : isError ? (
         <div role="alert" className="rounded-2xl border border-error-100 bg-error-50 p-6 text-center">
           <p className="text-sm font-semibold text-error-700">Couldn&apos;t load your tickets</p>
-          <p className="mt-1 text-xs text-error-700/80">{error.message}</p>
+          <p className="mt-1 text-xs text-error-700/80">Check your internet connection and try again.</p>
           <button onClick={() => refetch()} className="mt-3 rounded-lg bg-white px-4 py-2 text-xs font-semibold text-error-700 shadow-sm">
             Try again
           </button>
@@ -56,21 +61,27 @@ export default function MyTicketsPage() {
         </div>
       ) : (
         <>
-          <Section title="Upcoming" tickets={upcoming} />
-          <Section title="Past & cancelled" tickets={past} muted />
+          {upcoming.length === 0 && (
+            <p className="rounded-2xl bg-white p-4 text-center text-xs text-neutral-500">
+              No upcoming events.{" "}
+              <Link href="/events" className="font-semibold text-primary-700">Find one to go to</Link>
+            </p>
+          )}
+          <Section title="Upcoming" tickets={upcoming} now={now} />
+          <Section title="Past & cancelled" tickets={past} now={now} muted />
         </>
       )}
     </PageContainer>
   );
 }
 
-function Section({ title, tickets, muted }: { title: string; tickets: MyTicket[]; muted?: boolean }) {
+function Section({ title, tickets, now, muted }: { title: string; tickets: MyTicket[]; now: number; muted?: boolean }) {
   if (tickets.length === 0) return null;
   return (
     <section className="space-y-2">
       <h2 className="text-xs font-bold uppercase tracking-wide text-neutral-500">{title}</h2>
       {tickets.map((t) => {
-        const b = badge(t);
+        const b = badge(t, now);
         return (
           <Link
             key={t.id}

@@ -7,7 +7,6 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { useApp } from "@/lib/app-context";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useEvents, useOrganizerStatus } from "@/hooks/use-events";
-import { clearAuthTokens } from "@/lib/auth-storage";
 import { cn } from "@/lib/utils";
 import {
   emptyEventsCopy,
@@ -120,14 +119,9 @@ export default function EventsPage() {
       ) : events.isError ? (
         <div role="alert" className="rounded-2xl border border-error-100 bg-error-50 p-6 text-center">
           <p className="text-sm font-semibold text-error-700">Couldn&apos;t load events</p>
-          <p className="mt-1 text-xs text-error-700/80">{events.error.message}</p>
+          <p className="mt-1 text-xs text-error-700/80">Check your internet connection and try again.</p>
           <button
-            onClick={() => {
-              if (events.error?.message?.toLowerCase().includes("token")) {
-                clearAuthTokens();
-              }
-              events.refetch();
-            }}
+            onClick={() => events.refetch()}
             className="mt-3 rounded-lg bg-white px-4 py-2 text-xs font-semibold text-error-700 shadow-sm hover:bg-error-50 transition-colors"
           >
             Try again
@@ -155,6 +149,15 @@ export default function EventsPage() {
                 <EventRow key={event.id} event={event} now={now} />
               ))}
             </section>
+          )}
+          {events.hasNextPage && (
+            <button
+              onClick={() => events.fetchNextPage()}
+              disabled={events.isFetchingNextPage}
+              className="mx-auto block rounded-full border border-neutral-200 bg-white px-5 py-2 text-xs font-semibold text-neutral-700 hover:border-primary-300 disabled:opacity-60"
+            >
+              {events.isFetchingNextPage ? "Loading…" : "Load more events"}
+            </button>
           )}
         </>
       )}

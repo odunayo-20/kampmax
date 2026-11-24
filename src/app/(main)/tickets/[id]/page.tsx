@@ -15,7 +15,7 @@ interface PageProps {
 export default function TicketPage({ params }: PageProps) {
   const { id } = use(params);
   const router = useRouter();
-  const { data: ticket, isPending, isError, error, refetch } = useMyTicket(id);
+  const { data: ticket, isPending, isError, refetch } = useMyTicket(id);
 
   return (
     <PageContainer narrow className="space-y-4 pb-14">
@@ -31,7 +31,7 @@ export default function TicketPage({ params }: PageProps) {
       ) : isError || !ticket ? (
         <div role="alert" className="rounded-2xl border border-error-100 bg-error-50 p-6 text-center">
           <p className="text-sm font-semibold text-error-700">Couldn&apos;t load this ticket</p>
-          <p className="mt-1 text-xs text-error-700/80">{error?.message}</p>
+          <p className="mt-1 text-xs text-error-700/80">Check your internet connection and try again.</p>
           <div className="mt-3 flex justify-center gap-2">
             <button onClick={() => refetch()} className="rounded-lg bg-white px-4 py-2 text-xs font-semibold text-error-700 shadow-sm">
               Try again

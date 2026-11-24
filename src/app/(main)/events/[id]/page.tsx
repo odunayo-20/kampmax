@@ -17,9 +17,10 @@ import { useEvent } from "@/hooks/use-events";
 import {
   eventDate,
   eventTimeRange,
-  isBookable,
+  eventAction,
   naira,
   priceLabel,
+  startsIn,
 } from "@/components/events/event-format";
 
 interface PageProps {
@@ -49,7 +50,7 @@ export default function EventDetailPage({ params }: PageProps) {
           {notFound ? "This event isn't available" : "Couldn't load this event"}
         </p>
         <p className="mt-1 text-xs text-neutral-500">
-          {notFound ? "It may have been cancelled or removed." : error?.message}
+          {notFound ? "It may have been cancelled or removed." : "Check your internet connection and try again."}
         </p>
         <div className="mt-4 flex justify-center gap-2">
           {!notFound && (
@@ -71,17 +72,9 @@ export default function EventDetailPage({ params }: PageProps) {
     );
   }
 
-  const bookable = isBookable(event);
-  const ended = new Date(event.endsAt).getTime() <= Date.now();
-  const cta = event.attending
-    ? "View my ticket"
-    : ended
-      ? "Event ended"
-      : event.seatsLeft === 0
-        ? "Sold out"
-        : event.minPrice > 0
-          ? "Get Ticket"
-          : "Register";
+  const now = Date.now();
+  const action = eventAction(event, now);
+  const soon = startsIn(event.startsAt, event.endsAt, now);
 
   return (
     <div className="min-h-screen bg-neutral-50 pb-44 lg:pb-28">
@@ -119,11 +112,18 @@ export default function EventDetailPage({ params }: PageProps) {
               <BadgeCheck className="h-3.5 w-3.5 text-primary-600" aria-label="Verified organizer" />
             )}
           </p>
-          {event.category && (
-            <span className="mt-3 inline-block rounded-full bg-primary-50 px-3 py-1 text-[11px] font-semibold text-primary-700">
-              {event.category.name}
-            </span>
-          )}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {event.category && (
+              <span className="rounded-full bg-primary-50 px-3 py-1 text-[11px] font-semibold text-primary-700">
+                {event.category.name}
+              </span>
+            )}
+            {soon && event.status !== "CANCELLED" && (
+              <span className="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold text-amber-800">
+                {soon}
+              </span>
+            )}
+          </div>
           {event.status === "CANCELLED" && (
             <p className="mt-3 rounded-lg bg-error-50 p-2 text-xs font-semibold text-error-700">
               This event was cancelled.
@@ -174,7 +174,11 @@ export default function EventDetailPage({ params }: PageProps) {
                       )}
                     </p>
                     <p className="text-[11px] text-neutral-500">
-                      {tier.soldOut ? "Sold out" : `${tier.remaining} available`}
+                      {tier.soldOut || tier.remaining === 0
+                        ? "Sold out"
+                        : tier.remaining === undefined
+                          ? "Available"
+                          : `${tier.remaining} available`}
                     </p>
                   </div>
                   <span className="text-sm font-extrabold text-neutral-900">
@@ -195,21 +199,21 @@ export default function EventDetailPage({ params }: PageProps) {
               href="/tickets"
               className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 text-sm font-bold text-white"
             >
-              <Ticket className="h-4 w-4" /> {cta}
+              <Ticket className="h-4 w-4" /> View my ticket
             </Link>
-          ) : bookable ? (
+          ) : action.bookable ? (
             <Link
               href={`/events/${event.id}/checkout`}
               className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary-600 text-sm font-bold text-white hover:bg-primary-700"
             >
-              <Ticket className="h-4 w-4" /> {cta}
+              <Ticket className="h-4 w-4" /> {action.label}
             </Link>
           ) : (
             <button
               disabled
               className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-neutral-200 text-sm font-bold text-neutral-500"
             >
-              <Clock className="h-4 w-4" /> {cta}
+              <Clock className="h-4 w-4" /> {action.label}
             </button>
           )}
         </div>

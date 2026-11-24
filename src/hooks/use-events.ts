@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import {
   eventKeys,
@@ -45,10 +45,15 @@ import type {
 
 // ── Student: discover, details, tickets ───────────────────────
 
+/** The events list, a page at a time. Its key carries "pages" so it never shares a cache entry with the single-page list the home page prefetches. */
 export function useEvents(params: ListEventsParams = {}) {
-  return useQuery({
-    ...eventsListQuery(params),
-    select: (page) => page.items,
+  return useInfiniteQuery({
+    queryKey: [...eventsListQuery(params).queryKey, "pages"],
+    queryFn: ({ pageParam }) => listEventsApi({ ...params, page: pageParam }),
+    initialPageParam: 1,
+    getNextPageParam: (last) =>
+      last.meta.page < last.meta.totalPages ? last.meta.page + 1 : undefined,
+    select: (data) => data.pages.flatMap((p) => p.items),
   });
 }
 

@@ -33,7 +33,7 @@ export default function OrganizerHubPage() {
       ) : status.isError ? (
         <div role="alert" className="rounded-2xl border border-error-100 bg-error-50 p-6 text-center">
           <p className="text-sm font-semibold text-error-700">Couldn&apos;t load your organizer status</p>
-          <p className="mt-1 text-xs text-error-700/80">{status.error.message}</p>
+          <p className="mt-1 text-xs text-error-700/80">Check your internet connection and try again.</p>
           <button onClick={() => status.refetch()} className="mt-3 rounded-lg bg-white px-4 py-2 text-xs font-semibold text-error-700 shadow-sm">
             Try again
           </button>
@@ -66,7 +66,8 @@ function ApplicationState({
       <StateCard
         icon={<ShieldAlert className="h-8 w-8 text-error-600" />}
         title="Organizer access suspended"
-        body={application.reviewNote ?? "Contact support to restore your access."}
+        body={application.reviewNote ?? "You can't host events right now. Contact support if you think this is a mistake."}
+        action={{ href: "/support", label: "Contact support" }}
       />
     );
   }
@@ -98,18 +99,33 @@ function ApplicationState({
   );
 }
 
-function StateCard({ icon, title, body }: { icon: React.ReactNode; title: string; body: string }) {
+function StateCard({
+  icon,
+  title,
+  body,
+  action,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  body: string;
+  action?: { href: string; label: string };
+}) {
   return (
     <div className="rounded-2xl border border-neutral-200 bg-white p-6 text-center shadow-sm">
       <div className="flex justify-center">{icon}</div>
       <h2 className="mt-3 text-base font-bold text-neutral-900">{title}</h2>
       <p className="mt-1 text-sm text-neutral-600">{body}</p>
+      {action && (
+        <Link href={action.href} className="mt-4 inline-flex rounded-xl border border-neutral-200 px-4 py-2 text-xs font-semibold text-neutral-700 hover:border-primary-300">
+          {action.label}
+        </Link>
+      )}
     </div>
   );
 }
 
 function OrganizerEvents() {
-  const { data, isPending, isError, error, refetch } = useMyEvents();
+  const { data, isPending, isError, refetch } = useMyEvents();
   const events = data ?? [];
 
   return (
@@ -127,7 +143,7 @@ function OrganizerEvents() {
         </div>
       ) : isError ? (
         <div role="alert" className="rounded-2xl border border-error-100 bg-error-50 p-5 text-center text-xs text-error-700">
-          {error.message}{" "}
+          Couldn&apos;t load your events.{" "}
           <button onClick={() => refetch()} className="font-bold underline">Retry</button>
         </div>
       ) : events.length === 0 ? (

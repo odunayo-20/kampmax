@@ -5,7 +5,7 @@ import { Calendar, Download, MapPin, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { MyTicket } from "@/types/event-ticketing";
 import { QrImage } from "./QrImage";
-import { eventDate, eventTimeRange } from "./event-format";
+import { eventDate, eventTime, eventTimeRange, naira, startsIn } from "./event-format";
 
 const STATUS_STYLES: Record<MyTicket["status"], { label: string; cls: string }> = {
   VALID: { label: "Valid", cls: "bg-emerald-500 text-white" },
@@ -19,6 +19,17 @@ export function DigitalTicket({ ticket }: { ticket: MyTicket }) {
   const status = STATUS_STYLES[ticket.status];
   const active = ticket.status === "VALID" && ticket.event.status === "ACTIVE";
   const cancelled = ticket.event.status === "CANCELLED";
+  const soon = active ? startsIn(ticket.event.startsAt, ticket.event.endsAt) : null;
+  const badgeLabel = cancelled
+    ? "Event cancelled"
+    : ticket.status === "USED" && ticket.checkedInAt
+      ? `Used · ${eventDate(ticket.checkedInAt)} ${eventTime(ticket.checkedInAt)}`
+      : (soon ?? status.label);
+  const hint = active
+    ? "Show this QR code at the entrance"
+    : cancelled
+      ? "This event was cancelled, so the ticket cannot be used."
+      : "This ticket can no longer be used.";
 
   function save() {
     if (!qrUrl) return;
@@ -76,7 +87,15 @@ export function DigitalTicket({ ticket }: { ticket: MyTicket }) {
             <MapPin className="h-3.5 w-3.5 shrink-0 text-primary-400" />
             {ticket.event.location}
           </p>
-          <p className="text-white/60">{ticket.tier.name}</p>
+          <p className="text-white/60">
+            {ticket.tier.name}
+            {ticket.event.organizerName ? ` · By ${ticket.event.organizerName}` : ""}
+          </p>
+          <p className="text-white/60">
+            {ticket.total > 0
+              ? `Paid ${naira(ticket.total)}${ticket.serviceFee > 0 ? ` (incl. ${naira(ticket.serviceFee)} fee)` : ""}`
+              : "Free"}
+          </p>
         </div>
 
         <div className="flex flex-col items-center gap-2 rounded-2xl bg-white p-4">
@@ -89,7 +108,7 @@ export function DigitalTicket({ ticket }: { ticket: MyTicket }) {
               cancelled ? STATUS_STYLES.REFUNDED.cls : status.cls
             )}
           >
-            {cancelled ? "Event cancelled" : status.label}
+            {badgeLabel}
           </span>
         </div>
 
@@ -99,11 +118,9 @@ export function DigitalTicket({ ticket }: { ticket: MyTicket }) {
           disabled={!qrUrl}
           className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/25 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/10 disabled:opacity-50"
         >
-          <Download className="h-4 w-4" /> Save to gallery
+          <Download className="h-4 w-4" /> Download QR code
         </button>
-        <p className="text-center text-[11px] text-white/50">
-          Show this QR code at the entrance
-        </p>
+        <p className="text-center text-[11px] text-white/50">{hint}</p>
       </div>
     </div>
   );

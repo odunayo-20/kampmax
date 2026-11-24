@@ -4,16 +4,27 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Calendar, Loader2, Lock, MapPin, Wallet } from "lucide-react";
+import { ArrowLeft, Calendar, Loader2, MapPin, Wallet } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { fetchMyWalletBalance } from "@/services/wallet";
 import { useEvent, usePurchaseTicket } from "@/hooks/use-events";
 import { cn } from "@/lib/utils";
-import { eventDate, eventTime, naira } from "@/components/events/event-format";
+import { eventAction, eventDate, eventTime, naira, type EventActionKind } from "@/components/events/event-format";
+import type { EventTier } from "@/types/event-ticketing";
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
+
+/** Why a ticket can't be bought, by the state `eventAction` reports. Same words as the app. */
+const BLOCK_TEXT: Partial<Record<EventActionKind, string>> = {
+  cancelled: "This event was cancelled",
+  ended: "This event has ended",
+  "sold-out": "Sold out",
+  "not-on-sale": "Tickets aren't on sale yet.",
+};
+
+const isOff = (t: Pick<EventTier, "soldOut" | "remaining">) => !!t.soldOut || t.remaining === 0;
 
 export default function EventCheckoutPage({ params }: PageProps) {
   const { id } = use(params);
@@ -32,7 +43,7 @@ export default function EventCheckoutPage({ params }: PageProps) {
   // Pick the first ticket type that is still available.
   useEffect(() => {
     if (event && tierId === null) {
-      setTierId(event.tiers.find((t) => !t.soldOut)?.id ?? null);
+      setTierId(event.tiers.find((t) => !isOff(t))?.id ?? null);
     }
   }, [event, tierId]);
 
@@ -49,7 +60,7 @@ export default function EventCheckoutPage({ params }: PageProps) {
   if (isError || !event) {
     return (
       <div className="mx-auto max-w-md p-8 text-center text-sm text-neutral-600">
-        {error?.message ?? "Event not found."}{" "}
+        {error ? "We couldn't load this event. Check your internet connection and try again." : "Event not found."}{" "}
         <Link href="/events" className="font-semibold text-primary-700">Back to events</Link>
       </div>
     );
@@ -61,6 +72,8 @@ export default function EventCheckoutPage({ params }: PageProps) {
   const total = price + fee;
   const balance = wallet.data?.balance;
   const insufficient = total > 0 && balance !== undefined && balance < total;
+  const action = eventAction(event, Date.now());
+  const block = BLOCK_TEXT[action.kind];
 
   function pay() {
     if (!tier || purchase.isPending) return;
@@ -97,6 +110,14 @@ export default function EventCheckoutPage({ params }: PageProps) {
           </div>
         </div>
 
+        {block && (
+          <p role="alert" className="rounded-xl border border-error-100 bg-error-50 p-3 text-sm font-medium text-error-700">
+            {block}
+          </p>
+        )}
+
+        {!block && (
+        <>
         <section aria-labelledby="tier-heading" className="space-y-2">
           <h2 id="tier-heading" className="text-sm font-bold text-neutral-900">Select Ticket Type</h2>
           <div role="radiogroup" aria-labelledby="tier-heading" className="space-y-2">
@@ -108,12 +129,12 @@ export default function EventCheckoutPage({ params }: PageProps) {
                   type="button"
                   role="radio"
                   aria-checked={selected}
-                  disabled={t.soldOut}
+                  disabled={isOff(t)}
                   onClick={() => setTierId(t.id)}
                   className={cn(
                     "flex w-full items-center gap-3 rounded-2xl border bg-white p-3.5 text-left transition",
                     selected ? "border-primary-600 ring-1 ring-primary-600" : "border-neutral-200",
-                    t.soldOut && "opacity-50"
+                    isOff(t) && "opacity-50"
                   )}
                 >
                   <div className="min-w-0 flex-1">
@@ -125,8 +146,9 @@ export default function EventCheckoutPage({ params }: PageProps) {
                     </p>
                     <p className="text-base font-extrabold text-neutral-900">{t.price > 0 ? naira(t.price) : "Free"}</p>
                     <p className="text-[11px] text-neutral-500">
-                      {t.soldOut ? "Sold out" : `${t.remaining} available`}
-                      {t.description ? ` · ${t.description}` : ""}
+                      {[isOff(t) ? "Sold out" : t.remaining !== undefined ? `${t.remaining} available` : "", t.description]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </p>
                   </div>
                   <span className={cn("flex h-5 w-5 items-center justify-center rounded-full border-2", selected ? "border-primary-600" : "border-neutral-300")}>
@@ -159,16 +181,13 @@ export default function EventCheckoutPage({ params }: PageProps) {
               <div className="flex-1">
                 <p className="text-sm font-bold text-neutral-900">Kampmax Pay</p>
                 <p className="text-[11px] text-neutral-500">
-                  {balance !== undefined ? `Balance ${naira(balance)}` : "Fast · Secure · Reliable"}
+                  {balance !== undefined ? `Balance ${naira(balance)}` : "Paid from your wallet"}
                 </p>
               </div>
-              {insufficient && (
-                <Link href="/profile/wallet" className="text-xs font-bold text-primary-700">Top up</Link>
-              )}
             </div>
             {insufficient && (
               <p role="alert" className="text-xs text-error-700">
-                Your wallet balance is too low for this ticket. Top up to continue.
+                Your wallet balance is too low for this ticket. Add money to continue.
               </p>
             )}
           </section>
@@ -179,24 +198,34 @@ export default function EventCheckoutPage({ params }: PageProps) {
             {purchase.error.message || "We couldn't complete your purchase."}
           </p>
         )}
+        </>
+        )}
       </div>
 
-      {/* Sits above the mobile bottom navigation (62px + safe area). */}
-      <div className="fixed inset-x-0 bottom-[calc(62px+env(safe-area-inset-bottom))] z-40 border-t border-neutral-200 bg-white p-3 lg:bottom-0 lg:p-4">
-        <div className="mx-auto max-w-lg space-y-1.5">
-          <button
-            onClick={pay}
-            disabled={!tier || purchase.isPending || insufficient}
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary-600 text-sm font-bold text-white hover:bg-primary-700 disabled:opacity-50"
-          >
-            {purchase.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            {total > 0 ? `Pay ${naira(total)}` : "Get free ticket"}
-          </button>
-          <p className="flex items-center justify-center gap-1 text-[10px] text-neutral-400">
-            <Lock className="h-3 w-3" /> Your payment is secure and encrypted
-          </p>
+      {!block && (
+        /* Sits above the mobile bottom navigation (62px + safe area). */
+        <div className="fixed inset-x-0 bottom-[calc(62px+env(safe-area-inset-bottom))] z-40 border-t border-neutral-200 bg-white p-3 lg:bottom-0 lg:p-4">
+          <div className="mx-auto max-w-lg">
+            {insufficient ? (
+              <Link
+                href="/profile/wallet"
+                className="flex h-12 w-full items-center justify-center rounded-xl bg-primary-600 text-sm font-bold text-white hover:bg-primary-700"
+              >
+                Add money to wallet
+              </Link>
+            ) : (
+              <button
+                onClick={pay}
+                disabled={!tier || purchase.isPending}
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary-600 text-sm font-bold text-white hover:bg-primary-700 disabled:opacity-50"
+              >
+                {purchase.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                {total > 0 ? `Pay ${naira(total)}` : "Get free ticket"}
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

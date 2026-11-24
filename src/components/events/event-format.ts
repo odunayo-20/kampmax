@@ -78,16 +78,20 @@ export function eventAction(
   now: number
 ): { kind: EventActionKind; label: string; bookable: boolean } {
   if (e.status === "CANCELLED") return { kind: "cancelled", label: "Cancelled", bookable: false };
-  const start = Date.parse(e.startsAt);
-  const end = e.endsAt ? Date.parse(e.endsAt) : NaN;
-  const over = Number.isFinite(end) ? end < now : Number.isFinite(start) ? start + 6 * 3_600_000 < now : false;
-  if (over) return { kind: "ended", label: "Ended", bookable: false };
+  if (eventOver(e, now)) return { kind: "ended", label: "Ended", bookable: false };
   if (e.attending) return { kind: "held", label: "You\u2019re going", bookable: false };
   if (e.seatsLeft === 0) return { kind: "sold-out", label: "Sold out", bookable: false };
   if (e.tiers.length === 0) return { kind: "not-on-sale", label: "Not on sale yet", bookable: false };
   return e.minPrice > 0
     ? { kind: "ticket", label: "Get ticket", bookable: true }
     : { kind: "free", label: "Register", bookable: true };
+}
+
+/** Whether an event's time has gone: past its end, or six hours after its start when no end is given. */
+export function eventOver(e: { startsAt: string; endsAt?: string }, now: number): boolean {
+  const start = Date.parse(e.startsAt);
+  const end = e.endsAt ? Date.parse(e.endsAt) : NaN;
+  return Number.isFinite(end) ? end < now : Number.isFinite(start) ? start + 6 * 3_600_000 < now : false;
 }
 
 /** "Only 4 left!" / "30 seats left" / "Sold out", and whether it should look urgent. */
