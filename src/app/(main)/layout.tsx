@@ -8,7 +8,6 @@ import { MobileHeader } from "@/components/layout/MobileHeader";
 import { DesktopNavigation } from "@/components/layout/DesktopNavigation";
 import { BottomNavigation } from "@/components/layout/BottomNavigation";
 import { useAuth } from "@/lib/auth-context";
-import { Footer } from "@/components/layout/footer/Footer";
 import { CartDrawer } from "@/components/cart/CartDrawer";
 import { isServiceProviderDashboardPath } from "@/lib/utils";
 import { isFreelancerDashboardPath } from "@/services/freelancer-dashboard";
@@ -168,7 +167,6 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       {!isDashboardSection && <DesktopNavigation />}
       <main className={isDashboardSection ? "" : "pb-20 lg:pb-6"}>{children}</main>
       {!isDashboardSection && <BottomNavigation />}
-      {!isDashboardSection && <Footer />}
       {!isDashboardSection && <CartDrawer />}
     </div>
   );
