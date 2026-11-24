@@ -10,6 +10,8 @@ import {
   Users,
   MapPin,
   CreditCard,
+  Home,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -145,6 +147,22 @@ export function QuickAccessGrid() {
           );
         })}
       </div>
+
+      {/* Housing: its own banner, as on the app's Home */}
+      <Link
+        href="/accommodation"
+        aria-label="Find a place to live. Rooms and flats from verified agents"
+        className="group flex items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-3 transition-all duration-200 hover:border-emerald-300 hover:shadow-md active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600"
+      >
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-600">
+          <Home className="h-5 w-5" aria-hidden />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-bold text-neutral-800">Find a place to live</span>
+          <span className="block text-xs text-neutral-600">Rooms, hostels and flats from verified agents</span>
+        </span>
+        <ChevronRight className="h-[18px] w-[18px] shrink-0 text-neutral-400" aria-hidden />
+      </Link>
     </section>
   );
 }
