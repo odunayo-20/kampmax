@@ -2,10 +2,12 @@
 
 import { use, useCallback, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, Keyboard, XCircle } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Keyboard, XCircle } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { QrScanner } from "@/components/events/QrScanner";
-import { useCheckIn } from "@/hooks/use-events";
+import { useAttendance, useCheckIn } from "@/hooks/use-events";
+import { cn } from "@/lib/utils";
+import { describeCheckInError, normalizeTicketNumber, parseTicketQr, type ScanProblem } from "@/lib/ticket-scan";
 import { eventTime } from "@/components/events/event-format";
 import type { CheckInResult } from "@/types/event-ticketing";
 
@@ -15,25 +17,45 @@ interface PageProps {
 
 type Outcome =
   | { kind: "approved"; result: CheckInResult }
-  | { kind: "denied"; message: string };
+  | ({ kind: "problem" } & ScanProblem);
 
 export default function ScanTicketPage({ params }: PageProps) {
   const { id } = use(params);
   const checkIn = useCheckIn(id);
+  const attendance = useAttendance(id);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [manual, setManual] = useState("");
   const [showManual, setShowManual] = useState(false);
+  const [numberError, setNumberError] = useState<string | null>(null);
 
   const submit = useCallback(
     (input: { code?: string; ticketNumber?: string }) => {
       if (checkIn.isPending) return;
       checkIn.mutate(input, {
         onSuccess: (result) => setOutcome({ kind: "approved", result }),
-        onError: (err) => setOutcome({ kind: "denied", message: err.message || "Couldn't verify that ticket." }),
+        onError: (err) => setOutcome({ kind: "problem", ...describeCheckInError(err as { status?: number; code?: string; message?: string }) }),
       });
     },
     [checkIn]
   );
+
+  // Anything that isn't a Kampmax ticket is refused here, without a request.
+  function onScan(data: string) {
+    const parsed = parseTicketQr(data);
+    if (parsed.ok) submit({ code: parsed.code });
+    else setOutcome({ kind: "problem", tone: "bad", title: "Not a Kampmax ticket", detail: parsed.reason });
+  }
+
+  function submitNumber(e: React.FormEvent) {
+    e.preventDefault();
+    const ticketNumber = normalizeTicketNumber(manual);
+    if (!ticketNumber) {
+      setNumberError("Enter the ticket number, like KMX-82941.");
+      return;
+    }
+    setNumberError(null);
+    submit({ ticketNumber });
+  }
 
   function next() {
     setOutcome(null);
@@ -48,14 +70,21 @@ export default function ScanTicketPage({ params }: PageProps) {
           <Link href={`/organizer/events/${id}`} aria-label="Back to dashboard" className="text-white/80">
             <ArrowLeft className="h-5 w-5" />
           </Link>
-          <h1 className="text-base font-bold">Scan Ticket</h1>
+          <div className="text-center">
+            <h1 className="text-base font-bold">Scan tickets</h1>
+            {attendance.data && (
+              <p className="text-xs text-white/70">
+                {attendance.data.checkedIn.toLocaleString("en-NG")} of {attendance.data.total.toLocaleString("en-NG")} checked in
+              </p>
+            )}
+          </div>
           <span className="w-5" />
         </div>
 
         <QrScanner
           paused={outcome !== null}
           busy={checkIn.isPending}
-          onScan={(code) => submit({ code })}
+          onScan={onScan}
         />
         <p className="text-center text-xs text-white/70">Scan student&apos;s QR code</p>
 
@@ -85,11 +114,17 @@ export default function ScanTicketPage({ params }: PageProps) {
           </div>
         )}
 
-        {outcome?.kind === "denied" && (
+        {outcome?.kind === "problem" && (
           <div role="alert" className="space-y-3 rounded-2xl bg-white p-5 text-center text-neutral-900">
-            <XCircle className="mx-auto h-10 w-10 text-error-600" aria-hidden />
-            <p className="text-xs font-extrabold tracking-wide text-error-600">ENTRY DENIED</p>
-            <p className="text-sm text-neutral-700">{outcome.message}</p>
+            {outcome.tone === "warn" ? (
+              <AlertTriangle className="mx-auto h-10 w-10 text-amber-500" aria-hidden />
+            ) : (
+              <XCircle className="mx-auto h-10 w-10 text-error-600" aria-hidden />
+            )}
+            <p className={cn("text-sm font-extrabold", outcome.tone === "warn" ? "text-amber-700" : "text-error-600")}>
+              {outcome.title}
+            </p>
+            {outcome.detail && <p className="text-sm text-neutral-700">{outcome.detail}</p>}
             <button onClick={next} className="h-11 w-full rounded-xl bg-kampmax-navy text-sm font-bold text-white">
               Scan next
             </button>
@@ -105,17 +140,11 @@ export default function ScanTicketPage({ params }: PageProps) {
               <Keyboard className="h-4 w-4" /> Enter ticket number instead
             </button>
             {showManual && (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (manual.trim()) submit({ ticketNumber: manual.trim() });
-                }}
-                className="flex gap-2"
-              >
+              <form onSubmit={submitNumber} className="flex gap-2">
                 <input
                   value={manual}
                   onChange={(e) => setManual(e.target.value.toUpperCase())}
-                  placeholder="KMX-123456"
+                  placeholder="KMX-82941"
                   autoCapitalize="characters"
                   aria-label="Ticket number"
                   className="h-11 flex-1 rounded-xl border border-white/20 bg-white/10 px-3 font-mono text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/40"
@@ -128,6 +157,9 @@ export default function ScanTicketPage({ params }: PageProps) {
                   Check in
                 </button>
               </form>
+            )}
+            {showManual && numberError && (
+              <p role="alert" className="text-center text-xs text-amber-300">{numberError}</p>
             )}
           </div>
         )}

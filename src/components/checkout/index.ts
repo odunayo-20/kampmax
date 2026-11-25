@@ -7,7 +7,6 @@ export { AddressForm } from "./AddressForm";
 export { DeliveryOptions } from "./DeliveryOptions";
 export { VendorCheckoutGroup } from "./VendorCheckoutGroup";
 export { CouponSection } from "./CouponSection";
-export { KampmaxCoinSection } from "./KampmaxCoinSection";
 export { LoyaltySection } from "./LoyaltySection";
 export { PaymentMethod } from "./PaymentMethod";
 export { OrderSummary } from "./OrderSummary";

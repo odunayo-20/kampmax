@@ -3,12 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import jsQR from "jsqr";
 import { Loader2, ScanLine } from "lucide-react";
-
-/** Minimum gap between decoded codes so a wobbling camera can't hammer the API. */
-const RESCAN_COOLDOWN_MS = 2500;
+import { createRepeatFilter } from "@/lib/ticket-scan";
 
 interface QrScannerProps {
-  /** Called with each decoded code (rate limited). */
+  /** Called once for each code shown to the camera. */
   onScan: (code: string) => void;
   /** Pauses scanning, e.g. while a result is on screen. */
   paused?: boolean;
@@ -21,7 +19,7 @@ export function QrScanner({ onScan, paused = false, busy = false }: QrScannerPro
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef(0);
-  const lastRef = useRef({ code: "", at: 0 });
+  const [repeats] = useState(() => createRepeatFilter());
   const onScanRef = useRef(onScan);
   const pausedRef = useRef(paused);
   const [cameraOn, setCameraOn] = useState(false);
@@ -61,6 +59,7 @@ export function QrScanner({ onScan, paused = false, busy = false }: QrScannerPro
         const tick = () => {
           if (cancelled) return;
           const canvas = canvasRef.current;
+          if (pausedRef.current) repeats.hold();
           if (
             canvas &&
             !pausedRef.current &&
@@ -77,17 +76,7 @@ export function QrScanner({ onScan, paused = false, busy = false }: QrScannerPro
               const result = jsQR(frame.data, frame.width, frame.height, {
                 inversionAttempts: "dontInvert",
               });
-              const now = Date.now();
-              if (
-                result?.data &&
-                !(
-                  result.data === lastRef.current.code &&
-                  now - lastRef.current.at < RESCAN_COOLDOWN_MS
-                )
-              ) {
-                lastRef.current = { code: result.data, at: now };
-                onScanRef.current(result.data);
-              }
+              if (result?.data && repeats.isNew(result.data)) onScanRef.current(result.data);
             }
           }
           rafRef.current = requestAnimationFrame(tick);
@@ -111,7 +100,7 @@ export function QrScanner({ onScan, paused = false, busy = false }: QrScannerPro
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     };
-  }, []);
+  }, [repeats]);
 
   return (
     <div className="space-y-2">

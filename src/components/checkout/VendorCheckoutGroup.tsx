@@ -1,21 +1,20 @@
 "use client";
 
 import { Verified, Package, PackageOpen } from "lucide-react";
-import { CheckoutVendorGroup, VendorDeliveryOption } from "@/types/checkout";
+import type { CheckoutDeliveryMethod, CheckoutVendorGroup } from "@/types/checkout";
+import { lineTotal, variantLabelOf } from "@/services/checkout";
 import { formatNaira } from "@/lib/utils";
 import { DeliveryOptions } from "./DeliveryOptions";
 
 interface VendorCheckoutGroupProps {
   group: CheckoutVendorGroup;
-  loadingVendorId: string | null;
-  onChangeDelivery: (vendorId: string, option: VendorDeliveryOption) => void;
-  /** true when the cart is being re-validated (e.g. campus change). */
+  onChangeDelivery: (vendorId: string, method: CheckoutDeliveryMethod) => void;
+  /** true while the order is being placed. */
   readonly?: boolean;
 }
 
 export function VendorCheckoutGroup({
   group,
-  loadingVendorId,
   onChangeDelivery,
   readonly,
 }: VendorCheckoutGroupProps) {
@@ -47,16 +46,7 @@ export function VendorCheckoutGroup({
 
       <div className="divide-y divide-kampmax-border">
         {group.items.map((item) => {
-          const effectiveVariant =
-            item.variantLabel ||
-            (item.selectedVariation
-              ? `${item.selectedVariation.name}: ${item.selectedVariation.option}`
-              : undefined) ||
-            (item.selectedVariants
-              ? Object.entries(item.selectedVariants)
-                  .map(([k, v]) => `${k}: ${v}`)
-                  .join(" · ")
-              : undefined);
+          const variant = variantLabelOf(item);
 
           return (
             <div
@@ -82,15 +72,15 @@ export function VendorCheckoutGroup({
                   <p className="text-xs text-kampmax-text-secondary">
                     Qty {item.quantity} × {formatNaira(item.unitPrice ?? item.product.price)}
                   </p>
-                  {effectiveVariant && (
+                  {variant && (
                     <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-slate-100 text-slate-700 rounded border border-slate-200">
-                      {effectiveVariant}
+                      {variant}
                     </span>
                   )}
                 </div>
               </div>
               <span className="text-sm font-semibold text-kampmax-navy shrink-0">
-                {formatNaira((item.unitPrice ?? item.product.price) * item.quantity)}
+                {formatNaira(lineTotal(item))}
               </span>
             </div>
           );
@@ -102,8 +92,9 @@ export function VendorCheckoutGroup({
           vendorId={group.vendorId}
           options={group.deliveryOptions}
           selected={group.selectedDelivery}
-          loadingVendorId={loadingVendorId}
-          onSelect={readonly ? () => {} : onChangeDelivery}
+          onSelect={(vendorId, option) => {
+            if (!readonly) onChangeDelivery(vendorId, option.method);
+          }}
         />
       </div>
     </section>

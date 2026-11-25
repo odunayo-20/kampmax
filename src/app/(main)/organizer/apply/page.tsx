@@ -7,37 +7,41 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { useApp } from "@/lib/app-context";
 import { useApplyOrganizer, useOrganizerStatus } from "@/hooks/use-events";
+import { CampusSelector } from "@/components/layout/footer/CampusSelector";
+import { FieldError, inputClass } from "@/components/events/organizer/fields";
+import {
+  DESCRIPTION_MAX,
+  NAME_MAX,
+  PROOF_MAX,
+  validateApplication,
+  type ApplicationErrors,
+  type ApplicationForm,
+} from "@/lib/organizer-application";
 
-const inputClass =
-  "w-full rounded-xl border border-kampmax-border bg-white px-4 py-2.5 text-sm focus:outline-none focus:border-kampmax-blue";
 
 export default function OrganizerApplyPage() {
   const router = useRouter();
   const { selectedCampus } = useApp();
   const status = useOrganizerStatus();
   const apply = useApplyOrganizer();
-  const [organizationName, setOrganizationName] = useState("");
-  const [description, setDescription] = useState("");
-  const [proofUrl, setProofUrl] = useState("");
+  const [form, setForm] = useState<ApplicationForm>({ organizationName: "", description: "", proofUrl: "" });
+  const [errors, setErrors] = useState<ApplicationErrors>({});
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const campusId = selectedCampus?.id;
   const state = status.data?.application?.status;
   const blocked = state === "PENDING" || state === "APPROVED" || state === "SUSPENDED";
-  const valid =
-    Boolean(campusId) &&
-    organizationName.trim().length >= 3 &&
-    description.trim().length >= 30;
+  const set = (key: keyof ApplicationForm) => (e: { target: { value: string } }) =>
+    setForm((f) => ({ ...f, [key]: e.target.value }));
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!valid || !campusId || apply.isPending) return;
+    if (apply.isPending) return;
+    const checked = validateApplication(form);
+    setErrors(checked.ok ? {} : checked.errors);
+    if (!checked.ok || !campusId) return;
     apply.mutate(
-      {
-        campusId,
-        organizationName: organizationName.trim(),
-        description: description.trim(),
-        proofUrl: proofUrl.trim() || undefined,
-      },
+      { campusId, ...checked.value },
       { onSuccess: () => router.replace("/organizer") }
     );
   }
@@ -70,56 +74,71 @@ export default function OrganizerApplyPage() {
               details and apply again.
             </p>
           )}
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            aria-label="Change campus"
+            className={`text-left ${inputClass}`}
+          >
+            <span className="block text-[11px] text-kampmax-text-muted">Campus</span>
+            <span className="font-semibold text-kampmax-text">
+              {campusId ? selectedCampus.name : "Choose your campus"}
+            </span>
+          </button>
           <label className="block text-xs font-semibold text-kampmax-text">
-            Club or organization name
+            Club or organisation name
             <input
-              value={organizationName}
-              onChange={(e) => setOrganizationName(e.target.value)}
-              maxLength={120}
-              placeholder="RUGIPO Tech Community"
+              value={form.organizationName}
+              onChange={set("organizationName")}
+              maxLength={NAME_MAX}
+              aria-invalid={Boolean(errors.organizationName)}
               className={`mt-1 ${inputClass}`}
             />
+            <FieldError message={errors.organizationName} />
           </label>
           <label className="block text-xs font-semibold text-kampmax-text">
             What events will you run?
             <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              value={form.description}
+              onChange={set("description")}
               rows={5}
-              maxLength={2000}
-              placeholder="Tell us who you are and the kind of events you plan to host (at least 30 characters)."
+              maxLength={DESCRIPTION_MAX}
+              aria-invalid={Boolean(errors.description)}
+              placeholder="Who you are, the kind of events, and how often."
               className={`mt-1 ${inputClass}`}
             />
-            <span className="mt-0.5 block text-[11px] font-normal text-kampmax-text-muted">
-              {description.trim().length}/30 minimum
+            <span className="mt-0.5 block text-right text-[11px] font-normal text-kampmax-text-muted">
+              {form.description.length}/{DESCRIPTION_MAX}
             </span>
+            <FieldError message={errors.description} />
           </label>
           <label className="block text-xs font-semibold text-kampmax-text">
-            Proof link (optional)
+            Link that shows who you are (optional)
             <input
-              value={proofUrl}
-              onChange={(e) => setProofUrl(e.target.value)}
-              maxLength={500}
+              value={form.proofUrl}
+              onChange={set("proofUrl")}
+              maxLength={PROOF_MAX}
               inputMode="url"
-              placeholder="Link to a club letter or student ID scan"
+              aria-invalid={Boolean(errors.proofUrl)}
+              placeholder="https://instagram.com/your-club"
               className={`mt-1 ${inputClass}`}
             />
+            <FieldError message={errors.proofUrl} />
           </label>
-          {!campusId && (
-            <p className="text-xs text-error-700">Select your campus first (from the home screen).</p>
-          )}
+          {!campusId && <p className="text-xs text-error-700">Choose your campus first.</p>}
           {apply.isError && (
             <p role="alert" className="rounded-lg bg-error-50 p-3 text-xs text-error-700">
-              {apply.error.message}
+              Couldn&apos;t send your application. Try again.
             </p>
           )}
           <button
             type="submit"
-            disabled={!valid || apply.isPending}
+            disabled={apply.isPending}
             className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-kampmax-navy text-sm font-bold text-white disabled:opacity-50"
           >
-            {apply.isPending && <Loader2 className="h-4 w-4 animate-spin" />} Submit application
+            {apply.isPending && <Loader2 className="h-4 w-4 animate-spin" />} Send application
           </button>
+          <CampusSelector hideTrigger open={pickerOpen} onOpenChange={setPickerOpen} />
         </form>
       )}
     </PageContainer>

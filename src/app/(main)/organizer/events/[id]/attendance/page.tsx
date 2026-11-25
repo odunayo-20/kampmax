@@ -46,7 +46,7 @@ export default function AttendancePage({ params }: PageProps) {
         <div className="h-64 animate-pulse rounded-2xl bg-neutral-200/70" aria-busy="true" />
       ) : isError ? (
         <div role="alert" className="rounded-2xl border border-error-100 bg-error-50 p-6 text-center text-xs text-error-700">
-          {error.message}{" "}
+          Couldn&apos;t load the attendance report.{" "}
           <button onClick={() => refetch()} className="font-bold underline">Retry</button>
         </div>
       ) : (
@@ -121,7 +121,7 @@ export default function AttendancePage({ params }: PageProps) {
             {exportCsv.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
             Download Attendance List
           </button>
-          {exportCsv.isError && <p role="alert" className="text-center text-xs text-error-700">{exportCsv.error.message}</p>}
+          {exportCsv.isError && <p role="alert" className="text-center text-xs text-error-700">Couldn&apos;t export the list. Try again.</p>}
         </>
       )}
     </PageContainer>

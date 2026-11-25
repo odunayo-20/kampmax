@@ -11,14 +11,12 @@ interface CouponSectionProps {
   coupon: CouponState;
   onApply: (code: string) => void;
   onRemove: () => void;
-  enabled: boolean;
 }
 
 export function CouponSection({
   coupon,
   onApply,
   onRemove,
-  enabled,
 }: CouponSectionProps) {
   const [input, setInput] = useState(coupon.code);
   const isApplied = coupon.status === "valid";
@@ -71,21 +69,19 @@ export function CouponSection({
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value.toUpperCase())}
-          onKeyDown={(e) => e.key === "Enter" && enabled && onApply(input.trim())}
+          onKeyDown={(e) => e.key === "Enter" && onApply(input.trim())}
           placeholder="Enter promo code"
           aria-label="Promo code"
-          disabled={!enabled}
           className={cn(
             "flex-1 h-10 px-3 text-sm font-mono uppercase border rounded-lg focus:outline-none focus:ring-1 transition-colors",
             coupon.status === "invalid"
               ? "border-kampmax-error focus:border-kampmax-error focus:ring-kampmax-error"
-              : "border-kampmax-border focus:border-kampmax-blue focus:ring-kampmax-blue",
-            !enabled && "opacity-60"
+              : "border-kampmax-border focus:border-kampmax-blue focus:ring-kampmax-blue"
           )}
         />
         <button
           onClick={() => onApply(input.trim())}
-          disabled={isLoading || !input.trim() || !enabled}
+          disabled={isLoading || !input.trim()}
           className="h-10 px-4 text-sm font-medium bg-kampmax-navy text-white rounded-lg hover:bg-kampmax-navy-light disabled:opacity-50 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-2"
         >
           {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -94,7 +90,7 @@ export function CouponSection({
       </div>
 
 
-      {enabled && !isApplied && coupon.status !== "idle" && coupon.status !== "loading" && (
+      {!isApplied && coupon.status !== "idle" && coupon.status !== "loading" && (
         <p
           role={coupon.status === "invalid" ? "alert" : "status"}
           className={cn(

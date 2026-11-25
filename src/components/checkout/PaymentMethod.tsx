@@ -7,7 +7,6 @@ import { formatNaira } from "@/lib/utils";
 
 interface PaymentMethodProps {
   paymentMethod: CheckoutPaymentMethod;
-  paystackEnabled: boolean;
   finalTotal: number;
   onChange: (method: CheckoutPaymentMethod) => void;
   /** Kampmax Pay wallet balance; undefined while loading or unavailable (e.g. guests). */
@@ -24,7 +23,6 @@ const optionClass = (selected: boolean, disabled = false) =>
 
 export function PaymentMethod({
   paymentMethod,
-  paystackEnabled,
   finalTotal,
   onChange,
   walletBalance,
@@ -47,7 +45,7 @@ export function PaymentMethod({
         Payment Method
       </h2>
 
-      <fieldset disabled={!paystackEnabled}>
+      <div>
         <label className={optionClass(paymentMethod === "paystack")}>
           <input
             type="radio"
@@ -65,7 +63,7 @@ export function PaymentMethod({
           </div>
           <Lock className="h-4 w-4 text-kampmax-success shrink-0" />
         </label>
-      </fieldset>
+      </div>
 
       {walletEnabled && (
         <fieldset disabled={walletDisabled}>
@@ -97,12 +95,6 @@ export function PaymentMethod({
             </p>
           )}
         </fieldset>
-      )}
-
-      {!paystackEnabled && (
-        <p className="text-xs text-kampmax-text-secondary">
-          Online payment is not enabled in this prototype.
-        </p>
       )}
 
       <div className="flex items-start gap-2 p-2.5 bg-kampmax-blue/10 rounded-lg">

@@ -1,16 +1,9 @@
 "use client";
 
-import { Star, Info } from "lucide-react";
-import { LoyaltySectionState } from "@/types/checkout";
+import { Star } from "lucide-react";
 
-interface LoyaltySectionProps {
-  loyalty: LoyaltySectionState;
-}
-
-export function LoyaltySection({ loyalty }: LoyaltySectionProps) {
-  // If the backend hasn't enabled loyalty, hide the feature gracefully.
-  if (!loyalty.enabledByBackend) return null;
-  if (loyalty.pointsEarned <= 0) return null;
+export function LoyaltySection({ points }: { points: number }) {
+  if (points <= 0) return null;
 
   return (
     <section className="bg-white rounded-xl border border-kampmax-border p-4 sm:p-5">
@@ -20,12 +13,11 @@ export function LoyaltySection({ loyalty }: LoyaltySectionProps) {
         </div>
         <div className="min-w-0">
           <p className="text-sm font-semibold text-kampmax-text">
-            You&apos;ll earn {loyalty.pointsEarned.toLocaleString()} Kampmax
+            You&apos;ll earn {points.toLocaleString()} Kampmax
             Points on this order
           </p>
           <p className="text-[11px] text-kampmax-text-secondary">
-            {loyalty.message ||
-              "Points earned are calculated by the server at confirmation."}
+            Points are calculated and credited after the order is confirmed.
           </p>
         </div>
       </div>

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { useCart } from "@/lib/cart-context";
+import { getRefusalMessage } from "@/lib/error-messages";
 import { verifyPaymentApi } from "@/services/checkout";
 import { cancelUnpaidOrders } from "@/services/orders";
 
@@ -39,7 +40,7 @@ function CheckoutCallback() {
 
     void verifyPaymentApi(reference, true).then(({ data, error }) => {
       if (!data) {
-        setPhase({ kind: "failed", message: error?.message || "We couldn't verify your payment." });
+        setPhase({ kind: "failed", message: error ? getRefusalMessage(error) : "We couldn't verify your payment." });
         return;
       }
       if (data.status === "SUCCESS") {

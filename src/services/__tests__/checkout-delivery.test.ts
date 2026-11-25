@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildVendorDeliveryOptions, pickDefaultDelivery } from "@/services/checkout";
+import { buildVendorDeliveryOptions, pickDelivery } from "@/services/checkout";
 import type { VendorDeliveryOffer } from "@/types/checkout";
 
 const offer = (o: Partial<VendorDeliveryOffer> = {}): VendorDeliveryOffer => ({
@@ -52,7 +52,7 @@ describe("vendor delivery options", () => {
 
   it("defaults to free pickup, then delivery, then nothing", () => {
     const pick = (x: Partial<VendorDeliveryOffer>) =>
-      pickDefaultDelivery("v1", buildVendorDeliveryOptions("v1", offer(x)));
+      pickDelivery("v1", buildVendorDeliveryOptions("v1", offer(x)));
     expect(pick({ deliveryAvailable: true, deliveryFee: 500 })).toMatchObject({ method: "campus_pickup", fee: 0 });
     expect(pick({ pickupAvailable: false, deliveryAvailable: true, deliveryFee: 500 })).toMatchObject({
       method: "campus_delivery",

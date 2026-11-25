@@ -1,6 +1,6 @@
 "use client";
 
-import { Truck, Store, MapPin, Loader2, AlertCircle } from "lucide-react";
+import { Truck, Store, MapPin, AlertCircle } from "lucide-react";
 import {
   VendorDeliveryOption,
   VendorDeliverySelection,
@@ -18,22 +18,13 @@ interface DeliveryOptionsProps {
   vendorId: string;
   options: VendorDeliveryOption[];
   selected: VendorDeliverySelection | null;
-  loadingVendorId: string | null;
   onSelect: (vendorId: string, option: VendorDeliveryOption) => void;
-}
-
-function StateIndicator({ state }: { state: VendorDeliveryOption["state"] }) {
-  if (state === "loading") return <Loader2 className="h-4 w-4 animate-spin text-kampmax-blue" />;
-  if (state === "error" || state === "unavailable")
-    return <AlertCircle className="h-4 w-4 text-kampmax-error" />;
-  return null;
 }
 
 export function DeliveryOptions({
   vendorId,
   options,
   selected,
-  loadingVendorId,
   onSelect,
 }: DeliveryOptionsProps) {
   return (
@@ -44,8 +35,7 @@ export function DeliveryOptions({
       {options.map((opt) => {
         const Icon = METHOD_ICONS[opt.method] || Truck;
         const isSelected = selected?.optionId === opt.id;
-        const disabled = opt.state === "unavailable" || opt.state === "error";
-        const isLoading = loadingVendorId === vendorId && isSelected;
+        const disabled = opt.state === "unavailable";
         return (
           <label
             key={opt.id}
@@ -78,7 +68,7 @@ export function DeliveryOptions({
               )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <StateIndicator state={isLoading ? "loading" : opt.state} />
+              {disabled && <AlertCircle className="h-4 w-4 text-kampmax-error" />}
               <span
                 className={cn(
                   "text-sm font-semibold tabular-nums",

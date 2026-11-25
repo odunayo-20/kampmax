@@ -1,22 +1,15 @@
 import type { CartLineItem } from "@/types/cart";
 import { getVendorById, getCurrentUser } from "@/services/users";
-import { checkoutOrdersApi, CheckoutPayload } from "@/services/orders";
 import { apiClient, ApiError } from "@/lib/api-client";
 import type {
-  CheckoutSession,
-  CheckoutSessionOptions,
+  CheckoutSummary,
   CheckoutVendorGroup,
   VendorDeliveryOption,
   VendorDeliverySelection,
   VendorDeliveryOffer,
   CheckoutDeliveryMethod,
-  CheckoutActionResult,
-  CheckoutErrorInfo,
   CouponState,
   CouponCheckoutStatus,
-  PaymentVerificationResult,
-  DeliveryAddress,
-  PaystackPaymentInitiation,
 } from "@/types/checkout";
 
 // ============================================================
@@ -66,37 +59,25 @@ export interface BackendPaymentDetailResponse extends BackendPaymentResponse {
   }>;
 }
 
-const CHECKOUT_SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutes
+// ── Cart lines ──────────────────────────────────────────────────────────────
 
-interface CheckoutFeatureFlags {
-  couponValidationEnabled: boolean;
-  kampmaxCoinEnabled: boolean;
-  loyaltyEnabled: boolean;
-  paystackEnabled: boolean;
+export function lineTotal(item: CartLineItem): number {
+  return (item.unitPrice ?? item.product.price) * item.quantity;
 }
 
-const FEATURE_FLAGS: CheckoutFeatureFlags = {
-  couponValidationEnabled: true,
-  // Loyalty points are earned, never spent on payment.
-  kampmaxCoinEnabled: false,
-  loyaltyEnabled: true,
-  paystackEnabled: true,
-};
-
-// ── Error helpers ───────────────────────────────────────────────────────────
-
-function sanitizeError(err: unknown, fallback: string): CheckoutErrorInfo {
-  if (err instanceof Error && err.message) {
-    return { message: err.message };
+/** The chosen options of a line, e.g. "Size: XL · Colour: Blue". */
+export function variantLabelOf(item: CartLineItem): string | undefined {
+  if (item.variantLabel) return item.variantLabel;
+  if (item.selectedVariation) {
+    return `${item.selectedVariation.name}: ${item.selectedVariation.option}`;
   }
-  return { message: fallback };
+  if (!item.selectedVariants) return undefined;
+  return Object.entries(item.selectedVariants)
+    .map(([k, v]) => `${k}: ${v}`)
+    .join(" · ");
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-function makeSessionId(): string {
-  return `cs_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-}
+// ── Delivery ────────────────────────────────────────────────────────────────
 
 export function buildVendorDeliveryOptions(
   vendorId: string,
@@ -141,13 +122,16 @@ export function buildVendorDeliveryOptions(
   ];
 }
 
-/** The first available option; pickup is listed after delivery but preferred when free. */
-export function pickDefaultDelivery(
+/** Free pickup is preferred over delivery. */
+const DEFAULT_ORDER: CheckoutDeliveryMethod[] = ["campus_pickup", "vendor_pickup", "campus_delivery"];
+
+/** The customer's choice if the seller still offers it, otherwise the default. */
+export function pickDelivery(
   vendorId: string,
-  options: VendorDeliveryOption[]
+  options: VendorDeliveryOption[],
+  choice?: CheckoutDeliveryMethod
 ): VendorDeliverySelection | null {
-  const order: CheckoutDeliveryMethod[] = ["campus_pickup", "vendor_pickup", "campus_delivery"];
-  const opt = order
+  const opt = (choice ? [choice, ...DEFAULT_ORDER] : DEFAULT_ORDER)
     .map((m) => options.find((o) => o.method === m && o.state === "available"))
     .find(Boolean);
   return opt
@@ -155,113 +139,57 @@ export function pickDefaultDelivery(
     : null;
 }
 
-function groupVendorItems(
-  items: CartLineItem[]
-): { vendorId: string; items: CartLineItem[]; subtotal: number }[] {
-  const map = new Map<string, { items: CartLineItem[]; subtotal: number }>();
+// ── Summary ─────────────────────────────────────────────────────────────────
+
+/** Groups the active cart by seller and prices it for display. */
+export function buildCheckoutSummary({
+  items,
+  deliveryOffers,
+  choices = {},
+  discount = 0,
+}: {
+  items: CartLineItem[];
+  /** Per-vendor offers; a vendor missing here only gets its pickup options. */
+  deliveryOffers: Record<string, VendorDeliveryOffer>;
+  choices?: Record<string, CheckoutDeliveryMethod>;
+  discount?: number;
+}): CheckoutSummary {
+  const byVendor = new Map<string, CartLineItem[]>();
   for (const item of items) {
-    const vid = item.vendorId;
-    if (!map.has(vid)) map.set(vid, { items: [], subtotal: 0 });
-    const entry = map.get(vid)!;
-    entry.items.push(item);
-    entry.subtotal += (item.unitPrice ?? item.product.price) * item.quantity;
+    byVendor.set(item.vendorId, [...(byVendor.get(item.vendorId) ?? []), item]);
   }
-  return Array.from(map.entries()).map(([vendorId, v]) => ({
-    vendorId,
-    items: v.items,
-    subtotal: v.subtotal,
-  }));
-}
 
-// ── Public API ────────────────────────────────────────────────────────────
-
-/**
- * Creates presentation session from a live cart.
- */
-export function createCheckoutSession(options: CheckoutSessionOptions): CheckoutSession {
-  const { items, campusId, customerId, deliveryOffers = {} } = options;
-  const active = items.filter((i) => !i.savedForLater);
-
-  const vendorRaw = groupVendorItems(active);
-  const itemsSubtotal = vendorRaw.reduce((s, v) => s + v.subtotal, 0);
-  const itemCount = active.reduce((s, i) => s + i.quantity, 0);
-  const discountTotal = 0;
-  const coinDeduction = 0;
-
-  const vendorGroups: CheckoutVendorGroup[] = vendorRaw.map((v) => {
-    const vendor = getVendorById(v.vendorId);
-    const optionsList = buildVendorDeliveryOptions(v.vendorId, deliveryOffers[v.vendorId]);
-    const defaultDelivery = pickDefaultDelivery(v.vendorId, optionsList);
+  const vendorGroups: CheckoutVendorGroup[] = [...byVendor].map(([vendorId, lines]) => {
+    const vendor = getVendorById(vendorId);
+    const deliveryOptions = buildVendorDeliveryOptions(vendorId, deliveryOffers[vendorId]);
     return {
-      vendorId: v.vendorId,
+      vendorId,
       vendorName: vendor?.storeName || "Unknown seller",
       vendorVerified: vendor?.verified || false,
-      items: v.items,
-      subtotal: v.subtotal,
-      deliveryOptions: optionsList,
-      selectedDelivery: defaultDelivery,
-      deliveryReady: defaultDelivery !== null,
+      items: lines,
+      subtotal: lines.reduce((sum, line) => sum + lineTotal(line), 0),
+      deliveryOptions,
+      selectedDelivery: pickDelivery(vendorId, deliveryOptions, choices[vendorId]),
     };
   });
+
+  const itemsSubtotal = vendorGroups.reduce((sum, g) => sum + g.subtotal, 0);
   const deliveryTotal = vendorGroups.reduce((sum, g) => sum + (g.selectedDelivery?.fee ?? 0), 0);
-  const finalTotal =
-    Math.max(0, itemsSubtotal + deliveryTotal - discountTotal - coinDeduction);
 
   return {
-    sessionId: makeSessionId(),
-    customerId,
-    campusId,
-    currency: "NGN",
-    itemsSubtotal,
-    deliveryTotal,
-    discountTotal,
-    coinDeduction,
-    finalTotal,
     vendorGroups,
     pricing: {
       itemsSubtotal,
       deliveryTotal,
-      discountTotal,
-      coinDeduction,
-      finalTotal,
-      itemCount,
+      discountTotal: discount,
+      // The platform fee is charged to the seller, never to the customer.
+      finalTotal: Math.max(0, itemsSubtotal + deliveryTotal - discount),
+      itemCount: items.reduce((sum, i) => sum + i.quantity, 0),
     },
-    expiresAt: new Date(Date.now() + CHECKOUT_SESSION_TTL_MS).toISOString(),
-    paystackEnabled: FEATURE_FLAGS.paystackEnabled,
   };
 }
 
-export function getCheckoutSession(session: CheckoutSession): CheckoutSession {
-  return {
-    ...session,
-    expiresAt: new Date(Date.now() + CHECKOUT_SESSION_TTL_MS).toISOString(),
-  };
-}
-
-export function isCheckoutSessionExpired(session: CheckoutSession): boolean {
-  return new Date(session.expiresAt).getTime() < Date.now();
-}
-
-/**
- * Validates checkout items before payment.
- */
-export async function validateCheckout(
-  session: CheckoutSession
-): Promise<CheckoutActionResult> {
-  if (!session || session.vendorGroups.length === 0) {
-    return {
-      ok: false,
-      error: {
-        code: "empty_cart",
-        message: "Your cart is empty. Please add items before checking out.",
-      },
-    };
-  }
-
-  return {
-    ok: true,
-  };
-}
+// ── Promo codes ─────────────────────────────────────────────────────────────
 
 interface CouponPreviewResponse {
   code: string;
@@ -294,62 +222,40 @@ function couponStatusFromReason(reason: string): CouponState["status"] {
  * POST /api/v1/orders/checkout/preview — the server is authoritative; the
  * amount shown here is re-computed when the order is actually placed.
  */
-export async function applyCoupon(
-  session: CheckoutSession,
-  code: string
-): Promise<CheckoutActionResult<CouponState>> {
-  void session;
+export async function applyCoupon(code: string): Promise<CouponState> {
   const { data, error } = await apiClient.post<{ promotionCode: string }, CouponPreviewResponse>(
     "/orders/checkout/preview",
     { promotionCode: code }
   );
 
   if (error || !data) {
-    const message = error?.message || "We couldn't check that code. Please try again.";
-    return {
-      ok: false,
-      data: { code, status: "not_applicable", message },
-      error: { code: "coupon_unavailable", message },
-    };
+    return { code, status: "not_applicable", message: "We couldn't check that code. Please try again." };
   }
 
   if (data.totalDiscount > 0) {
     const applied = data.quotes.find((q) => q.applied)?.promotion;
-    return {
-      ok: true,
-      data: {
-        code,
-        status: "valid",
-        message: applied?.title,
-        appliedDiscount: data.totalDiscount,
-      },
-    };
+    return { code, status: "valid", message: applied?.title, appliedDiscount: data.totalDiscount };
   }
 
   const reason = data.quotes.find((q) => q.reason)?.reason ?? "That code can't be applied to this order.";
-  return {
-    ok: false,
-    data: { code, status: couponStatusFromReason(reason), message: reason },
-    error: { code: "coupon_rejected", message: reason },
-  };
+  return { code, status: couponStatusFromReason(reason), message: reason };
 }
 
-export async function removeCoupon(): Promise<CheckoutActionResult<CouponState>> {
-  return {
-    ok: true,
-    data: { code: "", status: "idle" },
+export function couponStatusLabel(status: CouponCheckoutStatus): string {
+  const labels: Record<CouponCheckoutStatus, string> = {
+    idle: "",
+    loading: "Validating…",
+    valid: "Promo code applied.",
+    invalid: "This promo code isn't valid.",
+    expired: "This promo code has expired.",
+    minimum_not_reached:
+      "This promo requires a minimum order value that wasn't reached.",
+    vendor_specific: "This promo only applies to specific sellers.",
+    product_specific: "This promo only applies to specific products.",
+    already_used: "This promo code has already been used.",
+    not_applicable: "This promo code can't be applied to this order.",
   };
-}
-
-export async function selectDelivery(
-  session: CheckoutSession,
-  selection: VendorDeliverySelection
-): Promise<CheckoutActionResult<VendorDeliverySelection>> {
-  void session;
-  return {
-    ok: true,
-    data: selection,
-  };
+  return labels[status];
 }
 
 // ============================================================
@@ -393,140 +299,44 @@ export async function verifyPaymentApi(
   return { data, error: null };
 }
 
-/**
- * Initialize Paystack payment for a checkout session / order.
- */
-export async function initializePaystackPayment(
-  session: CheckoutSession,
+/** Starts one Paystack charge for these orders; `data` is the page to send the customer to. */
+export async function startPaystackPayment(
   orderIds: string[],
-  callbackUrl?: string
-): Promise<CheckoutActionResult<PaystackPaymentInitiation>> {
-  const [orderId] = orderIds;
-  if (!orderId) {
-    return {
-      ok: false,
-      error: {
-        code: "missing_order_id",
-        message: "An active order ID is required to initialize payment.",
-      },
-    };
-  }
-
+  callbackUrl: string
+): Promise<{ data: string | null; error: ApiError | null }> {
   const { data, error } = await initializePaymentApi({
-    orderId,
+    orderId: orderIds[0],
     orderIds,
     gateway: "paystack",
     callbackUrl,
   });
-
-  if (data && data.reference) {
-    return {
-      ok: true,
-      data: {
-        reference: data.reference,
-        authorizationUrl: data.authorizationUrl || undefined,
-        amount: data.amount,
-        currency: "NGN",
-        checkoutSessionId: session.sessionId,
-      },
-    };
-  }
-
-  return {
-    ok: false,
-    error: {
-      code: error?.status ? String(error.status) : "payment_init_failed",
-      message: error?.message || "Failed to initialize payment gateway with backend.",
-    },
-  };
+  return { data: data?.authorizationUrl || null, error };
 }
 
 /**
  * Pay the given orders from the customer's Kampmax Pay wallet. The backend
  * debits the wallet and confirms the orders in one step; a low balance comes
- * back as an error and nothing is charged.
+ * back as an error and nothing is charged. `data` is the order to show.
  */
 export async function payOrdersWithWallet(
   orderIds: string[]
-): Promise<CheckoutActionResult<{ reference: string; orderId: string }>> {
-  const [orderId] = orderIds;
-  if (!orderId) {
-    return {
-      ok: false,
-      error: {
-        code: "missing_order_id",
-        message: "An active order ID is required to pay.",
-      },
-    };
-  }
-
+): Promise<{ data: string | null; error: ApiError | null }> {
   const { data, error } = await apiClient.post<
     { orderId: string; orderIds: string[] },
     BackendPaymentResponse
-  >("/payments/wallet", { orderId, orderIds });
+  >("/payments/wallet", { orderId: orderIds[0], orderIds });
 
-  if (data && data.reference && data.status === "SUCCESS") {
-    return { ok: true, data: { reference: data.reference, orderId: data.orderId } };
-  }
-
-  return {
-    ok: false,
-    error: {
-      code: error?.status ? String(error.status) : "wallet_payment_failed",
-      message: error?.message || "We couldn't complete the wallet payment.",
-    },
-  };
+  return { data: !error && data?.status === "SUCCESS" ? data.orderId : null, error };
 }
 
-/**
- * Check payment status via backend API verification.
- */
-export async function getPaymentStatus(
-  reference: string
-): Promise<CheckoutActionResult<PaymentVerificationResult>> {
-  if (!reference) {
-    return {
-      ok: false,
-      error: { code: "missing_reference", message: "Payment reference is required." },
-    };
-  }
+// ── Customer ────────────────────────────────────────────────────────────────
 
-  const { data, error } = await verifyPaymentApi(reference);
-
-  if (data) {
-    const isSuccess = data.status === "SUCCESS";
-    const isPending = data.status === "PENDING";
-    return {
-      ok: isSuccess,
-      data: {
-        status: isSuccess ? "successful" : isPending ? "pending" : "failed",
-        reference,
-        message: isSuccess
-          ? "Payment verified successfully."
-          : isPending
-          ? "Payment is pending confirmation."
-          : "Payment failed or was cancelled.",
-      },
-    };
-  }
-
-  return {
-    ok: false,
-    error: {
-      code: error?.status ? String(error.status) : "verification_failed",
-      message: error?.message || "Payment verification failed or returned invalid status from backend.",
-    },
-  };
-}
-
-// ── Customer / address ──────────────────────────────────────────────────────
-
-export function getCustomerInfo(customerId?: string): {
+export function getCustomerInfo(customerId: string): {
   fullName: string;
   email: string;
   phone: string;
 } {
-  const current = customerId ? getCurrentUser() : undefined;
+  const current = getCurrentUser();
   const user = current && current.id === customerId ? current : undefined;
   return {
     fullName: user?.name || "",
@@ -535,30 +345,6 @@ export function getCustomerInfo(customerId?: string): {
   };
 }
 
-export type { DeliveryAddress };
-
-export function checkoutFeatureFlags(): CheckoutFeatureFlags {
-  return FEATURE_FLAGS;
-}
-
-export function couponStatusLabel(status: CouponCheckoutStatus): string {
-  const labels: Record<CouponCheckoutStatus, string> = {
-    idle: "",
-    loading: "Validating…",
-    valid: "Promo code applied.",
-    invalid: "This promo code isn't valid.",
-    expired: "This promo code has expired.",
-    minimum_not_reached:
-      "This promo requires a minimum order value that wasn't reached.",
-    vendor_specific: "This promo only applies to specific sellers.",
-    product_specific: "This promo only applies to specific products.",
-    already_used: "This promo code has already been used.",
-    not_applicable: "This promo code can't be applied to this order.",
-  };
-  return labels[status];
-}
-
 export function estimateLoyaltyPointsEarned(subtotal: number): number {
-  if (!FEATURE_FLAGS.loyaltyEnabled) return 0;
   return Math.round(subtotal * 0.05);
 }

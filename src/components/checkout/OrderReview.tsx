@@ -3,10 +3,10 @@
 import { CheckCircle2 } from "lucide-react";
 import {
   CheckoutCustomer,
-  VendorDeliverySelection,
   CheckoutVendorGroup,
   CHECKOUT_DELIVERY_METHOD_LABELS,
 } from "@/types/checkout";
+import { lineTotal, variantLabelOf } from "@/services/checkout";
 import type { SavedAddress } from "@/types";
 import { formatNaira } from "@/lib/utils";
 
@@ -14,19 +14,19 @@ interface OrderReviewProps {
   customer: CheckoutCustomer;
   campusName: string;
   address: SavedAddress | null;
-  vendorDeliveries: VendorDeliverySelection[];
-  vendorNames: Record<string, string>;
-  vendorGroups?: CheckoutVendorGroup[];
+  vendorGroups: CheckoutVendorGroup[];
 }
 
 export function OrderReview({
   customer,
   campusName,
   address,
-  vendorDeliveries,
-  vendorNames,
   vendorGroups,
 }: OrderReviewProps) {
+  const deliveries = vendorGroups.flatMap((g) =>
+    g.selectedDelivery ? [{ ...g.selectedDelivery, vendorName: g.vendorName }] : []
+  );
+
   return (
     <section
       aria-labelledby="order-review-title"
@@ -81,24 +81,20 @@ export function OrderReview({
           <p className="text-xs font-semibold text-kampmax-text-secondary uppercase tracking-wide mb-1">
             Delivery method per seller
           </p>
-          {vendorDeliveries.length === 0 ? (
+          {deliveries.length === 0 ? (
             <p className="text-kampmax-warning text-xs">
               Select a delivery method for each vendor.
             </p>
           ) : (
             <ul className="space-y-1">
-              {vendorDeliveries.map((d) => (
+              {deliveries.map((d) => (
                 <li key={d.vendorId} className="flex justify-between gap-2 text-xs">
                   <span className="text-kampmax-text-secondary truncate">
-                    {vendorNames[d.vendorId] || d.vendorId}
+                    {d.vendorName}
                   </span>
                   <span className="text-kampmax-text font-medium shrink-0">
-                    {CHECKOUT_DELIVERY_METHOD_LABELS[d.method] || "Delivery"}
-                    {d.fee !== undefined && d.fee > 0
-                      ? ` · ${formatNaira(d.fee)}`
-                      : d.fee === 0
-                        ? " · Free"
-                        : ""}
+                    {CHECKOUT_DELIVERY_METHOD_LABELS[d.method]}
+                    {d.fee > 0 ? ` · ${formatNaira(d.fee)}` : " · Free"}
                   </span>
                 </li>
               ))}
@@ -107,7 +103,7 @@ export function OrderReview({
         </div>
 
         {/* Items & Variety summary */}
-        {vendorGroups && vendorGroups.length > 0 && (
+        {vendorGroups.length > 0 && (
           <div>
             <p className="text-xs font-semibold text-kampmax-text-secondary uppercase tracking-wide mb-1.5">
               Items & Selected Variety
@@ -123,16 +119,7 @@ export function OrderReview({
                   </span>
                   <ul className="space-y-1 divide-y divide-slate-100">
                     {group.items.map((item) => {
-                      const effectiveVariant =
-                        item.variantLabel ||
-                        (item.selectedVariation
-                          ? `${item.selectedVariation.name}: ${item.selectedVariation.option}`
-                          : undefined) ||
-                        (item.selectedVariants
-                          ? Object.entries(item.selectedVariants)
-                              .map(([k, v]) => `${k}: ${v}`)
-                              .join(" · ")
-                          : undefined);
+                      const variant = variantLabelOf(item);
 
                       return (
                         <li
@@ -143,14 +130,14 @@ export function OrderReview({
                             <span className="text-kampmax-text font-medium truncate">
                               {item.product.title} (x{item.quantity})
                             </span>
-                            {effectiveVariant && (
+                            {variant && (
                               <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
-                                {effectiveVariant}
+                                {variant}
                               </span>
                             )}
                           </div>
                           <span className="text-kampmax-navy font-semibold shrink-0">
-                            {formatNaira((item.unitPrice ?? item.product.price) * item.quantity)}
+                            {formatNaira(lineTotal(item))}
                           </span>
                         </li>
                       );

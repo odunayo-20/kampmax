@@ -20,6 +20,7 @@ import {
   useSettleEvent,
 } from "@/hooks/use-events";
 import { cn } from "@/lib/utils";
+import { actionError } from "@/lib/event-publish";
 import { eventDate, eventTimeRange, naira } from "@/components/events/event-format";
 import { TicketsTab } from "@/components/events/organizer/TicketsTab";
 import { SettingsTab } from "@/components/events/organizer/SettingsTab";
@@ -51,11 +52,10 @@ export default function OrganizerEventPage({ params }: PageProps) {
     );
   }
   if (event.isError || dashboard.isError || !event.data || !dashboard.data) {
-    const message = event.error?.message ?? dashboard.error?.message ?? "Couldn't load this event.";
     return (
       <PageContainer narrow>
         <div role="alert" className="rounded-2xl border border-error-100 bg-error-50 p-6 text-center">
-          <p className="text-sm font-semibold text-error-700">{message}</p>
+          <p className="text-sm font-semibold text-error-700">Couldn&apos;t load this event. Check your internet connection and try again.</p>
           <Link href="/organizer" className="mt-3 inline-block text-xs font-bold text-error-700 underline">
             Back to organizer hub
           </Link>
@@ -184,7 +184,7 @@ function AttendeesTab({ eventId }: { eventId: string }) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const q = useDebounce(search.trim(), 300);
-  const { data, isPending, isError, error } = useAttendees(eventId, q, page);
+  const { data, isPending, isError } = useAttendees(eventId, q, page);
 
   return (
     <div className="space-y-3">
@@ -205,7 +205,7 @@ function AttendeesTab({ eventId }: { eventId: string }) {
       {isPending ? (
         <div className="h-32 animate-pulse rounded-xl bg-neutral-200/70" aria-busy="true" />
       ) : isError ? (
-        <p role="alert" className="rounded-xl bg-error-50 p-3 text-xs text-error-700">{error.message}</p>
+        <p role="alert" className="rounded-xl bg-error-50 p-3 text-xs text-error-700">Couldn&apos;t load attendees. Check your internet connection and try again.</p>
       ) : data.items.length === 0 ? (
         <p className="rounded-xl bg-white p-6 text-center text-sm text-neutral-500">
           {q ? "No attendees match your search." : "No tickets have been booked yet."}
@@ -312,7 +312,7 @@ function RevenueTab({
             {settle.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
             {r.canSettle ? `Release ${naira(r.net)} to wallet now` : "Paid out automatically after the event ends"}
           </button>
-          {settle.isError && <p role="alert" className="text-xs text-error-700">{settle.error.message}</p>}
+          {settle.isError && <p role="alert" className="text-xs text-error-700">{actionError(settle.error, "Couldn't release the revenue. Try again.")}</p>}
         </div>
       )}
     </div>
