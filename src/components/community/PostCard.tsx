@@ -19,6 +19,8 @@ function PollView({ post }: { post: CommunityPost }) {
   const pendingIdx = vote.isPending ? vote.variables?.optionIndex : undefined;
   const myVote = pendingIdx ?? poll.myVote;
   const canVote = !poll.closed && !vote.isPending;
+  // Like the app: no percentages before you vote, so they can't sway you.
+  const showResults = myVote !== null || poll.closed;
 
   return (
     <div className="mt-3 space-y-2">
@@ -39,10 +41,10 @@ function PollView({ post }: { post: CommunityPost }) {
               mine ? "border-kampmax-blue" : "border-kampmax-border"
             )}
           >
-            <span className="absolute inset-y-0 left-0 bg-kampmax-blue/10" style={{ width: `${pct}%` }} />
+            {showResults && <span className="absolute inset-y-0 left-0 bg-kampmax-blue/10" style={{ width: `${pct}%` }} />}
             <span className="relative flex justify-between gap-2">
               <span className="truncate">{option.text}</span>
-              <span className="text-xs text-kampmax-text-secondary">{pct}%</span>
+              {showResults && <span className="text-xs text-kampmax-text-secondary">{pct}%</span>}
             </span>
           </button>
         );
@@ -171,6 +173,15 @@ export function PostCard({ post, linkToDetail = true }: { post: CommunityPost; l
           {saved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
         </button>
       </div>
+      {(like.isError || save.isError || resolve.isError) && (
+        <p role="alert" className="px-4 pb-2.5 text-xs text-kampmax-error">
+          {like.isError
+            ? "Couldn't update your like. Try again."
+            : save.isError
+              ? "Couldn't save this post. Try again."
+              : "Couldn't mark this as resolved. Try again."}
+        </p>
+      )}
     </article>
   );
 }

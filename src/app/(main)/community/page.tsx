@@ -190,6 +190,14 @@ export default function CommunityFeedPage() {
               <MessageCircle className="h-12 w-12 text-neutral-300 mx-auto mb-3" />
               <p className="text-sm font-bold text-neutral-900">{empty.title}</p>
               <p className="text-xs text-neutral-500 mt-1">{empty.text}</p>
+              {discussionTab === "all" && (
+                <Link
+                  href="/community/create"
+                  className="mt-4 inline-flex rounded-xl bg-primary-600 px-4 py-2 text-xs font-semibold text-white hover:bg-primary-700"
+                >
+                  Write a post
+                </Link>
+              )}
             </div>
           ) : (
             <div className="space-y-3">
@@ -198,21 +206,10 @@ export default function CommunityFeedPage() {
               ))}
             </div>
           )}
+          {discussionTab !== "saved" && <LoadOlder feed={feed} />}
         </div>
       ) : (
         <div className="space-y-3.5">
-          {/* Pinned Broadcast Banner */}
-          <div className="p-4 bg-rose-50/60 border border-rose-100 rounded-2xl shadow-xs space-y-2">
-            <div className="flex items-center gap-2 text-rose-700">
-              <Megaphone className="h-4 w-4" />
-              <h3 className="text-xs font-bold uppercase tracking-wider">Campus Broadcasts</h3>
-            </div>
-            <p className="text-xs text-neutral-700 leading-relaxed">
-              Official verified announcements from campus administration, faculties, departmental
-              associations, and student leadership.
-            </p>
-          </div>
-
           {announcementPosts.length > 0 ? (
             <div className="space-y-3">
               {announcementPosts.map((post) => (
@@ -226,8 +223,24 @@ export default function CommunityFeedPage() {
               <p className="text-xs text-neutral-500">{empty.text}</p>
             </div>
           )}
+          <LoadOlder feed={feed} />
         </div>
       )}
     </PageContainer>
+  );
+}
+
+/** Polls, lost & found and announcements are picked out of the loaded posts, so older ones need this. */
+function LoadOlder({ feed }: { feed: ReturnType<typeof useCommunityFeed> }) {
+  if (!feed.hasNextPage) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => feed.fetchNextPage()}
+      disabled={feed.isFetchingNextPage}
+      className="mx-auto block rounded-full border border-neutral-200 bg-white px-5 py-2 text-xs font-semibold text-neutral-700 hover:border-primary-300 disabled:opacity-60"
+    >
+      {feed.isFetchingNextPage ? "Loading…" : "Load older posts"}
+    </button>
   );
 }

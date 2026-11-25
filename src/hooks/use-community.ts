@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { communityEventKeys, communityKeys } from "@/lib/query-keys";
 import {
@@ -24,15 +24,21 @@ import {
   setPostLikedApi,
 } from "@/services/posts-api";
 
-const FEED_LIMIT = 50;
+const FEED_LIMIT = 20;
 
 export function useCommunityFeed(campusId: string) {
   const { status } = useAuth();
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: communityKeys.feed(campusId),
     enabled: status === "authenticated",
     staleTime: 30_000,
-    queryFn: () => fetchFeed(campusId, 1, FEED_LIMIT),
+    queryFn: ({ pageParam }) => fetchFeed(campusId, pageParam, FEED_LIMIT),
+    initialPageParam: 1,
+    getNextPageParam: (last, pages) => (last.hasMore ? pages.length + 1 : undefined),
+    select: (data) => ({
+      items: data.pages.flatMap((p) => p.items),
+      total: data.pages[0]?.total ?? 0,
+    }),
   });
 }
 
