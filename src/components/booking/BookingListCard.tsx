@@ -27,12 +27,8 @@ export function BookingListCard({
       ? `/customer/bookings/${booking.id}`
       : `/service-provider/bookings/${booking.id}`;
 
-  const priceLabel =
-    booking.price.model === "fixed"
-      ? formatNaira(booking.price.amount)
-      : booking.price.model === "range"
-        ? `${formatNaira(booking.price.amount)}–${formatNaira(booking.price.amountMax ?? booking.price.amount)}`
-        : `From ${formatNaira(booking.price.amount)}`;
+  // The amount on a booking is what was charged, whatever the service's pricing model.
+  const priceLabel = formatNaira(booking.price.amount);
 
   const needsAction = booking.status === "pending" && role === "provider";
 

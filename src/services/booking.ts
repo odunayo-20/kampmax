@@ -3,7 +3,6 @@ import type {
   BookingAvailabilityResponse,
   BookingError,
   BookingEvidence,
-  BookingListFilter,
   BookingListQuery,
   BookingPageResult,
   BookingPaymentStage,
@@ -19,6 +18,7 @@ import type {
   ServiceProblemCategory,
 } from "@/types/booking";
 import { BOOKING_STATUS_SHORT_LABELS } from "@/types/booking";
+import { MY_BOOKING_TABS, type MyBookingTab } from "@/lib/my-bookings-list";
 import type { ServiceProviderLocationType } from "@/types/service-provider";
 
 // Bookings, straight from the backend (/bookings). Every price, slot, status
@@ -227,10 +227,10 @@ export async function fetchProviderBooking(id: string): Promise<ServiceBooking |
   throw new Error(error?.message || "Could not load this booking.");
 }
 
-export async function fetchCustomerBookingCounts(): Promise<Record<BookingListFilter, number>> {
-  const filters: BookingListFilter[] = ["upcoming", "in_progress", "completed", "past", "cancelled", "all"];
-  const totals = await Promise.all(filters.map((status) => fetchPage("/bookings/me", { status, limit: 1 })));
-  return Object.fromEntries(filters.map((f, i) => [f, totals[i].total])) as Record<BookingListFilter, number>;
+/** How many bookings each tab holds. */
+export async function fetchCustomerBookingCounts(): Promise<Record<MyBookingTab, number>> {
+  const totals = await Promise.all(MY_BOOKING_TABS.map((t) => fetchPage("/bookings/me", { status: t.key, limit: 1 })));
+  return Object.fromEntries(MY_BOOKING_TABS.map((t, i) => [t.key, totals[i].total])) as Record<MyBookingTab, number>;
 }
 
 export interface ProviderBookingSummary {
