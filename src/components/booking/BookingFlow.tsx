@@ -72,7 +72,8 @@ export function BookingFlow({ serviceId }: { serviceId: string }) {
   const [error, setError] = useState<BookingError | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [created, setCreated] = useState<{ id: string; reference: string } | null>(null);
-  const idempotencyRef = useRef<string>("");
+  // One key per set of choices: retrying the same booking is safe, changing it starts a new one.
+  const idempotencyRef = useRef<{ fingerprint: string; key: string } | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -146,10 +147,15 @@ export function BookingFlow({ serviceId }: { serviceId: string }) {
           This service can&apos;t be booked right now
         </h1>
         <p className="mt-2 text-sm text-neutral-500">
-          {availabilityQuery.error instanceof Error
-            ? availabilityQuery.error.message
-            : "Some services go through the request-quote flow instead."}
+          Check your internet connection and try again. Some services are priced by quote and can&apos;t be booked online.
         </p>
+        <button
+          type="button"
+          onClick={() => void availabilityQuery.refetch()}
+          className="mt-4 block w-full text-sm font-semibold text-primary-700"
+        >
+          Try again
+        </button>
         <Link
           href="/services"
           className="mt-6 inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-700"
@@ -225,19 +231,20 @@ export function BookingFlow({ serviceId }: { serviceId: string }) {
     }
 
     setSubmitting(true);
-    if (!idempotencyRef.current) {
-      idempotencyRef.current = `bk_${Date.now()}_${Math.floor(Math.random() * 1e9)}`;
-    }
-
-    const result = await createBooking({
+    const choices = {
       serviceId,
       startAt: selectedSlot.startAt,
       locationType: chosen.type,
       address: chosen.type === "customer_location" ? address.trim() : undefined,
       notes: notes.trim() || undefined,
       customerPhone: phone.trim(),
-      idempotencyKey: idempotencyRef.current,
-    });
+    };
+    const fingerprint = JSON.stringify(choices);
+    if (idempotencyRef.current?.fingerprint !== fingerprint) {
+      idempotencyRef.current = { fingerprint, key: `bk_${Date.now()}_${Math.floor(Math.random() * 1e9)}` };
+    }
+
+    const result = await createBooking({ ...choices, idempotencyKey: idempotencyRef.current.key });
     setSubmitting(false);
 
     if (result.ok) {
@@ -256,10 +263,19 @@ export function BookingFlow({ serviceId }: { serviceId: string }) {
       setRefreshKey((k) => k + 1);
       setStep("schedule");
       setSelectedSlot(null);
-      idempotencyRef.current = "";
+      idempotencyRef.current = null;
       return;
     }
-    setError(err);
+    // No clear answer: it may have gone through, and the same key makes trying again safe.
+    setError(
+      err.code === "500"
+        ? {
+            ...err,
+            message:
+              "We couldn't tell whether your booking went through. Try again: if it did, you will get the same booking back and won't be charged twice.",
+          }
+        : err
+    );
   }
 
   return (

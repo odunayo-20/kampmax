@@ -4,11 +4,13 @@ import { useState } from "react";
 import { Heart, MessageCircle, Send, Trash2 } from "lucide-react";
 import { cn, timeAgo } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useAddComment, useDeleteComment, usePostComments, useToggleCommentLike } from "@/hooks/use-community";
 
 export function CommentSection({ postId }: { postId: string }) {
   const { user } = useAuth();
   const [text, setText] = useState("");
+  const [deleting, setDeleting] = useState<string | null>(null);
   const comments = usePostComments(postId);
   const add = useAddComment(postId);
   const like = useToggleCommentLike();
@@ -62,7 +64,7 @@ export function CommentSection({ postId }: { postId: string }) {
                     <button
                       type="button"
                       disabled={del.isPending}
-                      onClick={() => del.mutate({ postId, commentId: comment.id })}
+                      onClick={() => setDeleting(comment.id)}
                       aria-label="Delete comment"
                       className="text-kampmax-text-secondary/70 hover:text-kampmax-error"
                     >
@@ -81,7 +83,29 @@ export function CommentSection({ postId }: { postId: string }) {
         </div>
       )}
 
-      {add.isError && <p className="text-xs text-kampmax-error">Couldn&apos;t post your comment. Try again.</p>}
+      {(add.isError || del.isError || like.isError) && (
+        <p role="alert" className="text-xs text-kampmax-error">
+          {add.isError
+            ? "Couldn't post your comment. Try again."
+            : del.isError
+              ? "Couldn't delete the comment. Try again."
+              : "Couldn't update your like. Try again."}
+        </p>
+      )}
+
+      <ConfirmDialog
+        open={deleting !== null}
+        title="Delete this comment?"
+        body="This can't be undone."
+        confirmLabel="Delete"
+        destructive
+        pending={del.isPending}
+        onCancel={() => setDeleting(null)}
+        onConfirm={() => {
+          if (deleting) del.mutate({ postId, commentId: deleting });
+          setDeleting(null);
+        }}
+      />
 
       <div className="flex gap-2 pt-2 border-t border-kampmax-border">
         <div className="w-8 h-8 rounded-full bg-kampmax-navy text-white flex items-center justify-center flex-shrink-0 text-xs font-bold">

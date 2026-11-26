@@ -119,7 +119,7 @@ export function ServiceCard({ service, provider: providerProp, className }: Serv
               href={`/services/${service.id}`}
               className="inline-flex items-center justify-center w-full h-8 rounded-xl bg-primary-50 text-primary-700 text-xs font-bold hover:bg-primary-600 hover:text-white transition-colors shadow-2xs"
             >
-              Book Service
+              {service.pricingModel === "quote" ? "Ask for a quote" : "Book Service"}
             </Link>
           </div>
         </div>

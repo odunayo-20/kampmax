@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -12,7 +13,11 @@ import {
   User,
 } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
-import { MORE_MENU_SECTIONS } from "@/config/navigation";
+import { menuSections } from "@/lib/more-menu";
+import { useMyProfiles } from "@/hooks/use-my-profiles";
+import { useUnreadMessageCount } from "@/hooks/use-messages";
+import { useUnreadNotificationCount } from "@/hooks/use-notifications";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useAuth } from "@/lib/auth-context";
 import { useApp } from "@/lib/app-context";
 import { useCart } from "@/lib/cart-context";
@@ -25,7 +30,16 @@ export default function MorePage() {
   const { selectedCampus } = useApp();
   const { itemCount } = useCart();
 
+  const [confirmingLogout, setConfirmingLogout] = useState(false);
+  const profiles = useMyProfiles();
+  const unread: Record<string, number> = {
+    messages: useUnreadMessageCount().data ?? 0,
+    notifications: useUnreadNotificationCount().data ?? 0,
+  };
+  const sections = menuSections(!!user, profiles.data);
+
   const handleLogout = async () => {
+    setConfirmingLogout(false);
     await logout();
     router.push("/login");
   };
@@ -33,12 +47,7 @@ export default function MorePage() {
   return (
     <PageContainer className="space-y-5 pb-16">
       {/* Top Header */}
-      <div className="space-y-1">
-        <h1 className="text-xl font-bold text-neutral-900 tracking-tight">More</h1>
-        <p className="text-xs text-neutral-500 font-medium">
-          Hub navigation, services, orders and account settings
-        </p>
-      </div>
+      <h1 className="text-xl font-bold text-neutral-900 tracking-tight">More</h1>
 
       {/* 1. User Profile Preview Card / Guest Explore Card */}
       {user ? (
@@ -82,16 +91,9 @@ export default function MorePage() {
               <User className="h-6 w-6" />
             </div>
             <div className="space-y-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <h2 className="text-sm font-bold text-neutral-900">
-                  Exploring as Guest
-                </h2>
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-neutral-100 text-neutral-600">
-                  Guest Mode
-                </span>
-              </div>
+              <h2 className="text-sm font-bold text-neutral-900">Welcome to Kampmax</h2>
               <p className="text-xs text-neutral-500 leading-relaxed">
-                Sign in or create an account to view orders, buy tickets, chat with vendors, and access campus services.
+                Sign in or create an account to view orders, buy tickets, chat with sellers, and access campus services.
               </p>
             </div>
           </div>
@@ -124,7 +126,7 @@ export default function MorePage() {
               </span>
             </div>
             <p className="text-xl sm:text-2xl font-black tracking-tight text-white">
-              {user ? "Your campus wallet" : "Zero Fee Campus Pay"}
+              {user ? "Your campus wallet" : "Pay on campus"}
             </p>
           </div>
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/20 backdrop-blur-md text-white border border-white/20">
@@ -132,10 +134,7 @@ export default function MorePage() {
           </span>
         </div>
 
-        <div className="pt-3.5 flex items-center justify-between gap-3">
-          <p className="text-[11px] text-blue-100 font-medium hidden sm:block">
-            Fast campus payments with 0% fee
-          </p>
+        <div className="pt-3.5 flex items-center justify-end gap-3">
           <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
             <Link
               href={user ? "/pay" : "/login?returnTo=/pay"}
@@ -150,7 +149,7 @@ export default function MorePage() {
 
       {/* 3. Grouped Navigation Sections */}
       <div className="space-y-5">
-        {MORE_MENU_SECTIONS.map((section) => (
+        {sections.map((section) => (
           <div key={section.id} className="space-y-2">
             <div className="px-1">
               <h3 className="text-[11px] font-extrabold tracking-wider text-neutral-400 uppercase">
@@ -191,6 +190,11 @@ export default function MorePage() {
                               {item.badge}
                             </span>
                           )}
+                          {unread[item.id] > 0 && (
+                            <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-primary-600 text-white">
+                              {unread[item.id]} unread
+                            </span>
+                          )}
                           {isCart && itemCount > 0 && (
                             <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-primary-600 text-white">
                               {itemCount} {itemCount === 1 ? "item" : "items"}
@@ -218,7 +222,7 @@ export default function MorePage() {
       <div className="pt-2">
         {user ? (
           <button
-            onClick={handleLogout}
+            onClick={() => setConfirmingLogout(true)}
             className="w-full flex items-center justify-center gap-2 p-3.5 bg-white border border-rose-200/80 rounded-2xl text-xs font-bold text-rose-600 hover:bg-rose-50/50 shadow-2xs transition-colors"
           >
             <LogOut className="h-4 w-4" />
@@ -241,6 +245,15 @@ export default function MorePage() {
           </p>
         </div>
       </div>
+      <ConfirmDialog
+        open={confirmingLogout}
+        title="Log out of Kampmax?"
+        body="You will need to sign back in to access your orders, tickets, and messages."
+        confirmLabel="Log out"
+        destructive
+        onCancel={() => setConfirmingLogout(false)}
+        onConfirm={handleLogout}
+      />
     </PageContainer>
   );
 }

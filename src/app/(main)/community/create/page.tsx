@@ -1,19 +1,28 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ImagePlus, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { uploadFileDirect } from "@/services/media";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { CampusSelector } from "@/components/layout/footer/CampusSelector";
+import {
+  cleanOptions,
+  draftProblem,
+  LOST_FOUND_FIELD_MAX,
+  MAX_PHOTOS,
+  MAX_POLL_OPTIONS,
+  MIN_POLL_OPTIONS,
+  POLL_DAYS,
+  POLL_OPTION_MAX,
+  POST_MAX,
+} from "@/lib/post-compose";
 import { useApp } from "@/lib/app-context";
 import { useAuth } from "@/lib/auth-context";
 import { useCreatePost } from "@/hooks/use-community";
 import type { PostKind } from "@/services/posts-api";
-
-const MAX_LENGTH = 5000;
-const MAX_IMAGES = 4;
-const MAX_POLL_OPTIONS = 6;
 
 interface AttachedImage {
   id: string;
@@ -26,7 +35,9 @@ const inputClass =
 export default function CreatePostPage() {
   const router = useRouter();
   const { selectedCampus } = useApp();
-  const { user } = useAuth();
+  const { user, status } = useAuth();
+  const [shown, setShown] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const create = useCreatePost();
 
   const [kind, setKind] = useState<PostKind>("POST");
@@ -51,22 +62,17 @@ export default function CreatePostPage() {
   ];
 
   const trimmed = content.trim();
-  const cleanOptions = pollOptions.map((o) => o.trim()).filter(Boolean);
-  const kindValid =
-    kind === "POST"
-      ? trimmed.length > 0 || images.length > 0
-      : kind === "POLL"
-        ? trimmed.length > 0 && cleanOptions.length >= 2 && new Set(cleanOptions.map((o) => o.toLowerCase())).size === cleanOptions.length
-        : kind === "LOST_FOUND"
-          ? lfItem.trim().length > 0 && lfLocation.trim().length > 0
-          : trimmed.length > 0 && !!selectedCampus?.id;
-  const canPost = kindValid && !create.isPending && !uploading;
+  const problem = draftProblem(
+    { kind, text: content, photoCount: images.length, pollOptions, lostItem: lfItem, lostLocation: lfLocation },
+    { hasCampus: !!selectedCampus?.id }
+  );
+  const busy = create.isPending || uploading;
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
     setUploadError(null);
     setUploading(true);
-    const room = MAX_IMAGES - images.length;
+    const room = MAX_PHOTOS - images.length;
     const added: AttachedImage[] = [];
     for (const file of Array.from(files).slice(0, room)) {
       if (!file.type.startsWith("image/")) {
@@ -75,7 +81,7 @@ export default function CreatePostPage() {
       }
       const { data, error } = await uploadFileDirect(file, "post");
       if (error || !data?.url) {
-        setUploadError(error?.message || "Couldn't upload that image. Try again.");
+        setUploadError("Couldn't upload that image. Try again.");
         continue;
       }
       added.push({ id: data.id, url: data.url });
@@ -85,14 +91,15 @@ export default function CreatePostPage() {
   }
 
   function handleSubmit() {
-    if (!canPost) return;
+    setShown(true);
+    if (problem || busy) return;
     create.mutate(
       {
         kind,
         content: trimmed || undefined,
         campusId: selectedCampus?.id || undefined,
         media: images.map((img, i) => ({ type: "IMAGE" as const, url: img.url, sortOrder: i })),
-        poll: kind === "POLL" ? { options: cleanOptions, durationDays: pollDays } : undefined,
+        poll: kind === "POLL" ? { options: cleanOptions(pollOptions), durationDays: pollDays } : undefined,
         lostFound:
           kind === "LOST_FOUND"
             ? { status: lfStatus, item: lfItem.trim(), location: lfLocation.trim(), contact: lfContact.trim() || undefined }
@@ -100,6 +107,19 @@ export default function CreatePostPage() {
         announcement: kind === "ANNOUNCEMENT" ? { priority } : undefined,
       },
       { onSuccess: (post) => router.replace(`/community/${post.id}`) }
+    );
+  }
+
+  if (status === "unauthenticated") {
+    return (
+      <PageContainer>
+        <div className="flex flex-col items-center justify-center gap-3 py-20">
+          <p className="text-sm text-kampmax-text-secondary">Sign in to post to your campus.</p>
+          <Link href="/login" className="rounded-xl bg-primary-600 px-4 py-2 text-xs font-semibold text-white hover:bg-primary-700">
+            Sign in
+          </Link>
+        </div>
+      </PageContainer>
     );
   }
 
@@ -117,12 +137,23 @@ export default function CreatePostPage() {
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={!canPost}
+          disabled={busy}
           className="px-4 py-2 rounded-xl bg-kampmax-blue text-white text-sm font-semibold disabled:opacity-40"
         >
-          {create.isPending ? "Posting…" : "Post"}
+          {create.isPending ? "Posting…" : uploading ? "Uploading photos…" : "Post"}
         </button>
       </div>
+
+      {shown && problem && <p role="alert" className="text-xs text-kampmax-error">{problem}</p>}
+      {create.isError && (
+        <p role="alert" className="text-xs text-kampmax-error">Couldn&apos;t publish your post. Check your connection and try again.</p>
+      )}
+
+      <button type="button" onClick={() => setPickerOpen(true)} aria-label="Change campus" className={cn(inputClass, "text-left")}>
+        <span className="block text-[11px] text-kampmax-text-secondary">Campus</span>
+        <span className="font-semibold text-kampmax-text">{selectedCampus?.name || "Choose your campus"}</span>
+      </button>
+      <CampusSelector hideTrigger open={pickerOpen} onOpenChange={setPickerOpen} />
 
       <div className="flex gap-2 overflow-x-auto">
         {kinds.map((k) => (
@@ -157,9 +188,10 @@ export default function CreatePostPage() {
               </button>
             ))}
           </div>
-          <input className={inputClass} placeholder="What item? (e.g. black backpack)" maxLength={200} value={lfItem} onChange={(e) => setLfItem(e.target.value)} />
-          <input className={inputClass} placeholder="Where?" maxLength={200} value={lfLocation} onChange={(e) => setLfLocation(e.target.value)} />
-          <input className={inputClass} placeholder="Contact info (optional)" maxLength={200} value={lfContact} onChange={(e) => setLfContact(e.target.value)} />
+          <input aria-label="What is it?" className={inputClass} placeholder="What is it? (e.g. black backpack)" maxLength={LOST_FOUND_FIELD_MAX} value={lfItem} onChange={(e) => setLfItem(e.target.value)} />
+          <input aria-label="Where?" className={inputClass} placeholder={lfStatus === "LOST" ? "Where you last saw it" : "Where you found it"} maxLength={LOST_FOUND_FIELD_MAX} value={lfLocation} onChange={(e) => setLfLocation(e.target.value)} />
+          <input aria-label="How to reach you" className={inputClass} placeholder="How to reach you (optional): phone number or hostel" maxLength={LOST_FOUND_FIELD_MAX} value={lfContact} onChange={(e) => setLfContact(e.target.value)} />
+          <p className="text-[11px] text-kampmax-text-secondary">Contact details are shown on the post, so only add what you are happy to share.</p>
         </div>
       )}
 
@@ -184,7 +216,7 @@ export default function CreatePostPage() {
       <div>
         <textarea
           value={content}
-          maxLength={MAX_LENGTH}
+          maxLength={POST_MAX}
           onChange={(e) => setContent(e.target.value)}
           rows={kind === "POST" ? 8 : 4}
           autoFocus
@@ -198,7 +230,7 @@ export default function CreatePostPage() {
           className="w-full rounded-xl border border-kampmax-border bg-white px-4 py-3 text-sm focus:outline-none focus:border-kampmax-blue resize-none"
         />
         <p className="text-[10px] text-kampmax-text-secondary text-right mt-1">
-          {content.length}/{MAX_LENGTH}
+          {content.length}/{POST_MAX}
         </p>
       </div>
 
@@ -208,13 +240,14 @@ export default function CreatePostPage() {
             <div key={i} className="flex gap-2">
               <input
                 className={inputClass}
-                placeholder={`Option ${i + 1}`}
-                maxLength={100}
+                aria-label={`Answer ${i + 1}`}
+                placeholder={`Answer ${i + 1}`}
+                maxLength={POLL_OPTION_MAX}
                 value={opt}
                 onChange={(e) => setPollOptions((prev) => prev.map((o, j) => (j === i ? e.target.value : o)))}
               />
-              {pollOptions.length > 2 && (
-                <button type="button" aria-label="Remove option" onClick={() => setPollOptions((prev) => prev.filter((_, j) => j !== i))}>
+              {pollOptions.length > MIN_POLL_OPTIONS && (
+                <button type="button" aria-label={`Remove answer ${i + 1}`} onClick={() => setPollOptions((prev) => prev.filter((_, j) => j !== i))}>
                   <X className="h-4 w-4 text-kampmax-text-secondary" />
                 </button>
               )}
@@ -226,13 +259,13 @@ export default function CreatePostPage() {
               onClick={() => setPollOptions((prev) => [...prev, ""])}
               className="flex items-center gap-1 text-xs font-semibold text-kampmax-blue"
             >
-              <Plus className="h-3.5 w-3.5" /> Add option
+              <Plus className="h-3.5 w-3.5" /> Add an answer
             </button>
           )}
           <label className="flex items-center gap-2 text-xs text-kampmax-text-secondary">
             Poll length
             <select value={pollDays} onChange={(e) => setPollDays(Number(e.target.value))} className="rounded-lg border border-kampmax-border bg-white px-2 py-1">
-              {[1, 3, 7, 14].map((d) => (
+              {POLL_DAYS.map((d) => (
                 <option key={d} value={d}>
                   {d} day{d > 1 ? "s" : ""}
                 </option>
@@ -262,7 +295,7 @@ export default function CreatePostPage() {
               ))}
             </div>
           )}
-          {images.length < MAX_IMAGES && (
+          {images.length < MAX_PHOTOS && (
             <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-kampmax-border bg-white px-3 py-2 text-xs font-semibold text-kampmax-text">
               <ImagePlus className="h-4 w-4" />
               {uploading ? "Uploading…" : "Add photos"}
@@ -282,8 +315,6 @@ export default function CreatePostPage() {
           {uploadError && <p className="text-xs text-kampmax-error">{uploadError}</p>}
         </div>
       )}
-
-      {create.isError && <p className="text-xs text-kampmax-error">Couldn&apos;t publish your post. Check the details and try again.</p>}
     </PageContainer>
   );
 }

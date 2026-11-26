@@ -231,11 +231,16 @@ export function ServiceDetailView({
           </section>
 
           {/* Reviews teaser */}
-          {serviceReviews.length > 0 && (
+          {serviceReviews.length === 0 ? (
+            <section className="bg-white rounded-2xl border border-neutral-200 p-5">
+              <h2 className="text-sm font-bold text-neutral-900 mb-2">Recent reviews</h2>
+              <p className="text-sm text-neutral-500">No reviews yet. Reviews come from people who finished a booking.</p>
+            </section>
+          ) : (
             <section className="bg-white rounded-2xl border border-neutral-200 p-5">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-bold text-neutral-900">
-                  Recent reviews · {getServiceCategoryName(service.categoryId)}
+                  Recent reviews
                 </h2>
                 <Link
                   href={`/services/providers/${provider.id}#reviews`}
@@ -333,13 +338,17 @@ export function ServiceDetailView({
             </div>
 
             <div className="mt-4 pt-4 border-t border-neutral-100 space-y-1.5 text-xs text-neutral-500">
-              <p className="inline-flex items-center gap-1.5">
-                <ShieldCheck className="h-3.5 w-3.5 text-primary-600" aria-hidden />
-                {provider.totalBookings}+ bookings completed
-              </p>
-              <p className="inline-flex items-center gap-1.5">
-                <BadgeCheck className="h-3.5 w-3.5 text-primary-600" aria-hidden />
-                No upfront payment — request first
+              {provider.totalBookings > 0 && (
+                <p className="flex items-center gap-1.5">
+                  <ShieldCheck className="h-3.5 w-3.5 text-primary-600" aria-hidden />
+                  {provider.totalBookings} {provider.totalBookings === 1 ? "booking" : "bookings"} completed
+                </p>
+              )}
+              <p className="flex items-start gap-1.5">
+                <BadgeCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary-600" aria-hidden />
+                {isQuoteOnly
+                  ? "Asking for a quote costs nothing."
+                  : "Booking takes the price from your wallet and holds it until the job is confirmed."}
               </p>
             </div>
 

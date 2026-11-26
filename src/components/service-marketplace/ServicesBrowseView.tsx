@@ -6,14 +6,10 @@ import Link from "next/link";
 import {
   Search,
   ShieldCheck,
-  Star,
   MapPin,
-  CheckCircle2,
-  Clock,
   ArrowRight,
   Filter,
   UserCheck,
-  Zap,
 } from "lucide-react";
 import { useApp } from "@/lib/app-context";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -30,15 +26,6 @@ import { serviceSortLabel } from "./constants";
 import { searchProviders } from "@/services/service-marketplace";
 import { Avatar } from "@/components/ui";
 import { cn } from "@/lib/utils";
-
-const QUICK_SERVICE_TAGS = [
-  "Laptop Repair",
-  "Knotless Braids",
-  "Birthday Shoot",
-  "Math Tutoring",
-  "Laundry",
-  "Wig Revamp",
-];
 
 function FilteredSearchField({
   value,
@@ -126,47 +113,6 @@ function VerifiedProsReel() {
   );
 }
 
-function GuaranteeRow() {
-  const items = [
-    {
-      icon: ShieldCheck,
-      title: "Escrow Protection",
-      body: "Funds are released to providers only after you confirm job satisfaction.",
-    },
-    {
-      icon: UserCheck,
-      title: "Campus Verified",
-      body: "Providers are verified students or vetted local technicians.",
-    },
-    {
-      icon: Zap,
-      title: "Fast Turnaround",
-      body: "Get same-day emergency repairs, styling, and academic tutoring.",
-    },
-  ];
-
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-      {items.map((item) => (
-        <div
-          key={item.title}
-          className="flex items-start gap-3 bg-white rounded-2xl border border-neutral-200/90 p-3.5 shadow-2xs"
-        >
-          <span className="w-9 h-9 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center shrink-0">
-            <item.icon className="h-4.5 w-4.5" />
-          </span>
-          <div>
-            <h3 className="text-xs font-bold text-neutral-900">{item.title}</h3>
-            <p className="text-[11px] text-neutral-500 mt-0.5 leading-snug">
-              {item.body}
-            </p>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export function ServicesBrowseView() {
   const { selectedCampus } = useApp();
   const {
@@ -201,9 +147,6 @@ export function ServicesBrowseView() {
               <MapPin className="h-3.5 w-3.5 text-primary-400" />
               <span>{selectedCampus.name} ({campusAbbr})</span>
             </span>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-400 text-neutral-950">
-              <span>Verified Campus Gigs & Services</span>
-            </span>
           </div>
 
           <div>
@@ -223,19 +166,6 @@ export function ServicesBrowseView() {
             />
           </div>
 
-          {/* Quick Tag Pills */}
-          <div className="flex items-center gap-1.5 flex-wrap pt-1">
-            <span className="text-[11px] font-semibold text-neutral-300">Popular:</span>
-            {QUICK_SERVICE_TAGS.map((tag) => (
-              <button
-                key={tag}
-                onClick={() => setFilter("q", tag)}
-                className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/10 transition-colors"
-              >
-                {tag}
-              </button>
-            ))}
-          </div>
         </div>
       </section>
 
@@ -258,9 +188,6 @@ export function ServicesBrowseView() {
         <ServiceCategoryChips categories={categories} />
       </section>
 
-      {/* 4. Trust & Guarantee Badges */}
-      <GuaranteeRow />
-
       {/* 5. Main Results Feed with Sidebar & Scalable Pagination */}
       <section id="results" className="scroll-mt-20 pt-2 space-y-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -272,6 +199,10 @@ export function ServicesBrowseView() {
             </h2>
             <p className="text-xs text-neutral-500">
               Showing active services at {campusAbbr} · Sorted by {serviceSortLabel(filters.sort)}
+            </p>
+            <p className="mt-1 text-xs text-neutral-500">
+              When you book a priced service, the money is taken from your wallet and held. It is released when you
+              confirm the job, or automatically 72 hours after the provider marks it done.
             </p>
           </div>
 
