@@ -132,6 +132,8 @@ export function useCheckout() {
     queryKey: ["delivery-offers", status, vendorIds],
     queryFn: () => fetchDeliveryOffers(vendorIds),
     enabled: vendorIds.length > 0 && status !== "loading",
+    // Fees must be current each time checkout is opened.
+    staleTime: 0,
   });
 
   const [deliveryChoices, setDeliveryChoices] = useState<Record<string, CheckoutDeliveryMethod>>({});
