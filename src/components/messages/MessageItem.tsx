@@ -102,7 +102,7 @@ export function MessageItem({ message, isMine, showTail }: MessageItemProps) {
           )}
         >
           <time dateTime={message.createdAt}>{formatMessageTime(message.createdAt)}</time>
-          <MessageStatus read={message.read} isMine={isMine && !offerId} />
+          <MessageStatus isMine={isMine && !offerId} />
         </div>
       </div>
     </div>

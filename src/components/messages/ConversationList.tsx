@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCheck, Inbox, MessageCircle, Search, Store, X } from "lucide-react";
+import { CheckCheck, Search, Store, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -12,7 +12,15 @@ import {
   useUnreadMessageCount,
 } from "@/hooks/use-messages";
 import { MESSAGE_SEARCH_DEBOUNCE_MS } from "@/config/messaging";
-import { getConversationPeer, getConversationSnippet, formatConversationTime } from "./message-utils";
+import {
+  getConversationPeer,
+  getConversationSnippet,
+  formatConversationTime,
+  INBOX_ERROR_TITLE,
+  inboxEmpty,
+  SELLER_TAG,
+  unreadLine,
+} from "./message-utils";
 import { UnreadMessageBadge } from "./UnreadMessageBadge";
 import { ConversationListSkeleton } from "./skeletons";
 
@@ -63,9 +71,7 @@ export function ConversationList({
           <div>
             <h1 className="text-lg font-bold text-kampmax-text">Messages</h1>
             {totalUnread > 0 && (
-              <p className="text-xs text-kampmax-text-secondary mt-0.5">
-                {totalUnread} unread message{totalUnread > 1 ? "s" : ""}
-              </p>
+              <p className="text-xs text-kampmax-text-secondary mt-0.5">{unreadLine(totalUnread)}</p>
             )}
           </div>
           {totalUnread > 0 && (
@@ -121,28 +127,19 @@ export function ConversationList({
           <ConversationListSkeleton />
         ) : conversationsQuery.isError ? (
           <div className="px-6 py-12 text-center">
-            <MessageCircle className="h-10 w-10 text-kampmax-text-secondary/30 mx-auto mb-3" aria-hidden />
-            <p className="text-sm font-medium text-kampmax-text">Could not load conversations</p>
-            <p className="text-xs text-kampmax-text-secondary mt-1">Please try again.</p>
+            <p className="text-sm font-medium text-kampmax-text">{INBOX_ERROR_TITLE}</p>
             <button
               type="button"
               onClick={() => conversationsQuery.refetch()}
               className="mt-4 rounded-lg px-4 py-2 text-xs font-semibold text-white bg-kampmax-blue hover:bg-kampmax-blue/90"
             >
-              Retry
+              Try again
             </button>
           </div>
         ) : conversations.length === 0 ? (
           <div className="px-6 py-12 text-center">
-            <Inbox className="h-10 w-10 text-kampmax-text-secondary/30 mx-auto mb-3" aria-hidden />
-            <p className="text-sm font-medium text-kampmax-text">
-              {search ? "No conversations found" : "No messages yet"}
-            </p>
-            <p className="text-xs text-kampmax-text-secondary mt-1">
-              {search
-                ? "Try a different search term"
-                : "Start a conversation from a product page or a seller's store"}
-            </p>
+            <p className="text-sm font-medium text-kampmax-text">{inboxEmpty(!!search).title}</p>
+            <p className="mx-auto mt-1 max-w-xs text-xs text-kampmax-text-secondary">{inboxEmpty(!!search).text}</p>
           </div>
         ) : (
           <div className="divide-y divide-kampmax-border">
@@ -188,14 +185,8 @@ export function ConversationList({
                       </span>
                       {peer.isVendor && (
                         <span className="text-[9px] px-1 py-0.5 rounded bg-kampmax-gold/10 text-kampmax-gold font-semibold flex-shrink-0">
-                          VENDOR
+                          {SELLER_TAG.toUpperCase()}
                         </span>
-                      )}
-                      {conversation.isPinned && (
-                        <span className="sr-only">Pinned</span>
-                      )}
-                      {conversation.isMuted && (
-                        <span className="sr-only">Muted</span>
                       )}
                     </div>
                     <p

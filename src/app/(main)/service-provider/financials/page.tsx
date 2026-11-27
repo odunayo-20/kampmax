@@ -9,10 +9,7 @@ import { WalletActivity } from "@/components/wallet/WalletActivity";
 export default function FinancialsOverviewPage() {
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold text-kampmax-text">Financials</h1>
-        <p className="mt-1 text-sm text-kampmax-text-secondary">Your wallet balance and recent activity.</p>
-      </header>
+      <h1 className="text-2xl font-bold text-kampmax-text">Financials</h1>
 
       <SpFinancialsSubnav />
 

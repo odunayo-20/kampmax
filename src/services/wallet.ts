@@ -57,6 +57,8 @@ export interface BackendPaginatedWalletTransactions {
 export interface WithdrawPayload {
   amount: number;
   note?: string;
+  /** One per withdrawal attempt: the server answers a repeat with 409, so a retry cannot take the money twice. */
+  idempotencyKey?: string;
   destination: {
     bankCode: string;
     accountNumber: string;
@@ -202,8 +204,9 @@ export interface WalletTopup {
   authorizationUrl?: string;
 }
 
-function toFailure(error: ApiError | null, fallback: string): Error {
-  return new Error(error?.message || fallback);
+/** The message to show, with the status and code kept so a screen can tell a refusal from a lost connection. */
+function toFailure(error: ApiError | null, fallback: string): Error & { status?: number; code?: string | number } {
+  return Object.assign(new Error(error?.message || fallback), { status: error?.status, code: error?.code });
 }
 
 /**

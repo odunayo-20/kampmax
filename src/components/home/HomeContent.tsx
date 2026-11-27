@@ -249,7 +249,7 @@ export function HomeContent() {
             title="Campus sellers"
             subtitle={`Shops at ${selectedCampus.abbreviation}`}
             icon={<StoreIcon className="h-4 w-4 text-primary-600" aria-hidden />}
-            action={{ label: "View all", href: "/marketplace" }}
+            action={{ label: "View all", href: "/sellers" }}
           />
           <HorizontalScroll>
             {vendors.map((vendor) => (

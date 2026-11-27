@@ -7,6 +7,7 @@ import { WithdrawModal } from "@/components/wallet/WithdrawModal";
 import { Button } from "@/components/ui";
 import { formatNaira } from "@/lib/utils";
 import { describeClearing } from "@/lib/wallet-clearing";
+import { withdrawDisabledReason } from "@/lib/withdrawal";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
 import {
   fetchMyWallet,
@@ -53,9 +54,14 @@ export function WalletWithdrawals() {
               </p>
             )}
           </div>
-          <Button onClick={() => setOpen(true)} disabled={!wallet.data || wallet.data.balance < 100}>
-            Withdraw
-          </Button>
+          <div className="sm:text-right">
+            <Button onClick={() => setOpen(true)} disabled={!wallet.data || !!withdrawDisabledReason(wallet.data.balance)}>
+              Withdraw
+            </Button>
+            {wallet.data && withdrawDisabledReason(wallet.data.balance) && (
+              <p className="mt-1.5 text-xs text-kampmax-text-secondary">{withdrawDisabledReason(wallet.data.balance)}</p>
+            )}
+          </div>
         </div>
       )}
 
@@ -78,7 +84,7 @@ export function WalletWithdrawals() {
         )}
       </section>
 
-      <WithdrawModal isOpen={open} onClose={() => setOpen(false)} onWithdraw={withdraw} balance={wallet.data?.balance ?? 0} />
+      <WithdrawModal isOpen={open} onClose={() => setOpen(false)} onWithdraw={withdraw} balance={wallet.data?.balance ?? 0} clearing={wallet.data?.pendingAmount ?? 0} />
     </div>
   );
 }

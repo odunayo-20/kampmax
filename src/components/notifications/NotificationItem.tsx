@@ -11,6 +11,8 @@ interface NotificationItemProps {
   onDelete?: (id: string) => void;
   onNavigate?: (url: string) => void;
   compact?: boolean;
+  /** The coloured category icon. The full page leaves it out because its group headings already name the category. */
+  showIcon?: boolean;
 }
 
 function formatNotifTime(dateStr: string): string {
@@ -34,6 +36,7 @@ export function NotificationItem({
   onDelete,
   onNavigate,
   compact,
+  showIcon = true,
 }: NotificationItemProps) {
   const config = getNotificationCategoryMeta(notification.category);
   const Icon = config.icon;
@@ -70,15 +73,16 @@ export function NotificationItem({
         {notification.read && <span className="w-2 h-2" />}
       </div>
 
-      {/* Icon */}
-      <div
-        className={cn(
-          "w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0",
-          config.bg
-        )}
-      >
-        <Icon className={cn("h-5 w-5", config.color)} />
-      </div>
+      {showIcon && (
+        <div
+          className={cn(
+            "w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0",
+            config.bg
+          )}
+        >
+          <Icon className={cn("h-5 w-5", config.color)} />
+        </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 min-w-0">

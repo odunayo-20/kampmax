@@ -1,6 +1,7 @@
 import { apiClient, type ApiError } from "@/lib/api-client";
 import type { Notification, NotificationCategory, NotificationType } from "@/types";
 import { categoryLabels, type NotificationCategorySummary } from "@/services/notifications";
+import { actionUrlFor } from "@/lib/notification-rules";
 
 // The signed-in user's notifications, straight from the backend. Nothing here
 // falls back to bundled data: a failure throws so the page can say so.
@@ -50,15 +51,6 @@ const KIND: Record<string, { type: NotificationType; category: NotificationCateg
 };
 
 const FALLBACK = { type: "system" as NotificationType, category: "account" as NotificationCategory };
-
-function actionUrlFor(data: Record<string, unknown> | null): string | undefined {
-  if (!data) return undefined;
-  if (typeof data.link === "string") return data.link;
-  if (typeof data.orderId === "string") return `/orders/${data.orderId}`;
-  if (typeof data.ticketId === "string") return `/tickets/${data.ticketId}`;
-  if (typeof data.eventId === "string") return `/events/${data.eventId}`;
-  return undefined;
-}
 
 export function mapNotification(n: BackendNotificationItem, userId: string): Notification {
   const kind = KIND[n.type] ?? FALLBACK;

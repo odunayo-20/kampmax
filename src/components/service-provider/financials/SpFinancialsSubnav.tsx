@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 const ITEMS = [
   { href: "/service-provider/financials", label: "Overview", match: "overview" },
   { href: "/service-provider/financials/transactions", label: "Transactions", match: "transactions" },
-  { href: "/service-provider/financials/payouts", label: "Payouts", match: "payouts" },
   { href: "/service-provider/financials/payout-account", label: "Payout account", match: "payout-account" },
 ] as const;
 

@@ -268,6 +268,7 @@ export default function WalletPage() {
         onClose={() => setShowWithdraw(false)}
         onWithdraw={withdraw}
         balance={wallet.balance}
+        clearing={wallet.pendingAmount}
       />
 
       <FundingModal

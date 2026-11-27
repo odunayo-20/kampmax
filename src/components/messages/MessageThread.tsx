@@ -7,7 +7,7 @@ import { useMessages } from "@/hooks/use-messages";
 import { Conversation, Message } from "@/types";
 import { MessageItem } from "./MessageItem";
 import { MessageThreadSkeleton } from "./skeletons";
-import { formatConversationDate } from "./message-utils";
+import { formatConversationDate, THREAD_EMPTY, THREAD_ERROR_TITLE } from "./message-utils";
 
 interface MessageThreadProps {
   conversation: Conversation;
@@ -62,19 +62,18 @@ export function MessageThread({ conversation, isParticipant }: MessageThreadProp
             <MessageThreadSkeleton />
           ) : messagesQuery.isError ? (
             <div className="py-16 text-center">
-              <p className="text-sm font-medium text-kampmax-text">Could not load messages</p>
-              <p className="text-xs text-kampmax-text-secondary mt-1">Please try again.</p>
+              <p className="text-sm font-medium text-kampmax-text">{THREAD_ERROR_TITLE}</p>
               <button
                 type="button"
                 onClick={() => messagesQuery.refetch()}
                 className="mt-4 rounded-lg px-4 py-2 text-xs font-semibold text-white bg-kampmax-blue hover:bg-kampmax-blue/90"
               >
-                Retry
+                Try again
               </button>
             </div>
           ) : flattened.length === 0 ? (
             <div className="py-16 text-center">
-              <p className="text-sm text-kampmax-text-secondary">No messages yet — say hello!</p>
+              <p className="text-sm text-kampmax-text-secondary">{THREAD_EMPTY}</p>
             </div>
           ) : (
             <>

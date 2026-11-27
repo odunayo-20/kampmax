@@ -18,8 +18,9 @@ import {
   useUnreadNotificationCount,
 } from "@/hooks/use-notifications";
 import { notificationErrorMessage, getSafeNotificationTarget } from "@/lib/notification-utils";
+import { markAllLabel, NOTIFICATION_ACTION_ERROR } from "@/lib/notification-rules";
 import { Notification, NotificationCategory } from "@/types";
-import { CheckCheck, Filter } from "lucide-react";
+import { CheckCheck } from "lucide-react";
 
 export default function NotificationsPage() {
   const router = useRouter();
@@ -76,16 +77,15 @@ export default function NotificationsPage() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          {/* View toggle */}
-          <button
-            onClick={() =>
-              setViewMode(viewMode === "grouped" ? "flat" : "grouped")
-            }
-            className="p-2 rounded-lg text-kampmax-text-secondary hover:bg-kampmax-muted transition-colors"
-            title={viewMode === "grouped" ? "Flat view" : "Grouped view"}
-          >
-            <Filter className="h-4 w-4" />
-          </button>
+          {visible.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setViewMode(viewMode === "grouped" ? "flat" : "grouped")}
+              className="rounded-lg px-2 py-2 text-xs font-semibold text-kampmax-blue hover:bg-kampmax-muted transition-colors"
+            >
+              {viewMode === "grouped" ? "Newest first" : "Group by type"}
+            </button>
+          )}
 
           {unreadCount > 0 && (
             <button
@@ -94,11 +94,17 @@ export default function NotificationsPage() {
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-kampmax-blue bg-kampmax-blue/10 hover:bg-kampmax-blue/15 transition-colors disabled:opacity-50"
             >
               <CheckCheck className="h-3.5 w-3.5" />
-              {markAll.isPending ? "Marking…" : "Mark all read"}
+              {markAll.isPending ? "Marking…" : markAllLabel(unreadCount)}
             </button>
           )}
         </div>
       </div>
+
+      {(markRead.isError || markAll.isError || deleteItem.isError) && (
+        <p role="alert" className="text-sm text-error-600">
+          {NOTIFICATION_ACTION_ERROR}
+        </p>
+      )}
 
       {/* Category Filter */}
       <CategoryFilter
@@ -158,6 +164,7 @@ export default function NotificationsPage() {
                       onMarkAsRead={(id) => markRead.mutate(id)}
                       onDelete={(id) => deleteItem.mutate(id)}
                       onNavigate={handleNavigate}
+                      showIcon={false}
                     />
                   ))}
                 </div>
@@ -175,6 +182,7 @@ export default function NotificationsPage() {
               onMarkAsRead={(id) => markRead.mutate(id)}
               onDelete={(id) => deleteItem.mutate(id)}
               onNavigate={handleNavigate}
+              showIcon={false}
             />
           ))}
         </div>

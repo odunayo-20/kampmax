@@ -1,5 +1,23 @@
 import { Conversation } from "@/types";
 
+/** What a chat's other side is called when it is a store. Buyers see "seller", never "vendor". */
+export const SELLER_TAG = "Seller";
+
+/** What the empty inbox says: nothing found for a search, or no chats yet. The app says the same. */
+export function inboxEmpty(searching: boolean): { title: string; text: string } {
+  return searching
+    ? { title: "No conversations found", text: "Try a different name." }
+    : {
+        title: "No messages yet",
+        text: "Message a seller from a product page, or a freelancer or client from a proposal or contract. Your chats show up here.",
+      };
+}
+
+export const INBOX_ERROR_TITLE = "Couldn't load your messages";
+
+/** "3 unread messages". */
+export const unreadLine = (n: number): string => `${n} unread ${n === 1 ? "message" : "messages"}`;
+
 export interface ConversationPeer {
   id: string;
   name: string;
@@ -26,7 +44,7 @@ export function getConversationPeer(
     id: peerId,
     name,
     isVendor,
-    roleLabel: isVendor ? "Vendor" : peerRole === "VENDOR" ? "Vendor" : "Customer",
+    roleLabel: isVendor || peerRole === "VENDOR" ? SELLER_TAG : "Customer",
   };
 }
 
@@ -59,12 +77,19 @@ export function formatConversationTime(dateStr: string): string {
   return d.toLocaleDateString("en-NG", { month: "short", day: "numeric" });
 }
 
-export function formatConversationDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-NG", {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-  });
+/** What a chat shows when it has no messages, and when it cannot be loaded. The app says the same. */
+export const THREAD_EMPTY = "No messages yet. Say hello.";
+export const THREAD_ERROR_TITLE = "Couldn't load this chat";
+
+/** "Today", "Yesterday", else "Friday 20 Nov": the heading above a day's messages. */
+export function formatConversationDate(dateStr: string, now = new Date()): string {
+  const d = new Date(dateStr);
+  const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  if (sameDay(d, now)) return "Today";
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (sameDay(d, yesterday)) return "Yesterday";
+  return d.toLocaleDateString("en-NG", { weekday: "long", day: "numeric", month: "short" });
 }
 
 export function formatMessageTime(dateStr: string): string {
