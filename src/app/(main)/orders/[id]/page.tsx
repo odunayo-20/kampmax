@@ -552,8 +552,11 @@ export default function OrderDetailPage({
               Cancel Order
             </h3>
             <p className="text-sm text-kampmax-text-secondary">
-              Are you sure you want to cancel order #{order.id}? This action
-              cannot be undone.
+              Are you sure you want to cancel order #{order.id}? This cannot be
+              undone.{" "}
+              {order.status === "confirmed"
+                ? "The full amount goes back to your Kampmax wallet."
+                : "You have not been charged."}
             </p>
             <div className="flex gap-2">
               <button

@@ -1,8 +1,9 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, use, useState } from "react";
 import Link from "next/link";
-import { ClipboardList, Plus, Building2, AlertCircle } from "lucide-react";
+import Image from "next/image";
+import { ClipboardList, ImageIcon, Plus } from "lucide-react";
 import {
   useAccommodationCatalog,
   useAccommodationProperties,
@@ -13,6 +14,9 @@ import { accommodationApi } from "@/services/accommodation";
 import type { AccommodationPaymentFrequency } from "@/types/accommodation";
 import { AccommodationListingManager } from "@/components/accommodation/AccommodationListingManager";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { LoadError, Pill } from "@/components/accommodation/enquiry-parts";
+import { LISTING_FILTERS, LISTINGS_EMPTY, listingMatches, listingStatus, NEEDS_PROPERTY, placeLine, rentLine, type ListingFilter } from "@/lib/agent-listings";
+import { formatNaira } from "@/lib/utils";
 
 function ListingForm({
   properties,
@@ -286,8 +290,15 @@ function ListingForm({
   );
 }
 
-export default function AgentListingsPage() {
-  const [showForm, setShowForm] = useState(false);
+/**
+ * The agent's listings: a filtered list of cards, and the one picked open beside it. `?new=1` opens the form for a
+ * new listing straight away, for "Add a room" on the hub. The same screen as the mobile app's agent-listings.
+ */
+export default function AgentListingsPage({ searchParams }: { searchParams: Promise<{ new?: string }> }) {
+  const { new: openNew } = use(searchParams);
+  const [showForm, setShowForm] = useState(openNew === "1");
+  const [filter, setFilter] = useState<ListingFilter>("all");
+  const [picked, setPicked] = useState<string | undefined>();
   const catalogQuery = useAccommodationCatalog();
   const propertiesQuery = useAccommodationProperties(1, true);
   const listingsQuery = useAgentAccommodationListings(1, true);
@@ -295,94 +306,119 @@ export default function AgentListingsPage() {
   const properties = propertiesQuery.data?.items ?? [];
   const packages = catalogQuery.data?.packages ?? [];
   const amenities = catalogQuery.data?.amenities ?? [];
+  const items = listingsQuery.data?.items ?? [];
+  const shown = items.filter((l) => listingMatches(l, filter));
+  const open = items.find((l) => l.id === (picked ?? shown[0]?.id));
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-kampmax-text">
-            Accommodation Listings
-          </h1>
-          <p className="mt-1 text-sm text-kampmax-text-secondary">
-            Publish student listings, manage drafts, subscription packages, and pricing terms.
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight text-kampmax-text">Listings</h1>
+          <p className="mt-1 text-sm text-kampmax-text-secondary">One listing per room. Students see it once it is approved and paid for.</p>
         </div>
-
         <button
           type="button"
           onClick={() => setShowForm((c) => !c)}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-kampmax-blue px-4 py-2 text-xs font-semibold text-white shadow-2xs hover:bg-kampmax-blue/90"
+          className="inline-flex items-center gap-1.5 rounded-xl bg-kampmax-blue px-4 py-2 text-xs font-semibold text-white hover:bg-kampmax-blue/90"
         >
-          <Plus className="h-4 w-4" />
-          <span>{showForm ? "Close Form" : "Create Listing"}</span>
+          {showForm ? "Close" : <><Plus className="h-4 w-4" aria-hidden /> New listing</>}
         </button>
       </div>
 
-      {showForm && (
-        properties.length === 0 ? (
+      {showForm &&
+        (properties.length === 0 ? (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center">
-            <AlertCircle className="mx-auto h-8 w-8 text-amber-600" />
-            <h2 className="mt-2 text-sm font-bold text-amber-900">Add a Property First</h2>
-            <p className="mt-1 text-xs text-amber-800">
-              Listings require a property and unit. Please add a property before creating a listing.
-            </p>
-            <Link
-              href="/agent/properties"
-              className="mt-3 inline-flex rounded-xl bg-kampmax-blue px-4 py-2 text-xs font-semibold text-white"
-            >
-              Go to Properties →
+            <h2 className="text-sm font-bold text-amber-900">{NEEDS_PROPERTY.title}</h2>
+            <p className="mt-1 text-xs text-amber-800">{NEEDS_PROPERTY.text}</p>
+            <Link href="/agent/properties" className="mt-3 inline-flex rounded-xl bg-kampmax-blue px-4 py-2 text-xs font-semibold text-white">
+              Add a property
             </Link>
           </div>
         ) : (
-          <ListingForm
-            properties={properties}
-            amenities={amenities}
-            onSuccess={() => setShowForm(false)}
-          />
-        )
-      )}
+          <ListingForm properties={properties} amenities={amenities} onSuccess={() => setShowForm(false)} />
+        ))}
 
-      {/* Listings List */}
-      <section className="space-y-4">
-        {listingsQuery.isPending ? (
-          <div className="space-y-4">
-            <Skeleton className="h-40 w-full rounded-2xl" />
-            <Skeleton className="h-40 w-full rounded-2xl" />
-          </div>
-        ) : listingsQuery.isError ? (
-          <p className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs text-red-700">
-            Could not load listings: {listingsQuery.error.message}
-          </p>
-        ) : listingsQuery.data.items.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-kampmax-border bg-white p-12 text-center">
-            <ClipboardList className="mx-auto h-12 w-12 text-neutral-300" />
-            <h2 className="mt-3 text-base font-bold text-kampmax-text">No Listings Created Yet</h2>
-            <p className="mt-1 text-xs text-kampmax-text-secondary">
-              Listings are drafts until you subscribe to a publication package. Start creating listings for your rooms.
-            </p>
-            <button
-              type="button"
-              onClick={() => setShowForm(true)}
-              className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-kampmax-blue px-4 py-2 text-xs font-semibold text-white"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Create First Listing</span>
+      {listingsQuery.isPending ? (
+        <div className="space-y-4">
+          <Skeleton className="h-24 w-full rounded-2xl" />
+          <Skeleton className="h-24 w-full rounded-2xl" />
+        </div>
+      ) : listingsQuery.isError ? (
+        <LoadError what="load your listings" error={listingsQuery.error} onRetry={() => void listingsQuery.refetch()} />
+      ) : items.length === 0 ? (
+        !showForm && (
+          <div className="rounded-2xl border border-dashed border-kampmax-border bg-white p-10 text-center">
+            <h2 className="text-base font-bold text-kampmax-text">{LISTINGS_EMPTY.title}</h2>
+            <p className="mx-auto mt-1 max-w-md text-sm text-kampmax-text-secondary">{LISTINGS_EMPTY.text}</p>
+            <button type="button" onClick={() => setShowForm(true)} className="mt-4 rounded-xl bg-kampmax-blue px-4 py-2 text-xs font-semibold text-white">
+              Create a listing
             </button>
           </div>
-        ) : (
-          <div className="divide-y divide-kampmax-border rounded-2xl border border-kampmax-border bg-white p-4">
-            {listingsQuery.data.items.map((listing) => (
-              <AccommodationListingManager
-                key={listing.id}
-                listing={listing}
-                packages={packages}
-                amenities={amenities}
-              />
-            ))}
+        )
+      ) : (
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Show">
+            {LISTING_FILTERS.map((f) => {
+              const count = items.filter((l) => listingMatches(l, f.id)).length;
+              const on = filter === f.id;
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={on}
+                  onClick={() => { setFilter(f.id); setPicked(undefined); }}
+                  className={`rounded-full border px-3 py-1 text-sm ${on ? "border-kampmax-blue bg-kampmax-blue text-white" : "border-kampmax-border bg-white text-kampmax-text hover:bg-kampmax-bg"}`}
+                >
+                  {f.label}
+                  {count > 0 && <span className="ml-1.5 opacity-80">{count}</span>}
+                </button>
+              );
+            })}
           </div>
-        )}
-      </section>
+
+          <div className="grid gap-4 lg:grid-cols-[22rem_1fr]">
+            <ul className="space-y-2" aria-label="Listings">
+              {shown.length === 0 && <li className="text-sm text-kampmax-text-secondary">Nothing here.</li>}
+              {shown.map((l) => {
+                const s = listingStatus(l);
+                const on = l.id === open?.id;
+                const photo = l.media[0]?.url;
+                return (
+                  <li key={l.id}>
+                    <button
+                      type="button"
+                      aria-current={on ? "true" : undefined}
+                      onClick={() => setPicked(l.id)}
+                      className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left ${on ? "border-kampmax-blue bg-blue-50/40" : "border-kampmax-border bg-white hover:bg-kampmax-bg"}`}
+                    >
+                      <span className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-kampmax-muted">
+                        {photo ? (
+                          <Image src={photo} alt="" fill unoptimized sizes="64px" className="object-cover" />
+                        ) : (
+                          <ImageIcon className="absolute inset-0 m-auto h-5 w-5 text-kampmax-text-secondary" aria-hidden />
+                        )}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="line-clamp-2 block text-sm font-semibold text-kampmax-text">{l.title}</span>
+                        <span className="block truncate text-xs text-kampmax-text-secondary">{placeLine(l)}</span>
+                        <span className="block text-xs font-semibold text-kampmax-blue">{rentLine(l, formatNaira)}</span>
+                        <span className="mt-1 block"><Pill label={s.label} tone={s.tone} /></span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            {open && (
+              <div className="rounded-2xl border border-kampmax-border bg-white px-4">
+                <AccommodationListingManager key={open.id} listing={open} packages={packages} amenities={amenities} />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-

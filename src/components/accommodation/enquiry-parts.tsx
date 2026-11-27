@@ -6,16 +6,17 @@ import { describeWhen, MESSAGE_MAX, type Tone, VISIT_NOTE_MAX, visitTimeProblem,
 import { describeHousingError } from "@/lib/accommodation-text";
 import { timeAgo } from "@/lib/utils";
 
-/** Pieces both sides of a housing enquiry use: the student's MyHousingEnquiries and the agent's AccommodationEnquiries. */
+/** Pieces the housing screens share: both sides of an enquiry, the agent's visits, hub and listings. */
 
-const PILL: Record<Tone, string> = {
+const PILL: Record<Tone | "bad", string> = {
   positive: "bg-emerald-50 text-emerald-800",
   attention: "bg-amber-50 text-amber-900",
   info: "bg-blue-50 text-blue-900",
   neutral: "bg-kampmax-muted text-kampmax-text-secondary",
+  bad: "bg-red-50 text-red-800",
 };
 
-export function Pill({ label, tone }: { label: string; tone: Tone }) {
+export function Pill({ label, tone }: { label: string; tone: Tone | "bad" }) {
   return <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${PILL[tone]}`}>{label}</span>;
 }
 

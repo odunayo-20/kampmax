@@ -58,17 +58,35 @@ const listing = (over: Partial<AccommodationListing> = {}): AccommodationListing
 const render_ = (l: AccommodationListing) =>
   render(<AccommodationListingManager listing={l} packages={[]} amenities={[]} />);
 
-describe("a listing row", () => {
-  it("shows views, saves and enquiries for a live listing", () => {
+describe("one listing", () => {
+  it("shows views, saves and enquiries for a live listing, and what students pay", () => {
     render_(listing());
 
-    expect(screen.getByText("40 views · 6 saves · 3 enquiries")).toBeTruthy();
-    expect(screen.getByText(/₦450,000/)).toBeTruthy();
+    expect(screen.getByText("Views").nextSibling?.textContent).toBe("40");
+    expect(screen.getByText("Enquiries").nextSibling?.textContent).toBe("3");
+    expect(screen.getByText("Students pay up front").nextSibling?.textContent).toBe("₦450,000");
   });
 
-  it("shows no numbers for a draft nobody can see yet", () => {
-    render_(listing({ moderationStatus: "DRAFT", stats: { views: 0, saves: 0, enquiries: 0 } }));
+  it("shows no numbers for a draft nobody can see yet, and asks to finish it first", () => {
+    render_(listing({ moderationStatus: "DRAFT", publicationStatus: "INACTIVE" as never, stats: { views: 0, saves: 0, enquiries: 0 } }));
 
-    expect(screen.queryByText(/views/)).toBeNull();
+    expect(screen.queryByText("Views")).toBeNull();
+    expect(screen.getByRole("button", { name: "Finish your listing" })).toBeTruthy();
+    expect(screen.getByText("Add a description and at least one photo.")).toBeTruthy();
+  });
+
+  it("offers Publish again, not resubmit, for a rejected listing with no paid period", () => {
+    render_(listing({ moderationStatus: "REJECTED", rejectionReason: "Blurry photos" }));
+
+    expect(screen.getByRole("button", { name: "Publish again" })).toBeTruthy();
+    expect(screen.getByText("Kampmax asked for changes: Blurry photos")).toBeTruthy();
+  });
+
+  it("explains why a listing with a running package cannot be archived", () => {
+    render_(listing({ subscription: { id: "s1", status: "ACTIVE", amount: 5000, autoRenew: true, endsAt: "2027-03-01T00:00:00Z" } }));
+
+    expect(screen.queryByRole("button", { name: "Archive listing" })).toBeNull();
+    expect(screen.getByText(/can be archived after its subscription ends/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Turn off automatic renewal" })).toBeTruthy();
   });
 });

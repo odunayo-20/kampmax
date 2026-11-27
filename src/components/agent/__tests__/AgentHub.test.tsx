@@ -5,44 +5,52 @@ import { readAgentOverview, type AgentOverview } from "@/services/accommodation-
 
 const state = vi.hoisted(() => ({ data: undefined as AgentOverview | undefined, mutate: vi.fn() }));
 vi.mock("@/hooks/use-accommodation", () => ({
-  useAccommodationAgentOverview: () => ({ data: state.data }),
+  useAccommodationAgentOverview: () => ({ data: state.data, isError: false }),
   useConfirmAccommodationAvailability: () => ({ isPending: false, isError: false, error: null, mutate: state.mutate }),
+  useAccommodationEnquiries: () => ({ data: { items: [] }, isPending: false, isError: false, error: null }),
 }));
 
-import { AccommodationAgentOverview } from "../AccommodationAgentOverview";
+import { AgentHub } from "../AgentHub";
 
 afterEach(() => {
   cleanup();
   state.mutate.mockReset();
 });
 
-describe("the agent's today card", () => {
+describe("the agent hub", () => {
   it("lets the agent answer for each room that needs confirming", () => {
     state.data = readAgentOverview({
       needsConfirming: { count: 1, hideBy: "2026-11-25T00:00:00Z", listings: [{ id: "l1", title: "Room A" }] },
     });
-    render(<AccommodationAgentOverview />);
+    render(<AgentHub />);
 
-    expect(screen.getByText("1 room needs confirming")).toBeTruthy();
+    expect(screen.getByText("1 room to confirm")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "It is taken" }));
     expect(state.mutate).toHaveBeenCalledWith({ id: "l1", availabilityStatus: "OCCUPIED" });
   });
 
-  it("points an expiring listing at billing to renew it", () => {
+  it("shows what the next payment is under Spent, linked to billing", () => {
     state.data = readAgentOverview({
+      spending: { total: 4000 },
       nextRenewal: { listingId: "l1", title: "Room A", expiresAt: "2026-12-01T00:00:00Z", amount: 2000, autoRenew: false },
     });
-    render(<AccommodationAgentOverview />);
+    render(<AgentHub />);
 
-    expect(screen.getByText(/Next expiry/)).toBeTruthy();
-    expect(screen.getByText(/₦2,000/)).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Renew" }).getAttribute("href")).toBe("/agent/billing");
+    const spent = screen.getByText(/^Ends .*₦2,000$/);
+    expect(spent.closest("a")?.getAttribute("href")).toBe("/agent/billing");
   });
 
-  it("says so when there is nothing to do", () => {
-    state.data = readAgentOverview({});
-    render(<AccommodationAgentOverview />);
+  it("points at visits waiting for an answer before new enquiries", () => {
+    state.data = readAgentOverview({ inspections: { awaitingAnswer: 1 }, enquiries: { new: 2 } });
+    render(<AgentHub />);
 
-    expect(screen.getByText(/Nothing to confirm today/)).toBeTruthy();
+    expect(screen.getByText("1 visit request waiting").closest("a")?.getAttribute("href")).toBe("/agent/visits");
+  });
+
+  it("walks a new agent to their first property", () => {
+    state.data = readAgentOverview({});
+    render(<AgentHub />);
+
+    expect(screen.getByText("Add your first property").closest("a")?.getAttribute("href")).toBe("/agent/properties");
   });
 });

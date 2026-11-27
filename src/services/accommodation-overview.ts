@@ -4,7 +4,8 @@
 //
 // What an approved agent should act on today and how their rooms are doing,
 // from `GET /accommodation/agent/dashboard`: rooms to confirm, the next
-// renewal, how fast students get an answer, and views/saves per listing.
+// renewal, how fast students get an answer, views/saves per listing, and the
+// counts the hub shows (listings, enquiries, visits, spending).
 // The backend works the numbers out; this only reads them safely and words
 // them. A missing field is empty, never a crash. The request itself lives
 // in accommodationApi.agentOverview (services/accommodation.ts).
@@ -18,6 +19,11 @@ export interface AgentReplyStats {
 }
 
 export interface AgentOverview {
+  properties: number;
+  listings: { total: number; drafts: number; pendingApproval: number; active: number; expired: number; expiringSoon: number };
+  enquiries: { total: number; new: number };
+  /** What the agent has paid for listings in all, and any refund on its way back. */
+  spending: { total: number; currency: string; refundsPending: number };
   nextRenewal: {
     listingId: string;
     title: string;
@@ -59,10 +65,25 @@ export function readAgentOverview(raw: unknown): AgentOverview {
   const reply = bag(r.reply);
   const interest = bag(r.interest);
   const visits = bag(r.inspections);
+  const l = bag(r.listings);
+  const e = bag(r.enquiries);
+  const s = bag(r.spending);
+  const money = (v: unknown) => (Number(v) > 0 ? Number(v) : 0);
   const rooms = (Array.isArray(confirm.listings) ? confirm.listings : [])
     .map(bag)
     .filter((x) => text(x.id));
   return {
+    properties: countOf(r.properties),
+    listings: {
+      total: countOf(l.total),
+      drafts: countOf(l.drafts),
+      pendingApproval: countOf(l.pendingApproval),
+      active: countOf(l.active),
+      expired: countOf(l.expired),
+      expiringSoon: countOf(l.expiringSoon),
+    },
+    enquiries: { total: countOf(e.total), new: countOf(e.new) },
+    spending: { total: money(s.total), currency: text(s.currency) || "NGN", refundsPending: money(s.refundsPending) },
     nextRenewal:
       text(renewal.listingId) && text(renewal.expiresAt)
         ? {

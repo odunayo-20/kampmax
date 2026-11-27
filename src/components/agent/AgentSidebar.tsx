@@ -60,7 +60,7 @@ export function AgentSidebar({
       ],
     },
     {
-      title: "Inquiries & Leads",
+      title: "Students",
       items: [
         { href: "/agent/enquiries", label: "Enquiries", icon: MessageSquare },
         { href: "/agent/visits", label: "Visits", icon: CalendarDays },

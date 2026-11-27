@@ -1,28 +1,55 @@
 "use client";
 
+import Image from "next/image";
 import { FormEvent, useState } from "react";
 import {
   useArchiveAccommodationListing,
   useCancelAccommodationRenewal,
   useConfirmAccommodationAvailability,
   useEnableAccommodationRenewal,
-  useRenewAccommodationSubscription,
   useSubmitAccommodationListing,
-  useSubscribeAccommodationListing,
   useUpdateAccommodationListing,
 } from "@/hooks/use-accommodation";
+import { describeHousingError } from "@/lib/accommodation-text";
+import { canRenewNow, renewalAction, subscriptionView } from "@/lib/agent-billing";
+import {
+  AVAILABILITY_LABEL,
+  AVAILABILITY_OPTIONS,
+  canArchiveListing,
+  canEditListing,
+  canPublish,
+  canResubmit,
+  joinAnd,
+  listingStatus,
+  listingTip,
+  missingOnListing,
+  placeLine,
+  rentLine,
+  type Availability,
+  type ListingTone,
+} from "@/lib/agent-listings";
+import { formatNaira } from "@/lib/utils";
 import { accommodationApi } from "@/services/accommodation";
-import { listingInterest } from "@/services/accommodation-overview";
-import type {
-  AccommodationAmenityOption,
-  AccommodationListing,
-  AccommodationPackage,
-  AccommodationUnit,
-} from "@/types/accommodation";
-import { formatMoney } from "@/lib/utils";
+import type { AccommodationAmenityOption, AccommodationListing, AccommodationPackage } from "@/types/accommodation";
+import { Pill, useAsk, useRun } from "./enquiry-parts";
+import { PublishDialog } from "./PublishDialog";
 
+const NOTICE: Record<ListingTone, string> = {
+  bad: "bg-red-50 text-red-900",
+  attention: "bg-amber-50 text-amber-900",
+  positive: "bg-emerald-50 text-emerald-900",
+  info: "bg-blue-50 text-blue-900",
+  neutral: "bg-kampmax-muted/60 text-kampmax-text",
+};
+
+const day = (iso: string) => new Date(iso).toLocaleDateString("en-NG", { weekday: "short", day: "numeric", month: "short" });
+
+/**
+ * One of the agent's listings: where it stands and the one thing to do next, its price, details, interest,
+ * availability and subscription. The same screen as the mobile app's agent-listing/[id].
+ */
 export function AccommodationListingManager({
-  listing,
+  listing: l,
   packages,
   amenities,
 }: {
@@ -30,42 +57,224 @@ export function AccommodationListingManager({
   packages: AccommodationPackage[];
   amenities: AccommodationAmenityOption[];
 }) {
-  const update = useUpdateAccommodationListing();
   const archive = useArchiveAccommodationListing();
-  const submit = useSubmitAccommodationListing();
-  const subscribe = useSubscribeAccommodationListing();
+  const resubmit = useSubmitAccommodationListing();
   const confirmAvailability = useConfirmAccommodationAvailability();
   const cancelRenewal = useCancelAccommodationRenewal();
   const enableRenewal = useEnableAccommodationRenewal();
-  const renew = useRenewAccommodationSubscription();
   const [editing, setEditing] = useState(false);
+  const [paying, setPaying] = useState<"publish" | "renew" | null>(null);
+  const [availability, setAvailability] = useState<Availability | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const { error, run } = useRun();
+  const busy = archive.isPending || resubmit.isPending || confirmAvailability.isPending || cancelRenewal.isPending || enableRenewal.isPending;
+  const { confirm, dialog } = useAsk(busy);
+
+  const status = listingStatus(l);
+  const missing = missingOnListing(l);
+  const sub = l.subscription;
+  const subView = sub ? subscriptionView(sub) : null;
+  const stats = l.stats ?? { views: 0, saves: 0, enquiries: 0 };
+  const tip = listingTip(l);
+  const photo = l.media[0]?.url;
+  const toggle = sub ? renewalAction(sub) : null;
+
+  // The one thing to do next.
+  let main: { label: string; onClick: () => void } | null = null;
+  if (canPublish(l)) main = missing.length > 0 ? { label: "Finish your listing", onClick: () => setEditing(true) } : { label: "Publish", onClick: () => setPaying("publish") };
+  else if (l.moderationStatus === "REJECTED")
+    main = canResubmit(l) ? { label: "Send back for review", onClick: () => void run(() => resubmit.mutateAsync(l.id)) } : { label: "Publish again", onClick: () => setPaying("publish") };
+  else if (sub && canRenewNow(sub) && l.moderationStatus === "APPROVED") main = { label: "Renew listing", onClick: () => setPaying("renew") };
+
+  function setRenewal(on: boolean) {
+    if (!sub) return;
+    if (on) return void run(() => enableRenewal.mutateAsync(sub.id));
+    confirm({
+      title: "Turn off automatic renewal?",
+      body: sub.endsAt ? `Your listing stays up until ${day(sub.endsAt)}, then it will be hidden unless you renew.` : "Your listing will not renew by itself.",
+      confirmLabel: "Turn off",
+      cancelLabel: "Keep it on",
+      destructive: false,
+      run: () => run(() => cancelRenewal.mutateAsync(sub.id)),
+    });
+  }
+
+  function saveAvailability() {
+    if (!availability) return;
+    const go = () => run(async () => {
+      await confirmAvailability.mutateAsync({ id: l.id, availabilityStatus: availability });
+      setAvailability(null);
+    });
+    if (availability === "AVAILABLE") return void go();
+    confirm({ title: "Hide this listing?", body: "Students will not see it while the room is not available. Mark it available again to show it.", confirmLabel: "Update", cancelLabel: "Cancel", destructive: false, run: go });
+  }
+
+  return (
+    <article className="space-y-4 py-4">
+      {photo && (
+        <div className="relative h-48 w-full overflow-hidden rounded-xl bg-kampmax-muted">
+          <Image src={photo} alt="Main photo of the listing" fill unoptimized sizes="(max-width: 1024px) 100vw, 640px" className="object-cover" />
+        </div>
+      )}
+
+      <header className="space-y-1">
+        <h2 className="text-lg font-bold text-kampmax-text">{l.title}</h2>
+        <p className="text-sm text-kampmax-text-secondary">{placeLine(l)}</p>
+        <Pill label={status.label} tone={status.tone} />
+      </header>
+
+      {status.text && <p className={`rounded-lg p-3 text-sm ${NOTICE[status.tone]}`}>{status.text}</p>}
+      {canPublish(l) && missing.length > 0 && (
+        <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-950">
+          <p className="font-semibold">Before you can publish</p>
+          <p>Add {joinAnd(missing)}.</p>
+        </div>
+      )}
+
+      {main && (
+        <button type="button" disabled={busy} onClick={main.onClick} className="w-full rounded-lg bg-kampmax-blue px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 sm:w-auto">
+          {main.label}
+        </button>
+      )}
+      {message && <p role="status" className="text-sm text-emerald-700">{message}</p>}
+      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+
+      {editing && <ListingEditForm listing={l} amenities={amenities} onDone={(note) => { setEditing(false); setMessage(note); }} />}
+
+      <Section title="Rent and charges">
+        <Line label="Rent" value={rentLine(l, formatNaira)} bold />
+        {l.cautionFee > 0 && <Line label="Caution fee" value={formatNaira(l.cautionFee)} />}
+        {l.agencyFee > 0 && <Line label="Agency fee" value={formatNaira(l.agencyFee)} />}
+        {l.agreementFee > 0 && <Line label="Agreement fee" value={formatNaira(l.agreementFee)} />}
+        {l.otherCharges > 0 && <Line label="Other charges" value={formatNaira(l.otherCharges)} />}
+        <Line label="Students pay up front" value={formatNaira(l.totalUpfrontCost)} bold />
+      </Section>
+
+      {l.description && (
+        <Section title="Description">
+          <p className="whitespace-pre-wrap text-sm text-kampmax-text">{l.description}</p>
+        </Section>
+      )}
+      {l.amenities.length > 0 && (
+        <Section title="Facilities">
+          <p className="text-sm text-kampmax-text">{l.amenities.map((a) => a.name).join(" · ")}</p>
+        </Section>
+      )}
+
+      {l.moderationStatus === "APPROVED" && (
+        <Section title="How it is doing" hint="Views are page opens, not people.">
+          <Line label="Views" value={String(stats.views)} />
+          <Line label="Saved by students" value={String(stats.saves)} />
+          <Line label="Enquiries" value={String(stats.enquiries)} />
+          {tip && <p className="text-sm text-kampmax-text-secondary">{tip}</p>}
+        </Section>
+      )}
+
+      {l.moderationStatus === "APPROVED" && (
+        <Section title="Availability" hint="Keep this up to date. Students lose trust in rooms that are already taken.">
+          <Line label="Right now" value={AVAILABILITY_LABEL[l.availabilityStatus] ?? l.availabilityStatus} bold />
+          {availability ? (
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="text-xs text-kampmax-text-secondary">
+                Availability
+                <select value={availability} onChange={(e) => setAvailability(e.target.value as Availability)} className="mt-1 block rounded-md border border-kampmax-border bg-white px-2 py-2 text-sm text-kampmax-text">
+                  {AVAILABILITY_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+                </select>
+              </label>
+              <button type="button" disabled={busy} onClick={saveAvailability} className="rounded-md bg-kampmax-blue px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">Update</button>
+              <button type="button" onClick={() => setAvailability(null)} className="rounded-md border border-kampmax-border px-3 py-2 text-xs">Cancel</button>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={busy || l.availabilityStatus !== "AVAILABLE"}
+                onClick={() => void run(() => confirmAvailability.mutateAsync({ id: l.id }))}
+                className="rounded-md border border-kampmax-border px-3 py-2 text-xs disabled:opacity-50"
+              >
+                Yes, still available
+              </button>
+              <button type="button" disabled={busy} onClick={() => setAvailability(l.availabilityStatus as Availability)} className="px-3 py-2 text-xs text-kampmax-text-secondary underline disabled:opacity-50">
+                Change availability
+              </button>
+            </div>
+          )}
+        </Section>
+      )}
+
+      {sub && subView && (
+        <Section title="Subscription">
+          <Pill label={subView.label} tone={subView.tone} />
+          {subView.text && <p className="text-sm text-kampmax-text">{subView.text}</p>}
+          <Line label="Price" value={sub.amount > 0 ? `${formatNaira(sub.amount)} per period` : "Free"} />
+          {toggle && (
+            <button type="button" disabled={busy} onClick={() => setRenewal(toggle === "turn-on")} className="rounded-md border border-kampmax-border px-3 py-2 text-xs disabled:opacity-50">
+              {toggle === "turn-on" ? "Turn on automatic renewal" : "Turn off automatic renewal"}
+            </button>
+          )}
+        </Section>
+      )}
+
+      <div className="flex flex-wrap items-center gap-3 border-t border-kampmax-border pt-4">
+        {canEditListing(l) && !editing && (
+          <button type="button" disabled={busy} onClick={() => setEditing(true)} className="rounded-md border border-kampmax-border px-3 py-2 text-xs disabled:opacity-50">Edit listing</button>
+        )}
+        {canArchiveListing(l) ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => confirm({ title: `Archive "${l.title}"?`, body: "It will be removed from your listings. This cannot be undone.", confirmLabel: "Archive", run: () => run(() => archive.mutateAsync(l.id)) })}
+            className="px-3 py-2 text-xs text-red-700 underline disabled:opacity-50"
+          >
+            Archive listing
+          </button>
+        ) : (
+          <p className="text-xs text-kampmax-text-secondary">This listing can be archived after its subscription ends. Turn off automatic renewal and let it run out.</p>
+        )}
+      </div>
+
+      <PublishDialog
+        open={paying !== null}
+        onClose={() => setPaying(null)}
+        onDone={setMessage}
+        listingId={l.id}
+        packages={packages}
+        renew={paying === "renew" && sub ? { id: sub.id, amount: sub.amount } : undefined}
+      />
+      {dialog}
+    </article>
+  );
+}
+
+function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-2 rounded-lg border border-kampmax-border p-4">
+      <h3 className="text-sm font-semibold text-kampmax-text">{title}</h3>
+      {hint && <p className="text-xs text-kampmax-text-secondary">{hint}</p>}
+      {children}
+    </section>
+  );
+}
+
+function Line({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
+  return (
+    <div className="flex justify-between gap-3 text-sm">
+      <span className="text-kampmax-text-secondary">{label}</span>
+      <span className={`text-right text-kampmax-text ${bold ? "font-bold" : ""}`}>{value}</span>
+    </div>
+  );
+}
+
+/** Editing a saved listing. Compared with the mobile form screen separately. */
+function ListingEditForm({ listing, amenities, onDone }: { listing: AccommodationListing; amenities: AccommodationAmenityOption[]; onDone: (note: string) => void }) {
+  const update = useUpdateAccommodationListing();
   const [files, setFiles] = useState<File[]>([]);
   const [amenityIds, setAmenityIds] = useState(listing.amenities.map((item) => item.id));
-  const [packageId, setPackageId] = useState(packages[0]?.id ?? "");
-  const [autoRenew, setAutoRenew] = useState(false);
-  const [termsAccepted, setTermsAccepted] = useState(false);
-  const [availability, setAvailability] = useState<AccommodationUnit["availabilityStatus"]>(
-    listing.availabilityStatus as AccommodationUnit["availabilityStatus"]
-  );
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-
-  const busy =
-    update.isPending ||
-    archive.isPending ||
-    submit.isPending ||
-    subscribe.isPending ||
-    confirmAvailability.isPending ||
-    cancelRenewal.isPending ||
-    enableRenewal.isPending ||
-    renew.isPending;
-  const interest = listingInterest(listing);
-  const canEdit = listing.moderationStatus !== "PENDING_APPROVAL" && listing.moderationStatus !== "ADMIN_SUSPENDED";
 
   async function saveEdits(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    setMessage(null);
     const form = new FormData(event.currentTarget);
     try {
       const newMedia = await Promise.all(files.map((file) => accommodationApi.uploadListingImage(file)));
@@ -82,180 +291,57 @@ export function AccommodationListingManager({
           otherCharges: Number(form.get("otherCharges") || 0),
           amenityIds,
           ...(files.length > 0
-            ? {
-                media: [
-                  ...listing.media.map((item) => ({ mediaId: item.mediaId, caption: item.caption ?? undefined })),
-                  ...newMedia.map((item) => ({ mediaId: item.id })),
-                ],
-              }
+            ? { media: [...listing.media.map((item) => ({ mediaId: item.mediaId, caption: item.caption ?? undefined })), ...newMedia.map((item) => ({ mediaId: item.id }))] }
             : {}),
         },
       });
-      setEditing(false);
-      setFiles([]);
-      setMessage("Listing saved. Approved listings with content changes return to review.");
+      onDone("Listing saved. Approved listings with content changes return to review.");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "The listing could not be updated.");
-    }
-  }
-
-  async function startCheckout(kind: "initial" | "renewal") {
-    setError(null);
-    setMessage(null);
-    try {
-      const result =
-        kind === "initial"
-          ? await subscribe.mutateAsync({ id: listing.id, packageId: packageId || undefined, autoRenew })
-          : await renew.mutateAsync({ id: listing.subscription!.id, autoRenew });
-      if (result.authorizationUrl) {
-        const destination = new URL(result.authorizationUrl);
-        if (destination.protocol !== "https:") throw new Error("The payment provider returned an unsupported checkout link.");
-        window.location.assign(destination.href);
-      } else {
-        setMessage(result.note ?? "No payment is due. The listing status has been updated.");
-      }
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not start payment.");
+      setError(describeHousingError(reason));
     }
   }
 
   return (
-    <article className="py-4">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h3 className="font-medium text-kampmax-text">{listing.title}</h3>
-          <p className="mt-1 text-xs text-kampmax-text-secondary">
-            {listing.property?.title} · {listing.unit?.unitName} · {formatMoney(listing.rentAmount, listing.currency)} / {listing.paymentFrequency.toLowerCase()} · {listing.moderationStatus.replaceAll("_", " ").toLowerCase()}
-          </p>
-          {interest && <p className="mt-1 text-xs font-medium text-kampmax-text">{interest}</p>}
-          {listing.rejectionReason && <p className="mt-1 text-xs text-red-700">Review note: {listing.rejectionReason}</p>}
-          {listing.subscription && (
-            <p className="mt-1 text-xs text-kampmax-text-secondary">
-              Subscription {listing.subscription.status.toLowerCase()}
-              {listing.subscription.endsAt ? ` · ends ${new Date(listing.subscription.endsAt).toLocaleDateString()}` : ""}
-              {listing.subscription.autoRenew ? " · auto-renew on" : " · auto-renew off"}
-            </p>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {canEdit && <button type="button" onClick={() => setEditing((current) => !current)} className="rounded-md border border-kampmax-border px-3 py-2 text-xs">{editing ? "Close editor" : "Edit"}</button>}
-          {listing.moderationStatus === "DRAFT" && (
-            <div className="flex flex-wrap items-center gap-2">
-              <select aria-label={`Package for ${listing.title}`} value={packageId} onChange={(event) => setPackageId(event.target.value)} className="rounded-md border border-kampmax-border bg-white px-2 py-2 text-xs">
-                {packages.map((pkg) => <option key={pkg.id} value={pkg.id}>{pkg.name} · {formatMoney(pkg.price, pkg.currency)}</option>)}
-              </select>
-              <button type="button" disabled={busy || packages.length === 0 || !termsAccepted} onClick={() => void startCheckout("initial")} className="rounded-md bg-kampmax-blue px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">
-                {subscribe.isPending ? "Starting…" : "Pay & submit"}
-              </button>
-            </div>
-          )}
-          {listing.moderationStatus === "REJECTED" && (
-            <button type="button" disabled={busy} onClick={() => submit.mutate(listing.id)} className="rounded-md border border-kampmax-border px-3 py-2 text-xs disabled:opacity-50">
-              Resubmit for review
-            </button>
-          )}
-          {listing.moderationStatus === "DRAFT" && (
-            <button type="button" disabled={busy} onClick={() => {
-              if (window.confirm(`Archive "${listing.title}"? This cannot be undone.`)) archive.mutate(listing.id);
-            }} className="text-xs text-red-700 underline disabled:opacity-50">Archive</button>
-          )}
-        </div>
-      </div>
-
-      {listing.moderationStatus === "DRAFT" && (
-        <div className="mt-3 flex flex-wrap gap-4 text-xs text-kampmax-text-secondary">
-          <label className="flex items-start gap-2">
-            <input type="checkbox" checked={termsAccepted} onChange={(event) => setTermsAccepted(event.target.checked)} />
-            <span>I have read and accept the listing billing terms.</span>
-          </label>
-          <label className="flex items-start gap-2">
-            <input type="checkbox" checked={autoRenew} onChange={(event) => setAutoRenew(event.target.checked)} />
-            <span>Automatically renew this subscription. I can turn this off later.</span>
-          </label>
-        </div>
-      )}
-
-      {editing && (
-        <form onSubmit={(event) => void saveEdits(event)} className="mt-4 grid gap-3 rounded-lg bg-kampmax-bg p-4 sm:grid-cols-2">
-          {([
-            ["title", "Title", listing.title, "text"],
-            ["rentAmount", "Rent (₦)", String(listing.rentAmount), "number"],
-            ["cautionFee", "Caution fee (₦)", String(listing.cautionFee), "number"],
-            ["agencyFee", "Agency fee (₦)", String(listing.agencyFee), "number"],
-            ["agreementFee", "Agreement fee (₦)", String(listing.agreementFee), "number"],
-            ["otherCharges", "Other charges (₦)", String(listing.otherCharges), "number"],
-          ] as const).map(([field, label, value, type]) => (
-            <label key={field} className="text-xs text-kampmax-text-secondary">{label}
-              <input name={field} type={type} required={field === "title" || field === "rentAmount"} min={type === "number" ? 0 : undefined} defaultValue={value} className="mt-1 block w-full rounded-md border border-kampmax-border px-3 py-2 text-sm text-kampmax-text" />
+    <form onSubmit={(event) => void saveEdits(event)} className="grid gap-3 rounded-lg bg-kampmax-bg p-4 sm:grid-cols-2">
+      {([
+        ["title", "Title", listing.title, "text"],
+        ["rentAmount", "Rent (₦)", String(listing.rentAmount), "number"],
+        ["cautionFee", "Caution fee (₦)", String(listing.cautionFee), "number"],
+        ["agencyFee", "Agency fee (₦)", String(listing.agencyFee), "number"],
+        ["agreementFee", "Agreement fee (₦)", String(listing.agreementFee), "number"],
+        ["otherCharges", "Other charges (₦)", String(listing.otherCharges), "number"],
+      ] as const).map(([field, label, value, type]) => (
+        <label key={field} className="text-xs text-kampmax-text-secondary">{label}
+          <input name={field} type={type} required={field === "title" || field === "rentAmount"} min={type === "number" ? 0 : undefined} defaultValue={value} className="mt-1 block w-full rounded-md border border-kampmax-border px-3 py-2 text-sm text-kampmax-text" />
+        </label>
+      ))}
+      <label className="text-xs text-kampmax-text-secondary">Rent frequency
+        <select name="paymentFrequency" defaultValue={listing.paymentFrequency} className="mt-1 block w-full rounded-md border border-kampmax-border bg-white px-3 py-2 text-sm">
+          <option value="ANNUALLY">Annually</option><option value="BIANNUALLY">Every six months</option><option value="PER_SEMESTER">Per semester</option><option value="QUARTERLY">Quarterly</option><option value="MONTHLY">Monthly</option><option value="PER_NIGHT">Per night</option>
+        </select>
+      </label>
+      <label className="text-xs text-kampmax-text-secondary sm:col-span-2">Description
+        <textarea name="description" rows={3} maxLength={5000} defaultValue={listing.description ?? ""} className="mt-1 block w-full rounded-md border border-kampmax-border px-3 py-2 text-sm text-kampmax-text" />
+      </label>
+      <label className="text-xs text-kampmax-text-secondary sm:col-span-2">Add listing photos
+        <input type="file" accept="image/*" multiple onChange={(event) => setFiles(Array.from(event.target.files ?? []))} className="mt-1 block w-full text-sm" />
+      </label>
+      <fieldset className="sm:col-span-2">
+        <legend className="text-xs text-kampmax-text-secondary">Facilities</legend>
+        <div className="mt-2 flex flex-wrap gap-3">
+          {amenities.map((amenity) => (
+            <label key={amenity.id} className="flex items-center gap-1.5 text-xs">
+              <input type="checkbox" checked={amenityIds.includes(amenity.id)} onChange={(event) => setAmenityIds((current) => (event.target.checked ? [...current, amenity.id] : current.filter((id) => id !== amenity.id)))} />
+              {amenity.name}
             </label>
           ))}
-          <label className="text-xs text-kampmax-text-secondary">Rent frequency
-            <select name="paymentFrequency" defaultValue={listing.paymentFrequency} className="mt-1 block w-full rounded-md border border-kampmax-border bg-white px-3 py-2 text-sm">
-              <option value="ANNUALLY">Annually</option><option value="BIANNUALLY">Every six months</option><option value="PER_SEMESTER">Per semester</option><option value="QUARTERLY">Quarterly</option><option value="MONTHLY">Monthly</option><option value="PER_NIGHT">Per night</option>
-            </select>
-          </label>
-          <label className="text-xs text-kampmax-text-secondary sm:col-span-2">Description
-            <textarea name="description" rows={3} maxLength={5000} defaultValue={listing.description ?? ""} className="mt-1 block w-full rounded-md border border-kampmax-border px-3 py-2 text-sm text-kampmax-text" />
-          </label>
-          <label className="text-xs text-kampmax-text-secondary sm:col-span-2">Add listing photos
-            <input type="file" accept="image/*" multiple onChange={(event) => setFiles(Array.from(event.target.files ?? []))} className="mt-1 block w-full text-sm" />
-          </label>
-          <fieldset className="sm:col-span-2">
-            <legend className="text-xs text-kampmax-text-secondary">Facilities</legend>
-            <div className="mt-2 flex flex-wrap gap-3">
-              {amenities.map((amenity) => (
-                <label key={amenity.id} className="flex items-center gap-1.5 text-xs">
-                  <input type="checkbox" checked={amenityIds.includes(amenity.id)} onChange={(event) => setAmenityIds((current) => event.target.checked ? [...current, amenity.id] : current.filter((id) => id !== amenity.id))} />
-                  {amenity.name}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          {error && <p role="alert" className="text-sm text-red-700 sm:col-span-2">{error}</p>}
-          <div className="flex items-center gap-3 sm:col-span-2">
-            <button disabled={busy} className="rounded-md bg-kampmax-blue px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{update.isPending ? "Saving…" : "Save changes"}</button>
-            {listing.moderationStatus === "REJECTED" && <span className="text-xs text-kampmax-text-secondary">Save your corrections, then choose Resubmit for review.</span>}
-          </div>
-        </form>
-      )}
-
-      {listing.moderationStatus === "APPROVED" && (
-        <div className="mt-3 flex flex-wrap items-end gap-2">
-          <label className="text-xs text-kampmax-text-secondary">Availability
-            <select value={availability} onChange={(event) => setAvailability(event.target.value as AccommodationUnit["availabilityStatus"])} className="mt-1 block rounded-md border border-kampmax-border bg-white px-2 py-2 text-xs">
-              {["AVAILABLE", "RESERVED", "OCCUPIED", "UNAVAILABLE"].map((item) => <option key={item} value={item}>{item.toLowerCase()}</option>)}
-            </select>
-          </label>
-          <button type="button" disabled={busy} onClick={() => confirmAvailability.mutate({ id: listing.id, availabilityStatus: availability })} className="rounded-md border border-kampmax-border px-3 py-2 text-xs disabled:opacity-50">Update availability</button>
         </div>
-      )}
-
-      {listing.subscription && (
-        <div className="mt-3 flex flex-wrap gap-3 text-xs">
-          {listing.subscription.autoRenew ? (
-            <button type="button" disabled={busy} onClick={() => cancelRenewal.mutate(listing.subscription!.id)} className="text-kampmax-text-secondary underline disabled:opacity-50">Turn off auto-renewal</button>
-          ) : listing.subscription.status === "ACTIVE" ? (
-            <button type="button" disabled={busy} onClick={() => enableRenewal.mutate(listing.subscription!.id)} className="text-kampmax-text-secondary underline disabled:opacity-50">Turn on auto-renewal</button>
-          ) : null}
-          {["ACTIVE", "PAST_DUE", "EXPIRED"].includes(listing.subscription.status) && (
-            <>
-              {packages.length > 0 && (
-                <label className="flex items-center gap-1">
-                  <input type="checkbox" checked={termsAccepted} onChange={(event) => setTermsAccepted(event.target.checked)} />
-                  Accept billing terms
-                </label>
-              )}
-              <button type="button" disabled={busy || packages.length === 0 || !termsAccepted} onClick={() => void startCheckout("renewal")} className="text-kampmax-text-secondary underline disabled:opacity-50">Renew listing</button>
-            </>
-          )}
-        </div>
-      )}
-      {message && <p className="mt-2 text-xs text-emerald-700">{message}</p>}
-      {(error || archive.error || submit.error || confirmAvailability.error || cancelRenewal.error || enableRenewal.error || renew.error) && (
-        <p role="alert" className="mt-2 text-xs text-red-700">
-          {error ?? archive.error?.message ?? submit.error?.message ?? confirmAvailability.error?.message ?? cancelRenewal.error?.message ?? enableRenewal.error?.message ?? renew.error?.message}
-        </p>
-      )}
-    </article>
+      </fieldset>
+      {error && <p role="alert" className="text-sm text-red-700 sm:col-span-2">{error}</p>}
+      <div className="flex items-center gap-3 sm:col-span-2">
+        <button disabled={update.isPending} className="rounded-md bg-kampmax-blue px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{update.isPending ? "Saving…" : "Save changes"}</button>
+        <button type="button" onClick={() => onDone("")} className="rounded-md border border-kampmax-border px-3 py-2 text-xs">Cancel</button>
+      </div>
+    </form>
   );
 }

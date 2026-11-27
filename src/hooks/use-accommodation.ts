@@ -107,11 +107,12 @@ export function useAccommodationAgentOverview(enabled = true) {
   });
 }
 
+/** The agent's listings, up to 100 at once as on mobile, so the filters count all of them. */
 export function useAgentAccommodationListings(page = 1, enabled = true) {
   const { status, user } = useAuth();
   return useQuery({
     queryKey: publicAccommodationKeys.agentListings(user?.id, page),
-    queryFn: () => accommodationApi.listings(page),
+    queryFn: () => accommodationApi.listings(page, 100),
     enabled: enabled && status === "authenticated" && Boolean(user?.id),
   });
 }

@@ -1,105 +1,49 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import {
-  CircleDashed,
-  CheckCircle2,
-  Clock,
-  Loader,
-  PackageCheck,
-  XCircle,
-  AlertTriangle,
-} from "lucide-react";
-import { cn, formatNaira } from "@/lib/utils";
+import Link from "next/link";
+import { Pill } from "@/components/accommodation/enquiry-parts";
 import { useAccommodationEnquiries } from "@/hooks/use-accommodation";
-import type { AccommodationEnquiryStatus } from "@/types/accommodation";
+import { describeHousingError } from "@/lib/accommodation-text";
+import { enquiryStatusView, waitingText } from "@/lib/agent-enquiry";
+import { timeAgo } from "@/lib/utils";
 
-const STATUS: Record<AccommodationEnquiryStatus, { label: string; icon: typeof Loader; cls: string }> = {
-  NEW: { label: "New Lead", icon: CircleDashed, cls: "bg-neutral-100 text-neutral-700" },
-  CONTACTED: { label: "Contacted", icon: CheckCircle2, cls: "bg-info-50 text-info-700" },
-  INSPECTION_SCHEDULED: { label: "Inspection Scheduled", icon: Clock, cls: "bg-warning-50 text-warning-700" },
-  VISITED: { label: "Inspected", icon: PackageCheck, cls: "bg-primary-50 text-primary-700" },
-  NEGOTIATING: { label: "Negotiating", icon: Loader, cls: "bg-purple-50 text-purple-700" },
-  CLOSED: { label: "Closed", icon: CheckCircle2, cls: "bg-success-50 text-success-700" },
-  CANCELLED: { label: "Cancelled", icon: XCircle, cls: "bg-error-50 text-error-700" },
-  NOT_INTERESTED: { label: "Not Interested", icon: XCircle, cls: "bg-error-50 text-error-700" },
-  UNRESPONSIVE: { label: "Unresponsive", icon: AlertTriangle, cls: "bg-neutral-100 text-neutral-700" },
-};
-
+/** The latest enquiries on the hub, each opening its conversation. Wording as on the enquiries page. */
 export function AgentRecentInquiries() {
-  const router = useRouter();
-  const { data: enquiries, isPending, isError } = useAccommodationEnquiries("AGENT", 1);
-  const items = enquiries?.items ?? [];
+  const { data, isPending, isError, error } = useAccommodationEnquiries("AGENT", 1);
+  const items = data?.items ?? [];
 
   return (
-    <div className="rounded-xl border border-kampmax-border bg-white">
-      <div className="flex items-center justify-between px-4 pt-4 pb-2">
-        <h3 className="text-sm font-semibold text-kampmax-text">Recent Inquiries & Leads</h3>
-        <button
-          type="button"
-          onClick={() => router.push("/agent/enquiries")}
-          className="text-xs font-medium text-primary-600 hover:underline"
-        >
-          View all
-        </button>
+    <section className="rounded-xl border border-kampmax-border bg-white">
+      <div className="flex items-center justify-between px-4 pb-2 pt-4">
+        <h2 className="text-sm font-semibold text-kampmax-text">Recent enquiries</h2>
+        <Link href="/agent/enquiries" className="text-xs font-medium text-kampmax-blue hover:underline">View all</Link>
       </div>
 
       {isPending ? (
         <div className="space-y-2 px-4 pb-4">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="h-12 animate-pulse rounded-lg bg-neutral-100" />
-          ))}
+          {[0, 1, 2].map((i) => <div key={i} className="h-12 animate-pulse rounded-lg bg-kampmax-muted" />)}
         </div>
       ) : isError ? (
-        <p className="px-4 pb-4 text-sm text-error-700">Couldn&apos;t load your inquiries.</p>
+        <p role="alert" className="px-4 pb-4 text-sm text-red-700">We couldn&apos;t load your enquiries. {describeHousingError(error)}</p>
       ) : items.length === 0 ? (
-        <p className="px-4 pb-4 text-sm text-kampmax-text-secondary">
-          You haven&apos;t received any accommodation inquiries yet.
-        </p>
+        <p className="px-4 pb-4 text-sm text-kampmax-text-secondary">When a student asks about one of your live listings, it shows up here.</p>
       ) : (
         <ul className="divide-y divide-kampmax-border">
-          {items.slice(0, 6).map((inquiry) => {
-            const s = STATUS[inquiry.status] ?? STATUS.NEW;
-            const Icon = s.icon;
-            const inquiryCode = `INQ-${inquiry.id.slice(0, 14).toUpperCase()}`;
-
-            return (
-              <li key={inquiry.id}>
-                <button
-                  type="button"
-                  onClick={() => router.push(`/agent/enquiries?open=${encodeURIComponent(inquiry.id)}`)}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-neutral-50 transition-colors"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-kampmax-text">{inquiryCode}</span>
-                      <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold", s.cls)}>
-                        <Icon className="h-3 w-3" aria-hidden /> {s.label}
-                      </span>
-                    </div>
-                    <p className="mt-0.5 truncate text-xs text-kampmax-text-secondary">
-                      {inquiry.counterpart} · {inquiry.listingTitle || "Room Listing"} · {formatRelative(inquiry.createdAt)}
-                    </p>
-                  </div>
-                  <span className="shrink-0 text-sm font-bold text-kampmax-text">
-                    ₦250,000
-                  </span>
-                </button>
-              </li>
-            );
-          })}
+          {items.slice(0, 6).map((e) => (
+            <li key={e.id}>
+              <Link href={`/agent/enquiries?open=${encodeURIComponent(e.id)}`} className="block px-4 py-3 hover:bg-kampmax-bg">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-sm font-semibold text-kampmax-text">{e.counterpart}</span>
+                  <Pill {...enquiryStatusView(e.status)} />
+                </div>
+                <p className="mt-0.5 truncate text-xs text-kampmax-text-secondary">
+                  {e.listingTitle || "A listing"} · {waitingText(e) ?? timeAgo(e.updatedAt)}
+                </p>
+              </Link>
+            </li>
+          ))}
         </ul>
       )}
-    </div>
+    </section>
   );
 }
-
-function formatRelative(iso: string): string {
-  if (!iso) return "recently";
-  const diff = Date.now() - new Date(iso).getTime();
-  const days = Math.floor(diff / 86400000);
-  if (days < 1) return "today";
-  if (days === 1) return "yesterday";
-  return `${days}d ago`;
-}
-
