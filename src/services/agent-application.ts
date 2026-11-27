@@ -120,3 +120,112 @@ export function isWaitingForReview(kind: AgentDashboardGateKind): boolean {
 export function showsPendingApplication(kind: AgentDashboardGateKind, pathname: string): boolean {
   return isWaitingForReview(kind) && (pathname === "/agent" || opensAfterApproval(pathname));
 }
+
+// ---------- applying (the same three steps as the mobile app's agent-setup) ----------
+
+export interface AgentAnswers {
+  fullName: string;
+  phone: string;
+  email: string;
+  operatingLocation: string;
+  agencyName: string;
+  businessAddress: string;
+  identity: File | null;
+  authority: File | null;
+  business: File | null;
+  accepted: boolean;
+}
+
+export const AGENT_STEPS = [
+  { label: "About you", description: "Your contact details and the campus area you work in." },
+  { label: "Verification documents", description: "Students trust verified agents. Files are seen only by the Kampmax review team." },
+  { label: "Review and apply", description: "Check your answers and accept the agent agreement." },
+];
+
+export const AGREEMENT_TEXT =
+  "I accept the Kampmax Accommodation Agent Agreement. Every listing I advertise will be genuine, accurately described and authorized by the property owner.";
+
+export const DOC_MAX_BYTES = 5 * 1024 * 1024;
+const DOC_TYPES_ALLOWED = ["application/pdf", "image/jpeg", "image/png"];
+
+export function emptyAgent(prefill: { name?: string | null; phone?: string | null; email?: string | null } = {}): AgentAnswers {
+  return {
+    fullName: prefill.name ?? "",
+    phone: prefill.phone ?? "",
+    email: prefill.email ?? "",
+    operatingLocation: "",
+    agencyName: "",
+    businessAddress: "",
+    identity: null,
+    authority: null,
+    business: null,
+    accepted: false,
+  };
+}
+
+const PHONE = /^\+?[0-9 ()-]{7,20}$/;
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+/** Why a chosen file cannot be sent, or null. The limits are the backend's. */
+export function agentDocProblem(file: { type?: string; size?: number; name?: string }): string | null {
+  const type = (file.type ?? "").toLowerCase();
+  const byName = /\.(pdf|jpe?g|png)$/i.test(file.name ?? "");
+  if (type ? !DOC_TYPES_ALLOWED.includes(type) : !byName) return "Choose a PDF, JPEG or PNG file.";
+  if ((file.size ?? 0) > DOC_MAX_BYTES) return "That file is over 5 MB. Choose a smaller one, or take a clearer, smaller photo.";
+  if (file.size === 0) return "That file is empty.";
+  return null;
+}
+
+/** What still stops the agent moving past a step, or null. */
+export function agentStepProblem(step: number, a: AgentAnswers): string | null {
+  switch (step) {
+    case 0:
+      if (a.fullName.trim().length < 2) return "Enter your full name as it appears on your ID.";
+      if (!PHONE.test(a.phone.trim())) return "Enter a phone number like 0803 123 4567.";
+      if (!EMAIL.test(a.email.trim())) return "Enter an email address.";
+      if (a.operatingLocation.trim().length < 2) return 'Say where you operate, for example "UNILAG (Akoka / Yaba)".';
+      return null;
+    case 1:
+      if (!a.identity) return "Add a government ID. A NIN slip, driver's licence, passport or voter's card is fine.";
+      if (!a.authority) return "Add proof you may rent the property out: a letter from the landlord, a title deed or a C of O.";
+      return null;
+    case 2:
+      return a.accepted ? null : "Accept the agent agreement to apply.";
+    default:
+      return null;
+  }
+}
+
+/** The POST /accommodation/agents/apply body. */
+export function agentBody(a: AgentAnswers) {
+  return {
+    fullName: a.fullName.trim(),
+    phone: a.phone.trim(),
+    email: a.email.trim(),
+    operatingLocation: a.operatingLocation.trim(),
+    agencyName: a.agencyName.trim() || undefined,
+    businessAddress: a.businessAddress.trim() || undefined,
+    acceptAgreement: true as const,
+  };
+}
+
+export const DOC_NAME: Record<"identity" | "authority" | "business", string> = {
+  identity: "Government ID",
+  authority: "Proof of authority",
+  business: "Business registration",
+};
+
+/** The files to send after applying, each with the type the backend files it under. */
+export function documentsToSend(a: AgentAnswers): { key: keyof typeof DOC_NAME; type: "IDENTITY" | "AUTHORIZATION_LETTER" | "BUSINESS_REGISTRATION"; file: File }[] {
+  const out: ReturnType<typeof documentsToSend> = [];
+  if (a.identity) out.push({ key: "identity", type: "IDENTITY", file: a.identity });
+  if (a.authority) out.push({ key: "authority", type: "AUTHORIZATION_LETTER", file: a.authority });
+  if (a.business) out.push({ key: "business", type: "BUSINESS_REGISTRATION", file: a.business });
+  return out;
+}
+
+/** What to say when the application went but some files did not. */
+export function uploadsFailedText(names: string[]): string {
+  const list = names.join(", ").replace(/, ([^,]*)$/, " and $1");
+  return `Your application was sent, but ${list} could not be uploaded. Press Send again to retry, or add it later from your agent page.`;
+}

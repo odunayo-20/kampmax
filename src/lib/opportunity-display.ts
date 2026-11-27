@@ -39,3 +39,19 @@ export function monthsText(months: number): string {
 export function openingsText(openings: number): string {
   return `${openings} ${openings === 1 ? "opening" : "openings"}`;
 }
+
+/**
+ * When a posting stops taking responses, in words: "Closes today", "Closes tomorrow", "Closes in 5 days", or
+ * "Closed". Null when there is no usable deadline. The mobile app's freelance-ux deadlineNote says the same.
+ * (timeAgo only counts backwards, so it said "just now" for every future date.)
+ */
+export function closesText(deadline: string | null | undefined, now: number = Date.now()): string | null {
+  if (!deadline) return null;
+  const end = new Date(deadline).getTime();
+  if (!Number.isFinite(end)) return null;
+  if (end < now) return "Closed";
+  const days = Math.ceil((end - now) / 86_400_000);
+  if (days === 0) return "Closes today";
+  if (days === 1) return "Closes tomorrow";
+  return `Closes in ${days} days`;
+}

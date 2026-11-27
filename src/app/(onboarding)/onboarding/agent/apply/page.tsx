@@ -1,462 +1,234 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Building2,
-  ArrowLeft,
-  Upload,
-  CheckCircle,
-  ShieldCheck,
-  FileText,
-  AlertCircle,
-  Trash2,
-} from "lucide-react";
+import { useAccommodationAgentStatus, useApplyAsAccommodationAgent, useUploadAccommodationDocument } from "@/hooks/use-accommodation";
+import { Field, fieldClass } from "@/components/agent/form-parts";
+import { StepFlow } from "@/components/onboarding/StepFlow";
+import { describeHousingError } from "@/lib/accommodation-text";
 import { useAuth } from "@/lib/auth-context";
 import {
-  useAccommodationAgentStatus,
-  useApplyAsAccommodationAgent,
-  useUploadAccommodationDocument,
-} from "@/hooks/use-accommodation";
-import type { AgentDocumentType } from "@/types/accommodation";
+  AGENT_STEPS,
+  AGREEMENT_TEXT,
+  agentBody,
+  agentDocProblem,
+  agentStepProblem,
+  DOC_NAME,
+  documentsToSend,
+  emptyAgent,
+  uploadsFailedText,
+  type AgentAnswers,
+} from "@/services/agent-application";
 
-interface QueuedDoc {
-  file: File;
-  type: AgentDocumentType;
-  label: string;
-}
+type Answers = AgentAnswers;
 
+/**
+ * Applying to be an accommodation agent: details, documents, then a review and the agreement. Review takes 24 to 48
+ * hours. A retry never sends the application or a finished upload twice. The same flow as the mobile agent-setup.
+ */
 export default function AgentApplyPage() {
   const router = useRouter();
   const { user, status: authStatus } = useAuth();
   const statusQuery = useAccommodationAgentStatus();
-  const applyMutation = useApplyAsAccommodationAgent();
-  const uploadMutation = useUploadAccommodationDocument();
+  const apply = useApplyAsAccommodationAgent();
+  const upload = useUploadAccommodationDocument();
+  const [a, setA] = useState<Answers>(() => emptyAgent());
+  const [step, setStep] = useState(0);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const done = useRef(new Set<string>());
 
-  const [step, setStep] = useState<1 | 2>(1);
-
-  // Form Fields
-  const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [operatingLocation, setOperatingLocation] = useState("");
-  const [agencyName, setAgencyName] = useState("");
-  const [businessAddress, setBusinessAddress] = useState("");
-  const [acceptedAgreement, setAcceptedAgreement] = useState(false);
-
-  // Document Uploads
-  const [queuedDocs, setQueuedDocs] = useState<QueuedDoc[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-
-  // Pre-fill user data
   useEffect(() => {
-    if (user) {
-      setFullName((curr) => curr || user.name || "");
-      setPhone((curr) => curr || user.phone || "");
-      setEmail((curr) => curr || user.email || "");
-    }
+    if (user) setA((c) => ({ ...c, fullName: c.fullName || user.name || "", phone: c.phone || user.phone || "", email: c.email || user.email || "" }));
   }, [user]);
 
-  // Gatekeeping
   useEffect(() => {
-    if (authStatus === "unauthenticated") {
-      router.replace(`/login?returnTo=${encodeURIComponent("/onboarding/agent/apply")}`);
-    }
+    if (authStatus === "unauthenticated") router.replace(`/login?returnTo=${encodeURIComponent("/onboarding/agent/apply")}`);
   }, [authStatus, router]);
 
+  // An application already sent goes to where it stands, unless this page is the one finishing it.
   useEffect(() => {
-    if (statusQuery.data?.status === "APPROVED") {
-      router.replace("/agent");
-    } else if (statusQuery.data?.applied && statusQuery.data?.status === "PENDING") {
-      router.replace("/onboarding/agent/submitted");
-    }
+    if (done.current.size > 0) return;
+    if (statusQuery.data?.status === "APPROVED") router.replace("/agent");
+    else if (statusQuery.data?.applied && statusQuery.data.status === "PENDING") router.replace("/onboarding/agent/submitted");
   }, [statusQuery.data, router]);
 
-  function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>, type: AgentDocumentType, label: string) {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert("File size exceeds 5 MB. Please choose a smaller file.");
-        return;
-      }
-      setQueuedDocs((prev) => [...prev.filter((d) => d.type !== type), { file, type, label }]);
-      e.target.value = "";
-    }
-  }
+  const patch = (next: Partial<Answers>) => {
+    setProblem(null);
+    setA((c) => ({ ...c, ...next }));
+  };
 
-  function removeQueuedDoc(type: AgentDocumentType) {
-    setQueuedDocs((prev) => prev.filter((d) => d.type !== type));
-  }
-
-  async function handleFinalSubmit(e: FormEvent) {
-    e.preventDefault();
-    setSubmitError(null);
-    setIsSubmitting(true);
-
+  async function send() {
+    setSending(true);
     try {
-      // 1. Submit Agent Profile
-      await applyMutation.mutateAsync({
-        fullName: fullName.trim(),
-        phone: phone.trim(),
-        email: email.trim(),
-        operatingLocation: operatingLocation.trim(),
-        agencyName: agencyName.trim() || undefined,
-        businessAddress: businessAddress.trim() || undefined,
-        acceptAgreement: true,
-      });
-
-      // 2. Upload any queued documents
-      for (const doc of queuedDocs) {
+      if (!done.current.has("apply")) {
         try {
-          await uploadMutation.mutateAsync({
-            file: doc.file,
-            documentType: doc.type,
-          });
-        } catch (docErr) {
-          console.warn(`Doc upload warning for ${doc.type}:`, docErr);
+          await apply.mutateAsync(agentBody(a));
+        } catch (e) {
+          // 409: an earlier try already sent the application, so carry on with the documents.
+          if ((e as { status?: number }).status !== 409) throw e;
+        }
+        done.current.add("apply");
+      }
+      const failed: string[] = [];
+      for (const doc of documentsToSend(a)) {
+        if (done.current.has(doc.key)) continue;
+        try {
+          await upload.mutateAsync({ file: doc.file, documentType: doc.type });
+          done.current.add(doc.key);
+        } catch {
+          failed.push(DOC_NAME[doc.key]);
         }
       }
-
-      // 3. Navigate to Submitted screen
+      if (failed.length > 0) return setProblem(uploadsFailedText(failed));
       router.replace("/onboarding/agent/submitted");
-    } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "Application submission failed.");
-      setIsSubmitting(false);
+    } catch (reason) {
+      setProblem(describeHousingError(reason));
+    } finally {
+      setSending(false);
     }
   }
 
+  function next() {
+    const found = agentStepProblem(step, a);
+    setProblem(found);
+    if (found) return;
+    if (step < AGENT_STEPS.length - 1) return setStep(step + 1);
+    void send();
+  }
+
+  const text = (key: "fullName" | "phone" | "email" | "operatingLocation" | "agencyName" | "businessAddress", label: string, props: React.InputHTMLAttributes<HTMLInputElement>) => (
+    <Field label={label}>
+      <input value={a[key]} onChange={(e) => patch({ [key]: e.target.value })} className={fieldClass} {...props} />
+    </Field>
+  );
+
   return (
-    <div className="min-h-screen bg-kampmax-bg px-4 py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-kampmax-bg px-4 py-10 sm:px-6">
       <div className="mx-auto max-w-2xl">
-        <Link
-          href="/onboarding/agent"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-kampmax-text-secondary hover:text-kampmax-text mb-6"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span>Back to overview</span>
-        </Link>
-
-        {/* Header */}
-        <div className="border-b border-kampmax-border pb-6">
-          <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-kampmax-blue">
-            <Building2 className="h-4 w-4" />
-            <span>Agent Application</span>
-          </div>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight text-kampmax-text sm:text-3xl">
-            Apply to Become an Accommodation Agent
-          </h1>
-          <p className="mt-1 text-xs text-kampmax-text-secondary">
-            Provide your operating locations and credentials. Our team will verify your account to unlock publishing.
-          </p>
-
-          {/* Stepper indicator */}
-          <div className="mt-6 flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setStep(1)}
-              className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold ${
-                step === 1 ? "bg-kampmax-blue text-white" : "bg-neutral-100 text-neutral-600"
-              }`}
-            >
-              <span>1</span>
-              <span>Profile & Contact</span>
-            </button>
-            <span className="text-neutral-300">/</span>
-            <button
-              type="button"
-              onClick={() => {
-                if (fullName && phone && email && operatingLocation && acceptedAgreement) {
-                  setStep(2);
-                }
-              }}
-              className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold ${
-                step === 2 ? "bg-kampmax-blue text-white" : "bg-neutral-100 text-neutral-600"
-              }`}
-            >
-              <span>2</span>
-              <span>Verification Documents</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Step 1: Profile & Contact */}
-        {step === 1 && (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              setStep(2);
-            }}
-            className="mt-6 space-y-4 rounded-2xl border border-kampmax-border bg-white p-6 shadow-xs"
+        <Link href="/onboarding/agent" className="text-sm text-kampmax-blue hover:underline">← Back</Link>
+        <div className="mt-4">
+          <StepFlow
+            title="Agent application"
+            steps={AGENT_STEPS}
+            step={step}
+            problem={problem}
+            pending={sending}
+            finishLabel="Send application"
+            onBack={() => { setProblem(null); setStep(step - 1); }}
+            onNext={next}
           >
-            <h2 className="text-base font-bold text-kampmax-text">Contact & Operating Details</h2>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="text-xs font-semibold text-kampmax-text">
-                Full Legal Name *
-                <input
-                  required
-                  placeholder="As shown on your ID card"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="mt-1 block w-full rounded-xl border border-kampmax-border px-3.5 py-2 text-sm text-kampmax-text focus:border-kampmax-blue focus:outline-none"
-                />
-              </label>
-
-              <label className="text-xs font-semibold text-kampmax-text">
-                Operating Campus / Town *
-                <input
-                  required
-                  placeholder="e.g. UNILAG (Akoka / Yaba / Bariga)"
-                  value={operatingLocation}
-                  onChange={(e) => setOperatingLocation(e.target.value)}
-                  className="mt-1 block w-full rounded-xl border border-kampmax-border px-3.5 py-2 text-sm text-kampmax-text focus:border-kampmax-blue focus:outline-none"
-                />
-              </label>
-
-              <label className="text-xs font-semibold text-kampmax-text">
-                Phone Number *
-                <input
-                  required
-                  type="tel"
-                  placeholder="08012345678"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="mt-1 block w-full rounded-xl border border-kampmax-border px-3.5 py-2 text-sm text-kampmax-text focus:border-kampmax-blue focus:outline-none"
-                />
-              </label>
-
-              <label className="text-xs font-semibold text-kampmax-text">
-                Email Address *
-                <input
-                  required
-                  type="email"
-                  placeholder="agent@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1 block w-full rounded-xl border border-kampmax-border px-3.5 py-2 text-sm text-kampmax-text focus:border-kampmax-blue focus:outline-none"
-                />
-              </label>
-
-              <label className="text-xs font-semibold text-kampmax-text sm:col-span-2">
-                Agency / Property Brand Name (Optional)
-                <input
-                  placeholder="e.g. TrustHaven Real Estate"
-                  value={agencyName}
-                  onChange={(e) => setAgencyName(e.target.value)}
-                  className="mt-1 block w-full rounded-xl border border-kampmax-border px-3.5 py-2 text-sm text-kampmax-text focus:border-kampmax-blue focus:outline-none"
-                />
-              </label>
-
-              <label className="text-xs font-semibold text-kampmax-text sm:col-span-2">
-                Physical Office Address (Optional)
-                <input
-                  placeholder="e.g. 14 Commercial Avenue, Yaba, Lagos"
-                  value={businessAddress}
-                  onChange={(e) => setBusinessAddress(e.target.value)}
-                  className="mt-1 block w-full rounded-xl border border-kampmax-border px-3.5 py-2 text-sm text-kampmax-text focus:border-kampmax-blue focus:outline-none"
-                />
-              </label>
-            </div>
-
-            <div className="border-t border-kampmax-border pt-4">
-              <label className="flex items-start gap-2.5 text-xs text-kampmax-text-secondary cursor-pointer">
-                <input
-                  type="checkbox"
-                  required
-                  checked={acceptedAgreement}
-                  onChange={(e) => setAcceptedAgreement(e.target.checked)}
-                  className="mt-0.5 rounded border-neutral-300 text-kampmax-blue focus:ring-kampmax-blue"
-                />
-                <span>
-                  I accept the Kampmax Accommodation Agent Agreement, confirming that all listings I advertise are genuine, accurately described, and authorized by property owners.
-                </span>
-              </label>
-            </div>
-
-            <div className="flex justify-end pt-3">
-              <button
-                type="submit"
-                disabled={!acceptedAgreement || !fullName || !phone || !email || !operatingLocation}
-                className="rounded-xl bg-kampmax-blue px-6 py-2.5 text-xs font-bold text-white shadow-2xs hover:bg-kampmax-blue/90 disabled:opacity-50"
-              >
-                Continue to Documents →
-              </button>
-            </div>
-          </form>
-        )}
-
-        {/* Step 2: Verification Documents */}
-        {step === 2 && (
-          <form onSubmit={handleFinalSubmit} className="mt-6 space-y-6">
-            <div className="rounded-2xl border border-kampmax-border bg-white p-6 shadow-xs">
-              <div className="flex items-center gap-2 border-b border-kampmax-border pb-4">
-                <ShieldCheck className="h-5 w-5 text-kampmax-blue" />
-                <div>
-                  <h2 className="text-base font-bold text-kampmax-text">Upload Verification Documents</h2>
-                  <p className="text-xs text-kampmax-text-secondary">
-                    Files are stored securely and reviewed only by the Kampmax Trust & Safety team.
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-5 space-y-4">
-                {/* 1. Identity */}
-                <div className="rounded-xl border border-kampmax-border bg-neutral-50/70 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-bold text-kampmax-text">
-                        1. Government-Issued ID *
-                      </p>
-                      <p className="mt-0.5 text-[11px] text-kampmax-text-secondary">
-                        NIN Slip, Driver&apos;s License, International Passport, or Voter&apos;s Card (PDF/JPEG/PNG, max 5 MB).
-                      </p>
-                    </div>
-
-                    {queuedDocs.some((d) => d.type === "IDENTITY") ? (
-                      <div className="flex items-center gap-2">
-                        <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
-                          <CheckCircle className="h-3.5 w-3.5" />
-                          <span>Ready</span>
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => removeQueuedDoc("IDENTITY")}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ) : (
-                      <label className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-kampmax-border bg-white px-3 py-1.5 text-xs font-semibold text-kampmax-blue hover:bg-neutral-50">
-                        <Upload className="h-3 w-3" />
-                        <span>Select File</span>
-                        <input
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-                          onChange={(e) => handleFileSelected(e, "IDENTITY", "Government ID")}
-                          className="sr-only"
-                        />
-                      </label>
-                    )}
+            {step === 0 && (
+              <div className="space-y-5">
+                <fieldset className="space-y-3">
+                  <legend className="text-sm font-semibold text-kampmax-text">Contact details</legend>
+                  <p className="text-xs text-kampmax-text-secondary">The review team uses these to reach you. Students message you through Kampmax.</p>
+                  {text("fullName", "Full name", { placeholder: "As shown on your ID card", autoComplete: "name", maxLength: 160 })}
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {text("phone", "Phone", { type: "tel", placeholder: "0803 123 4567", autoComplete: "tel", maxLength: 20 })}
+                    {text("email", "Email", { type: "email", autoComplete: "email", maxLength: 254 })}
                   </div>
-                </div>
-
-                {/* 2. Authority / Ownership */}
-                <div className="rounded-xl border border-kampmax-border bg-neutral-50/70 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-bold text-kampmax-text">
-                        2. Proof of Authority to Lease / Ownership *
-                      </p>
-                      <p className="mt-0.5 text-[11px] text-kampmax-text-secondary">
-                        Written authorization letter from the landlord or title deed/C of O.
-                      </p>
-                    </div>
-
-                    {queuedDocs.some((d) => d.type === "AUTHORIZATION_LETTER" || d.type === "OWNERSHIP_PROOF") ? (
-                      <div className="flex items-center gap-2">
-                        <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
-                          <CheckCircle className="h-3.5 w-3.5" />
-                          <span>Ready</span>
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            removeQueuedDoc("AUTHORIZATION_LETTER");
-                            removeQueuedDoc("OWNERSHIP_PROOF");
-                          }}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ) : (
-                      <label className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-kampmax-border bg-white px-3 py-1.5 text-xs font-semibold text-kampmax-blue hover:bg-neutral-50">
-                        <Upload className="h-3 w-3" />
-                        <span>Select File</span>
-                        <input
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-                          onChange={(e) => handleFileSelected(e, "AUTHORIZATION_LETTER", "Letter of Authorization")}
-                          className="sr-only"
-                        />
-                      </label>
-                    )}
-                  </div>
-                </div>
-
-                {/* 3. Business / CAC */}
-                <div className="rounded-xl border border-kampmax-border bg-neutral-50/70 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-bold text-kampmax-text">
-                        3. Business Registration (Optional for Agencies)
-                      </p>
-                      <p className="mt-0.5 text-[11px] text-kampmax-text-secondary">
-                        CAC Certificate of Incorporation or Business Name Registration.
-                      </p>
-                    </div>
-
-                    {queuedDocs.some((d) => d.type === "BUSINESS_REGISTRATION") ? (
-                      <div className="flex items-center gap-2">
-                        <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
-                          <CheckCircle className="h-3.5 w-3.5" />
-                          <span>Ready</span>
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => removeQueuedDoc("BUSINESS_REGISTRATION")}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ) : (
-                      <label className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-kampmax-border bg-white px-3 py-1.5 text-xs font-semibold text-kampmax-text hover:bg-neutral-50">
-                        <Upload className="h-3 w-3" />
-                        <span>Select File</span>
-                        <input
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-                          onChange={(e) => handleFileSelected(e, "BUSINESS_REGISTRATION", "CAC Registration")}
-                          className="sr-only"
-                        />
-                      </label>
-                    )}
-                  </div>
-                </div>
+                </fieldset>
+                <fieldset className="space-y-3">
+                  <legend className="text-sm font-semibold text-kampmax-text">Where you work</legend>
+                  {text("operatingLocation", "Campus area you operate in", { placeholder: "UNILAG (Akoka / Yaba / Bariga)", maxLength: 200 })}
+                  {text("agencyName", "Agency name (optional)", { placeholder: "TrustHaven Real Estate", maxLength: 200 })}
+                  {text("businessAddress", "Business address (optional)", { placeholder: "14 Commercial Avenue, Yaba, Lagos", maxLength: 300 })}
+                </fieldset>
               </div>
+            )}
 
-              {submitError && (
-                <p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-xs text-red-700 font-medium">
-                  {submitError}
-                </p>
-              )}
-
-              <div className="mt-6 flex items-center justify-between border-t border-kampmax-border pt-4">
-                <button
-                  type="button"
-                  onClick={() => setStep(1)}
-                  className="rounded-xl border border-kampmax-border px-4 py-2 text-xs font-semibold text-kampmax-text hover:bg-neutral-50"
-                >
-                  ← Back to Profile
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="rounded-xl bg-kampmax-blue px-6 py-2.5 text-xs font-bold text-white shadow-2xs hover:bg-kampmax-blue/90 disabled:opacity-50"
-                >
-                  {isSubmitting ? "Submitting Application…" : "Submit Agent Application"}
-                </button>
+            {step === 1 && (
+              <div className="space-y-4">
+                <p className="text-xs text-kampmax-text-secondary">PDF, JPEG or PNG, up to 5 MB each.</p>
+                <FilePick label="Government-issued ID" hint="NIN slip, driver's licence, international passport or voter's card." file={a.identity} onChange={(identity) => patch({ identity })} onProblem={setProblem} />
+                <FilePick label="Proof you may rent the property out" hint="A letter from the landlord, or a title deed or C of O." file={a.authority} onChange={(authority) => patch({ authority })} onProblem={setProblem} />
+                <FilePick label="Business registration (optional)" hint="Only if you apply as an agency." file={a.business} onChange={(business) => patch({ business })} onProblem={setProblem} />
               </div>
-            </div>
-          </form>
-        )}
+            )}
+
+            {step === 2 && (
+              <div className="space-y-4 text-sm">
+                <Review
+                  title="You"
+                  onEdit={() => setStep(0)}
+                  rows={[
+                    ["Name", a.fullName],
+                    ["Phone", a.phone],
+                    ["Email", a.email],
+                    ["Operates in", a.operatingLocation],
+                    ["Agency", a.agencyName],
+                  ]}
+                />
+                <Review
+                  title="Documents"
+                  onEdit={() => setStep(1)}
+                  rows={[
+                    ["Government ID", a.identity?.name ?? ""],
+                    ["Proof of authority", a.authority?.name ?? ""],
+                    ["Business registration", a.business?.name ?? ""],
+                  ]}
+                />
+                <label className="flex items-start gap-2">
+                  <input type="checkbox" checked={a.accepted} onChange={(e) => patch({ accepted: e.target.checked })} className="mt-1" />
+                  <span>{AGREEMENT_TEXT}</span>
+                </label>
+                <p className="text-center text-xs text-kampmax-text-secondary">Our trust and safety team reviews applications within 24 to 48 hours.</p>
+              </div>
+            )}
+          </StepFlow>
+        </div>
       </div>
     </div>
   );
 }
 
+function FilePick({ label, hint, file, onChange, onProblem }: { label: string; hint: string; file: File | null; onChange: (f: File | null) => void; onProblem: (p: string | null) => void }) {
+  return (
+    <div className="rounded-lg border border-kampmax-border p-3">
+      <p className="text-sm font-semibold text-kampmax-text">{label}</p>
+      <p className="text-xs text-kampmax-text-secondary">{hint}</p>
+      {file ? (
+        <p className="mt-2 flex items-center justify-between gap-2 text-sm">
+          <span className="truncate">{file.name}</span>
+          <button type="button" onClick={() => onChange(null)} className="text-xs text-red-700 underline">Remove</button>
+        </p>
+      ) : (
+        <input
+          type="file"
+          accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+          aria-label={label}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (!f) return;
+            const problem = agentDocProblem(f);
+            onProblem(problem);
+            if (!problem) onChange(f);
+          }}
+          className="mt-2 block w-full text-sm"
+        />
+      )}
+    </div>
+  );
+}
+
+function Review({ title, rows, onEdit }: { title: string; rows: [string, string][]; onEdit: () => void }) {
+  return (
+    <section className="rounded-lg border border-kampmax-border p-3">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-kampmax-text">{title}</h3>
+        <button type="button" onClick={onEdit} className="text-xs text-kampmax-blue underline">Edit</button>
+      </div>
+      <dl className="mt-2 space-y-1">
+        {rows.map(([k, v]) => (
+          <div key={k} className="flex justify-between gap-3">
+            <dt className="text-kampmax-text-secondary">{k}</dt>
+            <dd className="truncate text-right text-kampmax-text">{v || "—"}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}

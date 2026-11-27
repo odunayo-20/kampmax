@@ -21,6 +21,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { cn, formatDate, formatDateTime, formatNaira, timeAgo } from "@/lib/utils";
+import { closesText } from "@/lib/opportunity-display";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { ErrorState } from "@/components/admin/ErrorState";
@@ -265,7 +266,7 @@ export default function AdminJobDetailPage() {
         />
         <StatCard label="Applications" value={String(detail.applications.visible)} icon={UserRound} tone="gold" hint={`${detail.applications.total} total ${listing.opportunityType && listing.opportunityType !== "gig" ? "applications" : "proposals"}`} />
         <StatCard label="Views" value={listing.viewCount.toLocaleString("en-NG")} icon={Eye} tone="blue" hint="Lifetime" />
-        <StatCard label="Deadline" value={formatDate(listing.deadline)} icon={CalendarClock} tone="default" hint={timeAgo(listing.deadline)} />
+        <StatCard label="Deadline" value={formatDate(listing.deadline)} icon={CalendarClock} tone="default" hint={closesText(listing.deadline) ?? undefined} />
         <StatCard label="Arrangement" value={listing.workArrangement.replaceAll("_", " ")} icon={Briefcase} tone="default" hint={listing.location.city ?? listing.location.state ?? "Location not stated"} />
         <StatCard label="Open reports" value={String(listing.employersReported)} icon={FileWarning} tone={listing.employersReported > 0 ? "error" : "default"} hint={listing.employersReported > 0 ? "Waiting for an admin" : "None waiting"} />
       </section>
@@ -355,7 +356,7 @@ function OverviewTab({
             <InfoRow label="Posting status" value={listing.status} />
             <InfoRow label="Views" value={listing.viewCount.toLocaleString("en-NG")} />
             <InfoRow label="Posted" value={`${timeAgo(listing.postedAt)} · ${formatDate(listing.postedAt)}`} />
-            <InfoRow label="Deadline" value={`${timeAgo(listing.deadline)} · ${formatDate(listing.deadline)}`} />
+            <InfoRow label="Deadline" value={[closesText(listing.deadline), formatDate(listing.deadline)].filter(Boolean).join(" · ")} />
           </dl>
 
           <div className="border-t border-kampmax-border px-4 py-3">

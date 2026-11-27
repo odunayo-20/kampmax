@@ -16,7 +16,7 @@ import {
   WORK_ARRANGEMENT_LABEL,
 } from "@/config/opportunity";
 import { formatNairaCompact, timeAgo } from "@/lib/utils";
-import { hiringPayText, monthsText } from "@/lib/opportunity-display";
+import { closesText, hiringPayText, monthsText } from "@/lib/opportunity-display";
 import { OpportunityTypeBadge } from "@/components/employer/jobs/OpportunityTypeBadge";
 import { OpportunityStatusBadge } from "./StatusBadges";
 
@@ -101,10 +101,12 @@ export function OpportunityCard({
               : DURATION_LABEL[o.duration]}
           </span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <CalendarDays className="h-3.5 w-3.5 text-neutral-400" aria-hidden />
-          <span>Closes {timeAgo(o.deadline).replace(" ago", "")}</span>
-        </div>
+        {closesText(o.deadline) && (
+          <div className="flex items-center gap-1.5">
+            <CalendarDays className="h-3.5 w-3.5 text-neutral-400" aria-hidden />
+            <span>{closesText(o.deadline)}</span>
+          </div>
+        )}
         <div className="flex items-center gap-1.5">
           <span className="capitalize">{o.experienceLevel}</span>
         </div>
