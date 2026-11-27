@@ -295,7 +295,13 @@ export function useCheckout() {
       orderIds = placed.data.flatMap((o) => (o.backendId ? [o.backendId] : []));
       // The server's own reason (e.g. a promo that just expired) is shown.
       if (placed.error || orderIds.length === 0) {
-        fail(getRefusalMessage(placed.error));
+        const status = placed.error?.status;
+        const message = getRefusalMessage(placed.error);
+        fail(
+          typeof status !== "number" || status >= 500
+            ? `${message} Check My Orders before trying again.`
+            : message
+        );
         return;
       }
 

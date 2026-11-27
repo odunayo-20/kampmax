@@ -54,6 +54,7 @@ function buildCsp({ env = process.env, isDev = false } = {}) {
     "data:",
     "blob:",
     api,
+    "https://res.cloudinary.com",
     "https://images.unsplash.com",
     "https://*.r2.dev",
     "https://*.r2.cloudflarestorage.com",

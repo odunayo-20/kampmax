@@ -70,12 +70,14 @@ describe("useCheckout", () => {
     vi.stubGlobal("location", { origin: "https://app.test", assign });
   });
 
-  it("never shows raw server text, and a retry sends a new request", async () => {
+  it("warns to check orders after a server error, hides raw text, and allows an explicit retry", async () => {
     mocks.placeOrders.mockResolvedValue({ data: [], error: apiError(500, "Internal server error") });
     const result = await ready();
 
     await submit(result);
-    expect(result.current.error).toBe("Something went wrong on our end. Please try again.");
+    expect(result.current.error).toBe(
+      "Something went wrong on our end. Please try again. Check My Orders before trying again."
+    );
     expect(result.current.phase).toBe("failed");
     expect(result.current.isBusy).toBe(false);
 
