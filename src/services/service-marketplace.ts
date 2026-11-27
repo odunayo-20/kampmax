@@ -145,6 +145,8 @@ export function getServicePriceDisplay(
         label: `${formatNaira(price)} – ${formatNaira(priceMax ?? price)}`,
         hint: "Depends on options",
       };
+    case "hourly":
+      return { label: `${formatNaira(price)} / hour`, hint: "Hourly rate" };
     case "quote":
       return { label: "Quote required", hint: "Request a quote" };
     case "fixed":

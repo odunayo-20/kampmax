@@ -113,7 +113,10 @@ describe("booking reads", () => {
     );
     const page = await fetchCustomerBookings({ status: "upcoming", page: 2, search: " braid " });
     expect(page).toEqual({ items: [{ id: "b1" }], total: 1, page: 2, limit: 12, totalPages: 3 });
-    expect(get.mock.calls[0][0]).toBe("/bookings/me?status=upcoming&search=braid&page=2&limit=12");
+    // Upcoming lists the soonest first unless another order is chosen.
+    expect(get.mock.calls[0][0]).toBe("/bookings/me?status=upcoming&search=braid&sort=upcoming&page=2&limit=12");
+    await fetchCustomerBookings({ status: "completed", sort: "oldest" });
+    expect(get.mock.calls[1][0]).toBe("/bookings/me?status=completed&sort=oldest&page=1&limit=12");
   });
 
   it("returns null for a booking that is not yours or not there, and throws on a real failure", async () => {

@@ -12,13 +12,11 @@
 
 import { apiClient } from "@/lib/api-client";
 import { campusIdOrUndefined, onlyCampusIds } from "@/lib/campus-id";
+import type { BookingPreference, Slot } from "@/lib/provider-hours";
+import { makeSlug } from "@/lib/service-form";
 import type {
-  ServiceProviderActivityEvent,
-  ServiceProviderDashboardMetric,
   ServiceProviderDashboardRecord,
   ServiceProviderDashboardService,
-  ServiceProviderProfileCompletion,
-  ServiceProviderProfileCompletionItem,
   ServiceProviderReviewsSummary,
   ServiceProviderServiceInput,
 } from "@/types/service-provider-dashboard";
@@ -110,89 +108,6 @@ export interface BackendSpAnalyticsOverview {
   [key: string]: unknown;
 }
 
-export interface BackendSpBookingStatusCounts {
-  pending?: number;
-  accepted?: number;
-  in_progress?: number;
-  completed?: number;
-  cancelled?: number;
-  rejected?: number;
-  [key: string]: number | undefined;
-}
-
-/**
- * The booking-status endpoint answers a list, `[{ status: "COMPLETED", count: 3 }]`,
- * but the dashboard counts by key. Read the list into those keys, grouping the
- * statuses the way customers see them (confirmed covers accepted; expired counts
- * as cancelled; disputed counts as completed). An already-keyed object passes through.
- */
-export function statusCountsOf(body: unknown): BackendSpBookingStatusCounts {
-  if (!Array.isArray(body)) {
-    return typeof body === "object" && body !== null ? (body as BackendSpBookingStatusCounts) : {};
-  }
-  const counts: BackendSpBookingStatusCounts = {};
-  const add = (key: string, n: number) => {
-    counts[key] = (counts[key] ?? 0) + n;
-  };
-  for (const row of body as { status?: unknown; count?: unknown }[]) {
-    const n = Number(row?.count);
-    if (!Number.isFinite(n)) continue;
-    switch (String(row?.status ?? "").toUpperCase()) {
-      case "PENDING":
-        add("pending", n);
-        break;
-      case "ACCEPTED":
-      case "CONFIRMED":
-        add("accepted", n);
-        break;
-      case "IN_PROGRESS":
-        add("in_progress", n);
-        break;
-      case "COMPLETED":
-      case "DISPUTED":
-        add("completed", n);
-        break;
-      case "CANCELLED":
-      case "EXPIRED":
-        add("cancelled", n);
-        break;
-      case "REJECTED":
-        add("rejected", n);
-        break;
-    }
-  }
-  return counts;
-}
-
-/** The overview endpoint wraps its numbers as `{ overview: {...} }`; a flat object passes through. */
-export function overviewOf(body: unknown): BackendSpAnalyticsOverview | undefined {
-  if (typeof body !== "object" || body === null) return undefined;
-  const inner = (body as { overview?: unknown }).overview;
-  return typeof inner === "object" && inner !== null
-    ? (inner as BackendSpAnalyticsOverview)
-    : (body as BackendSpAnalyticsOverview);
-}
-
-/** A booking on the provider's services, as GET /bookings/provider lists it (only what the overview reads). */
-export interface BackendSpBookingRow {
-  id: string;
-  status: string;
-  serviceName?: string;
-  startAt?: string;
-  createdAt?: string;
-}
-
-/**
- * The rows of a list response. A failed request comes back as `data: {}`, which is
- * truthy, so `data || []` would let an object through and crash `.map`/`.slice`.
- */
-function rowsOf<T>(res: { data: unknown; error: unknown }): T[] {
-  if (res.error) return [];
-  if (Array.isArray(res.data)) return res.data as T[];
-  const items = (res.data as { items?: unknown } | null)?.items;
-  return Array.isArray(items) ? (items as T[]) : [];
-}
-
 // ---- Mapping helpers ---------------------------------------------------------
 
 const DAY_SPECS = [
@@ -210,6 +125,7 @@ function mapPricingModelToFrontend(backend: string): ServiceProviderPricingModel
     case "STARTING_FROM":
       return "starting_from";
     case "HOURLY":
+      return "hourly";
     case "NEGOTIABLE":
       return "quote";
     case "FIXED":
@@ -224,6 +140,8 @@ function mapPricingModelToBackend(
   switch (frontend) {
     case "starting_from":
       return "STARTING_FROM";
+    case "hourly":
+      return "HOURLY";
     case "quote":
       return "NEGOTIABLE";
     case "range":
@@ -392,231 +310,9 @@ export function buildDashboardRecordFromLive(
   };
 }
 
-export function computeProfileCompletionFromLive(
-  record: ServiceProviderDashboardRecord
-): ServiceProviderProfileCompletion {
-  const missing: ServiceProviderProfileCompletionItem[] = [];
-  let percentage = 0;
-
-  const displayNameOk = !!record.profile.displayName?.trim();
-  const bioOk = !!(record.profile.bio?.trim() || record.profile.description?.trim());
-
-  if (displayNameOk && bioOk) {
-    percentage += 35;
-  } else {
-    if (!displayNameOk) {
-      missing.push({
-        key: "display_name",
-        label: "Profile name",
-        description: "Add your display name.",
-        href: "/service-provider/profile",
-      });
-    }
-    if (!bioOk) {
-      missing.push({
-        key: "bio",
-        label: "Profile description",
-        description: "Tell customers about your experience and skills.",
-        href: "/service-provider/profile",
-      });
-    }
-  }
-
-  const activeCount = record.services.filter(
-    (s) => s.status === SERVICE_PROVIDER_SERVICE_STATUS.ACTIVE
-  ).length;
-
-  if (activeCount >= 3) {
-    percentage += 25;
-  } else if (activeCount >= 1) {
-    percentage += 15;
-    missing.push({
-      key: "more_services",
-      label: "Additional services",
-      description: "Add more services to improve discovery across campuses.",
-      href: "/service-provider/services/new",
-    });
-  } else {
-    missing.push({
-      key: "services",
-      label: "Services",
-      description: "Create at least one service offering so customers can book you.",
-      href: "/service-provider/services/new",
-    });
-  }
-
-  // Customers pick by photo, so a live service without one is worth fixing.
-  const activeWithoutPhoto = record.services.filter(
-    (s) => s.status === SERVICE_PROVIDER_SERVICE_STATUS.ACTIVE && !s.images?.length
-  );
-  if (activeWithoutPhoto.length > 0) {
-    percentage -= 5;
-    missing.push({
-      key: "service_photos",
-      label: "Service photos",
-      description:
-        activeWithoutPhoto.length === 1
-          ? `Add a photo to "${activeWithoutPhoto[0].name}" so customers can see what they're booking.`
-          : `Add photos to ${activeWithoutPhoto.length} of your services so customers can see what they're booking.`,
-      href:
-        activeWithoutPhoto.length === 1
-          ? `/service-provider/services/${activeWithoutPhoto[0].id}/edit`
-          : "/service-provider/services",
-    });
-  }
-
-  if (record.availability.days.some((d) => d.isAvailable)) {
-    percentage += 20;
-  } else {
-    missing.push({
-      key: "availability",
-      label: "Availability",
-      description: "Set your working hours so customers know when you're available.",
-      href: "/service-provider/availability",
-    });
-  }
-
-  if (record.verification.status === SERVICE_PROVIDER_VERIFICATION_STATUS.APPROVED) {
-    percentage += 20;
-  } else {
-    missing.push({
-      key: "verification",
-      label: "Verification",
-      description: "Submit verification to unlock the verified badge and build trust.",
-      href: "/service-provider/verification",
-    });
-  }
-
-  return { percentage: Math.max(0, Math.min(100, percentage)), missing };
-}
-
 // ============================================================
 // LIVE API FUNCTIONS
 // ============================================================
-
-/**
- * Fetches full live dashboard bundle from backend:
- * Profile + Services + Availability + Analytics + Incoming Bookings.
- */
-export async function fetchSpDashboardLive(): Promise<{
-  record: ServiceProviderDashboardRecord;
-  metrics: ServiceProviderDashboardMetric[];
-  activity: ServiceProviderActivityEvent[];
-}> {
-  const [profileRes, servicesRes, availabilityRes, analyticsRes, bookingStatusRes, bookingsRes, reviewsRes] =
-    await Promise.all([
-      apiClient.get<BackendSpProfile>("/service-provider/profile/me"),
-      apiClient.get<BackendSpService[]>("/service-provider/services/me"),
-      apiClient.get<BackendSpAvailabilitySlot[]>("/service-provider/availability/me"),
-      apiClient.get<BackendSpAnalyticsOverview>("/analytics/service-provider"),
-      apiClient.get<BackendSpBookingStatusCounts>("/analytics/service-provider/bookings/status"),
-      apiClient.get<{ items: BackendSpBookingRow[] }>("/bookings/provider?limit=10"),
-      apiClient.get<{ averageRating: number | null; totalCount: number }>("/bookings/provider/reviews"),
-    ]);
-
-  if (profileRes.error || !profileRes.data) {
-    throw profileRes.error || new Error("Failed to load service provider profile");
-  }
-
-  const profile = profileRes.data;
-  const services = rowsOf<BackendSpService>(servicesRes);
-  const availability = rowsOf<BackendSpAvailabilitySlot>(availabilityRes);
-  const analytics = overviewOf(analyticsRes.error ? undefined : analyticsRes.data);
-  const statusCounts = statusCountsOf(bookingStatusRes.error ? undefined : bookingStatusRes.data);
-  const bookings = rowsOf<BackendSpBookingRow>(bookingsRes);
-
-  // null means the ratings couldn't be read; a null average means there are no reviews yet.
-  const ratings =
-    reviewsRes.error || !reviewsRes.data
-      ? null
-      : { average: reviewsRes.data.averageRating, count: reviewsRes.data.totalCount };
-
-  const record = buildDashboardRecordFromLive(profile, services, availability, analytics, ratings);
-
-  const activeServicesCount = services.filter((s) => s.status === "ACTIVE").length;
-  const pendingBookings = statusCounts.pending ?? 0;
-  const acceptedBookings = statusCounts.accepted ?? 0;
-  const inProgressBookings = statusCounts.in_progress ?? 0;
-  const completedBookings = statusCounts.completed ?? 0;
-  const cancelledBookings = statusCounts.cancelled ?? 0;
-  const totalBookings =
-    (analytics?.totalBookings ??
-      pendingBookings + acceptedBookings + inProgressBookings + completedBookings + cancelledBookings) ||
-    bookings.length;
-
-  const metrics: ServiceProviderDashboardMetric[] = [
-    {
-      key: "active_services",
-      label: "Active Services",
-      valueLabel: String(activeServicesCount),
-      tone: "positive",
-      sublabel: `${services.length} total listing${services.length !== 1 ? "s" : ""}`,
-    },
-    {
-      key: "total_bookings",
-      label: "Total Bookings",
-      valueLabel: String(totalBookings),
-      tone: "neutral",
-    },
-    {
-      key: "upcoming_bookings",
-      label: "Upcoming Bookings",
-      valueLabel: String(acceptedBookings),
-      tone: "info",
-      sublabel: pendingBookings > 0
-        ? `${pendingBookings} awaiting confirmation`
-        : "Confirmed bookings",
-    },
-    {
-      key: "in_progress_bookings",
-      label: "In Progress",
-      valueLabel: String(inProgressBookings),
-      tone: "info",
-      sublabel: `${completedBookings} completed · ${cancelledBookings} cancelled`,
-    },
-    {
-      key: "average_rating",
-      label: "Average Rating",
-      valueLabel: ratings?.average == null ? "—" : ratings.average.toFixed(1),
-      tone: ratings?.average == null ? "neutral" : "gold",
-      sublabel: !ratings
-        ? "Ratings unavailable"
-        : ratings.count > 0
-          ? `From ${ratings.count} review${ratings.count === 1 ? "" : "s"}`
-          : "No reviews yet",
-    },
-    {
-      key: "profile_views",
-      label: "Profile Views",
-      valueLabel: typeof analytics?.profileViews === "number" ? String(analytics.profileViews) : "—",
-      tone: "neutral",
-      sublabel: typeof analytics?.profileViews === "number" ? "this month" : "Not tracked yet",
-    },
-  ];
-
-  // Map real recent bookings to activity events
-  const activity: ServiceProviderActivityEvent[] = bookings.slice(0, 10).map((b) => ({
-    id: `spa_b_${b.id}`,
-    kind: "booking_request",
-    title: b.status === "pending" ? "New booking request" : `Booking ${b.status}`,
-    message: `${b.serviceName || "Service"}${b.startAt ? ` on ${new Date(b.startAt).toLocaleDateString()}` : ""}`,
-    createdAt: b.createdAt || b.startAt || new Date().toISOString(),
-    href: `/service-provider/bookings`,
-  }));
-
-  if (activity.length === 0) {
-    activity.push({
-      id: `spa_init_${profile.id}`,
-      kind: "profile_approved",
-      title: "Profile active",
-      message: `Your service provider profile "${profile.displayName}" is active.`,
-      createdAt: profile.createdAt,
-      href: "/service-provider/profile",
-    });
-  }
-
-  return { record, metrics, activity };
-}
 
 /**
  * Fetches own service provider profile record.
@@ -652,14 +348,15 @@ export async function updateSpProfileLive(
     locationCity: string;
     locationState: string;
     serviceRadius: string;
-    primaryCampusId: string;
+    /** null takes the main campus off the profile. */
+    primaryCampusId: string | null;
     additionalCampusIds: string[];
     bookingPreference: "INSTANT" | "REQUEST_APPROVAL";
     minAdvanceNoticeHours: number;
     maxAdvanceBookingDays: number;
     bufferMinutes: number;
   }>
-): Promise<{ ok: boolean; error?: string; record?: ServiceProviderDashboardRecord }> {
+): Promise<{ ok: boolean; error?: string; status?: number; record?: ServiceProviderDashboardRecord }> {
   const payload: Record<string, unknown> = {};
   if (patch.displayName !== undefined) payload.displayName = patch.displayName.trim();
   if (patch.bio !== undefined) payload.bio = patch.bio.trim();
@@ -669,7 +366,9 @@ export async function updateSpProfileLive(
   if (patch.locationCity !== undefined) payload.locationCity = patch.locationCity;
   if (patch.locationState !== undefined) payload.locationState = patch.locationState;
   if (patch.serviceRadius !== undefined) payload.serviceRadius = patch.serviceRadius;
-  if (patch.primaryCampusId !== undefined) payload.primaryCampusId = campusIdOrUndefined(patch.primaryCampusId);
+  if (patch.primaryCampusId !== undefined) {
+    payload.primaryCampusId = patch.primaryCampusId === null ? null : campusIdOrUndefined(patch.primaryCampusId);
+  }
   if (patch.additionalCampusIds !== undefined) payload.additionalCampusIds = onlyCampusIds(patch.additionalCampusIds);
   if (patch.bookingPreference !== undefined) payload.bookingPreference = patch.bookingPreference;
   if (patch.minAdvanceNoticeHours !== undefined) payload.minAdvanceNoticeHours = patch.minAdvanceNoticeHours;
@@ -682,7 +381,7 @@ export async function updateSpProfileLive(
   );
 
   if (error || !data) {
-    return { ok: false, error: error?.message || "Failed to update profile" };
+    return { ok: false, error: error?.message || "Failed to update profile", status: error?.status };
   }
 
   const fullRecord = await fetchSpProfileRecordLive();
@@ -694,9 +393,8 @@ export async function updateSpProfileLive(
  */
 export async function fetchSpServicesLive(): Promise<ServiceProviderDashboardService[]> {
   const res = await apiClient.get<BackendSpService[]>("/service-provider/services/me");
-  if (res.error || !res.data) {
-    return [];
-  }
+  // A failed load is an error, not "no services": an empty list would invite adding a first service.
+  if (res.error || !res.data) throw new Error(res.error?.message || "Could not load your services.");
   return res.data.map(mapBackendService).sort((a, b) =>
     new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
   );
@@ -707,19 +405,14 @@ export async function fetchSpServicesLive(): Promise<ServiceProviderDashboardSer
  */
 export async function addSpDashboardServiceLive(
   input: ServiceProviderServiceInput
-): Promise<{ ok: boolean; service?: ServiceProviderDashboardService; error?: string }> {
+): Promise<{ ok: boolean; service?: ServiceProviderDashboardService; error?: string; status?: number }> {
   if (!input.name.trim()) return { ok: false, error: "Service name is required." };
   if (!input.categoryId) return { ok: false, error: "Choose a category." };
   if (input.price < 0) return { ok: false, error: "Price must be zero or more." };
   if (input.durationMinutes <= 0) return { ok: false, error: "Duration must be positive." };
 
-  const slug =
-    input.name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "") +
-    "-" +
-    Date.now().toString(36);
+  // The form keeps one slug while the name is unchanged, so a retry cannot create a second copy.
+  const slug = input.slug ?? makeSlug(input.name);
 
   const payload: Record<string, unknown> = {
     title: input.name.trim(),
@@ -743,7 +436,7 @@ export async function addSpDashboardServiceLive(
   );
 
   if (error || !data || !data.id) {
-    return { ok: false, error: error?.message || "Failed to create service" };
+    return { ok: false, error: error?.message || "Failed to create service", status: error?.status };
   }
 
   return { ok: true, service: mapBackendService(data) };
@@ -755,7 +448,7 @@ export async function addSpDashboardServiceLive(
 export async function updateSpDashboardServiceLive(
   serviceId: string,
   patch: Partial<ServiceProviderServiceInput>
-): Promise<{ ok: boolean; error?: string; service?: ServiceProviderDashboardService }> {
+): Promise<{ ok: boolean; error?: string; status?: number; service?: ServiceProviderDashboardService }> {
   const payload: Record<string, unknown> = {};
   if (patch.name !== undefined) payload.title = patch.name.trim();
   if (patch.description !== undefined) payload.description = patch.description.trim();
@@ -777,7 +470,7 @@ export async function updateSpDashboardServiceLive(
   );
 
   if (error || !data || !data.id) {
-    return { ok: false, error: error?.message || "Failed to update service" };
+    return { ok: false, error: error?.message || "Failed to update service", status: error?.status };
   }
 
   return { ok: true, service: mapBackendService(data) };
@@ -889,6 +582,102 @@ export async function updateSpAvailabilityLive(
   return { ok: true };
 }
 
+// ── Weekly hours and how bookings are taken ──────────────────
+
+export interface SpHoursInput {
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+}
+
+type SpWrite = { ok: boolean; error?: string; status?: number };
+
+async function writeHours(
+  call: Promise<{ error: { message?: string; status?: number } | null }>
+): Promise<SpWrite> {
+  const { error } = await call;
+  return error ? { ok: false, error: error.message, status: error.status } : { ok: true };
+}
+
+/** GET /service-provider/availability/me: only the active windows come back. Throws when it cannot load. */
+export async function fetchSpHours(): Promise<Slot[]> {
+  const { data, error } = await apiClient.get<BackendSpAvailabilitySlot[]>("/service-provider/availability/me");
+  if (error || !data) throw new Error(error?.message || "Could not load your hours.");
+  return data.map((s) => ({ id: s.id, dayOfWeek: s.dayOfWeek, startTime: s.startTime.slice(0, 5), endTime: s.endTime.slice(0, 5) }));
+}
+
+/** POST /service-provider/availability. The backend refuses a window that overlaps another. */
+export function addSpHours(input: SpHoursInput): Promise<SpWrite> {
+  return writeHours(apiClient.post("/service-provider/availability", { ...input, isActive: true }));
+}
+
+/** PATCH /service-provider/availability/:id with new times. */
+export function updateSpHours(id: string, input: SpHoursInput): Promise<SpWrite> {
+  return writeHours(apiClient.patch(`/service-provider/availability/${id}`, input));
+}
+
+/** There is no delete; switching a window off removes it from the list. */
+export function removeSpHours(id: string): Promise<SpWrite> {
+  return writeHours(apiClient.patch(`/service-provider/availability/${id}`, { isActive: false }));
+}
+
+export interface SpBookingSettings {
+  bookingPreference: BookingPreference;
+  minAdvanceNoticeHours: number;
+  maxAdvanceBookingDays: number;
+  bufferMinutes: number;
+  primaryCampusId: string;
+  additionalCampusIds: string[];
+}
+
+/** How bookings are taken and which campuses are served, from the profile. Throws when it cannot load. */
+export async function fetchSpBookingSettings(): Promise<SpBookingSettings> {
+  const { data, error } = await apiClient.get<BackendSpProfile>("/service-provider/profile/me");
+  if (error || !data) throw new Error(error?.message || "Could not load your settings.");
+  return {
+    bookingPreference: data.bookingPreference === "INSTANT" ? "INSTANT" : "REQUEST_APPROVAL",
+    minAdvanceNoticeHours: data.minAdvanceNoticeHours ?? 2,
+    maxAdvanceBookingDays: data.maxAdvanceBookingDays ?? 30,
+    bufferMinutes: data.bufferMinutes ?? 15,
+    primaryCampusId: data.primaryCampusId ?? "",
+    additionalCampusIds: data.additionalCampusIds ?? [],
+  };
+}
+
+export interface SpProfileDetails {
+  slug: string;
+  displayName: string;
+  bio: string;
+  yearsOfExperience: number | null;
+  locationCity: string;
+  logoUrl: string | null;
+  coverImageUrl: string | null;
+  verification: ServiceProviderVerificationStatus;
+  /** The backend's own word (PENDING, VERIFIED, SUSPENDED, DEACTIVATED), which says more than `verification`. */
+  verificationStatus: string;
+  primaryCampusId: string;
+  additionalCampusIds: string[];
+}
+
+/** What the profile page shows and edits, from one request. Throws when it cannot load. */
+export async function fetchSpProfileDetails(): Promise<SpProfileDetails> {
+  const { data, error } = await apiClient.get<BackendSpProfile>("/service-provider/profile/me");
+  if (error || !data) throw new Error(error?.message || "Could not load your profile.");
+  return {
+    slug: data.slug,
+    displayName: data.displayName,
+    bio: data.bio ?? "",
+    yearsOfExperience: data.yearsOfExperience ?? null,
+    locationCity: data.locationCity ?? "",
+    logoUrl: data.logoUrl ?? null,
+    coverImageUrl: data.coverImageUrl ?? null,
+    verification: mapVerificationStatusToFrontend(data.verificationStatus),
+    verificationStatus: data.verificationStatus,
+    primaryCampusId: data.primaryCampusId ?? "",
+    additionalCampusIds: data.additionalCampusIds ?? [],
+  };
+}
+
 /**
  * The ratings customers left on this provider's finished bookings.
  * Throws when it can't be read; there is no placeholder rating.
@@ -901,6 +690,7 @@ export async function fetchSpReviewsSummaryLive(): Promise<ServiceProviderReview
     recent: Array<{
       id: string;
       rating: number;
+      title?: string;
       comment: string;
       createdAt: string;
       authorName: string;
@@ -912,6 +702,6 @@ export async function fetchSpReviewsSummaryLive(): Promise<ServiceProviderReview
     averageRating: data.averageRating,
     totalCount: data.totalCount,
     distribution: data.distribution,
-    recent: data.recent.map((r) => ({ ...r, visible: true })),
+    recent: data.recent,
   };
 }

@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { X, AlertCircle, CheckCircle2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatNaira } from "@/lib/utils";
+import { acceptNote, describeBookingActionError } from "@/lib/my-bookings-list";
 import { acceptBooking } from "@/services/booking";
 import type { BookingError, ServiceBooking } from "@/types/booking";
 
@@ -75,13 +76,12 @@ export function AcceptBookingModal({
               className="flex items-start gap-2 rounded-lg border border-error-200 bg-error-50 p-2.5 text-xs text-error-700"
             >
               <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-              {error.message}
+              {describeBookingActionError(error.code, error.message)}
             </p>
           )}
 
           <p className="rounded-lg bg-neutral-50 p-3 text-xs text-neutral-600">
-            The customer has already paid ₦{booking.price.amount.toLocaleString("en-NG")}. It is held safely
-            and paid to you once they confirm the service was done.
+            {acceptNote(formatNaira(booking.price.amount))}
           </p>
 
           <div className="flex gap-2">

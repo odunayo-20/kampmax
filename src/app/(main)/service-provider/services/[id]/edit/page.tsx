@@ -1,43 +1,24 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ServiceForm } from "@/components/service-provider/dashboard/ServiceForm";
 import {
   fetchSpServicesLive,
   updateSpDashboardServiceLive,
 } from "@/services/service-provider-dashboard";
-import type {
-  ServiceProviderDashboardService,
-  ServiceProviderServiceInput,
-} from "@/types/service-provider-dashboard";
+import type { ServiceProviderServiceInput } from "@/types/service-provider-dashboard";
+
+const SERVICES_KEY = ["service-provider", "services"];
 
 export default function EditServicePage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const params = useParams<{ id: string }>();
-  const [service, setService] = useState<ServiceProviderDashboardService | undefined>(undefined);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
+  const services = useQuery({ queryKey: SERVICES_KEY, queryFn: fetchSpServicesLive, retry: false });
+  const service = services.data?.find((s) => s.id === params.id);
 
-  useEffect(() => {
-    let cancelled = false;
-    fetchSpServicesLive()
-      .then((items) => {
-        if (cancelled) return;
-        setService(items.find((s) => s.id === params.id));
-        setLoading(false);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setLoadError(true);
-        setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [params.id]);
-
-  if (loading) {
+  if (services.isPending) {
     return (
       <div className="flex min-h-[300px] items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-primary-600/20 border-t-primary-600" />
@@ -47,10 +28,15 @@ export default function EditServicePage() {
 
   if (!service) {
     return (
-      <div className="rounded-xl border border-kampmax-border bg-white p-10 text-center">
+      <div role={services.isError ? "alert" : undefined} className="rounded-xl border border-kampmax-border bg-white p-10 text-center">
         <p className="text-sm font-medium text-kampmax-text">
-          {loadError ? "We couldn't load this service." : "Service not found."}
+          {services.isError ? "We couldn't load this service." : "Service not found."}
         </p>
+        {services.isError && (
+          <button type="button" onClick={() => void services.refetch()} className="mt-3 mr-4 text-sm font-medium text-primary-600 hover:underline">
+            Try again
+          </button>
+        )}
         <button
           type="button"
           onClick={() => router.push("/service-provider/services")}
@@ -64,19 +50,19 @@ export default function EditServicePage() {
 
   async function handleSubmit(input: ServiceProviderServiceInput) {
     const res = await updateSpDashboardServiceLive(params.id, input);
-    if (res.ok) router.push("/service-provider/services");
+    if (res.ok) {
+      await queryClient.invalidateQueries({ queryKey: SERVICES_KEY });
+      router.push("/service-provider/services");
+    }
     return res;
   }
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-kampmax-text">Edit service</h1>
-        <p className="mt-1 text-sm text-kampmax-text-secondary">Update the details below. Public profile updates immediately.</p>
-      </div>
+      <h1 className="text-2xl font-bold text-kampmax-text">Edit service</h1>
       <div className="rounded-xl border border-kampmax-border bg-white p-6">
         <ServiceForm
-          key={service!.id}
+          key={service.id}
           initial={service}
           onSubmit={handleSubmit}
           onCancel={() => router.push("/service-provider/services")}

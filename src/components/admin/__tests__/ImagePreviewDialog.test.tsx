@@ -5,11 +5,11 @@ import { ImagePreviewDialog, isSafeImageUrl } from "../ImagePreviewDialog";
 
 afterEach(cleanup);
 
-const photo = { url: "https://res.cloudinary.com/demo/image/upload/v1/a.webp", title: "Braiding" };
+const photo = { url: "https://cdn.kampmax.com/demo/image/upload/v1/a.webp", title: "Braiding" };
 
 describe("isSafeImageUrl", () => {
   it("accepts only secure web addresses", () => {
-    expect(isSafeImageUrl("https://res.cloudinary.com/demo/image/upload/v1/a.webp")).toBe(true);
+    expect(isSafeImageUrl("https://cdn.kampmax.com/demo/image/upload/v1/a.webp")).toBe(true);
     expect(isSafeImageUrl("http://cdn.example.com/a.jpg")).toBe(false);
     expect(isSafeImageUrl("javascript:alert(1)")).toBe(false);
     expect(isSafeImageUrl("data:image/svg+xml;base64,PHN2Zz4=")).toBe(false);

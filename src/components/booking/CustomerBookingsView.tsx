@@ -53,10 +53,10 @@ export function CustomerBookingsView() {
   const filtered = Object.values(filters).some(Boolean);
   const empty = myBookingsEmpty(tab, filtered);
 
+  // Filters stay when you change tab; only the page starts over.
   function switchTab(next: MyBookingTab) {
     setTab(next);
     setPage(1);
-    setFilters(EMPTY_FILTERS);
   }
 
   function patchFilters(patch: Partial<BookingListQuery>) {

@@ -11,7 +11,7 @@ function setup(over: Partial<React.ComponentProps<typeof RichTextEditor>> = {}) 
   const props = {
     value: "<h2>Hello</h2><p>World</p>",
     onChange: vi.fn(),
-    onUploadImage: vi.fn().mockResolvedValue({ url: "https://res.cloudinary.com/x/a.jpg" }),
+    onUploadImage: vi.fn().mockResolvedValue({ url: "https://cdn.kampmax.com/x/a.jpg" }),
     onError: vi.fn(),
     ...over,
   };
@@ -113,7 +113,7 @@ describe("image handling", () => {
     expect(event.defaultPrevented).toBe(true);
     await waitFor(() => expect(onUploadImage).toHaveBeenCalledWith(file));
     expect(onError).not.toHaveBeenCalled();
-    await waitFor(() => expect(area.querySelector("img")?.getAttribute("src")).toBe("https://res.cloudinary.com/x/a.jpg"));
+    await waitFor(() => expect(area.querySelector("img")?.getAttribute("src")).toBe("https://cdn.kampmax.com/x/a.jpg"));
   });
 
   it("shows an alt-text field for a new image and flags it as required", async () => {

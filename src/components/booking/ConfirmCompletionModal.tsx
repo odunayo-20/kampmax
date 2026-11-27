@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { BadgeCheck, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { describeBookingActionError } from "@/lib/my-bookings-list";
 import { confirmBookingCompletion } from "@/services/booking";
 import type { BookingError, ServiceBooking } from "@/types/booking";
 
@@ -77,7 +78,7 @@ export function ConfirmCompletionModal({
               className="flex items-start gap-2 rounded-lg border border-error-200 bg-error-50 p-2.5 text-xs text-error-700"
             >
               <BadgeCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-              {error.message}
+              {describeBookingActionError(error.code, error.message)}
             </p>
           )}
 

@@ -34,6 +34,7 @@ const PRICING_LABELS: Record<ServiceProviderPricingModel, string> = {
   fixed: "Fixed Price",
   starting_from: "Starting From",
   range: "Price Range",
+  hourly: "Per Hour",
   quote: "Quote Required",
 };
 

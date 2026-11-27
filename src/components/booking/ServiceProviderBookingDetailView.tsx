@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import {
   AlertCircle,
   ArrowLeft,
+  Ban,
   CalendarClock,
   CheckCircle2,
   ClipboardCheck,
@@ -13,17 +14,13 @@ import {
   MapPin,
   Phone,
   PlayCircle,
-  ShieldCheck,
   StickyNote,
-  User,
-  Wallet,
   XCircle,
 } from "lucide-react";
 import { cn, formatNaira } from "@/lib/utils";
-import { useAuth } from "@/lib/auth-context";
+import { describeBookingActionError, startOpensAt } from "@/lib/my-bookings-list";
 import {
   formatBookingDate,
-  formatBookingDay,
   formatBookingTime,
   fetchProviderBooking,
   startBooking,
@@ -32,45 +29,64 @@ import { BookingStatusBadge } from "./BookingStatusBadge";
 import { FulfillmentStatusBadge } from "./FulfillmentStatusBadge";
 import { BookingTimeline } from "./BookingTimeline";
 import { AcceptBookingModal } from "./AcceptBookingModal";
+import { CancelBookingModal } from "./CancelBookingModal";
 import { DeclineBookingModal } from "./DeclineBookingModal";
 import { CompleteBookingModal } from "./CompleteBookingModal";
 import { SettlementPanel } from "./SettlementPanel";
 import { BookingEmptyState } from "./BookingEmptyState";
 import type { BookingError, ServiceBooking } from "@/types/booking";
 
-const START_WINDOW_MS = 30 * 60 * 1000;
+type Modal = "accept" | "decline" | "complete" | "cancel" | null;
+
+const MODALS = {
+  accept: AcceptBookingModal,
+  decline: DeclineBookingModal,
+  complete: CompleteBookingModal,
+} as const;
+
+const BACK = (
+  <Link
+    href="/service-provider/bookings"
+    className="inline-flex items-center gap-1 text-xs font-semibold text-neutral-500 hover:text-primary-600"
+  >
+    <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> Bookings
+  </Link>
+);
 
 export function ServiceProviderBookingDetailView({ bookingId }: { bookingId: string }) {
   const queryClient = useQueryClient();
-  const [booking, setBooking] = useState<ServiceBooking | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [acceptOpen, setAcceptOpen] = useState(false);
-  const [declineOpen, setDeclineOpen] = useState(false);
-  const [completeOpen, setCompleteOpen] = useState(false);
-  const [busyAction, setBusyAction] = useState<"start" | null>(null);
+  const [modal, setModal] = useState<Modal>(null);
+  const [starting, setStarting] = useState(false);
   const [error, setError] = useState<BookingError | null>(null);
-
+  // The clock moves while the page is open: "Start" unlocks 30 minutes before the booking without a refresh.
+  const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
-    let cancelled = false;
-    fetchProviderBooking(bookingId)
-      .then((live) => {
-        if (cancelled) return;
-        setBooking(live);
-        setLoadError(null);
-        setLoading(false);
-      })
-      .catch((e: unknown) => {
-        if (cancelled) return;
-        setLoadError(e instanceof Error ? e.message : "Could not load this booking.");
-        setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [bookingId]);
+    const t = setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
 
-  if (loading && !booking) {
+  const key = ["bookings", "provider", "one", bookingId];
+  const q = useQuery({ queryKey: key, queryFn: () => fetchProviderBooking(bookingId), retry: false });
+  const booking = q.data;
+
+  /** Shows the booking the server just returned, and refreshes every list that includes it. */
+  function update(updated: ServiceBooking) {
+    queryClient.setQueryData(key, updated);
+    void queryClient.invalidateQueries({ queryKey: ["bookings"], predicate: (query) => query.queryKey[2] !== "one" });
+    setModal(null);
+  }
+
+  async function start(id: string) {
+    if (starting) return;
+    setStarting(true);
+    setError(null);
+    const result = await startBooking(id);
+    setStarting(false);
+    if (result.ok) update(result.booking);
+    else setError(result.error);
+  }
+
+  if (q.isPending) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-primary-600/20 border-t-primary-600" />
@@ -78,16 +94,17 @@ export function ServiceProviderBookingDetailView({ bookingId }: { bookingId: str
     );
   }
 
-  if (loadError && !booking) {
+  if (q.isError) {
     return (
       <div className="space-y-6">
-        <Link
-          href="/service-provider/bookings"
-          className="inline-flex items-center gap-1 text-xs font-semibold text-neutral-500 hover:text-primary-600"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> Bookings
-        </Link>
-        <BookingEmptyState title="We couldn't load this booking" description={loadError} />
+        {BACK}
+        <div role="alert" className="rounded-xl border border-kampmax-border bg-white p-6 text-center text-sm text-kampmax-text-secondary">
+          <p className="font-bold text-neutral-800">Couldn&apos;t load this booking</p>
+          <p className="mt-1">Check your connection and try again.</p>
+          <button type="button" onClick={() => void q.refetch()} className="mt-3 font-semibold text-primary-600 hover:underline">
+            Try again
+          </button>
+        </div>
       </div>
     );
   }
@@ -95,54 +112,23 @@ export function ServiceProviderBookingDetailView({ bookingId }: { bookingId: str
   if (!booking) {
     return (
       <div className="space-y-6">
-        <Link
-          href="/service-provider/bookings"
-          className="inline-flex items-center gap-1 text-xs font-semibold text-neutral-500 hover:text-primary-600"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> Bookings
-        </Link>
+        {BACK}
         <BookingEmptyState
           title="Booking not found"
-          description="It may have been removed, or the booking isn&apos;t booked on your profile."
+          description="It may have been removed, or it isn't booked on your profile."
         />
       </div>
     );
   }
 
   const startMs = new Date(booking.startAt).getTime();
-  const nowMs = Date.now();
-  const activeBookingId = booking.id;
-  const canStart = booking.status === "confirmed" && nowMs >= startMs - START_WINDOW_MS;
-  const canComplete = booking.status === "in_progress";
-  const pending = booking.status === "pending";
-
-  /** Shows the booking the server just returned, and refreshes every list that includes it. */
-  function update(updated: ServiceBooking) {
-    setBooking(updated);
-    void queryClient.invalidateQueries({ queryKey: ["bookings"] });
-  }
-
-  async function runSimple(action: "start") {
-    if (busyAction) return;
-    setBusyAction(action);
-    setError(null);
-    const result = await startBooking(activeBookingId);
-    setBusyAction(null);
-    if (result.ok) {
-      update(result.booking);
-    } else {
-      setError(result.error);
-    }
-  }
+  const opensAt = startOpensAt(booking, nowMs);
+  const canStart = booking.status === "confirmed" && opensAt === null;
+  const ActiveModal = modal && modal !== "cancel" ? MODALS[modal] : null;
 
   return (
     <div className="space-y-6">
-      <Link
-        href="/service-provider/bookings"
-        className="inline-flex items-center gap-1 text-xs font-semibold text-neutral-500 hover:text-primary-600"
-      >
-        <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> Bookings
-      </Link>
+      {BACK}
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -159,21 +145,20 @@ export function ServiceProviderBookingDetailView({ bookingId }: { bookingId: str
           </div>
           <p className="mt-1 text-xs text-kampmax-text-muted">
             Ref <span className="font-mono font-semibold">{booking.bookingReference}</span>
-            <span className="ml-2">by {booking.customer.name}</span>
           </p>
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {pending && (
+          {booking.status === "pending" && (
             <>
               <button
-                onClick={() => setDeclineOpen(true)}
+                onClick={() => setModal("decline")}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-error-200 bg-error-50 px-3.5 py-2 text-xs font-bold text-error-700 hover:bg-error-100"
               >
                 <XCircle className="h-3.5 w-3.5" aria-hidden /> Decline
               </button>
               <button
-                onClick={() => setAcceptOpen(true)}
+                onClick={() => setModal("accept")}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-success-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-success-700"
               >
                 <CheckCircle2 className="h-3.5 w-3.5" aria-hidden /> Accept booking
@@ -182,29 +167,36 @@ export function ServiceProviderBookingDetailView({ bookingId }: { bookingId: str
           )}
 
           {booking.status === "confirmed" && (
-            <button
-              onClick={() => runSimple("start")}
-              disabled={!canStart || busyAction !== null}
-              title={canStart ? "Start this appointment" : `Work can start from ${formatBookingDate(startMs)} · ${formatBookingTime(startMs)}`}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold transition-colors",
-                canStart && busyAction === null
-                  ? "bg-primary-600 text-white hover:bg-primary-700"
-                  : "cursor-not-allowed bg-neutral-200 text-neutral-500"
-              )}
-            >
-              {busyAction === "start" ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-              ) : (
-                <PlayCircle className="h-3.5 w-3.5" aria-hidden />
-              )}
-              Start booking
-            </button>
+            <>
+              <button
+                onClick={() => setModal("cancel")}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-error-200 bg-error-50 px-3.5 py-2 text-xs font-bold text-error-700 hover:bg-error-100"
+              >
+                <Ban className="h-3.5 w-3.5" aria-hidden /> Cancel booking
+              </button>
+              <button
+                onClick={() => void start(booking.id)}
+                disabled={!canStart || starting}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold transition-colors",
+                  canStart && !starting
+                    ? "bg-primary-600 text-white hover:bg-primary-700"
+                    : "cursor-not-allowed bg-neutral-200 text-neutral-500"
+                )}
+              >
+                {starting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                ) : (
+                  <PlayCircle className="h-3.5 w-3.5" aria-hidden />
+                )}
+                Start booking
+              </button>
+            </>
           )}
 
-          {canComplete && (
+          {booking.status === "in_progress" && (
             <button
-              onClick={() => setCompleteOpen(true)}
+              onClick={() => setModal("complete")}
               className="inline-flex items-center gap-1.5 rounded-lg bg-success-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-success-700"
             >
               <ClipboardCheck className="h-3.5 w-3.5" aria-hidden />
@@ -220,14 +212,13 @@ export function ServiceProviderBookingDetailView({ bookingId }: { bookingId: str
           className="flex items-start gap-2 rounded-lg border border-error-200 bg-error-50 p-3 text-xs text-error-700"
         >
           <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-          {error.message}
+          {describeBookingActionError(error.code, error.message)}
         </p>
       )}
 
-      {booking.status === "confirmed" && !canStart && (
+      {opensAt !== null && (
         <p className="rounded-lg border border-info-200 bg-info-50 p-3 text-xs text-info-800">
-          You can start this appointment from {formatBookingDate(startMs)} at{" "}
-          {formatBookingTime(startMs)} (30-minute grace window included).
+          You can start from {formatBookingDate(opensAt)}, {formatBookingTime(opensAt)}.
         </p>
       )}
 
@@ -250,21 +241,16 @@ export function ServiceProviderBookingDetailView({ bookingId }: { bookingId: str
             <h2 id="cust-title" className="text-xs font-bold uppercase tracking-wide text-kampmax-text-muted">
               Customer
             </h2>
-            <div className="mt-2 flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-100 text-sm font-bold text-primary-700">
-                {booking.customer.name.slice(0, 1).toUpperCase()}
-              </div>
-              <dl className="flex-1 space-y-1 text-sm">
-                <div className="flex items-center gap-2">
-                  <User className="h-3.5 w-3.5 shrink-0 text-neutral-400" aria-hidden />
-                  <span className="font-semibold text-kampmax-text">{booking.customer.name}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Phone className="h-3.5 w-3.5 shrink-0 text-neutral-400" aria-hidden />
-                  <span className="text-kampmax-text-secondary">{booking.customer.phone}</span>
-                </div>
-              </dl>
-            </div>
+            <p className="mt-2 text-sm font-semibold text-kampmax-text">{booking.customer.name}</p>
+            {booking.customer.phone && (
+              <a
+                href={`tel:${booking.customer.phone}`}
+                className="mt-1 inline-flex items-center gap-2 text-sm font-semibold text-primary-700 hover:underline"
+              >
+                <Phone className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                {booking.customer.phone}
+              </a>
+            )}
             <div className="mt-3 flex items-start gap-2 text-sm">
               <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-neutral-400" aria-hidden />
               <div>
@@ -280,19 +266,18 @@ export function ServiceProviderBookingDetailView({ bookingId }: { bookingId: str
                 <p className="text-kampmax-text-secondary">{booking.notes}</p>
               </div>
             )}
+            {booking.declineReason && (
+              <p className="mt-3 text-xs text-kampmax-text-secondary">Reason given: {booking.declineReason}</p>
+            )}
           </section>
 
           <section aria-labelledby="pay-title" className="rounded-xl border border-kampmax-border bg-white p-5">
             <h2 id="pay-title" className="text-xs font-bold uppercase tracking-wide text-kampmax-text-muted">
-              Payment & price
+              Payment
             </h2>
-            <p className="mt-2 text-sm font-bold text-kampmax-text">
-              <Wallet className="mr-1.5 inline h-4 w-4 text-primary-600" aria-hidden />
-              {formatNaira(booking.price.amount)}
-            </p>
-            <p className="mt-1 text-xs text-kampmax-text-muted">{booking.price.note}</p>
+            <p className="mt-2 text-sm font-bold text-kampmax-text">{formatNaira(booking.price.amount)}</p>
             <div className="mt-3">
-              <SettlementPanel booking={booking} />
+              <SettlementPanel booking={booking} viewer="provider" />
             </div>
           </section>
         </div>
@@ -306,50 +291,12 @@ export function ServiceProviderBookingDetailView({ bookingId }: { bookingId: str
               <BookingTimeline timeline={booking.timeline} />
             </div>
           </div>
-
-          <div className="rounded-xl border border-kampmax-border bg-white p-4 text-[11px] text-kampmax-text-secondary">
-            <p className="flex items-start gap-1.5">
-              <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success-600" aria-hidden />
-              {booking.cancellationPolicy.message}
-            </p>
-            {pending && (
-              <p className="mt-2">
-                Respond to this request — the customer is notified as soon as you accept or decline.
-              </p>
-            )}
-          </div>
         </aside>
       </div>
 
-      {acceptOpen && (
-        <AcceptBookingModal
-          booking={booking}
-          onClose={() => setAcceptOpen(false)}
-          onComplete={(updated) => {
-            update(updated);
-            setAcceptOpen(false);
-          }}
-        />
-      )}
-      {declineOpen && (
-        <DeclineBookingModal
-          booking={booking}
-          onClose={() => setDeclineOpen(false)}
-          onComplete={(updated) => {
-            update(updated);
-            setDeclineOpen(false);
-          }}
-        />
-      )}
-      {completeOpen && (
-        <CompleteBookingModal
-          booking={booking}
-          onClose={() => setCompleteOpen(false)}
-          onComplete={(updated) => {
-            update(updated);
-            setCompleteOpen(false);
-          }}
-        />
+      {ActiveModal && <ActiveModal booking={booking} onClose={() => setModal(null)} onComplete={update} />}
+      {modal === "cancel" && (
+        <CancelBookingModal booking={booking} by="provider" onClose={() => setModal(null)} onComplete={update} />
       )}
     </div>
   );

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { MessageSquarePlus, Star, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { describeBookingActionError } from "@/lib/my-bookings-list";
 import { submitBookingReview } from "@/services/booking";
 import type { BookingError, ServiceBooking } from "@/types/booking";
 
@@ -78,7 +79,7 @@ export function LeaveReviewModal({
               className="flex items-start gap-2 rounded-lg border border-error-200 bg-error-50 p-2.5 text-xs text-error-700"
             >
               <MessageSquarePlus className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-              {error.message}
+              {describeBookingActionError(error.code, error.message)}
             </p>
           )}
 

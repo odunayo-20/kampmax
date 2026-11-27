@@ -3,16 +3,9 @@
 import { useEffect, useState } from "react";
 import { X, AlertCircle, Ban } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { declineReasonText, DECLINE_REASONS, describeBookingActionError } from "@/lib/my-bookings-list";
 import { declineBooking } from "@/services/booking";
 import type { BookingError, ServiceBooking } from "@/types/booking";
-
-const REASONS = [
-  "No longer available at that time",
-  "Scheduling conflict",
-  "Need more information",
-  "Service not available in that location",
-  "Other",
-];
 
 export function DeclineBookingModal({
   booking,
@@ -42,10 +35,9 @@ export function DeclineBookingModal({
       setError({ code: "422", message: "Choose a reason so the customer knows why." });
       return;
     }
-    const finalReason = reason === "Other" ? note.trim() || "Other" : reason;
     setBusy(true);
     setError(null);
-    const result = await declineBooking(booking.id, finalReason);
+    const result = await declineBooking(booking.id, declineReasonText(reason, note));
     setBusy(false);
     if (result.ok) {
       onComplete(result.booking);
@@ -90,7 +82,7 @@ export function DeclineBookingModal({
               className="flex items-start gap-2 rounded-lg border border-error-200 bg-error-50 p-2.5 text-xs text-error-700"
             >
               <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-              {error.message}
+              {describeBookingActionError(error.code, error.message)}
             </p>
           )}
 
@@ -102,7 +94,7 @@ export function DeclineBookingModal({
               className="mt-1.5 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:border-error-400 focus:outline-none"
             >
               <option value="">Select a reason…</option>
-              {REASONS.map((r) => (
+              {DECLINE_REASONS.map((r) => (
                 <option key={r} value={r}>
                   {r}
                 </option>

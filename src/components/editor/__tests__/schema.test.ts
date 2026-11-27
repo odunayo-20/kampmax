@@ -57,19 +57,19 @@ describe("editor schema: content that must survive a save and reload", () => {
 
   it("captioned images keep src, alt, caption, alignment and size", () => {
     const out = roundTrip(
-      '<figure class="figure-right figure-md"><img src="https://res.cloudinary.com/x/a.jpg" alt="Students at OAU"><figcaption>Fresh<strong>ers</strong> week</figcaption></figure>'
+      '<figure class="figure-right figure-md"><img src="https://cdn.kampmax.com/x/a.jpg" alt="Students at OAU"><figcaption>Fresh<strong>ers</strong> week</figcaption></figure>'
     );
     expect(out).toContain('class="figure-right figure-md"');
-    expect(out).toContain('src="https://res.cloudinary.com/x/a.jpg"');
+    expect(out).toContain('src="https://cdn.kampmax.com/x/a.jpg"');
     expect(out).toContain('alt="Students at OAU"');
     expect(out).toContain("<figcaption>Fresh<strong>ers</strong> week</figcaption>");
   });
 
   it("an image without a caption loads (the server drops empty captions)", () => {
     const out = roundTrip(
-      '<p>a</p><figure class="figure-right figure-full"><img src="https://res.cloudinary.com/x/a.webp" alt="great" loading="lazy"></figure><p>b</p>'
+      '<p>a</p><figure class="figure-right figure-full"><img src="https://cdn.kampmax.com/x/a.webp" alt="great" loading="lazy"></figure><p>b</p>'
     );
-    expect(out).toContain('src="https://res.cloudinary.com/x/a.webp"');
+    expect(out).toContain('src="https://cdn.kampmax.com/x/a.webp"');
     expect(out).toContain('alt="great"');
     expect(out).toContain("<p>b</p>");
   });

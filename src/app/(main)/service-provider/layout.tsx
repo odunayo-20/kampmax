@@ -6,17 +6,11 @@ import { Menu, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { isServiceProviderDashboardPath } from "@/lib/utils";
 import { SERVICE_PROVIDER_DASHBOARD_GATE } from "@/services/service-provider-dashboard";
-import {
-  useServiceProviderAccess,
-  usePrefetchServiceProviderDashboard,
-} from "@/hooks/use-service-provider-dashboard";
+import { useServiceProviderAccess } from "@/hooks/use-service-provider-dashboard";
 import { DashboardShellSkeleton } from "@/components/layout/DashboardShellSkeleton";
 import { ServiceProviderAccessGate } from "@/components/service-provider/dashboard/ServiceProviderAccessGate";
 import { ServiceProviderSidebar } from "@/components/service-provider/dashboard/ServiceProviderSidebar";
 import { ServiceProviderTopbar } from "@/components/service-provider/dashboard/ServiceProviderTopbar";
-
-/** The page that shows the provider overview. */
-const SERVICE_PROVIDER_OVERVIEW_PATH = "/service-provider";
 
 /**
  * Service Provider module shell.
@@ -36,7 +30,6 @@ export default function ServiceProviderLayout({ children }: { children: React.Re
   const isPublicProfile = !isServiceProviderDashboardPath(pathname);
 
   const accessQuery = useServiceProviderAccess({ enabled: !isPublicProfile });
-  usePrefetchServiceProviderDashboard({ enabled: pathname === SERVICE_PROVIDER_OVERVIEW_PATH });
   // Keep the last known access if a background refresh fails.
   const access = accessQuery.data ?? null;
   const loadError = accessQuery.isError && !access;

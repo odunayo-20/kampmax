@@ -1,14 +1,16 @@
 "use client";
 
 import { BadgeDollarSign, ShieldCheck, Wallet } from "lucide-react";
+import { providerPaymentLine } from "@/lib/my-bookings-list";
 import type { ServiceBooking } from "@/types/booking";
 
 /**
- * Where the money is and, for the provider, what they receive. A backend projection: this panel only shows it.
+ * Where the money is. The customer sees the server's wording; the provider sees their own line and what they receive.
+ * A backend projection: this panel only shows it.
  */
-export function SettlementPanel({ booking, payout = true }: { booking: ServiceBooking; payout?: boolean }) {
+export function SettlementPanel({ booking, viewer }: { booking: ServiceBooking; viewer: "customer" | "provider" }) {
   const f = booking.fulfillment;
-  const s = payout ? f.settlement : undefined;
+  const s = viewer === "provider" ? f.settlement : undefined;
 
   return (
     <div className="space-y-3">
@@ -17,16 +19,20 @@ export function SettlementPanel({ booking, payout = true }: { booking: ServiceBo
           <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-primary-600" aria-hidden />
           <span>
             <span className="block font-semibold text-neutral-900">Payment</span>
-            <span className="mt-0.5 block text-neutral-600">{f.payment.label}</span>
+            <span className="mt-0.5 block text-neutral-600">
+              {viewer === "provider" ? providerPaymentLine(booking) : f.payment.label}
+            </span>
           </span>
         </p>
-        <p className="mt-3 flex items-start gap-2 border-t border-neutral-100 pt-3 text-neutral-700">
-          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-success-600" aria-hidden />
-          <span>
-            <span className="block font-semibold text-neutral-900">Escrow</span>
-            <span className="mt-0.5 block text-neutral-600">{f.escrow.label}</span>
-          </span>
-        </p>
+        {viewer === "customer" && (
+          <p className="mt-3 flex items-start gap-2 border-t border-neutral-100 pt-3 text-neutral-700">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-success-600" aria-hidden />
+            <span>
+              <span className="block font-semibold text-neutral-900">Escrow</span>
+              <span className="mt-0.5 block text-neutral-600">{f.escrow.label}</span>
+            </span>
+          </p>
+        )}
       </div>
 
       {s && (

@@ -16,7 +16,7 @@ const article: ArticleDetail = {
   title: "How to win scholarships",
   slug: "how-to-win-scholarships",
   excerpt: "Practical steps.",
-  coverImage: "https://res.cloudinary.com/x/cover.jpg",
+  coverImage: "https://cdn.kampmax.com/x/cover.jpg",
   author: { id: "u1", name: "Ada Obi", avatar: null },
   category: { id: "c1", name: "Career", slug: "career" },
   tags: [{ id: "t1", name: "Scholarships", slug: "scholarships" }],

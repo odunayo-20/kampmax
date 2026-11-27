@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { describeBookingActionError } from "@/lib/my-bookings-list";
 import { reportBookingProblem } from "@/services/booking";
 import { SERVICE_PROBLEM_CATEGORIES } from "@/config/service-order";
 import { EvidenceUpload } from "./EvidenceUpload";
@@ -86,7 +87,7 @@ export function ReportProblemModal({
               className="flex items-start gap-2 rounded-lg border border-error-200 bg-error-50 p-2.5 text-xs text-error-700"
             >
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-              {error.message}
+              {describeBookingActionError(error.code, error.message)}
             </p>
           )}
 

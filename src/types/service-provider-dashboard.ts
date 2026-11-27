@@ -52,40 +52,11 @@ export const SERVICE_PROVIDER_PERMISSIONS: ServiceProviderPermissions = {
   settingsEdit: true,
 };
 
-// ── Dashboard metric (backend-supplied only) ─────────────────
-
-export interface ServiceProviderDashboardMetric {
-  key:
-    | "active_services"
-    | "total_bookings"
-    | "upcoming_bookings"
-    | "in_progress_bookings"
-    | "average_rating"
-    | "profile_views"
-    | "response_time";
-  label: string;
-  valueLabel: string;
-  tone: "positive" | "neutral" | "info" | "gold";
-  sublabel?: string;
-}
-
-// ── Profile completeness (backend-computed) ──────────────────
-
-export interface ServiceProviderProfileCompletionItem {
-  key: string;
-  label: string;
-  description: string;
-  href: string;
-}
-
-export interface ServiceProviderProfileCompletion {
-  percentage: number;
-  missing: ServiceProviderProfileCompletionItem[];
-}
-
 // ── Management inputs (owner writes) ─────────────────────────
 
 export interface ServiceProviderServiceInput {
+  /** The web address part, made once by the form and kept while the name is unchanged. */
+  slug?: string;
   name: string;
   description: string;
   categoryId: string;
@@ -116,43 +87,16 @@ export interface ServiceProviderPortfolioItemInput {
   visible?: boolean;
 }
 
-// ── Dashboard activity (backend events; never fabricated) ────
-
-export type ServiceProviderActivityKind =
-  | "profile_approved"
-  | "verification_updated"
-  | "service_activated"
-  | "service_deactivated"
-  | "service_updated"
-  | "service_created"
-  | "review_received"
-  | "portfolio_item_added"
-  | "portfolio_item_updated"
-  | "availability_updated"
-  | "booking_request"
-  | "payout_update"
-  | "system_announcement";
-
-export interface ServiceProviderActivityEvent {
-  id: string;
-  kind: ServiceProviderActivityKind;
-  title: string;
-  message: string;
-  createdAt: string;
-  href?: string;
-}
-
 // ── Reviews (backend-supplied) ───────────────────────────────
 
 export interface ServiceProviderReview {
   id: string;
   authorName: string;
   rating: number;
+  title?: string;
   comment: string;
   serviceName: string;
   createdAt: string;
-  /** Whether the public profile shows this review. */
-  visible: boolean;
 }
 
 export interface ServiceProviderReviewsSummary {

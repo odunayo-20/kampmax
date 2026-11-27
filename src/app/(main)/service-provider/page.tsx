@@ -1,305 +1,209 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, CalendarDays, ExternalLink, Images, Plus, Wrench, X, Lightbulb } from "lucide-react";
-import { cn, timeAgo } from "@/lib/utils";
-import {
-  useServiceProviderDashboard,
-  useServiceProviderReviewsSummary,
-} from "@/hooks/use-service-provider-dashboard";
+import { useQuery } from "@tanstack/react-query";
+import { ArrowRight, ExternalLink } from "lucide-react";
+import { useServiceProviderReviewsSummary } from "@/hooks/use-service-provider-dashboard";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { CampusNames } from "@/components/service-provider/dashboard/CampusNames";
-import { ServiceProviderMetricCard } from "@/components/service-provider/dashboard/ServiceProviderMetricCard";
-import { ServiceProviderVerificationBadge } from "@/components/service-provider/dashboard/ServiceProviderStatusBadge";
-import type { ServiceProviderActivityKind } from "@/types/service-provider-dashboard";
+import { PROFILE_KEY } from "@/components/service-provider/dashboard/ProfessionalDetailsEditor";
+import { cn } from "@/lib/utils";
+import {
+  availableFooter,
+  moneyText,
+  onTheWayFooter,
+  providerNextStep,
+  requestsCallout,
+  setupSteps,
+  todayLine,
+  verificationNotice,
+} from "@/lib/provider-hub";
+import { fetchProviderBookingSummary, fetchProviderBookings } from "@/services/booking";
+import { fetchMyWallet } from "@/services/wallet";
+import { fetchMyPortfolio } from "@/services/service-provider-media";
+import { fetchSpHours, fetchSpProfileDetails, fetchSpServicesLive } from "@/services/service-provider-dashboard";
 
-const ACTIVITY_ICON: Record<ServiceProviderActivityKind, string> = {
-  profile_approved: "✅",
-  verification_updated: "🛡️",
-  service_activated: "🚀",
-  service_deactivated: "⏸️",
-  service_updated: "🔧",
-  service_created: "➕",
-  review_received: "⭐",
-  portfolio_item_added: "🖼️",
-  portfolio_item_updated: "🖼️",
-  availability_updated: "🗓️",
-  booking_request: "📅",
-  payout_update: "💰",
-  system_announcement: "📢",
-};
-
+/** The provider's home: money first, requests waiting, today's job, then the one thing to do next. */
 export default function ServiceProviderOverviewPage() {
-  const overview = useServiceProviderDashboard();
+  const profile = useQuery({ queryKey: PROFILE_KEY, queryFn: fetchSpProfileDetails, retry: false });
+  // Everything else waits for the profile, so a failure there does not fire a string of requests that would fail too.
+  const ready = !!profile.data;
+  const stats = useQuery({ queryKey: ["bookings", "provider", "summary"], queryFn: fetchProviderBookingSummary, enabled: ready, retry: false });
+  const next = useQuery({
+    queryKey: ["bookings", "provider", "next"],
+    queryFn: async () => (await fetchProviderBookings({ status: "upcoming", limit: 1 })).items[0] ?? null,
+    enabled: ready,
+    retry: false,
+  });
+  const wallet = useQuery({ queryKey: ["wallet", "provider-home"], queryFn: fetchMyWallet, enabled: ready, retry: false });
+  const services = useQuery({ queryKey: ["service-provider", "services"], queryFn: fetchSpServicesLive, enabled: ready, retry: false });
+  const hours = useQuery({ queryKey: ["service-provider", "hours"], queryFn: fetchSpHours, enabled: ready, retry: false });
+  const portfolio = useQuery({ queryKey: ["service-provider", "portfolio"], queryFn: fetchMyPortfolio, enabled: ready, retry: false });
   // Optional card: left out when the summary can't load.
   const reviews = useServiceProviderReviewsSummary().data;
-  const [showWelcome, setShowWelcome] = useState(true);
 
-  if (overview.isPending) return <ServiceProviderOverviewSkeleton />;
+  if (profile.isPending) return <ServiceProviderOverviewSkeleton />;
 
-  if (!overview.data) {
+  if (!profile.data) {
     return (
       <div role="alert" className="rounded-xl border border-kampmax-border bg-white p-10 text-center text-sm text-kampmax-text-secondary">
-        {overview.isError ? "We couldn't load your dashboard." : "Dashboard isn't available right now."}{" "}
+        We couldn&apos;t load your dashboard.{" "}
         <button
           type="button"
-          onClick={() => void overview.refetch()}
-          disabled={overview.isFetching}
+          onClick={() => void profile.refetch()}
+          disabled={profile.isFetching}
           className="font-semibold text-primary-600 hover:underline disabled:opacity-60"
         >
-          {overview.isFetching ? "Retrying…" : "Try again"}
+          {profile.isFetching ? "Retrying…" : "Try again"}
         </button>
       </div>
     );
   }
 
-  const { record, metrics, activity, completion } = overview.data;
-  const nextStep = completion.missing[0];
+  const p = profile.data;
+  const s = stats.data;
+  const money = s?.money;
+  const requests = requestsCallout(s?.pending ?? 0, money?.awaitingAnswer);
+  const today = todayLine(s, next.data);
+  const notice = verificationNotice(p.verificationStatus);
+  // Wait for the counts so the banner never says "nothing done" while they are still loading.
+  const loaded = services.isSuccess && hours.isSuccess && portfolio.isSuccess;
+  const step = loaded
+    ? providerNextStep(
+        setupSteps({
+          hasPicture: !!p.logoUrl,
+          services: services.data.length,
+          liveServices: services.data.filter((x) => x.status === "active").length,
+          hours: hours.data.length,
+          portfolio: portfolio.data.length,
+        })
+      )
+    : null;
 
   return (
     <div className="space-y-6">
-      {/* Greeting */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-kampmax-text">Hey {record.profile.displayName}!</h1>
-          <p className="mt-1 text-sm text-kampmax-text-secondary">
-            Here&apos;s what&apos;s happening with your services today.
-          </p>
-        </div>
+        <h1 className="text-2xl font-bold text-kampmax-text">{p.displayName}</h1>
         <Link
-          href={`/services/providers/${record.slug}`}
+          href={`/services/providers/${p.slug}`}
           className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-kampmax-border bg-white px-3.5 py-2 text-sm font-medium text-kampmax-text hover:bg-neutral-50"
         >
           <ExternalLink className="h-4 w-4" aria-hidden />
-          View Public Profile
+          View public profile
         </Link>
       </div>
 
-      {/* Welcome guidance (dismissible) */}
-      {showWelcome && (
-        <div className="relative overflow-hidden rounded-xl border border-primary-200 bg-primary-50 p-5">
-          <button
-            type="button"
-            onClick={() => setShowWelcome(false)}
-            aria-label="Dismiss guidance"
-            className="absolute right-3 top-3 rounded-md p-1 text-primary-400 hover:bg-primary-100 hover:text-primary-700"
-          >
-            <X className="h-4 w-4" aria-hidden />
-          </button>
-          <div className="flex items-start gap-3 pr-8">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-primary-600 ring-1 ring-primary-200">
-              <Lightbulb className="h-5 w-5" aria-hidden />
-            </div>
-            <div>
-              <h2 className="text-sm font-bold text-kampmax-text">Make the most of your profile</h2>
-              <p className="mt-1 text-sm text-kampmax-text-secondary">
-                Complete your profile and keep your services up to date to get found by students near <CampusNames ids={[record.location.primaryCampusId]} fallback="your campus" />.
-              </p>
-            </div>
+      {/* Money: what can be spent, and what is on its way once customers confirm */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Link href="/service-provider/financials" className="rounded-xl bg-primary-600 p-5 text-white hover:bg-primary-700">
+          <p className="text-xs font-semibold text-primary-100">Available</p>
+          <p className="mt-1 text-2xl font-bold">{moneyText(wallet.data?.balance)}</p>
+          <p className="mt-1 text-xs text-primary-100">{availableFooter(wallet.data?.pendingAmount, money)}</p>
+          <p className="mt-3 inline-flex items-center gap-1 text-sm font-semibold">
+            Withdraw <ArrowRight className="h-4 w-4" aria-hidden />
+          </p>
+        </Link>
+        <Link href="/service-provider/bookings" className="rounded-xl border border-kampmax-border bg-white p-5 hover:border-primary-300">
+          <p className="text-xs font-semibold text-kampmax-text-secondary">On the way</p>
+          <p className="mt-1 text-2xl font-bold text-kampmax-text">{moneyText(money?.onTheWay)}</p>
+          <p className="mt-1 text-xs text-kampmax-text-secondary">{onTheWayFooter(money)}</p>
+        </Link>
+      </div>
+
+      {requests && (
+        <Link
+          href="/service-provider/bookings"
+          className="flex items-center gap-3 rounded-xl border-2 border-warning-300 bg-white p-4 hover:bg-warning-50"
+        >
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-kampmax-text">{requests.title}</p>
+            <p className="text-sm text-kampmax-text-secondary">{requests.text}</p>
           </div>
+          <span className="inline-flex items-center gap-1 text-sm font-semibold text-warning-700">
+            Review <ArrowRight className="h-4 w-4" aria-hidden />
+          </span>
+        </Link>
+      )}
+
+      {today && (
+        <Link href="/service-provider/bookings" className="block rounded-xl border border-kampmax-border bg-white p-4 hover:border-primary-300">
+          <p className="text-sm font-bold text-kampmax-text">{today.title}</p>
+          <p className="text-sm text-kampmax-text-secondary">{today.detail}</p>
+        </Link>
+      )}
+
+      {notice && (
+        <div
+          role="status"
+          className={cn("rounded-xl p-4 text-sm", notice.blocked ? "bg-error-50 text-error-800" : "bg-warning-50 text-warning-900")}
+        >
+          <p className="font-bold">{notice.title}</p>
+          <p className="mt-0.5">{notice.body}</p>
+          {notice.blocked && (
+            <Link href="/support" className="mt-2 inline-block font-semibold underline">
+              Contact support
+            </Link>
+          )}
         </div>
       )}
 
-      {/* Metrics */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        {metrics.map((metric) => (
-          <ServiceProviderMetricCard key={metric.key} metric={metric} />
-        ))}
-      </div>
+      {s && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Count label="Requests" value={s.pending} />
+          <Count label="Upcoming" value={s.upcoming} />
+          <Count label="In progress" value={s.inProgress} />
+          <Count label="Completed" value={s.completed} />
+        </div>
+      )}
 
-      {/* Completion + quick actions */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="rounded-xl border border-kampmax-border bg-white p-5 lg:col-span-2">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-kampmax-text">Finish setting up your profile</h2>
-            <span className="text-sm font-bold text-primary-600">{completion.percentage}%</span>
-          </div>
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-neutral-200" role="progressbar" aria-valuenow={completion.percentage} aria-valuemin={0} aria-valuemax={100}>
-            <div
-              className={cn("h-full rounded-full", completion.percentage === 100 ? "bg-success-600" : "bg-primary-600")}
-              style={{ width: `${completion.percentage}%` }}
-            />
-          </div>
-
-          {completion.percentage === 100 ? (
-            <p className="mt-4 text-sm text-kampmax-text-secondary">
-              Your profile is fully set up. 🎉 Keep your services and availability fresh to stay at the top of results.
+      {step && (
+        <Link href={step.href} className="flex items-center gap-3 rounded-xl border border-primary-200 bg-primary-50 p-4 hover:bg-primary-100">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold text-primary-700">
+              Get more bookings · {step.progress}
             </p>
-          ) : (
-            <div className="mt-4 space-y-2">
-              {completion.missing.slice(0, 5).map((item) => (
-                <Link
-                  key={item.key}
-                  href={item.href}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-kampmax-text hover:bg-neutral-50"
-                >
-                  <span className="h-1.5 w-1.5 grow-0 rounded-full bg-primary-600" aria-hidden />
-                  <span className="flex-1">
-                    <span className="font-medium">{item.label}</span>
-                    <span className="ml-2 text-kampmax-text-muted">{item.description}</span>
-                  </span>
-                  <ArrowRight className="h-4 w-4 text-neutral-400" aria-hidden />
-                </Link>
-              ))}
-              {nextStep && (
-                <Link
-                  href={nextStep.href}
-                  className="mt-1 inline-flex items-center gap-1 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700"
-                >
-                  {nextStep.label} <ArrowRight className="h-4 w-4" aria-hidden />
-                </Link>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Quick actions */}
-        <div className="space-y-3">
-          <h2 className="text-sm font-bold text-kampmax-text">Quick actions</h2>
-          <QuickActionLink href="/service-provider/services/new" icon={Plus} title="Add a service" description="Create a new service listing" />
-          <QuickActionLink href="/service-provider/availability" icon={CalendarDays} title="Update availability" description="Weekly schedule & fees" />
-          <QuickActionLink href="/service-provider/portfolio" icon={Images} title="Manage portfolio" description="Showcase your best work" />
-        </div>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        {/* Recent activity */}
-        <div className="rounded-xl border border-kampmax-border bg-white p-5 lg:col-span-2">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-kampmax-text">Recent activity</h2>
-            <Link href="/service-provider/services" className="text-xs font-medium text-primary-600 hover:underline">
-              View services
-            </Link>
+            <p className="text-sm font-bold text-kampmax-text">{step.title}</p>
+            <p className="text-sm text-kampmax-text-secondary">{step.hint}</p>
           </div>
-          <ul className="mt-4 divide-y divide-kampmax-border">
-            {activity.slice(0, 6).map((event) => (
-              <li key={event.id}>
-                {event.href ? (
-                  <Link href={event.href} className="flex items-start gap-3 py-3 hover:bg-neutral-50">
-                    <ActivityRow icon={ACTIVITY_ICON[event.kind]} title={event.title} message={event.message} createdAt={event.createdAt} />
-                  </Link>
-                ) : (
-                  <div className="flex items-start gap-3 py-3">
-                    <ActivityRow icon={ACTIVITY_ICON[event.kind]} title={event.title} message={event.message} createdAt={event.createdAt} />
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
+          <ArrowRight className="h-5 w-5 shrink-0 text-primary-600" aria-hidden />
+        </Link>
+      )}
 
-        {/* Reviews + verification summary */}
-        <div className="space-y-4">
-          {reviews && (
-            <div className="rounded-xl border border-kampmax-border bg-white p-5">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-bold text-kampmax-text">Ratings & reviews</h2>
-                <Link href="/service-provider/reviews" className="text-xs font-medium text-primary-600 hover:underline">
-                  View all
-                </Link>
-              </div>
-              <div className="mt-3 flex items-center gap-2">
-                <span className="text-3xl font-bold text-kampmax-text">{reviews.averageRating === null ? "—" : reviews.averageRating.toFixed(1)}</span>
-                <span className="text-yellow-500" aria-label={`${reviews.averageRating ?? 0} out of 5`}>
-                  {"★★★★★".slice(0, Math.round(reviews.averageRating ?? 0))}
-                  <span className="text-neutral-300">{"★★★★★".slice(Math.round(reviews.averageRating ?? 0))}</span>
-                </span>
-                <span className="text-xs text-kampmax-text-muted">({reviews.totalCount} reviews)</span>
-              </div>
-              <div className="mt-3 space-y-1">
-                {reviews.distribution.map((d) => (
-                  <div key={d.stars} className="flex items-center gap-2 text-xs text-kampmax-text-secondary">
-                    <span className="w-6 text-right">{d.stars}</span>
-                    <div className="flex-1 h-1.5 rounded-full bg-neutral-200">
-                      <div
-                        className="h-full rounded-full bg-yellow-400"
-                        style={{ width: `${reviews.totalCount ? (d.count / reviews.totalCount) * 100 : 0}%` }}
-                      />
-                    </div>
-                    <span className="w-6 text-kampmax-text-muted">{d.count}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="rounded-xl border border-kampmax-border bg-white p-5">
-            <h2 className="text-sm font-bold text-kampmax-text">Verification</h2>
-            <div className="mt-3 flex items-center justify-between">
-              <ServiceProviderVerificationBadge status={record.verification.status} />
-              <Wrench className="h-5 w-5 text-neutral-300" aria-hidden />
-            </div>
-            <p className="mt-2 text-xs text-kampmax-text-muted">
-              Verification status is set by Kampmax. You can&apos;t change it from the dashboard.
+      {reviews && (
+        <Link href="/service-provider/reviews" className="flex items-center justify-between rounded-xl border border-kampmax-border bg-white p-4 hover:border-primary-300">
+          <div>
+            <p className="text-sm font-bold text-kampmax-text">Reviews</p>
+            <p className="text-sm text-kampmax-text-secondary">
+              {reviews.averageRating === null
+                ? "No reviews yet"
+                : `${reviews.averageRating.toFixed(1)} out of 5 from ${reviews.totalCount} ${reviews.totalCount === 1 ? "review" : "reviews"}`}
             </p>
           </div>
-        </div>
-      </div>
+          <ArrowRight className="h-4 w-4 text-neutral-400" aria-hidden />
+        </Link>
+      )}
     </div>
+  );
+}
+
+function Count({ label, value }: { label: string; value: number }) {
+  return (
+    <Link href="/service-provider/bookings" className="rounded-xl border border-kampmax-border bg-white p-4 hover:border-primary-300">
+      <p className="text-xs font-semibold text-kampmax-text-secondary">{label}</p>
+      <p className="mt-0.5 text-xl font-bold text-kampmax-text">{value}</p>
+    </Link>
   );
 }
 
 function ServiceProviderOverviewSkeleton() {
   return (
     <div role="status" aria-busy="true" aria-label="Loading dashboard" className="space-y-6">
-      <div className="space-y-2">
-        <Skeleton className="h-8 w-64 max-w-full" />
-        <Skeleton className="h-4 w-80 max-w-full" />
+      <Skeleton className="h-8 w-64 max-w-full" />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Skeleton className="h-32 rounded-xl" />
+        <Skeleton className="h-32 rounded-xl" />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-24 rounded-xl" />
-        ))}
-      </div>
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Skeleton className="h-56 rounded-xl lg:col-span-2" />
-        <Skeleton className="h-56 rounded-xl" />
-      </div>
+      <Skeleton className="h-20 rounded-xl" />
       <span className="sr-only">Loading dashboard</span>
     </div>
-  );
-}
-
-function ActivityRow({ icon, title, message, createdAt }: { icon: string; title: string; message: string; createdAt: string }) {
-  return (
-    <>
-      <span className="mt-0.5 text-base" aria-hidden>
-        {icon}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-medium text-kampmax-text">{title}</span>
-        <span className="block text-xs text-kampmax-text-secondary">{message}</span>
-      </span>
-      <span className="shrink-0 text-[11px] text-kampmax-text-muted">{timeAgo(createdAt)}</span>
-    </>
-  );
-}
-
-function QuickActionLink({
-  href,
-  icon: Icon,
-  title,
-  description,
-}: {
-  href: string;
-  icon: typeof Plus;
-  title: string;
-  description: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="flex items-start gap-3 rounded-xl border border-kampmax-border bg-white p-4 hover:border-primary-300 hover:shadow-sm"
-    >
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-100 text-primary-600">
-        <Icon className="h-4 w-4" aria-hidden />
-      </div>
-      <div className="min-w-0 flex-1">
-        <h3 className="text-sm font-semibold text-kampmax-text">{title}</h3>
-        <p className="text-xs text-kampmax-text-secondary">{description}</p>
-      </div>
-      <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-neutral-400" aria-hidden />
-    </Link>
   );
 }

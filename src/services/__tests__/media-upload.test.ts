@@ -3,7 +3,7 @@ import { mediaUrlProblem, uploadFileDirect } from "../media";
 
 describe("mediaUrlProblem", () => {
   it("accepts a public https address", () => {
-    expect(mediaUrlProblem("https://res.cloudinary.com/demo/image/upload/a.webp", "kampmax.app")).toBeNull();
+    expect(mediaUrlProblem("https://cdn.kampmax.com/demo/image/upload/a.webp", "kampmax.app")).toBeNull();
   });
 
   it("refuses a private address when the site is not running locally", () => {
@@ -44,9 +44,9 @@ describe("uploadFileDirect with a badly configured server", () => {
 
   it("returns the address when it is usable", async () => {
     vi.stubGlobal("window", { location: { hostname: "kampmax.app" } });
-    respond("https://res.cloudinary.com/demo/a.webp");
+    respond("https://cdn.kampmax.com/demo/a.webp");
     const { data, error } = await uploadFileDirect(file, "product");
     expect(error).toBeNull();
-    expect(data?.url).toBe("https://res.cloudinary.com/demo/a.webp");
+    expect(data?.url).toBe("https://cdn.kampmax.com/demo/a.webp");
   });
 });

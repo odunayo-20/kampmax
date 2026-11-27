@@ -13,6 +13,7 @@ const PRICING_MODELS = [
   { value: "fixed", label: "Fixed Price", description: "₦5,000" },
   { value: "starting_from", label: "Starting From", description: "From ₦5,000" },
   { value: "range", label: "Price Range", description: "₦5,000 - ₦10,000" },
+  { value: "hourly", label: "Per Hour", description: "₦3,000 an hour" },
   { value: "quote", label: "Quote Required", description: "Custom pricing" },
 ] as const;
 
@@ -226,6 +227,7 @@ function ServiceCard({
               <option value="fixed">Fixed Price</option>
               <option value="starting_from">Starting From</option>
               <option value="range">Price Range</option>
+              <option value="hourly">Per Hour</option>
               <option value="quote">Quote Required</option>
             </Select>
           </div>
@@ -330,6 +332,7 @@ function ServiceCard({
     fixed: `Fixed: ${formatNaira(service.price)}`,
     starting_from: `From ${formatNaira(service.price)}`,
     range: `Range: ${formatNaira(service.price)} - ${formatNaira(service.priceMax ?? service.price)}`,
+    hourly: `${formatNaira(service.price)} / hour`,
     quote: "Quote Required",
   };
 

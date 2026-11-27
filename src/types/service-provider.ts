@@ -99,6 +99,7 @@ export const SERVICE_PROVIDER_PRICING_MODEL = {
   FIXED: "fixed",
   STARTING_FROM: "starting_from",
   RANGE: "range",
+  HOURLY: "hourly",
   QUOTE: "quote",
 } as const;
 

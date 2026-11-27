@@ -12,9 +12,7 @@ vi.mock("@/lib/api-client", () => ({
   },
 }));
 
-import type { ServiceProviderDashboardMetric } from "@/types/service-provider-dashboard";
 import {
-  fetchSpDashboardLive,
   fetchSpProfileRecordLive,
   updateSpProfileLive,
   fetchSpServicesLive,
@@ -24,9 +22,11 @@ import {
   fetchSpAvailabilityLive,
   updateSpAvailabilityLive,
   fetchSpReviewsSummaryLive,
-  computeProfileCompletionFromLive,
-  statusCountsOf,
-  overviewOf,
+  fetchSpHours,
+  addSpHours,
+  removeSpHours,
+  fetchSpBookingSettings,
+  fetchSpProfileDetails,
   mapBackendService,
   mapBackendAvailability,
   type BackendSpProfile,
@@ -85,255 +85,6 @@ describe("service-provider-dashboard.api (live API implementation)", () => {
     },
   ];
 
-  describe("fetchSpDashboardLive", () => {
-    it("fetches profile, services, availability, analytics, and bookings to build dashboard", async () => {
-      getMock.mockImplementation((url: string) => {
-        if (url.includes("/service-provider/profile/me")) {
-          return Promise.resolve({ data: mockProfile, error: null });
-        }
-        if (url.includes("/service-provider/services/me")) {
-          return Promise.resolve({ data: mockServices, error: null });
-        }
-        if (url.includes("/service-provider/availability/me")) {
-          return Promise.resolve({ data: mockSlots, error: null });
-        }
-        if (url.includes("/bookings/provider/reviews")) {
-          return Promise.resolve({ data: { averageRating: 4.8, totalCount: 15 }, error: null });
-        }
-        if (url.includes("/analytics/service-provider/bookings/status")) {
-          return Promise.resolve({
-            data: { pending: 2, accepted: 5, in_progress: 1, completed: 18, cancelled: 1 },
-            error: null,
-          });
-        }
-        if (url.includes("/analytics/service-provider")) {
-          return Promise.resolve({
-            data: { totalBookings: 27, profileViews: 140 },
-            error: null,
-          });
-        }
-        if (url.includes("/bookings/provider?")) {
-          return Promise.resolve({
-            data: {
-              items: [
-                {
-                  id: "b-1",
-                  status: "pending",
-                  serviceName: "Socket Replacement",
-                  startAt: "2026-10-02T14:00:00Z",
-                  createdAt: "2026-09-29T10:00:00Z",
-                },
-              ],
-              meta: { total: 1, page: 1, limit: 10, totalPages: 1 },
-            },
-            error: null,
-          });
-        }
-        return Promise.resolve({ data: null, error: null });
-      });
-
-      const result = await fetchSpDashboardLive();
-
-      expect(result.record.providerId).toBe("sp-101");
-      expect(result.record.slug).toBe("fixit-electricals");
-      expect(result.record.profile.displayName).toBe("FixIt Electricals");
-      expect(result.record.services).toHaveLength(1);
-      expect(result.record.services[0].name).toBe("Socket Replacement");
-
-      // Verify metrics
-      const activeSvcMetric = result.metrics.find((m) => m.key === "active_services");
-      expect(activeSvcMetric?.valueLabel).toBe("1");
-
-      const totalBookingsMetric = result.metrics.find((m) => m.key === "total_bookings");
-      expect(totalBookingsMetric?.valueLabel).toBe("27");
-
-      const upcomingMetric = result.metrics.find((m) => m.key === "upcoming_bookings");
-      expect(upcomingMetric?.valueLabel).toBe("5");
-
-      const ratingMetric = result.metrics.find((m) => m.key === "average_rating");
-      expect(ratingMetric?.valueLabel).toBe("4.8");
-
-      // Verify activity events
-      expect(result.activity).toHaveLength(1);
-      expect(result.activity[0].kind).toBe("booking_request");
-    });
-  });
-
-  describe("a failed list request", () => {
-    // The API client answers a failure with `data: {}` (truthy), not undefined.
-    it("still loads the dashboard, with that list left empty", async () => {
-      getMock.mockImplementation((url: string) => {
-        const ok = (data: unknown) => Promise.resolve({ data, error: null });
-        const failed = Promise.resolve({ data: {}, error: new Error("Not Found") });
-        if (url.includes("/bookings/provider/reviews")) return ok({ averageRating: null, totalCount: 0 });
-        if (url.includes("/bookings/provider?")) return failed;
-        if (url.includes("/service-provider/services/me")) return failed;
-        if (url.includes("/service-provider/profile/me")) return ok(mockProfile);
-        if (url.includes("/service-provider/availability/me")) return ok(mockSlots);
-        if (url.includes("/analytics/service-provider/bookings/status")) return ok([]);
-        if (url.includes("/analytics/service-provider")) return ok({ overview: { totalBookings: 0 } });
-        return ok(null);
-      });
-
-      const { record, activity } = await fetchSpDashboardLive();
-
-      expect(record.services).toEqual([]);
-      expect(activity).toHaveLength(1);
-      expect(activity[0].kind).toBe("profile_approved");
-    });
-  });
-
-  describe("profile views", () => {
-    const withOverview = async (overview: unknown) => {
-      getMock.mockImplementation((url: string) => {
-        const ok = (data: unknown) => Promise.resolve({ data, error: null });
-        if (url.includes("/bookings/provider/reviews")) return ok({ averageRating: null, totalCount: 0 });
-        if (url.includes("/service-provider/profile/me")) return ok(mockProfile);
-        if (url.includes("/service-provider/services/me")) return ok(mockServices);
-        if (url.includes("/service-provider/availability/me")) return ok(mockSlots);
-        if (url.includes("/analytics/service-provider/bookings/status")) return ok([]);
-        if (url.includes("/analytics/service-provider")) return ok(overview);
-        if (url.includes("/bookings/provider?")) return ok({ items: [] });
-        return ok(null);
-      });
-      return fetchSpDashboardLive();
-    };
-    const card = (metrics: ServiceProviderDashboardMetric[]) => metrics.find((m) => m.key === "profile_views")!;
-
-    it("shows no number, not a false 0, when the backend doesn't track views", async () => {
-      // This is what the backend sends today: no profileViews at all.
-      const { metrics, record } = await withOverview({ overview: { totalBookings: 4 } });
-
-      expect(card(metrics)).toMatchObject({ valueLabel: "—", sublabel: "Not tracked yet" });
-      expect(record.metrics.profileViews).toBeNull();
-    });
-
-    it("shows the number when the backend does send one, including a real 0", async () => {
-      const some = await withOverview({ overview: { totalBookings: 4, profileViews: 140 } });
-      expect(card(some.metrics)).toMatchObject({ valueLabel: "140", sublabel: "this month" });
-      expect(some.record.metrics.profileViews).toBe(140);
-
-      const none = await withOverview({ overview: { totalBookings: 0, profileViews: 0 } });
-      expect(card(none.metrics)).toMatchObject({ valueLabel: "0", sublabel: "this month" });
-    });
-  });
-
-  describe("average rating", () => {
-    const dashboard = async (reviews: unknown) => {
-      getMock.mockImplementation((url: string) => {
-        const ok = (data: unknown) => Promise.resolve({ data, error: null });
-        if (url.includes("/bookings/provider/reviews")) return reviews === "fail" ? Promise.resolve({ data: null, error: new Error("down") }) : ok(reviews);
-        if (url.includes("/service-provider/profile/me")) return ok(mockProfile);
-        if (url.includes("/service-provider/services/me")) return ok(mockServices);
-        if (url.includes("/service-provider/availability/me")) return ok(mockSlots);
-        if (url.includes("/analytics/service-provider/bookings/status")) return ok([]);
-        if (url.includes("/analytics/service-provider")) return ok({ overview: { totalBookings: 0 } });
-        if (url.includes("/bookings/provider?")) return ok({ items: [] });
-        return ok(null);
-      });
-      return fetchSpDashboardLive();
-    };
-    const card = (metrics: ServiceProviderDashboardMetric[]) => metrics.find((m) => m.key === "average_rating")!;
-
-    it("shows the real average and how many reviews it comes from", async () => {
-      const { metrics, record } = await dashboard({ averageRating: 4.7, totalCount: 12 });
-
-      expect(card(metrics)).toMatchObject({ valueLabel: "4.7", sublabel: "From 12 reviews", tone: "gold" });
-      expect(record.metrics.averageRating).toBe(4.7);
-    });
-
-    it("says '1 review' for a single review", async () => {
-      const { metrics } = await dashboard({ averageRating: 5, totalCount: 1 });
-
-      expect(card(metrics).sublabel).toBe("From 1 review");
-    });
-
-    it("shows no rating, not a made-up 5.0, when there are no reviews yet", async () => {
-      const { metrics, record } = await dashboard({ averageRating: null, totalCount: 0 });
-
-      expect(card(metrics)).toMatchObject({ valueLabel: "—", sublabel: "No reviews yet", tone: "neutral" });
-      expect(JSON.stringify(metrics)).not.toContain("5-star");
-      expect(record.metrics.averageRating).toBeNull();
-    });
-
-    it("says so when the ratings can't be loaded, and still loads the rest of the dashboard", async () => {
-      const { metrics } = await dashboard("fail");
-
-      expect(card(metrics)).toMatchObject({ valueLabel: "—", sublabel: "Ratings unavailable" });
-      expect(metrics.find((m) => m.key === "active_services")).toBeTruthy();
-    });
-  });
-
-  describe("booking counts, as the backend really sends them", () => {
-    it("reads the status list into the dashboard's counts, grouped as customers see them", () => {
-      expect(
-        statusCountsOf([
-          { status: "PENDING", count: 2 },
-          { status: "CONFIRMED", count: 3 },
-          { status: "ACCEPTED", count: 1 },
-          { status: "IN_PROGRESS", count: 1 },
-          { status: "COMPLETED", count: 18 },
-          { status: "DISPUTED", count: 1 },
-          { status: "CANCELLED", count: 2 },
-          { status: "EXPIRED", count: 1 },
-          { status: "REJECTED", count: 4 },
-        ])
-      ).toEqual({ pending: 2, accepted: 4, in_progress: 1, completed: 19, cancelled: 3, rejected: 4 });
-    });
-
-    it("ignores rows it can't read, and accepts lower-case statuses", () => {
-      expect(statusCountsOf([{ status: "completed", count: 5 }, { status: "MYSTERY", count: 9 }, { status: "PENDING", count: "x" }, null])).toEqual({
-        completed: 5,
-      });
-    });
-
-    it("passes an already-keyed object through, and treats anything else as no bookings", () => {
-      expect(statusCountsOf({ pending: 2 })).toEqual({ pending: 2 });
-      expect(statusCountsOf(null)).toEqual({});
-      expect(statusCountsOf(undefined)).toEqual({});
-      expect(statusCountsOf([])).toEqual({});
-    });
-
-    it("unwraps the overview the backend nests as { overview: {...} }, and leaves a flat one alone", () => {
-      expect(overviewOf({ overview: { totalBookings: 27 } })?.totalBookings).toBe(27);
-      expect(overviewOf({ totalBookings: 27 })?.totalBookings).toBe(27);
-      expect(overviewOf(null)).toBeUndefined();
-    });
-
-    it("shows the real totals on the dashboard instead of zeros", async () => {
-      getMock.mockImplementation((url: string) => {
-        const ok = (data: unknown) => Promise.resolve({ data, error: null });
-        if (url.includes("/service-provider/profile/me")) return ok(mockProfile);
-        if (url.includes("/service-provider/services/me")) return ok(mockServices);
-        if (url.includes("/service-provider/availability/me")) return ok(mockSlots);
-        if (url.includes("/analytics/service-provider/bookings/status")) {
-          return ok([
-            { status: "PENDING", count: 2 },
-            { status: "CONFIRMED", count: 5 },
-            { status: "IN_PROGRESS", count: 1 },
-            { status: "COMPLETED", count: 18 },
-            { status: "CANCELLED", count: 1 },
-          ]);
-        }
-        if (url.includes("/analytics/service-provider")) {
-          return ok({ overview: { totalServices: 1, totalBookings: 27, completedBookings: 18, cancelledBookings: 1, rejectedBookings: 0, acceptanceRate: 96 } });
-        }
-        if (url.includes("/bookings/provider?")) return ok({ items: [] });
-        return ok(null);
-      });
-
-      const { metrics } = await fetchSpDashboardLive();
-      const label = (key: string) => metrics.find((m) => m.key === key)?.valueLabel;
-      const sublabel = (key: string) => metrics.find((m) => m.key === key)?.sublabel;
-
-      expect(label("total_bookings")).toBe("27");
-      expect(label("upcoming_bookings")).toBe("5");
-      expect(sublabel("upcoming_bookings")).toBe("2 awaiting confirmation");
-      expect(label("in_progress_bookings")).toBe("1");
-      expect(sublabel("in_progress_bookings")).toBe("18 completed · 1 cancelled");
-    });
-  });
-
   describe("fetchSpProfileRecordLive & updateSpProfileLive", () => {
     it("fetches profile record and maps fields", async () => {
       getMock.mockImplementation((url: string) => {
@@ -387,6 +138,17 @@ describe("service-provider-dashboard.api (live API implementation)", () => {
       expect(services[0].id).toBe("srv-1");
       expect(services[0].price).toBe(5000);
       expect(services[0].locationType).toBe("customer_location");
+    });
+
+    it("fails loudly when the services cannot be loaded, instead of showing none", async () => {
+      getMock.mockResolvedValue({ data: null, error: new Error("down") });
+      await expect(fetchSpServicesLive()).rejects.toThrow("down");
+    });
+
+    it("keeps an hourly service hourly, and a negotiable one negotiable, both ways", () => {
+      const hourly = mapBackendService({ ...mockServices[0], pricingModel: "HOURLY" });
+      expect(hourly.pricingModel).toBe("hourly");
+      expect(mapBackendService({ ...mockServices[0], pricingModel: "NEGOTIABLE" }).pricingModel).toBe("quote");
     });
 
     it("creates a new service via POST /service-provider/services", async () => {
@@ -463,6 +225,21 @@ describe("service-provider-dashboard.api (live API implementation)", () => {
 
         await updateSpDashboardServiceLive("srv-3", { price: 6000 });
         expect(patchMock.mock.calls[2][1]).not.toHaveProperty("coverMediaId");
+      });
+
+      it("uses the slug the form kept, so a retry sends the same one, and reports the failure status", async () => {
+        postMock.mockResolvedValue({ data: null, error: { message: "That link is taken.", status: 409 } });
+        const first = await addSpDashboardServiceLive({ ...base, slug: "room-cleaning-ab12" });
+        await addSpDashboardServiceLive({ ...base, slug: "room-cleaning-ab12" });
+        expect(first).toMatchObject({ ok: false, status: 409 });
+        const slugs = postMock.mock.calls.slice(-2).map(([, body]) => (body as { slug: string }).slug);
+        expect(slugs).toEqual(["room-cleaning-ab12", "room-cleaning-ab12"]);
+      });
+
+      it("saves an hourly service as hourly, not as a flat or negotiable price", async () => {
+        patchMock.mockResolvedValue({ data: created, error: null });
+        await updateSpDashboardServiceLive("srv-3", { pricingModel: "hourly", price: 3000 });
+        expect(patchMock.mock.calls.at(-1)?.[1]).toMatchObject({ pricingModel: "HOURLY", basePrice: 3000 });
       });
 
       it("sends the chosen status when creating, so a new service doesn't silently become a draft", async () => {
@@ -577,52 +354,68 @@ describe("service-provider-dashboard.api (live API implementation)", () => {
     });
   });
 
-  describe("profile completion: service photos", () => {
-    const svc = (over: Record<string, unknown>) => ({ id: "s1", name: "Braiding", status: "active", images: [], ...over });
-    const record = (services: unknown[]) =>
-      ({
-        profile: { displayName: "Chi", bio: "Braids" },
-        services,
-        availability: { days: [{ isAvailable: true }] },
-        verification: { status: "approved" },
-      }) as never;
-
-    it("asks for a photo on a live service that has none, linking straight to it", () => {
-      const done = computeProfileCompletionFromLive(record([svc({ images: ["https://x/1.jpg"] })]));
-      const nudged = computeProfileCompletionFromLive(record([svc({})]));
-
-      expect(done.missing.some((m) => m.key === "service_photos")).toBe(false);
-      const item = nudged.missing.find((m) => m.key === "service_photos");
-      expect(item?.href).toBe("/service-provider/services/s1/edit");
-      expect(item?.description).toContain("Braiding");
-      expect(nudged.percentage).toBe(done.percentage - 5);
+  describe("weekly hours and booking settings", () => {
+    it("lists every saved window, not a made-up week, and fails loudly when it cannot load", async () => {
+      getMock.mockResolvedValue({
+        data: [
+          { id: "a", providerId: "p", dayOfWeek: 3, startTime: "09:00:00", endTime: "12:00:00", isActive: true, createdAt: "" },
+          { id: "b", providerId: "p", dayOfWeek: 3, startTime: "14:00:00", endTime: "18:00:00", isActive: true, createdAt: "" },
+        ],
+        error: null,
+      });
+      expect(await fetchSpHours()).toEqual([
+        { id: "a", dayOfWeek: 3, startTime: "09:00", endTime: "12:00" },
+        { id: "b", dayOfWeek: 3, startTime: "14:00", endTime: "18:00" },
+      ]);
+      getMock.mockResolvedValue({ data: null, error: new Error("down") });
+      await expect(fetchSpHours()).rejects.toThrow("down");
     });
 
-    it("points to the services list when several need a photo", () => {
-      const result = computeProfileCompletionFromLive(record([svc({}), svc({ id: "s2", name: "Wigs" })]));
-
-      const item = result.missing.find((m) => m.key === "service_photos");
-      expect(item?.href).toBe("/service-provider/services");
-      expect(item?.description).toContain("2 of your services");
+    it("adds a window as active, closes one by switching it off, and reports the refusal", async () => {
+      postMock.mockResolvedValue({ data: {}, error: null });
+      patchMock.mockResolvedValue({ data: {}, error: null });
+      expect(await addSpHours({ dayOfWeek: 1, startTime: "09:00", endTime: "17:00" })).toEqual({ ok: true });
+      expect(postMock.mock.calls.at(-1)).toEqual(["/service-provider/availability", { dayOfWeek: 1, startTime: "09:00", endTime: "17:00", isActive: true }]);
+      await removeSpHours("a");
+      expect(patchMock.mock.calls.at(-1)).toEqual(["/service-provider/availability/a", { isActive: false }]);
+      postMock.mockResolvedValue({ data: null, error: { message: "That overlaps your 09:00 to 12:00 hours.", status: 409 } });
+      expect(await addSpHours({ dayOfWeek: 1, startTime: "10:00", endTime: "11:00" })).toEqual({
+        ok: false,
+        error: "That overlaps your 09:00 to 12:00 hours.",
+        status: 409,
+      });
     });
 
-    it("ignores drafts and inactive services, which customers can't see anyway", () => {
-      const result = computeProfileCompletionFromLive(
-        record([svc({ images: ["https://x/1.jpg"] }), svc({ id: "s2", status: "draft" }), svc({ id: "s3", status: "inactive" })])
-      );
-
-      expect(result.missing.some((m) => m.key === "service_photos")).toBe(false);
+    it("reads the profile page's details, including the city customers see, in one request", async () => {
+      getMock.mockResolvedValue({
+        data: {
+          slug: "fixit", displayName: "FixIt", bio: null, yearsOfExperience: 5, locationCity: "Lagos", logoUrl: null, coverImageUrl: "c.jpg",
+          verificationStatus: "VERIFIED", primaryCampusId: null, additionalCampusIds: null,
+        },
+        error: null,
+      });
+      expect(await fetchSpProfileDetails()).toEqual({
+        slug: "fixit", displayName: "FixIt", bio: "", yearsOfExperience: 5, locationCity: "Lagos", logoUrl: null, coverImageUrl: "c.jpg",
+        verification: "approved", verificationStatus: "VERIFIED", primaryCampusId: "", additionalCampusIds: [],
+      });
+      expect(getMock).toHaveBeenCalledTimes(1);
+      getMock.mockResolvedValue({ data: null, error: new Error("down") });
+      await expect(fetchSpProfileDetails()).rejects.toThrow("down");
     });
 
-    it("never goes below zero", () => {
-      const result = computeProfileCompletionFromLive({
-        profile: {},
-        services: [svc({})],
-        availability: { days: [] },
-        verification: { status: "pending" },
-      } as never);
-
-      expect(result.percentage).toBeGreaterThanOrEqual(0);
+    it("reads how bookings are taken from the profile", async () => {
+      getMock.mockResolvedValue({
+        data: { bookingPreference: "INSTANT", minAdvanceNoticeHours: 6, maxAdvanceBookingDays: 60, bufferMinutes: 10, primaryCampusId: "c1", additionalCampusIds: ["c2"] },
+        error: null,
+      });
+      expect(await fetchSpBookingSettings()).toEqual({
+        bookingPreference: "INSTANT",
+        minAdvanceNoticeHours: 6,
+        maxAdvanceBookingDays: 60,
+        bufferMinutes: 10,
+        primaryCampusId: "c1",
+        additionalCampusIds: ["c2"],
+      });
     });
   });
 
@@ -642,7 +435,7 @@ describe("service-provider-dashboard.api (live API implementation)", () => {
                 { stars: 1, count: 0 },
               ],
               recent: [
-                { id: "rev-1", rating: 5, comment: "Great work!", authorName: "Emeka O.", serviceName: "Socket Replacement", createdAt: "2026-09-20T00:00:00Z" },
+                { id: "rev-1", rating: 5, title: "Quick and neat", comment: "Great work!", authorName: "Emeka O.", serviceName: "Socket Replacement", createdAt: "2026-09-20T00:00:00Z" },
                 { id: "rev-2", rating: 4, comment: "Good job", authorName: "Ada N.", serviceName: "Socket Replacement", createdAt: "2026-09-21T00:00:00Z" },
               ],
             },
@@ -657,7 +450,7 @@ describe("service-provider-dashboard.api (live API implementation)", () => {
       expect(summary.averageRating).toBe(4.5);
       expect(summary.distribution.find((d) => d.stars === 5)?.count).toBe(1);
       expect(summary.recent).toHaveLength(2);
-      expect(summary.recent[0]).toMatchObject({ authorName: "Emeka O.", visible: true });
+      expect(summary.recent[0]).toMatchObject({ authorName: "Emeka O.", title: "Quick and neat" });
     });
 
     it("has no rating, not a made-up five stars, before the first review", async () => {

@@ -265,7 +265,7 @@ export function CustomerBookingDetailView({ bookingId }: { bookingId: string }) 
           </div>
 
           <aside className="space-y-3 lg:sticky lg:top-6 lg:self-start">
-            <SettlementPanel booking={booking} payout={false} />
+            <SettlementPanel booking={booking} viewer="customer" />
 
             {ready.requiresProviderApproval && (
               <p className="flex items-start gap-2 rounded-xl border border-warning-200 bg-warning-50 p-3.5 text-xs text-warning-800">

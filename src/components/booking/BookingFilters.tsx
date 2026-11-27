@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { fetchCustomerBookings, fetchProviderBookings } from "@/services/booking";
+import { defaultSort } from "@/lib/my-bookings-list";
 import type { BookingListQuery, BookingSort } from "@/types/booking";
 
 const SORT_OPTIONS: { value: BookingSort; label: string }[] = [
@@ -47,7 +48,7 @@ export function BookingFilters({
     !!query.serviceId ||
     !!query.dateFrom ||
     !!query.dateTo ||
-    (query.sort && query.sort !== "newest");
+    !!query.sort;
 
   return (
     <div className="space-y-2 rounded-xl border border-neutral-200 bg-white p-3">
@@ -104,7 +105,7 @@ export function BookingFilters({
         <label className="block">
           <span className="sr-only">Sort</span>
           <select
-            value={query.sort ?? "newest"}
+            value={query.sort ?? defaultSort(query.status)}
             onChange={(e) => onChange({ sort: e.target.value as BookingSort })}
             className="w-full rounded-lg border border-neutral-200 py-2 pl-2 pr-2 text-xs focus:border-primary-400 focus:outline-none"
           >

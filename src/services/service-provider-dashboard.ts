@@ -100,7 +100,6 @@ export async function getServiceProviderDashboardAccessApi(): Promise<ServicePro
 
 // ── Live Backend API exports ─────────────────────────────────
 export {
-  fetchSpDashboardLive,
   fetchSpProfileRecordLive,
   updateSpProfileLive,
   fetchSpServicesLive,
@@ -109,7 +108,13 @@ export {
   setSpDashboardServiceStatusLive,
   fetchSpAvailabilityLive,
   updateSpAvailabilityLive,
+  fetchSpHours,
+  addSpHours,
+  updateSpHours,
+  removeSpHours,
+  fetchSpBookingSettings,
+  fetchSpProfileDetails,
   fetchSpReviewsSummaryLive,
   buildDashboardRecordFromLive,
-  computeProfileCompletionFromLive,
 } from "./service-provider-dashboard.api";
+export type { SpBookingSettings, SpProfileDetails } from "./service-provider-dashboard.api";

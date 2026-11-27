@@ -54,7 +54,7 @@ describe("ArticleCard", () => {
   });
 
   it("uses a decorative empty alt for the cover so screen readers do not read the title twice", () => {
-    const { container } = render(<ArticleCard article={article({ coverImage: "https://res.cloudinary.com/x/c.jpg" })} />);
+    const { container } = render(<ArticleCard article={article({ coverImage: "https://cdn.kampmax.com/x/c.jpg" })} />);
     expect(container.querySelector("img")?.getAttribute("alt")).toBe("");
   });
 

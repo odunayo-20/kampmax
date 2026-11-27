@@ -4,12 +4,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { dashboardAccessKeys, serviceProviderDashboardKeys } from "@/lib/query-keys";
 import {
-  computeProfileCompletionFromLive,
-  fetchSpDashboardLive,
   fetchSpReviewsSummaryLive,
   getServiceProviderDashboardAccessApi,
 } from "@/services/service-provider-dashboard";
-import { useDashboardAccess, usePrefetchDashboardQueries } from "./use-dashboard-access";
+import { useDashboardAccess } from "./use-dashboard-access";
 
 /** Backend-authoritative dashboard access (GET /service-provider/profile/me). */
 export function useServiceProviderAccess({ enabled = true }: { enabled?: boolean } = {}) {
@@ -19,17 +17,6 @@ export function useServiceProviderAccess({ enabled = true }: { enabled?: boolean
     revalidateKey: dashboardAccessKeys.serviceProviderAll,
     queryFn: getServiceProviderDashboardAccessApi,
     enabled,
-  });
-}
-
-/** Overview (profile record, metrics, activity) plus the profile completion derived from it. */
-export function useServiceProviderDashboard() {
-  const { status, user } = useAuth();
-  return useQuery({
-    queryKey: serviceProviderDashboardKeys.overview(user?.id),
-    queryFn: fetchSpDashboardLive,
-    enabled: status === "authenticated",
-    select: (live) => ({ ...live, completion: computeProfileCompletionFromLive(live.record) }),
   });
 }
 
@@ -45,14 +32,4 @@ export function useServiceProviderReviewsSummary() {
     enabled: status === "authenticated",
     retry: false,
   });
-}
-
-const serviceProviderOverviewQueries = (userId: string | undefined) => [
-  { queryKey: serviceProviderDashboardKeys.overview(userId), queryFn: fetchSpDashboardLive },
-  { queryKey: serviceProviderDashboardKeys.reviewsSummary(userId), queryFn: fetchSpReviewsSummaryLive },
-];
-
-/** Warms the overview while the access check runs. */
-export function usePrefetchServiceProviderDashboard({ enabled }: { enabled: boolean }) {
-  usePrefetchDashboardQueries({ enabled, queries: serviceProviderOverviewQueries });
 }

@@ -18,7 +18,8 @@ import type {
   ServiceProblemCategory,
 } from "@/types/booking";
 import { BOOKING_STATUS_SHORT_LABELS } from "@/types/booking";
-import { MY_BOOKING_TABS, type MyBookingTab } from "@/lib/my-bookings-list";
+import { defaultSort, MY_BOOKING_TABS, type MyBookingTab } from "@/lib/my-bookings-list";
+import type { ProviderMoney } from "@/lib/provider-hub";
 import type { ServiceProviderLocationType } from "@/types/service-provider";
 
 // Bookings, straight from the backend (/bookings). Every price, slot, status
@@ -196,7 +197,7 @@ async function fetchPage(path: string, q: BookingListQuery): Promise<BookingPage
       serviceId: q.serviceId,
       dateFrom: q.dateFrom,
       dateTo: q.dateTo,
-      sort: q.sort,
+      sort: q.sort ?? defaultSort(q.status),
       page: q.page ?? 1,
       limit: q.limit ?? BOOKING_LIST_PAGE_SIZE,
     })}`
@@ -240,6 +241,8 @@ export interface ProviderBookingSummary {
   inProgress: number;
   completed: number;
   cancelled: number;
+  /** What is held for the provider, and what they have earned, in whole naira. */
+  money?: ProviderMoney;
 }
 
 export async function fetchProviderBookingSummary(): Promise<ProviderBookingSummary> {

@@ -96,7 +96,7 @@ export function BookingListCard({
           <p className="text-sm font-bold text-neutral-900">{priceLabel}</p>
           {needsAction && highlightsPending && (
             <p className="mt-0.5 text-[11px] font-semibold text-warning-600">
-              Awaiting confirmation
+              Needs your answer
             </p>
           )}
           <span className="mt-1.5 inline-flex items-center gap-0.5 text-[11px] font-semibold text-primary-600">
