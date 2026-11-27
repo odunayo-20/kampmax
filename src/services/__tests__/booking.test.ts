@@ -126,7 +126,7 @@ describe("booking reads", () => {
   it("counts every tab from the server", async () => {
     get.mockImplementation(() => ok({ items: [], meta: { total: 4, page: 1, limit: 1, totalPages: 4 } }));
     const counts = await fetchCustomerBookingCounts();
-    expect(counts).toEqual({ upcoming: 4, in_progress: 4, completed: 4, past: 4, cancelled: 4, all: 4 });
+    expect(counts).toEqual({ upcoming: 4, pending: 4, in_progress: 4, completed: 4, cancelled: 4, all: 4 });
   });
 });
 

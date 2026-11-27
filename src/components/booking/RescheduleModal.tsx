@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { X, AlertCircle, RefreshCcw, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { describeRescheduleError, rescheduleNote } from "@/lib/my-bookings-list";
 import { fetchBookingAvailability, rescheduleBooking } from "@/services/booking";
 import { BookingDayPicker } from "./BookingDayPicker";
 import { BookingTimeSlotGrid } from "./BookingTimeSlotGrid";
-import type { BookingError, BookingSlot, ServiceBooking } from "@/types/booking";
+import type { BookingSlot, ServiceBooking } from "@/types/booking";
 
 export function RescheduleModal({
   booking,
@@ -18,14 +19,16 @@ export function RescheduleModal({
   onClose: () => void;
   onComplete: (updated: ServiceBooking) => void;
 }) {
-  const [refreshKey, setRefreshKey] = useState(0);
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedSlot, setSelectedSlot] = useState<BookingSlot | null>(null);
-  const [error, setError] = useState<BookingError | null>(null);
+  const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  // One key per chosen time: a retry of the same move is safe, a different time is a new move.
+  const keyRef = useRef<{ startAt: string; key: string } | null>(null);
+  const note = rescheduleNote(booking.bookingPreference);
 
   const availabilityQuery = useQuery({
-    queryKey: ["booking-availability", booking.serviceId, refreshKey],
+    queryKey: ["booking-availability", booking.serviceId],
     queryFn: () => fetchBookingAvailability(booking.serviceId),
     retry: false,
     staleTime: 0,
@@ -53,23 +56,23 @@ export function RescheduleModal({
   async function submit() {
     if (!selectedSlot || busy) return;
     setBusy(true);
-    setError(null);
-    const result = await rescheduleBooking({
-      id: booking.id,
-      startAt: selectedSlot.startAt,
-      idempotencyKey: `bk_resched_${Date.now()}_${Math.floor(Math.random() * 1e9)}`,
-    });
+    setError("");
+    const startAt = selectedSlot.startAt;
+    if (keyRef.current?.startAt !== startAt) {
+      keyRef.current = { startAt, key: `bk_resched_${Date.now()}_${Math.floor(Math.random() * 1e9)}` };
+    }
+    const result = await rescheduleBooking({ id: booking.id, startAt, idempotencyKey: keyRef.current.key });
     setBusy(false);
     if (result.ok) {
       onComplete(result.booking);
       return;
     }
-    if (result.error.code === "409") {
-      setError(result.error);
-      setRefreshKey((k) => k + 1); // re-fetch availability so the taken slot greys out
-      return;
+    const failure = describeRescheduleError(result.error.code, result.error.message);
+    setError(failure.message);
+    if (failure.kind === "taken") {
+      setSelectedSlot(null);
+      void availabilityQuery.refetch(); // the taken time greys out
     }
-    setError(result.error);
   }
 
   return (
@@ -102,15 +105,22 @@ export function RescheduleModal({
               <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> Loading available times…
             </p>
           ) : !availability ? (
-            <p role="alert" className="text-xs text-neutral-500">
-              {availabilityQuery.error instanceof Error
-                ? availabilityQuery.error.message
-                : "This service can no longer be booked online. Use the provider chat instead."}
-            </p>
+            <div role="alert" className="text-xs text-neutral-500">
+              {availabilityQuery.isError ? (
+                <>
+                  Couldn&apos;t load the free times. Check your connection.{" "}
+                  <button type="button" onClick={() => void availabilityQuery.refetch()} className="font-semibold text-primary-600 hover:underline">
+                    Try again
+                  </button>
+                </>
+              ) : (
+                "This service can no longer be booked online. Message the provider instead."
+              )}
+            </div>
           ) : (
             <>
               <p className="text-xs text-neutral-600">
-                Pick a new time. Your current slot is held until you confirm a new one.
+                Pick a new time. Your current time stays booked until the move goes through. {note}
               </p>
 
               {error && (
@@ -119,14 +129,7 @@ export function RescheduleModal({
                   className="mt-3 flex items-start gap-2 rounded-lg border border-error-200 bg-error-50 p-2.5 text-xs text-error-700"
                 >
                   <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-                  <span>
-                    {error.message}
-                    {error.suggestedSlots && error.suggestedSlots.length > 0 && (
-                      <span className="mt-1 block text-[11px] text-error-600">
-                        Try: {error.suggestedSlots.join(", ")}
-                      </span>
-                    )}
-                  </span>
+                  <span>{error}</span>
                 </p>
               )}
 

@@ -19,7 +19,7 @@ import {
   Wallet,
   XCircle,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatNaira } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import {
   formatBookingDate,
@@ -288,11 +288,7 @@ export function ServiceProviderBookingDetailView({ bookingId }: { bookingId: str
             </h2>
             <p className="mt-2 text-sm font-bold text-kampmax-text">
               <Wallet className="mr-1.5 inline h-4 w-4 text-primary-600" aria-hidden />
-              {booking.price.model === "fixed"
-                ? "₦" + booking.price.amount.toLocaleString("en-NG")
-                : booking.price.model === "range"
-                  ? "₦" + booking.price.amount.toLocaleString("en-NG") + "–" + booking.price.amountMax?.toLocaleString("en-NG")
-                  : "From ₦" + booking.price.amount.toLocaleString("en-NG")}
+              {formatNaira(booking.price.amount)}
             </p>
             <p className="mt-1 text-xs text-kampmax-text-muted">{booking.price.note}</p>
             <div className="mt-3">

@@ -385,8 +385,6 @@ export interface BookingError {
   field?: string;
   /** True when the caller may retry (e.g. pick a new slot after 409). */
   recoverable?: boolean;
-  /** Suggest nearby free slots after a 409. */
-  suggestedSlots?: string[];
 }
 
 export type BookingResult =

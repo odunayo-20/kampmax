@@ -4,12 +4,11 @@ import { BadgeDollarSign, ShieldCheck, Wallet } from "lucide-react";
 import type { ServiceBooking } from "@/types/booking";
 
 /**
- * Where the money is, and what the provider receives. A backend projection:
- * this panel only shows it.
+ * Where the money is and, for the provider, what they receive. A backend projection: this panel only shows it.
  */
-export function SettlementPanel({ booking }: { booking: ServiceBooking }) {
+export function SettlementPanel({ booking, payout = true }: { booking: ServiceBooking; payout?: boolean }) {
   const f = booking.fulfillment;
-  const s = f.settlement;
+  const s = payout ? f.settlement : undefined;
 
   return (
     <div className="space-y-3">

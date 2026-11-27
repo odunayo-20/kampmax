@@ -41,7 +41,7 @@ export function CompletionCard({
             onClick={onConfirm}
             className="inline-flex items-center gap-1.5 rounded-lg bg-success-600 px-3 py-2 text-xs font-bold text-white hover:bg-success-700"
           >
-            <ThumbsUp className="h-3.5 w-3.5" aria-hidden /> It&apos;s done, confirm
+            <ThumbsUp className="h-3.5 w-3.5" aria-hidden /> Confirm it was done
           </button>
           <button
             onClick={onReport}
@@ -61,8 +61,8 @@ export function CompletionCard({
           <AlertTriangle className="h-3.5 w-3.5" aria-hidden /> Issue reported
         </p>
         <p className="mt-1 text-xs leading-relaxed text-error-700">
-          {f.problem?.description ?? "Your issue was reported."} It&apos;s been handed to Kampmax
-          support for review — you&apos;ll be updated here and in your notifications.
+          {f.problem?.description ?? "Your issue was reported."} Kampmax support is looking into it. The payment
+          stays on hold until then.
         </p>
       </div>
     );
@@ -83,15 +83,16 @@ export function CompletionCard({
           <BadgeCheck className="h-3.5 w-3.5" aria-hidden /> {confirmedLabel}
         </p>
         {f.review ? (
-          <p className="mt-1.5 text-xs text-neutral-600">
-            You rated this booking {f.review.rating}/5{f.review.title ? ` — “${f.review.title}”` : ""}.
-            Thanks for sharing your experience.
-          </p>
+          <div className="mt-1.5 text-xs text-neutral-600">
+            <p>
+              Your review: {f.review.rating} of 5{f.review.title ? ` · ${f.review.title}` : ""}
+            </p>
+            {f.review.body && <p className="mt-1">{f.review.body}</p>}
+          </div>
         ) : canReview ? (
           <>
             <p className="mt-1 text-xs leading-relaxed text-success-800">
-              Thanks for confirming. Your review window is open — rate {booking.serviceName}
-              while it&apos;s fresh.
+              You can now review {booking.serviceName}.
             </p>
             <button
               onClick={onReview}
@@ -102,7 +103,7 @@ export function CompletionCard({
           </>
         ) : (
           <p className="mt-1 text-xs text-neutral-500">
-            The review window for this booking has closed.
+            The time to review this booking has passed.
           </p>
         )}
       </div>

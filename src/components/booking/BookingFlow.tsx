@@ -712,16 +712,6 @@ export function BookingFlow({ serviceId }: { serviceId: string }) {
                   <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
                   {error.message}
                 </p>
-                {error.suggestedSlots && error.suggestedSlots.length > 0 && (
-                  <ul className="mt-2 space-y-1 text-[11px]">
-                    {error.suggestedSlots.map((s) => (
-                      <li key={s} className="flex items-center gap-1.5">
-                        <span className="h-1 w-1 rounded-full bg-warning-500" aria-hidden />
-                        {s}
-                      </li>
-                    ))}
-                  </ul>
-                )}
                 <button
                   type="button"
                   onClick={goToSchedule}
