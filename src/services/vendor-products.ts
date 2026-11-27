@@ -191,6 +191,8 @@ function vendorFieldsPayload(input: VendorFieldsInput, basePrice: number | undef
                   // No stock entered means unlimited (-1), not out of stock.
                   stockQuantity: o.stock ?? -1,
                   sku: null,
+                  // Shown on the cart and order line when this option is chosen.
+                  image: o.image || null,
                 })),
             }))
             .filter((g) => g.name && g.options.length > 0)

@@ -115,7 +115,12 @@ export default function VendorProductsPage({ params }: { params: Promise<{}> }) 
     });
 
   const rowActions = {
-    onPublish: (p: Product) => runAction(() => publish.mutateAsync({ id: p.id, status: "active" })),
+    // The menu shows Publish for drafts and Unpublish for live products. Unpublish
+    // goes to "inactive", which is stored as a draft on the backend.
+    onTogglePublish: (p: Product) =>
+      runAction(() =>
+        publish.mutateAsync({ id: p.id, status: p.publishedStatus === "active" ? "inactive" : "active" })
+      ),
     onArchive: (p: Product) => runAction(() => archive.mutateAsync(p)),
     onRestore: (p: Product) => runAction(() => restore.mutateAsync(p)),
     onDelete: (p: Product) => runAction(() => remove.mutateAsync(p)),

@@ -7,6 +7,8 @@ export type VariantOption = {
   available: boolean;
   priceModifier?: number;
   stock?: number;
+  /** Photo of this option (e.g. the Navy Blue shirt). */
+  image?: string;
 };
 
 export type VariantGroup = {
@@ -37,8 +39,27 @@ export function getVariantGroups(product: Pick<Product, "variantGroups">): Varia
         available: o.available !== false,
         priceModifier: o.priceModifier,
         stock: o.stock,
+        image: o.image || undefined,
       })),
     }));
+}
+
+/** Every option photo, in group order, without repeats. */
+export function getOptionImages(variantGroups: VariantGroup[]): string[] {
+  const all = variantGroups.flatMap((g) => g.options.flatMap((o) => (o.image ? [o.image] : [])));
+  return [...new Set(all)];
+}
+
+/** The photo of the chosen option, if any chosen option has one. */
+export function getSelectedOptionImage(
+  variantGroups: VariantGroup[],
+  selectedVariants: Record<string, string>
+): string | undefined {
+  for (const g of variantGroups) {
+    const image = g.options.find((o) => o.id === selectedVariants[g.id])?.image;
+    if (image) return image;
+  }
+  return undefined;
 }
 
 /**

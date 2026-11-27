@@ -1,5 +1,6 @@
 "use client";
 
+import { getRefusalMessage } from "@/lib/error-messages";
 import { DetailPageSkeleton } from "@/components/ui/Skeleton";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -18,6 +19,8 @@ import type { Opportunity, Proposal } from "@/types/opportunity";
 import { PROPOSAL_STATUS } from "@/types/opportunity";
 import { PROPOSAL_STATUS_META } from "@/config/opportunity";
 import { formatNaira, formatDate } from "@/lib/utils";
+import { formatFileSize, isSafeExternalUrl } from "@/lib/contract-utils";
+import Link from "next/link";
 import { ProposalStatusBadge } from "@/components/freelancer/opportunities/StatusBadges";
 import { ProposalTimeline } from "@/components/freelancer/proposals";
 import { ServiceConfirmDialog } from "@/components/freelancer/services/ServiceConfirmDialog";
@@ -33,6 +36,7 @@ export default function ProposalDetailPage() {
   const [remoteJob, setRemoteJob] = useState<Opportunity | null>(null);
   const [loading, setLoading] = useState(backend);
   const [showWithdraw, setShowWithdraw] = useState(false);
+  const [showDiscard, setShowDiscard] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,18 +85,19 @@ export default function ProposalDetailPage() {
       setShowWithdraw(false);
       setProposal(res.proposal);
     } else {
-      setError(res.error?.message ?? "We couldn't withdraw your proposal.");
+      setError(res.error ? getRefusalMessage(res.error) : "We couldn't withdraw your proposal.");
     }
   }
 
   async function discardDraft() {
-    if (busy || !window.confirm("Discard this draft? This can't be undone.")) return;
+    if (busy) return;
     setBusy(true);
     setError(null);
     const { error: discardError } = await discardProposalDraftApi(proposalId);
     setBusy(false);
     if (discardError) {
-      setError(discardError.message ?? "We couldn't discard your draft.");
+      setShowDiscard(false);
+      setError(getRefusalMessage(discardError));
       return;
     }
     router.push("/freelancer/proposals");
@@ -114,7 +119,7 @@ export default function ProposalDetailPage() {
         </p>
         <div className="mt-5">
           <Button variant="outline" onClick={() => router.push("/freelancer/proposals")}>
-            Back to My Proposals
+            Back to my proposals
           </Button>
         </div>
       </div>
@@ -132,12 +137,12 @@ export default function ProposalDetailPage() {
           onClick={() => router.push("/freelancer/proposals")}
           className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-500 hover:text-neutral-900"
         >
-          <ArrowLeft className="h-4 w-4" aria-hidden /> Back to My Proposals
+          <ArrowLeft className="h-4 w-4" aria-hidden /> Back to my proposals
         </button>
         <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold text-neutral-900">
-              {job?.title ?? proposal.jobTitle ?? "Opportunity"}
+              {job?.title || proposal.jobTitle || "Your proposal"}
             </h1>
             {job && (
               <p className="mt-0.5 text-sm text-neutral-500">
@@ -152,6 +157,13 @@ export default function ProposalDetailPage() {
       {error && (
         <div role="alert" className="rounded-lg border border-error-100 bg-error-50 p-3 text-sm text-error-700">
           {error}
+        </div>
+      )}
+
+      {p.status === PROPOSAL_STATUS.ACCEPTED && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-success-100 bg-success-50 p-4 text-sm text-success-700">
+          <span>You got the job. Your contract is where the work and payments happen.</span>
+          <Link href="/freelancer/contracts" className="font-semibold underline">Open my contracts</Link>
         </div>
       )}
 
@@ -203,6 +215,24 @@ export default function ProposalDetailPage() {
             </dl>
           </section>
 
+          {(p.milestones?.length ?? 0) > 0 && (
+            <section className="rounded-xl border border-neutral-200 bg-white p-6">
+              <h2 className="text-sm font-semibold text-neutral-900">Payment plan</h2>
+              <p className="mt-0.5 text-xs text-neutral-500">The client pays each part as you deliver it.</p>
+              <ol className="mt-3 divide-y divide-neutral-100">
+                {p.milestones!.map((m, i) => (
+                  <li key={`${i}-${m.title}`} className="flex items-baseline justify-between gap-3 py-2 text-sm">
+                    <span className="text-neutral-800">
+                      {i + 1}. {m.title}
+                      {m.dueDate && <span className="ml-2 text-xs text-neutral-500">due {formatDate(m.dueDate)}</span>}
+                    </span>
+                    <span className="font-semibold text-neutral-900">{formatNaira(m.amount)}</span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
+
           {p.screeningAnswers.length > 0 && (
             <section className="rounded-xl border border-neutral-200 bg-white p-6">
               <h2 className="text-sm font-semibold text-neutral-900">Client questions</h2>
@@ -230,10 +260,12 @@ export default function ProposalDetailPage() {
               <ul className="mt-3 space-y-1.5">
                 {p.attachments.map((a) => (
                   <li key={a.id} className="text-sm text-neutral-700">
-                    • {a.filename}
-                    <span className="ml-2 text-xs text-neutral-400">
-                      {(a.sizeBytes / 1024 / 1024).toFixed(2)}MB
-                    </span>
+                    {a.url && isSafeExternalUrl(a.url) ? (
+                      <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-primary-700 underline">{a.filename}</a>
+                    ) : (
+                      a.filename
+                    )}
+                    <span className="ml-2 text-xs text-neutral-400">{formatFileSize(a.sizeBytes)}</span>
                   </li>
                 ))}
               </ul>
@@ -267,9 +299,9 @@ export default function ProposalDetailPage() {
                       variant="destructive"
                       size="sm"
                       disabled={busy}
-                      onClick={() => void discardDraft()}
+                      onClick={() => setShowDiscard(true)}
                     >
-                      Discard draft
+                      Delete draft
                     </Button>
                   )}
                 </>
@@ -315,6 +347,16 @@ export default function ProposalDetailPage() {
         isBusy={busy}
         onConfirm={runWithdraw}
         onCancel={() => setShowWithdraw(false)}
+      />
+      <ServiceConfirmDialog
+        open={showDiscard}
+        title="Delete this draft?"
+        description="Your unsent proposal will be deleted. This cannot be undone."
+        confirmLabel={busy ? "Deleting…" : "Delete draft"}
+        tone="destructive"
+        isBusy={busy}
+        onConfirm={() => void discardDraft()}
+        onCancel={() => setShowDiscard(false)}
       />
     </div>
   );

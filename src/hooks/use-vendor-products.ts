@@ -67,6 +67,10 @@ export function useVendorProduct(id: string) {
 export function useInvalidateProducts() {
   const queryClient = useQueryClient();
   return () => {
+    // Lists that aren't on screen are dropped, not just marked stale. Otherwise
+    // coming back to the list (e.g. after creating a product) first paints the old
+    // cached page and only swaps in the fresh one when the slow request returns.
+    queryClient.removeQueries({ queryKey: vendorProductKeys.all, type: "inactive" });
     queryClient.invalidateQueries({ queryKey: vendorProductKeys.all });
     queryClient.invalidateQueries({ queryKey: vendorDashboardKeys.all });
   };

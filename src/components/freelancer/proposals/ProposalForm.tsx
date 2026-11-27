@@ -49,6 +49,8 @@ export function ProposalForm({
   function validate(): boolean {
     const e: Record<string, string> = {};
     if (!values.coverLetter.trim()) e.coverLetter = "A cover letter is required.";
+    // The backend refuses a letter shorter than 20 characters, so say so here first.
+    else if (values.coverLetter.trim().length < 20) e.coverLetter = "Your cover letter needs at least 20 characters.";
     else if (values.coverLetter.trim().length > PROPOSAL_COVER_LETTER_MAX)
       e.coverLetter = `Cover letter must be ${PROPOSAL_COVER_LETTER_MAX} characters or fewer.`;
 
@@ -136,7 +138,7 @@ export function ProposalForm({
         <h2 className="text-sm font-semibold text-neutral-900">Price & delivery</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <Input
-            label="Proposed amount (₦, optional)"
+            label={requireAmount ? "Your price (₦)" : "Your price (₦, optional)"}
             type="number"
             min={0}
             step={500}

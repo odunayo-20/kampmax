@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, Eye, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -13,16 +13,25 @@ interface ProductGalleryProps {
   onImageClick?: () => void;
   onBack?: () => void;
   showBack?: boolean;
+  /** When this changes to one of the images, the gallery jumps to it (e.g. a chosen variant's photo). */
+  focusImage?: string;
 }
 
 // Legacy uploads stored on the local backend (http://localhost:...) aren't served
 // and aren't an allowed next/image host, so they would crash the page.
 const isLegacyLocalUrl = (src: string) => /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(src);
 
-export function ProductGallery({ images: allImages, title, hasDiscount, discountPct, onImageClick, onBack, showBack }: ProductGalleryProps) {
+export function ProductGallery({ images: allImages, title, hasDiscount, discountPct, onImageClick, onBack, showBack, focusImage }: ProductGalleryProps) {
   const images = allImages.filter((src) => !isLegacyLocalUrl(src));
   const [activeImage, setActiveImage] = useState(0);
   const [lightbox, setLightbox] = useState(false);
+
+  useEffect(() => {
+    const index = focusImage ? images.indexOf(focusImage) : -1;
+    if (index >= 0) setActiveImage(index);
+    // Only a new focusImage should move the gallery, not every re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusImage]);
 
   if (!images.length) return null;
 

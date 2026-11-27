@@ -1,5 +1,6 @@
 "use client";
 
+import { getRefusalMessage } from "@/lib/error-messages";
 import { FormPageSkeleton } from "@/components/ui/Skeleton";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -123,10 +124,10 @@ function CreateProposalContent() {
     const res = await saveProposalDraftApi(buildInput(values, true));
     setBusy(false);
     if (res.error || !res.proposal) {
-      setError(res.error?.message ?? "We couldn't save your draft.");
+      setError(res.error ? getRefusalMessage(res.error) : "We couldn't save your draft.");
       return;
     }
-    router.push("/freelancer/proposals?status=draft");
+    router.push("/freelancer/proposals?tab=drafts");
   }
 
   async function handleSubmit() {
@@ -136,7 +137,7 @@ function CreateProposalContent() {
     const res = await submitProposalApi(buildInput(values));
     setBusy(false);
     if (res.error || !res.proposal) {
-      setError(res.error?.message ?? "We couldn't submit your proposal.");
+      setError(res.error ? getRefusalMessage(res.error) : "We couldn't send your proposal.");
       return;
     }
     void queryClient.invalidateQueries({ queryKey: freelancerDashboardKeys.all });
@@ -150,7 +151,7 @@ function CreateProposalContent() {
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-success-50 text-success-600">
           <CheckCircle2 className="h-8 w-8" aria-hidden />
         </div>
-        <h1 className="mt-4 text-xl font-bold text-neutral-900">Proposal submitted!</h1>
+        <h1 className="mt-4 text-xl font-bold text-neutral-900">Proposal sent</h1>
         <p className="mt-2 text-sm text-neutral-500">
           Your proposal for <span className="font-semibold text-neutral-800">{opportunity.title}</span>{" "}
           has been sent to {opportunity.employer.name}. You&apos;ll be able to track it under My Proposals.

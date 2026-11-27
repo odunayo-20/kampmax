@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { VariantGroup, VariantOption } from "./types";
 
@@ -41,6 +42,15 @@ export function VariantSelector({ variantGroups, selectedVariants, onChange, all
                     opt.available && !selected && "bg-white border-neutral-300 text-neutral-800 hover:border-neutral-400 hover:bg-neutral-50"
                   )}
                 >
+                  {opt.image && (
+                    <Image
+                      src={opt.image}
+                      alt=""
+                      width={24}
+                      height={24}
+                      className="mr-1.5 -ml-1 inline-block h-6 w-6 rounded-full object-cover align-middle"
+                    />
+                  )}
                   {opt.label}
                   {opt.priceModifier ? (
                     <span className={cn("ml-1 text-xs", selected ? "text-white/80" : "text-neutral-500")}>

@@ -3,9 +3,8 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getMyProposalsApi } from "@/services/proposals";
-import type { ProposalStatus } from "@/types/opportunity";
-import { PROPOSAL_STATUS } from "@/types/opportunity";
-import { PROPOSAL_FILTER_TABS } from "@/config/opportunity";
+import { defaultProposalGroup, groupFromParams, PROPOSAL_GROUPS, proposalGroup, type ProposalGroup } from "@/lib/proposal-groups";
+import { getFriendlyErrorMessage } from "@/lib/error-messages";
 import {
   MyProposalsHeader,
   ProposalList,
@@ -16,7 +15,6 @@ import {
 
 import { cn } from "@/lib/utils";
 
-type StatusFilter = ProposalStatus | "all";
 
 function ProposalsContent() {
   const router = useRouter();
@@ -26,21 +24,14 @@ function ProposalsContent() {
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
 
-  const statusParam = searchParams.get("status") ?? "all";
-  const status: StatusFilter = PROPOSAL_FILTER_TABS.some(
-    (t) => t.value === statusParam
-  )
-    ? (statusParam as StatusFilter)
-    : "all";
-
-  // Everything is loaded once; the status tabs filter it here.
+  // Everything is loaded once; the groups filter it here.
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     void getMyProposalsApi({ limit: 100 }).then((response) => {
       if (cancelled) return;
       if (response.error || !response.result) {
-        setError(response.error?.message ?? "We couldn't load your proposals.");
+        setError(response.error ? getFriendlyErrorMessage(response.error) : "We couldn't load your proposals.");
         setProposals([]);
         return;
       }
@@ -49,67 +40,51 @@ function ProposalsContent() {
     }).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [attempt]);
-  const filtered = useMemo(
-    () => (status === "all" ? proposals : proposals.filter((p) => p.status === status)),
-    [proposals, status]
-  );
 
   const counts = useMemo(() => {
-    const c = {} as Record<StatusFilter, number>;
-    c.all = proposals.length;
-    for (const status of PROPOSAL_FILTER_TABS) {
-      if (status.value !== "all") {
-        c[status.value] = 0;
-      }
-    }
-    for (const p of proposals) {
-      c[p.status] = (c[p.status] ?? 0) + 1;
-    }
+    const c: Record<ProposalGroup, number> = { waiting: 0, won: 0, drafts: 0, closed: 0 };
+    for (const p of proposals) c[proposalGroup(p.status)] += 1;
     return c;
   }, [proposals]);
+  const group = groupFromParams(searchParams) ?? defaultProposalGroup(proposals.map((p) => p.status));
+  const filtered = useMemo(() => proposals.filter((p) => proposalGroup(p.status) === group), [proposals, group]);
+  const groupMeta = PROPOSAL_GROUPS.find((g) => g.id === group)!;
 
-  function handleStatusChange(value: StatusFilter) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (value !== "all") params.set("status", value);
-    else params.delete("status");
-    router.replace(`/freelancer/proposals?${params.toString()}`, { scroll: false });
+  function pick(next: ProposalGroup) {
+    router.replace(`/freelancer/proposals?tab=${next}`, { scroll: false });
   }
 
   return (
     <div className="space-y-6">
       {error && <ProposalErrorState message={error} onRetry={() => setAttempt((n) => n + 1)} />}
+
       <div className="flex flex-wrap items-start justify-between gap-3">
         <MyProposalsHeader count={proposals.length} />
       </div>
 
-      {/* Status filter tabs */}
-      <div
-        className="flex gap-1 overflow-x-auto border-b border-neutral-200"
-        role="tablist"
-        aria-label="Filter proposals by status"
-      >
-        {PROPOSAL_FILTER_TABS.map((t) => {
-          const active = status === t.value;
-          const count = counts[t.value];
+      {counts.won > 0 && group !== "won" && (
+        <button type="button" onClick={() => pick("won")} className="flex w-full items-center justify-between rounded-lg bg-success-50 px-4 py-3 text-left text-sm font-semibold text-success-700">
+          <span>{counts.won === 1 ? "An employer accepted 1 of your proposals" : `Employers accepted ${counts.won} of your proposals`}</span>
+          <span>See</span>
+        </button>
+      )}
+
+      <div className="flex gap-1 overflow-x-auto border-b border-neutral-200" role="tablist" aria-label="Show proposals">
+        {PROPOSAL_GROUPS.map((t) => {
+          const active = group === t.id;
           return (
             <button
-              key={t.value}
+              key={t.id}
               role="tab"
               aria-selected={active}
-              onClick={() => handleStatusChange(t.value)}
+              onClick={() => pick(t.id)}
               className={cn(
                 "shrink-0 border-b-2 px-3.5 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600",
-                active
-                  ? "border-primary-600 text-primary-700"
-                  : "border-transparent text-neutral-500 hover:text-neutral-900"
+                active ? "border-primary-600 text-primary-700" : "border-transparent text-neutral-500 hover:text-neutral-900"
               )}
             >
               {t.label}
-              {typeof count === "number" && count > 0 && (
-                <span className="ml-1.5 rounded-full bg-neutral-100 px-1.5 py-0.5 text-xs text-neutral-500">
-                  {count}
-                </span>
-              )}
+              {counts[t.id] > 0 && <span className="ml-1.5 rounded-full bg-neutral-100 px-1.5 py-0.5 text-xs text-neutral-500">{counts[t.id]}</span>}
             </button>
           );
         })}
@@ -117,17 +92,13 @@ function ProposalsContent() {
 
       {loading && proposals.length === 0 ? (
         <ProposalGridSkeleton />
+      ) : proposals.length === 0 ? (
+        <ProposalEmptyState hasFilters={false} onReset={() => pick("waiting")} />
       ) : filtered.length === 0 ? (
-        <ProposalEmptyState
-          hasFilters={status !== "all"}
-          onReset={() => handleStatusChange("all")}
-        />
+        <p className="py-10 text-center text-sm text-neutral-500">{groupMeta.empty}</p>
       ) : (
-        // Keep the list on screen (dimmed) while switching tabs, instead of a skeleton flash.
-        <div
-          aria-busy={loading}
-          className={loading ? "pointer-events-none opacity-60 transition-opacity" : "transition-opacity"}
-        >
+        // Keep the list on screen (dimmed) while it reloads, instead of a skeleton flash.
+        <div aria-busy={loading} className={loading ? "pointer-events-none opacity-60 transition-opacity" : "transition-opacity"}>
           <ProposalList proposals={filtered} />
         </div>
       )}

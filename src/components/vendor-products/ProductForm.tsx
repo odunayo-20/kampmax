@@ -284,6 +284,15 @@ export function ProductForm({ initialData, onSave, onCancel, isLoading }: Produc
   const handleChange = <K extends keyof ProductFormData>(field: K, value: ProductFormData[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     setTouched((prev) => ({ ...prev, [field]: true }));
+    // Editing a field clears its own error straight away. Submitting checks again.
+    setErrors((prev) => {
+      // The original-price check compares against the price, so it goes with it.
+      const stale: (keyof ProductFormData)[] = field === "price" ? ["price", "originalPrice"] : [field];
+      if (!stale.some((k) => prev[k])) return prev;
+      const rest = { ...prev };
+      stale.forEach((k) => delete rest[k]);
+      return rest;
+    });
   };
 
   const handleBlur = <K extends keyof ProductFormData>(field: K) => {
@@ -331,6 +340,53 @@ export function ProductForm({ initialData, onSave, onCancel, isLoading }: Produc
     );
 
     if (failures.length > 0) setImageErrors(failures);
+  };
+
+  // One group per product carries the option photos (usually Color); the others
+  // hide the tile so two groups never fight over which photo the gallery shows.
+  const photoGroupId = (formData.variantGroups ?? []).find((g) => g.options.some((o) => o.image))?.id;
+  const [uploadingOptions, setUploadingOptions] = useState<string[]>([]);
+  const [optionPhotoError, setOptionPhotoError] = useState<string | null>(null);
+
+  const setOptionImage = (groupId: string, optionId: string, image: string | undefined) =>
+    handleChange(
+      "variantGroups",
+      (formData.variantGroups ?? []).map((g) =>
+        g.id === groupId
+          ? { ...g, options: g.options.map((o) => (o.id === optionId ? { ...o, image } : o)) }
+          : g
+      )
+    );
+
+  const pickOptionPhoto = (groupId: string, optionId: string) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      setOptionPhotoError(null);
+      setUploadingOptions((ids) => [...ids, optionId]);
+      setUploadingCount((n) => n + 1);
+      const { data, error } = await uploadFileDirect(file, "product");
+      setUploadingCount((n) => n - 1);
+      setUploadingOptions((ids) => ids.filter((id) => id !== optionId));
+      if (error || !data?.url) {
+        setOptionPhotoError(`${file.name}: ${error?.message ?? "upload failed"}`);
+        return;
+      }
+      const url = data.url;
+      // Re-read the groups after the upload, in case other edits happened meanwhile.
+      setFormData((prev) => ({
+        ...prev,
+        variantGroups: (prev.variantGroups ?? []).map((g) =>
+          g.id === groupId
+            ? { ...g, options: g.options.map((o) => (o.id === optionId ? { ...o, image: url } : o)) }
+            : g
+        ),
+      }));
+    };
+    input.click();
   };
 
   const removeImage = (index: number) => {
@@ -787,6 +843,36 @@ export function ProductForm({ initialData, onSave, onCancel, isLoading }: Produc
                     {group.options.map((option, oIdx) => (
                       <div key={option.id} className="flex items-center gap-2">
                         <DragHandle />
+                        {(!photoGroupId || photoGroupId === group.id) && (
+                          <div className="relative h-9 w-9 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => pickOptionPhoto(group.id, option.id)}
+                              disabled={uploadingOptions.includes(option.id)}
+                              aria-label={option.image ? `Change photo for ${option.value || "option"}` : `Add photo for ${option.value || "option"}`}
+                              title="Photo shown when a shopper picks this option"
+                              className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-md border border-dashed border-kampmax-border text-kampmax-text-secondary hover:border-kampmax-blue hover:text-kampmax-blue"
+                            >
+                              {uploadingOptions.includes(option.id) ? (
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-kampmax-blue border-t-transparent" />
+                              ) : option.image ? (
+                                <img src={option.image} alt="" className="h-full w-full object-cover" />
+                              ) : (
+                                <Upload className="h-4 w-4" />
+                              )}
+                            </button>
+                            {option.image && (
+                              <button
+                                type="button"
+                                onClick={() => setOptionImage(group.id, option.id, undefined)}
+                                aria-label={`Remove photo for ${option.value || "option"}`}
+                                className="absolute -right-1 -top-1 rounded-full bg-black/70 p-0.5 text-white hover:bg-black"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            )}
+                          </div>
+                        )}
                         <Input
                           placeholder={`Option ${oIdx + 1} (e.g., Red, Large)`}
                           value={option.value}
@@ -866,6 +952,15 @@ export function ProductForm({ initialData, onSave, onCancel, isLoading }: Produc
               {(formData.variantGroups ?? []).length === 0 && (
                 <p className="text-sm text-kampmax-text-secondary text-center py-4">
                   No variant groups yet. Add your first group below.
+                </p>
+              )}
+              {optionPhotoError && (
+                <p className="text-sm text-kampmax-error" role="alert">{optionPhotoError}</p>
+              )}
+              {photoGroupId && (formData.variantGroups ?? []).length > 1 && (
+                <p className="text-xs text-kampmax-text-secondary">
+                  Option photos are on {(formData.variantGroups ?? []).find((g) => g.id === photoGroupId)?.name.trim() || "the first group"} only.
+                  Remove its photos to put them on another group.
                 </p>
               )}
               {stockMismatchWarnings.length > 0 && (

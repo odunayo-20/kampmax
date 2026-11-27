@@ -176,6 +176,7 @@ export function mapBackendProposal(p: ProposalResponse): Proposal {
       filename: a.filename,
       sizeBytes: a.sizeBytes,
       mimeType: a.mimeType,
+      url: a.url,
     })),
     status,
     createdAt: p.createdAt,

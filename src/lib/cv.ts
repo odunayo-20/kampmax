@@ -1,11 +1,9 @@
 import { CV_ALLOWED_EXTENSIONS, CV_MAX_BYTES } from "@/config/cv";
 
 /** "120 KB", "2.4 MB". */
-export function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
+/** One file-size wording for the whole site; it lives with the contract helpers. */
+import { formatFileSize } from "./contract-utils";
+export { formatFileSize };
 
 /**
  * Why a file cannot be a CV, or null when it can. Checks the name and size

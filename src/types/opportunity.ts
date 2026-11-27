@@ -301,6 +301,8 @@ export interface ProposalAttachment {
   filename: string;
   sizeBytes: number;
   mimeType: string;
+  /** A link to open it, when the server gives one. */
+  url?: string | null;
 }
 
 // ── Proposed payment plan ───────────────────────────────────

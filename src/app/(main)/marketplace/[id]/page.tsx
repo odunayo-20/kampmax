@@ -41,6 +41,7 @@ import {
   DesktopActions,
   RecentlyViewedBar,
   getVariantGroups,
+  getOptionImages,
   getSpecs,
   getStockForSelection,
   calculateVariantPriceModifier,
@@ -119,12 +120,22 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     }
   }, [product]);
 
+  const variantGroups = useMemo(() => (product ? getVariantGroups(product) : []), [product]);
+
+  // The product's own photos first, then any option photos (e.g. each colour).
   const gallery = useMemo(() => {
     if (!product) return [];
-    return product.images.length > 0 ? product.images : ["/placeholder-product.svg"];
-  }, [product]);
+    const images = [...new Set([...product.images, ...getOptionImages(variantGroups)])];
+    return images.length > 0 ? images : ["/placeholder-product.svg"];
+  }, [product, variantGroups]);
 
-  const variantGroups = useMemo(() => (product ? getVariantGroups(product) : []), [product]);
+  // Set when the shopper picks an option that has a photo; the gallery follows it.
+  const [focusImage, setFocusImage] = useState<string>();
+  const chooseOption = (groupId: string, optionId: string) => {
+    setSelectedVariants((s) => ({ ...s, [groupId]: optionId }));
+    const image = variantGroups.find((g) => g.id === groupId)?.options.find((o) => o.id === optionId)?.image;
+    if (image) setFocusImage(image);
+  };
 
   useEffect(() => {
     if (!variantGroups.length) return;
@@ -210,8 +221,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const isUnavailable = isSold || isRemoved;
 
   const effectivePrice = product.price + variantPriceModifier;
-  const hasDiscount = !!product.originalPrice && product.originalPrice > effectivePrice;
-  const discountPct = hasDiscount ? calculateDiscountPercentage(product.originalPrice!, effectivePrice) : 0;
+  // A variant's extra price lifts the struck-through price by the same amount, so
+  // picking XL (+₦700) doesn't quietly shrink the discount.
+  const effectiveOriginalPrice = product.originalPrice
+    ? product.originalPrice + variantPriceModifier
+    : undefined;
+  const hasDiscount = !!effectiveOriginalPrice && effectiveOriginalPrice > effectivePrice;
+  const discountPct = hasDiscount ? calculateDiscountPercentage(effectiveOriginalPrice!, effectivePrice) : 0;
 
   const allVariantsSelected = areAllVariantsSelected(variantGroups, selectedVariants);
   // Real stock from the backend for the chosen options (-1 = unlimited).
@@ -288,6 +304,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           <div className="-mx-4 lg:mx-0">
             <ProductGallery
               images={gallery}
+              focusImage={focusImage}
               title={product.title}
               hasDiscount={hasDiscount}
               discountPct={discountPct}
@@ -308,7 +325,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             />
 
             <ProductInfoHeader
-              product={product}
+              product={{ ...product, originalPrice: effectiveOriginalPrice }}
               effectivePrice={effectivePrice}
               inStock={inStock}
               lowStock={lowStock}
@@ -322,7 +339,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             <VariantSelector
               variantGroups={variantGroups}
               selectedVariants={selectedVariants}
-              onChange={(groupId, optionId) => setSelectedVariants((s) => ({ ...s, [groupId]: optionId }))}
+              onChange={chooseOption}
               allSelected={allVariantsSelected}
               missingGroups={missingGroups}
             />

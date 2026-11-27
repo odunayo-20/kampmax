@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, Edit, MoreVertical, Archive, RotateCcw, Trash2 } from "lucide-react";
-import { cn, formatNaira, timeAgo } from "@/lib/utils";
+import { formatNaira, timeAgo } from "@/lib/utils";
+import { ProductMenuItem, DELETE_DISABLED_HINT } from "./ProductMenuItem";
 import { ProductPublishBadge, ProductStockBadge } from "./product-meta";
 import type { Product } from "@/types";
 import type { ProductPublishStatus } from "@/types/vendor-products";
@@ -13,51 +14,18 @@ interface ProductGridProps {
   products: Product[];
   onView: (product: Product) => void;
   onEdit: (product: Product) => void;
-  onPublish: (product: Product) => void;
+  onTogglePublish: (product: Product) => void;
   onArchive: (product: Product) => void;
   onRestore: (product: Product) => void;
   onDelete: (product: Product) => void;
 }
 
-function MenuItem({
-  icon: Icon,
-  label,
-  onClick,
-  danger,
-  disabled,
-}: {
-  icon: typeof Eye;
-  label: string;
-  onClick: () => void;
-  danger?: boolean;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(
-        "flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] font-medium transition-colors",
-        disabled
-          ? "opacity-40 cursor-not-allowed"
-          : danger
-          ? "text-kampmax-error hover:bg-kampmax-error/5"
-          : "text-kampmax-text hover:bg-kampmax-muted"
-      )}
-    >
-      <Icon className="h-3.5 w-3.5 shrink-0" />
-      {label}
-    </button>
-  );
-}
 
 export function ProductGrid({
   products,
   onView,
   onEdit,
-  onPublish,
+  onTogglePublish,
   onArchive,
   onRestore,
   onDelete,
@@ -85,7 +53,7 @@ export function ProductGrid({
           product={product}
           onView={() => onView(product)}
           onEdit={() => onEdit(product)}
-          onPublish={() => onPublish(product)}
+          onTogglePublish={() => onTogglePublish(product)}
           onArchive={() => onArchive(product)}
           onRestore={() => onRestore(product)}
           onDelete={() => onDelete(product)}
@@ -99,7 +67,7 @@ function ProductCard({
   product,
   onView,
   onEdit,
-  onPublish,
+  onTogglePublish,
   onArchive,
   onRestore,
   onDelete,
@@ -107,7 +75,7 @@ function ProductCard({
   product: Product;
   onView: () => void;
   onEdit: () => void;
-  onPublish: () => void;
+  onTogglePublish: () => void;
   onArchive: () => void;
   onRestore: () => void;
   onDelete: () => void;
@@ -138,17 +106,17 @@ function ProductCard({
           </button>
           {menuOpen && (
             <div className="absolute right-0 top-full mt-1 z-10 w-40 rounded-lg border border-kampmax-border bg-white py-1 shadow-lg">
-              <MenuItem icon={Eye} label="View" onClick={() => { setMenuOpen(false); onView(); }} />
-              <MenuItem icon={Edit} label="Edit" onClick={() => { setMenuOpen(false); onEdit(); }} disabled={!availability.canEdit} />
-              <MenuItem
+              <ProductMenuItem icon={Eye} label="View" onClick={() => { setMenuOpen(false); onView(); }} />
+              <ProductMenuItem icon={Edit} label="Edit" onClick={() => { setMenuOpen(false); onEdit(); }} disabled={!availability.canEdit} />
+              <ProductMenuItem
                 icon={Eye}
                 label={availability.canPublish ? "Publish" : "Unpublish"}
-                onClick={() => { setMenuOpen(false); onPublish(); }}
+                onClick={() => { setMenuOpen(false); onTogglePublish(); }}
                 disabled={!availability.canPublish && !availability.canUnpublish}
               />
-              {availability.canArchive && <MenuItem icon={Archive} label="Archive" onClick={() => { setMenuOpen(false); onArchive(); }} danger />}
-              {availability.canRestore && <MenuItem icon={RotateCcw} label="Restore" onClick={() => { setMenuOpen(false); onRestore(); }} />}
-              <MenuItem icon={Trash2} label="Delete" onClick={() => { setMenuOpen(false); onDelete(); }} danger disabled={!availability.canDelete} />
+              {availability.canArchive && <ProductMenuItem icon={Archive} label="Archive" onClick={() => { setMenuOpen(false); onArchive(); }} danger />}
+              {availability.canRestore && <ProductMenuItem icon={RotateCcw} label="Restore" onClick={() => { setMenuOpen(false); onRestore(); }} />}
+              <ProductMenuItem icon={Trash2} label="Delete" onClick={() => { setMenuOpen(false); onDelete(); }} danger disabled={!availability.canDelete} disabledHint={DELETE_DISABLED_HINT} />
             </div>
           )}
         </div>

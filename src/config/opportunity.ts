@@ -181,20 +181,6 @@ export const PROPOSAL_STATUS_META: Record<ProposalStatus, ProposalStatusMeta> = 
 
 // ── Proposal filter tabs (only statuses we expose) ─────────
 
-export const PROPOSAL_FILTER_TABS: {
-  value: ProposalStatus | "all";
-  label: string;
-}[] = [
-  { value: "all", label: "All" },
-  { value: PROPOSAL_STATUS.DRAFT, label: "Drafts" },
-  { value: PROPOSAL_STATUS.SUBMITTED, label: "Submitted" },
-  { value: PROPOSAL_STATUS.UNDER_REVIEW, label: "Under Review" },
-  { value: PROPOSAL_STATUS.SHORTLISTED, label: "Shortlisted" },
-  { value: PROPOSAL_STATUS.ACCEPTED, label: "Accepted" },
-  { value: PROPOSAL_STATUS.REJECTED, label: "Rejected" },
-  { value: PROPOSAL_STATUS.WITHDRAWN, label: "Withdrawn" },
-];
-
 // ── Sort options (backend-supported presentation) ───────────
 
 export const OPPORTUNITY_SORT_OPTIONS: {
