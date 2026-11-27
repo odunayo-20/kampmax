@@ -147,3 +147,184 @@ export const NEEDS_PROPERTY = {
   title: "Add a property first",
   text: "A listing is for one room in one of your properties. Add the property and its rooms, then come back.",
 };
+
+// ---------- the form (create and edit share it) ----------
+
+export const MAX_MONEY = 100_000_000;
+export const MAX_LISTING_PHOTOS = 10;
+
+export type PaymentFrequency = "MONTHLY" | "QUARTERLY" | "BIANNUALLY" | "ANNUALLY" | "PER_SEMESTER" | "PER_NIGHT";
+
+export const FREQUENCY_OPTIONS: { id: PaymentFrequency; label: string }[] = [
+  { id: "ANNUALLY", label: "Yearly" },
+  { id: "BIANNUALLY", label: "Every 6 months" },
+  { id: "PER_SEMESTER", label: "Per semester" },
+  { id: "QUARTERLY", label: "Every 3 months" },
+  { id: "MONTHLY", label: "Monthly" },
+  { id: "PER_NIGHT", label: "Per night" },
+];
+
+export interface ListingPhoto {
+  id: string;
+  url: string;
+}
+
+export interface ListingForm {
+  title: string;
+  description: string;
+  rentAmount: string;
+  paymentFrequency: PaymentFrequency;
+  cautionFee: string;
+  agencyFee: string;
+  agreementFee: string;
+  otherCharges: string;
+  amenityIds: string[];
+  photos: ListingPhoto[];
+}
+
+export type ListingErrors = Partial<Record<"title" | "description" | "rentAmount" | "cautionFee" | "agencyFee" | "agreementFee" | "otherCharges" | "photos", string>>;
+
+export const emptyListing = (): ListingForm => ({
+  title: "",
+  description: "",
+  rentAmount: "",
+  paymentFrequency: "ANNUALLY",
+  cautionFee: "",
+  agencyFee: "",
+  agreementFee: "",
+  otherCharges: "",
+  amenityIds: [],
+  photos: [],
+});
+
+const asText = (n: number): string => (n > 0 ? String(n) : "");
+
+export function formFromListing(l: AccommodationListing): ListingForm {
+  return {
+    title: l.title,
+    description: l.description ?? "",
+    rentAmount: asText(l.rentAmount),
+    paymentFrequency: (FREQUENCY_OPTIONS.some((o) => o.id === l.paymentFrequency) ? l.paymentFrequency : "ANNUALLY") as PaymentFrequency,
+    cautionFee: asText(l.cautionFee),
+    agencyFee: asText(l.agencyFee),
+    agreementFee: asText(l.agreementFee),
+    otherCharges: asText(l.otherCharges),
+    amenityIds: l.amenities.map((a) => a.id),
+    photos: l.media.map((m) => ({ id: m.mediaId, url: m.url })),
+  };
+}
+
+/** "250000", "₦250,000" or "" (nothing) to naira, kept to 2 decimals; null when it is not an amount or too big. */
+export function parseMoney(input: string, max = MAX_MONEY): number | null {
+  const raw = input.trim().toLowerCase();
+  if (raw === "" || raw === "0") return 0;
+  const cleaned = raw.replace(/[₦,\s]/g, "").replace(/^ngn/, "");
+  if (!/^\d+(\.\d{1,2})?$/.test(cleaned)) return null;
+  const naira = Math.round(Number(cleaned) * 100) / 100;
+  return Number.isFinite(naira) && naira >= 0 && naira <= max ? naira : null;
+}
+
+/** A sensible starting title for a room, so a new draft is one step from useful. */
+export function suggestedTitle(unit: { unitName: string; unitType: string }, property: { title: string }): string {
+  const name = `${unit.unitType} at ${property.title}`.replace(/\s+/g, " ").trim();
+  return name.length > 160 ? name.slice(0, 160).trim() : name;
+}
+
+type RoomSource = { id: string; title: string; units: { id: string; unitName: string; unitType: string }[] };
+
+/** The rooms that can still get a listing: a room has at most one. */
+export function freeRooms<P extends RoomSource>(properties: P[], listings: Pick<AccommodationListing, "unitId">[]): { id: string; property: P; unit: P["units"][number] }[] {
+  const taken = new Set(listings.map((l) => l.unitId));
+  return properties.flatMap((p) => p.units.filter((u) => !taken.has(u.id)).map((u) => ({ id: u.id, property: p, unit: u })));
+}
+
+const one = (s: string) => s.replace(/\s+/g, " ").trim();
+
+/** Problems by field. A draft only needs a title; the rest is checked for being a sane amount or length. */
+export function listingProblems(f: ListingForm): ListingErrors {
+  const e: ListingErrors = {};
+  const title = one(f.title);
+  if (title.length < 3) e.title = 'Give the listing a title, like "Self-contain near UNILAG gate".';
+  else if (title.length > 160) e.title = "Keep the title under 160 characters.";
+  if (f.description.trim().length > 5000) e.description = "Keep the description under 5,000 characters.";
+  const fields = [
+    ["rentAmount", "Rent"],
+    ["cautionFee", "Caution fee"],
+    ["agencyFee", "Agency fee"],
+    ["agreementFee", "Agreement fee"],
+    ["otherCharges", "Other charges"],
+  ] as const;
+  for (const [key, label] of fields) {
+    if (parseMoney(f[key]) === null) e[key] = `${label} must be an amount like 250000 (up to 2 decimals, under ₦100,000,000).`;
+  }
+  if (f.photos.length > MAX_LISTING_PHOTOS) e.photos = `Use at most ${MAX_LISTING_PHOTOS} photos.`;
+  return e;
+}
+
+/** Rent plus every compulsory charge, worked in kobo so the pennies never drift. Null if a field is not an amount. */
+export function totalUpfront(f: Pick<ListingForm, "rentAmount" | "cautionFee" | "agencyFee" | "agreementFee" | "otherCharges">): number | null {
+  const parts = [f.rentAmount, f.cautionFee, f.agencyFee, f.agreementFee, f.otherCharges].map((v) => parseMoney(v));
+  if (parts.some((p) => p === null)) return null;
+  return parts.reduce<number>((sum, p) => sum + Math.round((p as number) * 100), 0) / 100;
+}
+
+export interface ListingBody {
+  title: string;
+  description?: string;
+  rentAmount: number;
+  paymentFrequency: PaymentFrequency;
+  cautionFee: number;
+  agencyFee: number;
+  agreementFee: number;
+  otherCharges: number;
+  media: { mediaId: string }[];
+  amenityIds: string[];
+}
+
+const amount = (s: string): number => parseMoney(s) ?? 0;
+
+/** The body for a new draft. Call only after `listingProblems` found nothing. */
+export function listingBody(f: ListingForm): ListingBody {
+  const body: ListingBody = {
+    title: one(f.title),
+    rentAmount: amount(f.rentAmount),
+    paymentFrequency: f.paymentFrequency,
+    cautionFee: amount(f.cautionFee),
+    agencyFee: amount(f.agencyFee),
+    agreementFee: amount(f.agreementFee),
+    otherCharges: amount(f.otherCharges),
+    media: f.photos.map((p) => ({ mediaId: p.id })),
+    amenityIds: f.amenityIds,
+  };
+  if (f.description.trim()) body.description = f.description.trim();
+  return body;
+}
+
+const sameSet = (a: string[], b: string[]) => a.length === b.length && [...a].sort().join() === [...b].sort().join();
+const sameList = (a: string[], b: string[]) => a.length === b.length && a.every((v, i) => v === b[i]);
+
+/** Only what changed. Photos and facilities replace the whole set on the server, so they go only when they differ. */
+export function listingPatch(f: ListingForm, original: AccommodationListing): Partial<ListingBody> {
+  const was = formFromListing(original);
+  const patch: Partial<ListingBody> = {};
+  if (one(f.title) !== one(was.title)) patch.title = one(f.title);
+  if (f.description.trim() !== was.description.trim()) patch.description = f.description.trim();
+  if (amount(f.rentAmount) !== amount(was.rentAmount)) patch.rentAmount = amount(f.rentAmount);
+  if (f.paymentFrequency !== was.paymentFrequency) patch.paymentFrequency = f.paymentFrequency;
+  for (const k of ["cautionFee", "agencyFee", "agreementFee", "otherCharges"] as const) {
+    if (amount(f[k]) !== amount(was[k])) patch[k] = amount(f[k]);
+  }
+  if (!sameList(f.photos.map((p) => p.id), was.photos.map((p) => p.id))) patch.media = f.photos.map((p) => ({ mediaId: p.id }));
+  if (!sameSet(f.amenityIds, was.amenityIds)) patch.amenityIds = f.amenityIds;
+  return patch;
+}
+
+/** Facilities are not read by the review, so they never send a listing back. Everything else in the patch does. */
+const CRITICAL_KEYS = ["title", "description", "rentAmount", "paymentFrequency", "cautionFee", "agencyFee", "agreementFee", "otherCharges", "media"];
+
+/** True when saving this patch on an approved listing takes it off the site until the team reviews it again. */
+export function sendsBackForReview(l: Pick<AccommodationListing, "moderationStatus">, patch: Record<string, unknown>): boolean {
+  return l.moderationStatus === "APPROVED" && CRITICAL_KEYS.some((k) => k in patch);
+}
+
+export const LOST_DRAFT = "We lost the connection, so we cannot tell if the draft was saved. Check your listings before trying again.";

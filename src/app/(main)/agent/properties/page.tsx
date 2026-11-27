@@ -1,560 +1,185 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import Link from "next/link";
-import { Building2, Plus, Home, Trash2, Edit2, AlertCircle } from "lucide-react";
-import {
-  useAccommodationCatalog,
-  useAccommodationProperties,
-  useCreateAccommodationProperty,
-  useUpdateAccommodationProperty,
-  useArchiveAccommodationProperty,
-  useAddAccommodationUnit,
-  useUpdateAccommodationUnit,
-  useArchiveAccommodationUnit,
-} from "@/hooks/use-accommodation";
-import type { AccommodationProperty, AccommodationUnit } from "@/types/accommodation";
-import type { CreateAccommodationProperty } from "@/services/accommodation";
-import { PropertyPin, type Pin } from "@/components/agent/PropertyPin";
+import { useState } from "react";
+import { Plus } from "lucide-react";
+import { useAccommodationProperties, useArchiveAccommodationProperty, useArchiveAccommodationUnit } from "@/hooks/use-accommodation";
+import { LoadError, Pill, useAsk } from "@/components/accommodation/enquiry-parts";
+import { PropertyForm } from "@/components/agent/PropertyForm";
+import { RoomEditor } from "@/components/agent/RoomFields";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { describeHousingError } from "@/lib/accommodation-text";
+import { AVAILABILITY_LABEL } from "@/lib/agent-listings";
+import { ARCHIVE_CHECK_FAILED, archiveBlocker, archivePropertyWarning, PROPERTIES_EMPTY, publicPlace, roomsLine, unitSummary } from "@/lib/agent-properties";
+import { accommodationApi } from "@/services/accommodation";
+import type { AccommodationProperty, AccommodationUnit } from "@/types/accommodation";
 
-const EMPTY_FORM = {
-  title: "",
-  categoryId: "",
-  address: "",
-  state: "",
-  city: "",
-  neighbourhood: "",
-  description: "",
-  unitName: "",
-  unitType: "Single Room",
-  bedrooms: "1",
-  bathrooms: "1",
-};
-
-function PropertyForm({
-  categories,
-  onSuccess,
-}: {
-  categories: { id: string; name: string }[];
-  onSuccess?: () => void;
-}) {
-  const create = useCreateAccommodationProperty();
-  const [data, setData] = useState(EMPTY_FORM);
-  const [pin, setPin] = useState<Pin | null>(null);
-
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const input: CreateAccommodationProperty = {
-      title: data.title.trim(),
-      categoryId: data.categoryId,
-      address: data.address.trim(),
-      state: data.state.trim(),
-      city: data.city.trim(),
-      neighbourhood: data.neighbourhood.trim() || undefined,
-      description: data.description.trim() || undefined,
-      ...pin,
-      units: [
-        {
-          unitName: data.unitName.trim(),
-          unitType: data.unitType.trim(),
-          bedrooms: Number(data.bedrooms),
-          bathrooms: Number(data.bathrooms),
-        },
-      ],
-    };
-    create.mutate(input, {
-      onSuccess: () => {
-        setData(EMPTY_FORM);
-        setPin(null);
-        onSuccess?.();
-      },
-    });
-  }
-
-  return (
-    <form onSubmit={submit} className="rounded-2xl border border-kampmax-border bg-white p-6 shadow-xs">
-      <div className="flex items-center gap-2 border-b border-kampmax-border pb-4">
-        <Building2 className="h-5 w-5 text-kampmax-blue" />
-        <div>
-          <h2 className="text-base font-bold text-kampmax-text">Add New Property</h2>
-          <p className="text-xs text-kampmax-text-secondary">
-            Set up the building or hostel details and create its first rentable unit.
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-5 grid gap-4 sm:grid-cols-2">
-        <label className="text-xs font-semibold text-kampmax-text">
-          Property / Hostel Name *
-          <input
-            required
-            placeholder="e.g. Royal Heights Lodge"
-            value={data.title}
-            onChange={(e) => setData((c) => ({ ...c, title: e.target.value }))}
-            className="mt-1 block w-full rounded-xl border border-kampmax-border px-3.5 py-2 text-sm text-kampmax-text focus:border-kampmax-blue focus:outline-none"
-          />
-        </label>
-
-        <label className="text-xs font-semibold text-kampmax-text">
-          Property Type *
-          <select
-            required
-            value={data.categoryId}
-            onChange={(e) => setData((c) => ({ ...c, categoryId: e.target.value }))}
-            className="mt-1 block w-full rounded-xl border border-kampmax-border bg-white px-3.5 py-2 text-sm text-kampmax-text focus:border-kampmax-blue focus:outline-none"
-          >
-            <option value="">Select type...</option>
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="text-xs font-semibold text-kampmax-text sm:col-span-2">
-          Private Physical Address *
-          <input
-            required
-            placeholder="Street address (kept private until an inspection is scheduled)"
-            value={data.address}
-            onChange={(e) => setData((c) => ({ ...c, address: e.target.value }))}
-            className="mt-1 block w-full rounded-xl border border-kampmax-border px-3.5 py-2 text-sm text-kampmax-text focus:border-kampmax-blue focus:outline-none"
-          />
-        </label>
-
-        <label className="text-xs font-semibold text-kampmax-text">
-          City *
-          <input
-            required
-            placeholder="e.g. Akoka / Yaba"
-            value={data.city}
-            onChange={(e) => setData((c) => ({ ...c, city: e.target.value }))}
-            className="mt-1 block w-full rounded-xl border border-kampmax-border px-3.5 py-2 text-sm text-kampmax-text focus:border-kampmax-blue focus:outline-none"
-          />
-        </label>
-
-        <label className="text-xs font-semibold text-kampmax-text">
-          State *
-          <input
-            required
-            placeholder="e.g. Lagos"
-            value={data.state}
-            onChange={(e) => setData((c) => ({ ...c, state: e.target.value }))}
-            className="mt-1 block w-full rounded-xl border border-kampmax-border px-3.5 py-2 text-sm text-kampmax-text focus:border-kampmax-blue focus:outline-none"
-          />
-        </label>
-
-        <label className="text-xs font-semibold text-kampmax-text sm:col-span-2">
-          Neighbourhood / Landmark (Public)
-          <input
-            placeholder="e.g. 5 minutes from UNILAG Back Gate"
-            value={data.neighbourhood}
-            onChange={(e) => setData((c) => ({ ...c, neighbourhood: e.target.value }))}
-            className="mt-1 block w-full rounded-xl border border-kampmax-border px-3.5 py-2 text-sm text-kampmax-text focus:border-kampmax-blue focus:outline-none"
-          />
-        </label>
-
-        <div className="sm:col-span-2">
-          <PropertyPin value={pin} onChange={setPin} />
-        </div>
-
-        <label className="text-xs font-semibold text-kampmax-text sm:col-span-2">
-          General Property Description
-          <textarea
-            rows={3}
-            placeholder="Overview of the compound, security features, water supply, power backup, etc."
-            value={data.description}
-            onChange={(e) => setData((c) => ({ ...c, description: e.target.value }))}
-            className="mt-1 block w-full rounded-xl border border-kampmax-border px-3.5 py-2 text-sm text-kampmax-text focus:border-kampmax-blue focus:outline-none"
-          />
-        </label>
-
-        {/* First Unit Configuration */}
-        <div className="rounded-xl border border-neutral-200 bg-neutral-50/70 p-4 sm:col-span-2">
-          <p className="text-xs font-bold uppercase tracking-wider text-kampmax-blue">
-            First Unit / Room Details
-          </p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-4">
-            <label className="text-xs font-medium text-kampmax-text-secondary sm:col-span-2">
-              Unit / Room Label *
-              <input
-                required
-                placeholder="e.g. Room 101, Flat 3B"
-                value={data.unitName}
-                onChange={(e) => setData((c) => ({ ...c, unitName: e.target.value }))}
-                className="mt-1 block w-full rounded-lg border border-kampmax-border bg-white px-3 py-1.5 text-xs text-kampmax-text"
-              />
-            </label>
-            <label className="text-xs font-medium text-kampmax-text-secondary sm:col-span-2">
-              Unit Type *
-              <input
-                required
-                placeholder="e.g. Self Contain, Single Room"
-                value={data.unitType}
-                onChange={(e) => setData((c) => ({ ...c, unitType: e.target.value }))}
-                className="mt-1 block w-full rounded-lg border border-kampmax-border bg-white px-3 py-1.5 text-xs text-kampmax-text"
-              />
-            </label>
-            <label className="text-xs font-medium text-kampmax-text-secondary sm:col-span-2">
-              Bedrooms
-              <input
-                type="number"
-                min="0"
-                value={data.bedrooms}
-                onChange={(e) => setData((c) => ({ ...c, bedrooms: e.target.value }))}
-                className="mt-1 block w-full rounded-lg border border-kampmax-border bg-white px-3 py-1.5 text-xs text-kampmax-text"
-              />
-            </label>
-            <label className="text-xs font-medium text-kampmax-text-secondary sm:col-span-2">
-              Bathrooms
-              <input
-                type="number"
-                min="0"
-                value={data.bathrooms}
-                onChange={(e) => setData((c) => ({ ...c, bathrooms: e.target.value }))}
-                className="mt-1 block w-full rounded-lg border border-kampmax-border bg-white px-3 py-1.5 text-xs text-kampmax-text"
-              />
-            </label>
-          </div>
-        </div>
-      </div>
-
-      {create.error && (
-        <p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-xs font-medium text-red-700">
-          {create.error.message}
-        </p>
-      )}
-
-      <div className="mt-5 flex justify-end">
-        <button
-          type="submit"
-          disabled={create.isPending}
-          className="rounded-xl bg-kampmax-blue px-5 py-2.5 text-xs font-bold text-white shadow-2xs hover:bg-kampmax-blue/90 disabled:opacity-50"
-        >
-          {create.isPending ? "Saving Property…" : "Save Property"}
-        </button>
-      </div>
-    </form>
-  );
-}
-
-function UnitRow({
-  propertyId,
-  unit,
-}: {
-  propertyId: string;
-  unit: AccommodationUnit;
-}) {
-  const update = useUpdateAccommodationUnit();
-  const archive = useArchiveAccommodationUnit();
-  const [editing, setEditing] = useState(false);
-
-  function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    update.mutate(
-      {
-        propertyId,
-        unitId: unit.id,
-        input: {
-          unitName: String(form.get("unitName") ?? ""),
-          unitType: String(form.get("unitType") ?? ""),
-          bedrooms: Number(form.get("bedrooms")),
-          bathrooms: Number(form.get("bathrooms")),
-        },
-      },
-      {
-        onSuccess: () => setEditing(false),
-      }
-    );
-  }
-
-  if (editing) {
-    return (
-      <form onSubmit={save} className="flex flex-wrap items-end gap-2 rounded-xl bg-neutral-100 p-3 text-xs">
-        <label className="min-w-32 flex-1">
-          Unit Name
-          <input
-            name="unitName"
-            defaultValue={unit.unitName}
-            required
-            className="mt-1 block w-full rounded-lg border border-kampmax-border bg-white px-2.5 py-1.5 text-xs"
-          />
-        </label>
-        <label className="min-w-32 flex-1">
-          Unit Type
-          <input
-            name="unitType"
-            defaultValue={unit.unitType}
-            required
-            className="mt-1 block w-full rounded-lg border border-kampmax-border bg-white px-2.5 py-1.5 text-xs"
-          />
-        </label>
-        <label className="w-20">
-          Beds
-          <input
-            name="bedrooms"
-            type="number"
-            min="0"
-            defaultValue={unit.bedrooms}
-            className="mt-1 block w-full rounded-lg border border-kampmax-border bg-white px-2.5 py-1.5 text-xs"
-          />
-        </label>
-        <label className="w-20">
-          Baths
-          <input
-            name="bathrooms"
-            type="number"
-            min="0"
-            defaultValue={unit.bathrooms}
-            className="mt-1 block w-full rounded-lg border border-kampmax-border bg-white px-2.5 py-1.5 text-xs"
-          />
-        </label>
-        <div className="flex gap-1.5">
-          <button
-            type="submit"
-            disabled={update.isPending}
-            className="rounded-lg bg-kampmax-blue px-3 py-1.5 text-xs font-semibold text-white"
-          >
-            Save
-          </button>
-          <button
-            type="button"
-            onClick={() => setEditing(false)}
-            className="rounded-lg border border-kampmax-border bg-white px-3 py-1.5 text-xs"
-          >
-            Cancel
-          </button>
-        </div>
-      </form>
-    );
-  }
-
-  return (
-    <div className="flex items-center justify-between rounded-xl border border-kampmax-border bg-neutral-50/50 px-3.5 py-2.5 text-xs">
-      <div>
-        <p className="font-semibold text-kampmax-text">{unit.unitName}</p>
-        <p className="text-[11px] text-kampmax-text-secondary">
-          {unit.unitType} · {unit.bedrooms} bed(s) · {unit.bathrooms} bath(s)
-        </p>
-      </div>
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="rounded-md p-1.5 text-kampmax-text-secondary hover:bg-white hover:text-kampmax-blue"
-          title="Edit Unit"
-        >
-          <Edit2 className="h-3.5 w-3.5" />
-        </button>
-        <button
-          type="button"
-          disabled={archive.isPending}
-          onClick={() => {
-            if (window.confirm(`Archive ${unit.unitName}?`)) {
-              archive.mutate({ propertyId, unitId: unit.id }, { onError: (error) => window.alert(error.message) });
-            }
-          }}
-          className="rounded-md p-1.5 text-kampmax-text-secondary hover:bg-white hover:text-red-600"
-          title="Archive Unit"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function PropertyCard({ property }: { property: AccommodationProperty }) {
-  const [showAddUnit, setShowAddUnit] = useState(false);
-  const [unitName, setUnitName] = useState("");
-  const [unitType, setUnitType] = useState("Single Room");
-  const addUnit = useAddAccommodationUnit();
-  const archiveProperty = useArchiveAccommodationProperty();
-  const updateProperty = useUpdateAccommodationProperty();
-  const pin: Pin | null =
-    property.latitude !== null && property.longitude !== null
-      ? { latitude: property.latitude, longitude: property.longitude }
-      : null;
-
-  return (
-    <article className="rounded-2xl border border-kampmax-border bg-white p-5 shadow-xs">
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-kampmax-border pb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h3 className="text-base font-bold text-kampmax-text">{property.title}</h3>
-            <span className="rounded-md bg-neutral-100 px-2 py-0.5 text-[11px] font-semibold text-kampmax-text-secondary">
-              {property.city}, {property.state}
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-kampmax-text-secondary">
-            {property.address} {property.neighbourhood ? `(${property.neighbourhood})` : ""}
-          </p>
-        </div>
-
-        <button
-          type="button"
-          disabled={archiveProperty.isPending}
-          onClick={() => {
-            if (window.confirm(`Archive ${property.title} and all its units?`)) {
-              archiveProperty.mutate(property.id, { onError: (error) => window.alert(error.message) });
-            }
-          }}
-          className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
-        >
-          <Trash2 className="h-3 w-3" />
-          <span>Archive</span>
-        </button>
-      </div>
-
-      <div className="mt-4">
-        <PropertyPin
-          value={pin}
-          saving={updateProperty.isPending}
-          onChange={(next) => updateProperty.mutateAsync({ id: property.id, input: next })}
-        />
-      </div>
-
-      {/* Units List */}
-      <div className="mt-4">
-        <div className="flex items-center justify-between pb-2">
-          <p className="text-xs font-bold uppercase tracking-wider text-kampmax-text-secondary">
-            Rentable Units ({property.units.length})
-          </p>
-          <button
-            type="button"
-            onClick={() => setShowAddUnit((c) => !c)}
-            className="inline-flex items-center gap-1 text-xs font-semibold text-kampmax-blue hover:underline"
-          >
-            <Plus className="h-3 w-3" />
-            <span>Add Unit</span>
-          </button>
-        </div>
-
-        {showAddUnit && (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              addUnit.mutate(
-                { propertyId: property.id, input: { unitName: unitName.trim(), unitType: unitType.trim() } },
-                {
-                  onSuccess: () => {
-                    setUnitName("");
-                    setUnitType("Single Room");
-                    setShowAddUnit(false);
-                  },
-                }
-              );
-            }}
-            className="mb-3 flex flex-wrap items-end gap-2 rounded-xl bg-kampmax-blue/5 p-3 text-xs"
-          >
-            <input
-              required
-              placeholder="Unit name (e.g. Room 204)"
-              value={unitName}
-              onChange={(e) => setUnitName(e.target.value)}
-              className="min-w-32 flex-1 rounded-lg border border-kampmax-border bg-white px-3 py-1.5 text-xs"
-            />
-            <input
-              required
-              placeholder="Unit type (e.g. Self Contain)"
-              value={unitType}
-              onChange={(e) => setUnitType(e.target.value)}
-              className="min-w-32 flex-1 rounded-lg border border-kampmax-border bg-white px-3 py-1.5 text-xs"
-            />
-            <button
-              type="submit"
-              disabled={addUnit.isPending}
-              className="rounded-lg bg-kampmax-blue px-3 py-1.5 text-xs font-semibold text-white"
-            >
-              {addUnit.isPending ? "Adding…" : "Add"}
-            </button>
-          </form>
-        )}
-
-        <div className="space-y-2">
-          {property.units.map((unit) => (
-            <UnitRow key={unit.id} propertyId={property.id} unit={unit} />
-          ))}
-          {property.units.length === 0 && (
-            <p className="py-2 text-xs text-neutral-400">No units added yet.</p>
-          )}
-        </div>
-      </div>
-    </article>
-  );
-}
-
+/**
+ * The agent's properties: a list, and the one picked open beside it with its rooms. The same screens as the mobile
+ * app's agent-properties and agent-property-form.
+ */
 export default function AgentPropertiesPage() {
-  const [showForm, setShowForm] = useState(false);
-  const catalogQuery = useAccommodationCatalog();
-  const propertiesQuery = useAccommodationProperties(1, true);
+  const q = useAccommodationProperties(1, true);
+  const [adding, setAdding] = useState(false);
+  const [picked, setPicked] = useState<string | undefined>();
+  const items = q.data?.items ?? [];
+  const open = items.find((p) => p.id === (picked ?? items[0]?.id));
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-kampmax-text">
-            Properties & Units Inventory
-          </h1>
-          <p className="mt-1 text-sm text-kampmax-text-secondary">
-            Manage your buildings, student hostels, and create individual rentable units.
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight text-kampmax-text">Properties and rooms</h1>
+          <p className="mt-1 text-sm text-kampmax-text-secondary">Each property holds rooms. You list each room on its own, with its own rent and photos.</p>
         </div>
-
-        <button
-          type="button"
-          onClick={() => setShowForm((c) => !c)}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-kampmax-blue px-4 py-2 text-xs font-semibold text-white shadow-2xs hover:bg-kampmax-blue/90"
-        >
-          <Plus className="h-4 w-4" />
-          <span>{showForm ? "Close Form" : "Add Property"}</span>
+        <button type="button" onClick={() => setAdding((c) => !c)} className="inline-flex items-center gap-1.5 rounded-xl bg-kampmax-blue px-4 py-2 text-xs font-semibold text-white hover:bg-kampmax-blue/90">
+          {adding ? "Close" : <><Plus className="h-4 w-4" aria-hidden /> Add a property</>}
         </button>
       </div>
 
-      {showForm && catalogQuery.data && (
+      {adding && (
         <PropertyForm
-          categories={catalogQuery.data.categories}
-          onSuccess={() => setShowForm(false)}
+          mode="create"
+          onCancel={() => setAdding(false)}
+          onCreated={(id) => {
+            setAdding(false);
+            setPicked(id);
+          }}
         />
       )}
 
-      {/* Properties List */}
-      <section className="space-y-4">
-        {propertiesQuery.isPending ? (
-          <div className="space-y-4">
-            <Skeleton className="h-32 w-full rounded-2xl" />
-            <Skeleton className="h-32 w-full rounded-2xl" />
+      {q.isPending ? (
+        <Skeleton className="h-32 w-full rounded-2xl" />
+      ) : q.isError ? (
+        <LoadError what="load your properties" error={q.error} onRetry={() => void q.refetch()} />
+      ) : items.length === 0 ? (
+        !adding && (
+          <div className="rounded-2xl border border-dashed border-kampmax-border bg-white p-10 text-center">
+            <h2 className="text-base font-bold text-kampmax-text">{PROPERTIES_EMPTY.title}</h2>
+            <p className="mx-auto mt-1 max-w-md text-sm text-kampmax-text-secondary">{PROPERTIES_EMPTY.text}</p>
+            <button type="button" onClick={() => setAdding(true)} className="mt-4 rounded-xl bg-kampmax-blue px-4 py-2 text-xs font-semibold text-white">Add your first property</button>
           </div>
-        ) : propertiesQuery.isError ? (
-          <p className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs text-red-700">
-            Could not load properties: {propertiesQuery.error.message}
-          </p>
-        ) : propertiesQuery.data.items.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-kampmax-border bg-white p-12 text-center">
-            <Building2 className="mx-auto h-12 w-12 text-neutral-300" />
-            <h2 className="mt-3 text-base font-bold text-kampmax-text">No Properties Added Yet</h2>
-            <p className="mt-1 text-xs text-kampmax-text-secondary">
-              Add your first property above to organize rooms and start advertising listings to students.
-            </p>
-            <button
-              type="button"
-              onClick={() => setShowForm(true)}
-              className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-kampmax-blue px-4 py-2 text-xs font-semibold text-white"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Add Your First Property</span>
-            </button>
-          </div>
-        ) : (
-          propertiesQuery.data.items.map((property) => (
-            <PropertyCard key={property.id} property={property} />
-          ))
-        )}
-      </section>
+        )
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-[20rem_1fr]">
+          <ul className="space-y-2" aria-label="Properties">
+            {items.map((p) => {
+              const on = p.id === open?.id;
+              return (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    aria-current={on ? "true" : undefined}
+                    onClick={() => setPicked(p.id)}
+                    className={`w-full rounded-xl border p-3 text-left ${on ? "border-kampmax-blue bg-blue-50/40" : "border-kampmax-border bg-white hover:bg-kampmax-bg"}`}
+                  >
+                    <p className="line-clamp-2 text-sm font-semibold text-kampmax-text">{p.title}</p>
+                    <p className="truncate text-xs text-kampmax-text-secondary">{[p.categoryName, publicPlace(p)].filter(Boolean).join(" · ")}</p>
+                    <p className="mt-1 text-xs text-kampmax-text-secondary">{roomsLine(p.units.length)}</p>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          {open && <PropertyPanel key={open.id} property={open} onArchived={() => setPicked(undefined)} />}
+        </div>
+      )}
     </div>
   );
 }
 
+function PropertyPanel({ property: p, onArchived }: { property: AccommodationProperty; onArchived: () => void }) {
+  const archiveProperty = useArchiveAccommodationProperty();
+  const archiveUnit = useArchiveAccommodationUnit();
+  const [editing, setEditing] = useState(false);
+  const [room, setRoom] = useState<{ unit?: AccommodationUnit } | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const { confirm, dialog } = useAsk(archiveProperty.isPending || archiveUnit.isPending);
+
+  /** Looks at the agent's listings first: archiving under a paid listing would leave it running for nothing. */
+  async function startArchive(unit?: AccommodationUnit) {
+    setProblem(null);
+    setChecking(true);
+    let blocker: string | null;
+    try {
+      const listings = await accommodationApi.listings(1, 100);
+      blocker = archiveBlocker(listings.items, p.id, unit?.id);
+    } catch {
+      setProblem(ARCHIVE_CHECK_FAILED);
+      return;
+    } finally {
+      setChecking(false);
+    }
+    if (blocker) return setProblem(blocker);
+    confirm({
+      title: `Archive ${unit ? unit.unitName : p.title}?`,
+      body: unit ? "It will no longer be listed or editable. This cannot be undone." : archivePropertyWarning(p.units.length),
+      confirmLabel: "Archive",
+      run: async () => {
+        try {
+          if (unit) {
+            await archiveUnit.mutateAsync({ propertyId: p.id, unitId: unit.id });
+            setRoom(null);
+          } else {
+            await archiveProperty.mutateAsync(p.id);
+            onArchived();
+          }
+        } catch (reason) {
+          setProblem(describeHousingError(reason));
+        }
+      },
+    });
+  }
+
+  if (editing) return <PropertyForm mode="edit" property={p} onCancel={() => setEditing(false)} onSaved={() => setEditing(false)} />;
+
+  return (
+    <article className="space-y-4 rounded-2xl border border-kampmax-border bg-white p-5">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-kampmax-text">{p.title}</h2>
+          <p className="text-sm text-kampmax-text-secondary">{[p.categoryName, publicPlace(p)].filter(Boolean).join(" · ")}</p>
+          <p className="mt-1 text-xs text-kampmax-text-secondary">Street address (only you and Kampmax see it): {p.address}</p>
+        </div>
+        <button type="button" onClick={() => setEditing(true)} className="rounded-md border border-kampmax-border px-3 py-2 text-xs">Edit property</button>
+      </header>
+
+      {problem && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{problem}</p>}
+
+      <section className="space-y-2">
+        <h3 className="text-sm font-semibold text-kampmax-text">Rooms</h3>
+        <p className="text-xs text-kampmax-text-secondary">Each room is listed on its own, with its own rent and photos.</p>
+        {p.units.length === 0 && <p className="text-sm text-kampmax-text-secondary">No rooms yet. Add one so you can list it.</p>}
+        <ul className="divide-y divide-kampmax-border">
+          {p.units.map((u) => (
+            <li key={u.id}>
+              {room?.unit?.id === u.id ? (
+                <RoomEditor property={p} unit={u} archiving={checking} onArchive={() => void startArchive(u)} onDone={() => setRoom(null)} />
+              ) : (
+                <button type="button" onClick={() => setRoom({ unit: u })} className="flex w-full items-center gap-3 py-2.5 text-left hover:bg-kampmax-bg">
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-kampmax-text">{u.unitName}</span>
+                    <span className="block truncate text-xs text-kampmax-text-secondary">{u.unitType} · {unitSummary(u)}</span>
+                  </span>
+                  <Pill label={AVAILABILITY_LABEL[u.availabilityStatus] ?? u.availabilityStatus} tone={u.availabilityStatus === "AVAILABLE" ? "positive" : "neutral"} />
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+        {room && !room.unit ? (
+          <RoomEditor property={p} archiving={false} onDone={() => setRoom(null)} />
+        ) : (
+          <button type="button" onClick={() => setRoom({})} className="rounded-md border border-kampmax-border px-3 py-2 text-xs">Add a room</button>
+        )}
+      </section>
+
+      <div className="border-t border-kampmax-border pt-4">
+        <button type="button" disabled={checking || archiveProperty.isPending} onClick={() => void startArchive()} className="text-xs text-red-700 underline disabled:opacity-50">
+          {checking && !room ? "Checking your listings…" : "Archive this property"}
+        </button>
+      </div>
+      {dialog}
+    </article>
+  );
+}

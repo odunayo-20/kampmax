@@ -49,11 +49,11 @@ export function AgentSidebar({
     {
       items: [
         { href: "/agent", label: "Overview", icon: LayoutDashboard },
-        { href: "/agent/profile", label: "Profile", icon: Store },
+        { href: "/agent/profile", label: "Documents and details", icon: Store },
       ],
     },
     {
-      title: "Properties & Listings",
+      title: "Properties and listings",
       items: [
         { href: "/agent/properties", label: "Properties", icon: Building2 },
         { href: "/agent/listings", label: "Listings", icon: Package },
@@ -75,14 +75,14 @@ export function AgentSidebar({
     {
       title: "Account",
       items: [
-        { href: "/agent/verification", label: "Verification & KYC", icon: ShieldCheck },
+        { href: "/agent/verification", label: "Verification", icon: ShieldCheck },
         {
           href: "/chat",
           label: "Messages",
           icon: MessageSquare,
           badge: unreadMessages > 0 ? (unreadMessages > 9 ? "9+" : String(unreadMessages)) : undefined,
         },
-        { href: "/agent/settings", label: "Settings", icon: Settings },
+        { href: "/profile/settings", label: "Settings", icon: Settings },
       ],
     },
   ];
@@ -182,7 +182,7 @@ export function AgentSidebar({
 
 function isActive(pathname: string, href: string) {
   if (href === "/agent") return pathname === "/agent";
-  if (["/agent/profile", "/agent/settings"].includes(href)) {
+  if (href === "/agent/profile") {
     return pathname === href;
   }
   return pathname.startsWith(href);

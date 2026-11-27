@@ -26,11 +26,11 @@ export type AgentDocumentType =
   | "OTHER";
 
 export const AGENT_DOCUMENT_TYPE_LABELS: Record<AgentDocumentType, string> = {
-  IDENTITY: "Identity",
+  IDENTITY: "Government ID",
   OWNERSHIP_PROOF: "Proof of ownership",
   AUTHORIZATION_LETTER: "Letter of authorization",
   BUSINESS_REGISTRATION: "Business registration",
-  OTHER: "Other",
+  OTHER: "Other document",
 };
 
 export type AgentDocumentStatus = "PENDING" | "ACCEPTED" | "REJECTED";

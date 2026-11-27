@@ -56,7 +56,7 @@ const listing = (over: Partial<AccommodationListing> = {}): AccommodationListing
 });
 
 const render_ = (l: AccommodationListing) =>
-  render(<AccommodationListingManager listing={l} packages={[]} amenities={[]} />);
+  render(<AccommodationListingManager listing={l} packages={[]} />);
 
 describe("one listing", () => {
   it("shows views, saves and enquiries for a live listing, and what students pay", () => {

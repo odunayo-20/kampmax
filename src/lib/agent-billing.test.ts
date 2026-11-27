@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canRenewNow, choosablePackages, packageLabel, renewalAction, safeCheckoutUrl, subscriptionView } from "./agent-billing";
+import { afterPaymentText, canRenewNow, choosablePackages, packageLabel, paymentLine, paymentOutcome, renewalAction, safeCheckoutUrl, subscriptionLine, subscriptionView } from "./agent-billing";
 import { canArchiveListing, canResubmit, joinAnd, listingTip, missingOnListing } from "./agent-listings";
 
 const naira = (n: number) => `₦${n.toLocaleString("en-NG")}`;
@@ -29,6 +29,18 @@ describe("listing billing", () => {
     expect(canRenewNow({ status: "ACTIVE", endsAt: "2026-12-02T00:00:00Z" }, now)).toBe(true);
     expect(canRenewNow({ status: "EXPIRED", endsAt: null }, now)).toBe(true);
     expect(renewalAction({ status: "EXPIRED", autoRenew: false })).toBeNull();
+  });
+});
+
+describe("payments", () => {
+  it("names each payment and says how it ended", () => {
+    const p = { paymentType: "INITIAL", status: "FAILED", amount: 5000, paidAt: null, createdAt: "2026-11-20T10:00:00Z" };
+    expect(paymentLine(p, naira)).toMatchObject({ title: "First payment", detail: "₦5,000 · did not go through", pill: "Failed", tone: "bad" });
+    expect(paymentLine({ ...p, status: "REFUND_PENDING" }, naira).pill).toBe("Refund due");
+    expect(paymentOutcome("REFUNDED")).toBe("paid");
+    expect(paymentOutcome("PENDING")).toBe("waiting");
+    expect(subscriptionLine({ amount: 5000, durationDays: 30, autoRenew: true }, naira)).toBe("₦5,000 every 30 days · renews automatically");
+    expect(afterPaymentText(0)).toMatch(/sent for review/);
   });
 });
 

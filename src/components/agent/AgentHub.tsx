@@ -162,7 +162,7 @@ function Actions({ d }: { d: AgentOverview | undefined }) {
     { label: "Preview", href: "/accommodation", Icon: Eye },
     { label: "Help", href: "/support", Icon: Headset },
     { label: "Alerts", href: "/notifications", Icon: Bell },
-    { label: "Settings", href: "/agent/settings", Icon: Settings },
+    { label: "Settings", href: "/profile/settings", Icon: Settings },
   ];
   return (
     <div className="space-y-3 rounded-xl border border-kampmax-border bg-white p-4">

@@ -1,167 +1,120 @@
 "use client";
 
-import { Wallet, CheckCircle, Clock, CreditCard } from "lucide-react";
+import Link from "next/link";
 import {
-  useAccommodationSubscriptions,
-  useAccommodationPayments,
   useAccommodationPaymentReturn,
+  useAccommodationPayments,
+  useAccommodationSubscriptions,
+  useAgentAccommodationListings,
 } from "@/hooks/use-accommodation";
+import { LoadError, Pill } from "@/components/accommodation/enquiry-parts";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { BILLING_EMPTY, paymentLine, subscriptionLine, subscriptionView } from "@/lib/agent-billing";
+import { formatNaira } from "@/lib/utils";
 
-function money(amount: number, currency = "NGN") {
-  return new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
+const NOTICE = {
+  ok: "border-emerald-200 bg-emerald-50 text-emerald-900",
+  wait: "border-amber-200 bg-amber-50 text-amber-900",
+  error: "border-red-200 bg-red-50 text-red-800",
+};
 
+const listingHref = (id: string) => `/agent/listings?open=${encodeURIComponent(id)}`;
+
+/**
+ * What the agent has paid and what is running: subscriptions first, then every payment. Coming back from Paystack,
+ * the payment is checked with the server until it has an answer. The same screen as the mobile app's agent-billing.
+ */
 export default function AgentBillingPage() {
-  const subscriptionsQuery = useAccommodationSubscriptions(1, true);
-  const paymentsQuery = useAccommodationPayments(1, true);
-  const { notice } = useAccommodationPaymentReturn();
+  const subs = useAccommodationSubscriptions(1, true);
+  const payments = useAccommodationPayments(1, true);
+  const listings = useAgentAccommodationListings(1, true);
+  const { notice, check } = useAccommodationPaymentReturn();
+  const titleOf = (id: string) => listings.data?.items.find((l) => l.id === id)?.title ?? "Listing";
+
+  const subItems = subs.data?.items ?? [];
+  const payItems = payments.data?.items ?? [];
+  const empty = subs.isSuccess && payments.isSuccess && subItems.length === 0 && payItems.length === 0;
 
   return (
     <div className="space-y-6">
-      {notice && (
-        <div
-          role={notice.tone === "error" ? "alert" : "status"}
-          className={`rounded-xl border px-4 py-3 text-sm ${
-            notice.tone === "ok"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-              : notice.tone === "wait"
-                ? "border-amber-200 bg-amber-50 text-amber-800"
-                : "border-red-200 bg-red-50 text-red-700"
-          }`}
-        >
-          {notice.text}
-        </div>
-      )}
       <div>
-        <div className="flex items-center gap-2">
-          <Wallet className="h-6 w-6 text-kampmax-blue" />
-          <h1 className="text-2xl font-bold tracking-tight text-kampmax-text">
-            Subscriptions & Billing
-          </h1>
-        </div>
-        <p className="mt-1 text-sm text-kampmax-text-secondary">
-          Track your listing promotion packages, renewal settings, and payment transaction receipts.
-        </p>
+        <h1 className="text-2xl font-bold tracking-tight text-kampmax-text">Billing</h1>
+        <p className="mt-1 text-sm text-kampmax-text-secondary">One subscription per published listing, and every payment you have made.</p>
       </div>
 
-      {/* Active Subscriptions Section */}
-      <section className="rounded-2xl border border-kampmax-border bg-white p-6 shadow-xs">
-        <h2 className="text-base font-bold text-kampmax-text">Active Listing Subscriptions</h2>
-        <p className="mt-0.5 text-xs text-kampmax-text-secondary">
-          Packages currently active for your published room listings.
-        </p>
+      {notice && (
+        <div role={notice.tone === "error" ? "alert" : "status"} className={`rounded-xl border px-4 py-3 text-sm ${NOTICE[notice.tone]}`}>
+          <p>{notice.text}</p>
+          <div className="mt-2 flex flex-wrap gap-3">
+            {notice.canRetry && notice.reference && (
+              <button type="button" onClick={() => check(notice.reference as string)} className="font-semibold underline">Check again</button>
+            )}
+            {notice.listingId && notice.tone !== "wait" && (
+              <Link href={listingHref(notice.listingId)} className="font-semibold underline">View my listing</Link>
+            )}
+          </div>
+        </div>
+      )}
 
-        <div className="mt-4">
-          {subscriptionsQuery.isPending ? (
-            <div className="space-y-3">
-              <Skeleton className="h-16 w-full rounded-xl" />
-              <Skeleton className="h-16 w-full rounded-xl" />
-            </div>
-          ) : subscriptionsQuery.isError ? (
-            <p className="text-xs text-red-600">Could not load subscriptions.</p>
-          ) : subscriptionsQuery.data.items.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-kampmax-border p-8 text-center text-xs text-kampmax-text-secondary">
-              No active subscriptions yet. Publish a draft listing from your listings manager to activate a package.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {subscriptionsQuery.data.items.map((sub) => (
-                <div
-                  key={sub.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-kampmax-border bg-neutral-50/70 p-4 text-xs"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-kampmax-text">Listing Subscription</span>
-                      <span
-                        className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
-                          sub.status === "ACTIVE"
-                            ? "bg-emerald-100 text-emerald-800"
-                            : "bg-neutral-200 text-neutral-700"
-                        }`}
-                      >
-                        {sub.status.toLowerCase()}
+      {subs.isPending || payments.isPending ? (
+        <Skeleton className="h-40 w-full rounded-2xl" />
+      ) : subs.isError || payments.isError ? (
+        <LoadError what="load your billing" error={subs.error ?? payments.error} onRetry={() => void Promise.all([subs.refetch(), payments.refetch()])} />
+      ) : empty ? (
+        <div className="rounded-2xl border border-dashed border-kampmax-border bg-white p-10 text-center">
+          <h2 className="text-base font-bold text-kampmax-text">{BILLING_EMPTY.title}</h2>
+          <p className="mx-auto mt-1 max-w-md text-sm text-kampmax-text-secondary">{BILLING_EMPTY.text}</p>
+        </div>
+      ) : (
+        <>
+          <section className="rounded-2xl border border-kampmax-border bg-white p-5">
+            <h2 className="text-base font-bold text-kampmax-text">Subscriptions</h2>
+            <p className="mt-0.5 text-xs text-kampmax-text-secondary">One per published listing. Open one to go to its listing.</p>
+            {subItems.length === 0 && <p className="mt-3 text-sm text-kampmax-text-secondary">No subscriptions yet.</p>}
+            <ul className="mt-2 divide-y divide-kampmax-border">
+              {subItems.map((s) => {
+                const v = subscriptionView(s);
+                return (
+                  <li key={s.id}>
+                    <Link href={listingHref(s.listingId)} className="block py-3 hover:bg-kampmax-bg">
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="truncate text-sm font-semibold text-kampmax-text">{titleOf(s.listingId)}</span>
+                        <Pill label={v.label} tone={v.tone} />
                       </span>
-                    </div>
-                    <p className="mt-1 text-kampmax-text-secondary">
-                      Duration: {sub.durationDays} days · Auto-renewal:{" "}
-                      <strong className="text-kampmax-text">
-                        {sub.autoRenew ? "Enabled" : "Disabled"}
-                      </strong>
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-base font-bold text-kampmax-text">
-                      {money(sub.amount, sub.currency)}
-                    </p>
-                    <p className="text-[11px] text-kampmax-text-secondary">Per cycle</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
+                      <span className="block text-xs text-kampmax-text-secondary">{subscriptionLine(s, formatNaira)}</span>
+                      {v.text && <span className="block text-xs text-kampmax-text-secondary">{v.text}</span>}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
 
-      {/* Payment History Section */}
-      <section className="rounded-2xl border border-kampmax-border bg-white p-6 shadow-xs">
-        <h2 className="text-base font-bold text-kampmax-text">Payment Transaction History</h2>
-        <p className="mt-0.5 text-xs text-kampmax-text-secondary">
-          Receipts for listing package purchases and subscription payments.
-        </p>
-
-        <div className="mt-4">
-          {paymentsQuery.isPending ? (
-            <div className="space-y-3">
-              <Skeleton className="h-12 w-full rounded-xl" />
-              <Skeleton className="h-12 w-full rounded-xl" />
-            </div>
-          ) : paymentsQuery.isError ? (
-            <p className="text-xs text-red-600">Could not load payment history.</p>
-          ) : paymentsQuery.data.items.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-kampmax-border p-8 text-center text-xs text-kampmax-text-secondary">
-              No payments recorded yet.
-            </div>
-          ) : (
-            <div className="divide-y divide-kampmax-border overflow-x-auto">
-              {paymentsQuery.data.items.map((payment) => (
-                <div
-                  key={payment.id}
-                  className="flex items-center justify-between py-3.5 text-xs"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-kampmax-blue/10 text-kampmax-blue">
-                      <CreditCard className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-kampmax-text">
-                        {payment.paymentType.replaceAll("_", " ")}
-                      </p>
-                      <p className="text-[11px] text-kampmax-text-secondary">
-                        {new Date(payment.createdAt).toLocaleDateString()} · Status:{" "}
-                        <span className="font-medium text-emerald-600">
-                          {payment.status.toLowerCase()}
-                        </span>
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-kampmax-text">
-                      {money(payment.amount, payment.currency)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
+          <section className="rounded-2xl border border-kampmax-border bg-white p-5">
+            <h2 className="text-base font-bold text-kampmax-text">Payments</h2>
+            {payItems.length === 0 && <p className="mt-3 text-sm text-kampmax-text-secondary">No payments yet.</p>}
+            <ul className="mt-2 divide-y divide-kampmax-border">
+              {payItems.map((p) => {
+                const line = paymentLine(p, formatNaira);
+                return (
+                  <li key={p.id} className="flex items-center gap-3 py-3">
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-kampmax-text">{line.title} · {titleOf(p.listingId)}</span>
+                      <span className="block text-xs text-kampmax-text-secondary">{line.detail}</span>
+                      {p.status === "FAILED" && p.failureReason && <span className="block text-xs text-kampmax-text-secondary">{p.failureReason}</span>}
+                    </span>
+                    {p.status === "PENDING" ? (
+                      <button type="button" onClick={() => check(p.reference)} className="text-sm font-semibold text-kampmax-blue hover:underline">Check</button>
+                    ) : (
+                      <Pill label={line.pill} tone={line.tone} />
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        </>
+      )}
     </div>
   );
 }
-

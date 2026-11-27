@@ -19,21 +19,21 @@ beforeEach(() => {
   verifyPayment.mockReset();
 });
 
-function setup(search: string) {
+function setup(search: string, delays?: number[]) {
   window.history.replaceState(null, "", `/agent/billing${search}`);
   const client = new QueryClient();
   const invalidate = vi.spyOn(client, "invalidateQueries");
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
-  return { ...renderHook(() => useAccommodationPaymentReturn(), { wrapper }), invalidate };
+  return { ...renderHook(() => useAccommodationPaymentReturn(delays), { wrapper }), invalidate };
 }
 
 describe("paymentReturnNotice", () => {
   it("tells the agent a first payment now waits for approval", () => {
     const n = paymentReturnNotice({ status: "SUCCESS", paymentType: "INITIAL" });
     expect(n.tone).toBe("ok");
-    expect(n.text).toContain("waiting for our team to approve");
+    expect(n.text).toContain("Your paid time starts at approval");
   });
 
   it("tells the agent a renewal went through", () => {
@@ -84,13 +84,19 @@ describe("coming back from the payment page", () => {
     expect(window.location.search).toBe("?reference=KMPX-TOP-1");
   });
 
-  it("asks only once, even when the page renders again", async () => {
-    verifyPayment.mockResolvedValue({ status: "PENDING", paymentType: "INITIAL" });
-    const { result, rerender } = setup("?reference=ACC-1");
-    await waitFor(() => expect(result.current.notice?.tone).toBe("wait"));
+  it("asks again while the bank has not answered, then stops and offers Check again", async () => {
+    verifyPayment.mockResolvedValue({ status: "PENDING", paymentType: "INITIAL", listingId: "l1" });
+    const { result, rerender } = setup("?reference=ACC-1", [0.01]);
+    await waitFor(() => expect(result.current.notice?.canRetry).toBe(true));
     rerender();
-    rerender();
-    expect(verifyPayment).toHaveBeenCalledTimes(1);
+    expect(verifyPayment).toHaveBeenCalledTimes(2);
+    expect(result.current.notice?.listingId).toBe("l1");
+  });
+
+  it("says plainly when the hourly check limit is hit", async () => {
+    verifyPayment.mockRejectedValue(Object.assign(new Error("Too many"), { status: 429 }));
+    const { result } = setup("?reference=ACC-1");
+    await waitFor(() => expect(result.current.notice?.text).toMatch(/Too many checks/));
   });
 
   it("shows a plain message when the server cannot be reached, and still refreshes", async () => {

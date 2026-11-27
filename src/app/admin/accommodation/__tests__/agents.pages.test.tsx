@@ -198,7 +198,7 @@ describe("agent application page", () => {
     expect(screen.getByRole("heading", { name: "Ada Obi" })).toBeTruthy();
     expect(screen.getByText("ada@example.com")).toBeTruthy();
     expect(screen.getByText("5 Market Road")).toBeTruthy();
-    expect(screen.getByText("Identity")).toBeTruthy();
+    expect(screen.getByText("Government ID")).toBeTruthy();
     expect(screen.getByText("Proof of ownership")).toBeTruthy();
     expect(screen.getAllByText("Not reviewed")).toHaveLength(2);
     expect(screen.getByText(/Opening one is recorded in the audit log/)).toBeTruthy();
@@ -267,7 +267,7 @@ describe("agent application page", () => {
 
   it("accepts a document with one click, and rejects one only with a reason", async () => {
     render(<AgentPage />);
-    fireEvent.click(screen.getByRole("button", { name: "Accept Identity" }));
+    fireEvent.click(screen.getByRole("button", { name: "Accept Government ID" }));
     await waitFor(() =>
       expect(h.reviewDocument.mutateAsync).toHaveBeenCalledWith({
         agentId: "a1",
@@ -275,7 +275,7 @@ describe("agent application page", () => {
         decision: "ACCEPTED",
       })
     );
-    fireEvent.click(screen.getByRole("button", { name: "Reject Identity" }));
+    fireEvent.click(screen.getByRole("button", { name: "Reject Government ID" }));
     const dialog = within(screen.getByRole("alertdialog"));
     expect((dialog.getByRole("button", { name: "Reject document" }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.change(dialog.getByLabelText("What is wrong with it?"), { target: { value: "Photo is cut off" } });
@@ -295,9 +295,9 @@ describe("agent application page", () => {
     Object.defineProperty(URL, "createObjectURL", { value: () => "blob:doc", configurable: true });
     Object.defineProperty(URL, "revokeObjectURL", { value: () => {}, configurable: true });
     render(<AgentPage />);
-    fireEvent.click(screen.getByRole("button", { name: "View Identity" }));
+    fireEvent.click(screen.getByRole("button", { name: "View Government ID" }));
     await waitFor(() => expect(h.openAgentDocument).toHaveBeenCalledWith("a1", "d-IDENTITY"));
-    expect(await screen.findByRole("img", { name: "Identity" })).toBeTruthy();
+    expect(await screen.findByRole("img", { name: "Government ID" })).toBeTruthy();
   });
 
   it("offers suspend and revoke for an approved agent, restore for a suspended one", () => {

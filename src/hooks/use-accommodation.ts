@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
 import { publicAccommodationKeys } from "@/lib/query-keys";
 import { isFinalEnquiry } from "@/lib/accommodation-enquiry";
+import { afterPaymentText, CHECK_DELAYS, CHECKING_TEXT, paymentOutcome, STILL_WAITING_TEXT, TOO_MANY_CHECKS } from "@/lib/agent-billing";
 import {
   accommodationApi,
   type AccommodationSearchQuery,
@@ -84,7 +85,7 @@ export function useAccommodationSubscriptions(page = 1, enabled = true) {
   const { status, user } = useAuth();
   return useQuery({
     queryKey: ["accommodation", "subscriptions", user?.id, page],
-    queryFn: () => accommodationApi.subscriptions(page),
+    queryFn: () => accommodationApi.subscriptions(page, 100),
     enabled: enabled && status === "authenticated" && Boolean(user?.id),
   });
 }
@@ -93,7 +94,7 @@ export function useAccommodationPayments(page = 1, enabled = true) {
   const { status, user } = useAuth();
   return useQuery({
     queryKey: ["accommodation", "payments", user?.id, page],
-    queryFn: () => accommodationApi.paymentHistory(page),
+    queryFn: () => accommodationApi.paymentHistory(page, 100),
     enabled: enabled && status === "authenticated" && Boolean(user?.id),
   });
 }
@@ -483,39 +484,77 @@ export function useRenewAccommodationSubscription() {
   });
 }
 
-export type AccommodationPaymentNotice = { tone: "ok" | "wait" | "error"; text: string };
+export type AccommodationPaymentNotice = {
+  tone: "ok" | "wait" | "error";
+  text: string;
+  /** The payment this is about, so "Check again" can ask about it. */
+  reference?: string;
+  /** Its listing, for "View my listing". */
+  listingId?: string;
+  /** True once automatic checks have stopped without an answer. */
+  canRetry?: boolean;
+};
 
-/** What to tell the agent about a payment the gateway sent them back from. */
+/** What to tell the agent about a payment the server has answered for. */
 export function paymentReturnNotice(
-  payment: Pick<AccommodationPayment, "status" | "paymentType">
+  payment: Pick<AccommodationPayment, "status" | "paymentType"> & { amount?: number; failureReason?: string | null }
 ): AccommodationPaymentNotice {
-  if (payment.status === "SUCCESS") {
+  const outcome = paymentOutcome(payment.status);
+  if (outcome === "paid") {
     return {
       tone: "ok",
-      text:
-        payment.paymentType === "INITIAL"
-          ? "Payment received. Your listing is now waiting for our team to approve it, and goes live once it is."
-          : "Payment received. Your listing has been renewed.",
+      text: payment.paymentType === "INITIAL" ? afterPaymentText(payment.amount ?? 1) : "Payment received. Your listing has been renewed.",
     };
   }
-  if (payment.status === "PENDING") {
-    return {
-      tone: "wait",
-      text: "We are still waiting for the bank to confirm this payment. This page updates when it arrives.",
-    };
-  }
-  return { tone: "error", text: "That payment did not go through, so nothing was charged. You can try again." };
+  if (outcome === "waiting") return { tone: "wait", text: STILL_WAITING_TEXT };
+  const why = payment.failureReason?.trim();
+  return { tone: "error", text: `${why ? `${why}. ` : ""}That payment did not go through, so nothing was charged. You can try again from the listing.` };
 }
 
 /**
- * Paystack sends the agent back with ?reference=ACC-…; this confirms that
- * payment with the server exactly once, tidies the URL, and refreshes the
- * accommodation data. Other payments' references are ignored.
+ * Paystack sends the agent back with ?reference=ACC-…; this asks the server about that payment, tidies the URL, and
+ * keeps asking at growing intervals while the bank has not answered, then stops and offers "Check again". `check`
+ * starts the same for any payment (a pending row on Billing). Other payments' references are ignored.
  */
-export function useAccommodationPaymentReturn() {
+export function useAccommodationPaymentReturn(delays: number[] = CHECK_DELAYS) {
   const queryClient = useQueryClient();
   const [notice, setNotice] = useState<AccommodationPaymentNotice | null>(null);
   const handled = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const round = useRef(0);
+
+  const check = useCallback(
+    (reference: string) => {
+      clearTimeout(timer.current);
+      const mine = ++round.current;
+      let i = 0;
+      const refresh = () => void queryClient.invalidateQueries({ queryKey: publicAccommodationKeys.all });
+      setNotice({ tone: "wait", text: CHECKING_TEXT, reference });
+      const run = async () => {
+        try {
+          const payment = await accommodationApi.verifyPayment(reference);
+          if (mine !== round.current) return;
+          const base = { reference, listingId: payment.listingId };
+          if (paymentOutcome(payment.status) !== "waiting") {
+            setNotice({ ...paymentReturnNotice(payment), ...base });
+            return refresh();
+          }
+          if (i >= delays.length) {
+            setNotice({ tone: "wait", text: STILL_WAITING_TEXT, ...base, canRetry: true });
+            return refresh();
+          }
+          timer.current = setTimeout(() => void run(), delays[i++] * 1000);
+        } catch (error) {
+          if (mine !== round.current) return;
+          const limited = (error as { status?: number }).status === 429;
+          setNotice({ tone: limited ? "wait" : "error", text: limited ? TOO_MANY_CHECKS : getFriendlyErrorMessage(error), reference, canRetry: true });
+          refresh();
+        }
+      };
+      void run();
+    },
+    [delays, queryClient]
+  );
 
   useEffect(() => {
     if (handled.current) return;
@@ -524,14 +563,12 @@ export function useAccommodationPaymentReturn() {
     if (!reference?.startsWith("ACC-")) return;
     handled.current = true;
     window.history.replaceState(null, "", window.location.pathname);
-    accommodationApi
-      .verifyPayment(reference)
-      .then((payment) => setNotice(paymentReturnNotice(payment)))
-      .catch((error) => setNotice({ tone: "error", text: getFriendlyErrorMessage(error) }))
-      .finally(() => void queryClient.invalidateQueries({ queryKey: publicAccommodationKeys.all }));
-  }, [queryClient]);
+    check(reference);
+  }, [check]);
 
-  return { notice };
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  return { notice, check };
 }
 
 export function isApprovedAccommodationAgent(status: AccommodationAgentStatus | null | undefined) {

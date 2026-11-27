@@ -1,14 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, useState } from "react";
+import { useState } from "react";
 import {
   useArchiveAccommodationListing,
   useCancelAccommodationRenewal,
   useConfirmAccommodationAvailability,
   useEnableAccommodationRenewal,
   useSubmitAccommodationListing,
-  useUpdateAccommodationListing,
 } from "@/hooks/use-accommodation";
 import { describeHousingError } from "@/lib/accommodation-text";
 import { canRenewNow, renewalAction, subscriptionView } from "@/lib/agent-billing";
@@ -29,9 +28,9 @@ import {
   type ListingTone,
 } from "@/lib/agent-listings";
 import { formatNaira } from "@/lib/utils";
-import { accommodationApi } from "@/services/accommodation";
-import type { AccommodationAmenityOption, AccommodationListing, AccommodationPackage } from "@/types/accommodation";
+import type { AccommodationListing, AccommodationPackage } from "@/types/accommodation";
 import { Pill, useAsk, useRun } from "./enquiry-parts";
+import { ListingFormPanel } from "./ListingFormPanel";
 import { PublishDialog } from "./PublishDialog";
 
 const NOTICE: Record<ListingTone, string> = {
@@ -51,11 +50,9 @@ const day = (iso: string) => new Date(iso).toLocaleDateString("en-NG", { weekday
 export function AccommodationListingManager({
   listing: l,
   packages,
-  amenities,
 }: {
   listing: AccommodationListing;
   packages: AccommodationPackage[];
-  amenities: AccommodationAmenityOption[];
 }) {
   const archive = useArchiveAccommodationListing();
   const resubmit = useSubmitAccommodationListing();
@@ -139,7 +136,7 @@ export function AccommodationListingManager({
       {message && <p role="status" className="text-sm text-emerald-700">{message}</p>}
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
 
-      {editing && <ListingEditForm listing={l} amenities={amenities} onDone={(note) => { setEditing(false); setMessage(note); }} />}
+      {editing && <ListingFormPanel mode="edit" listing={l} onCancel={() => setEditing(false)} onSaved={(note) => { setEditing(false); setMessage(note); }} />}
 
       <Section title="Rent and charges">
         <Line label="Rent" value={rentLine(l, formatNaira)} bold />
@@ -262,86 +259,5 @@ function Line({ label, value, bold }: { label: string; value: string; bold?: boo
       <span className="text-kampmax-text-secondary">{label}</span>
       <span className={`text-right text-kampmax-text ${bold ? "font-bold" : ""}`}>{value}</span>
     </div>
-  );
-}
-
-/** Editing a saved listing. Compared with the mobile form screen separately. */
-function ListingEditForm({ listing, amenities, onDone }: { listing: AccommodationListing; amenities: AccommodationAmenityOption[]; onDone: (note: string) => void }) {
-  const update = useUpdateAccommodationListing();
-  const [files, setFiles] = useState<File[]>([]);
-  const [amenityIds, setAmenityIds] = useState(listing.amenities.map((item) => item.id));
-  const [error, setError] = useState<string | null>(null);
-
-  async function saveEdits(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-    const form = new FormData(event.currentTarget);
-    try {
-      const newMedia = await Promise.all(files.map((file) => accommodationApi.uploadListingImage(file)));
-      await update.mutateAsync({
-        id: listing.id,
-        input: {
-          title: String(form.get("title") ?? "").trim(),
-          description: String(form.get("description") ?? "").trim(),
-          rentAmount: Number(form.get("rentAmount")),
-          paymentFrequency: String(form.get("paymentFrequency")) as "MONTHLY" | "QUARTERLY" | "BIANNUALLY" | "ANNUALLY" | "PER_SEMESTER" | "PER_NIGHT",
-          cautionFee: Number(form.get("cautionFee") || 0),
-          agencyFee: Number(form.get("agencyFee") || 0),
-          agreementFee: Number(form.get("agreementFee") || 0),
-          otherCharges: Number(form.get("otherCharges") || 0),
-          amenityIds,
-          ...(files.length > 0
-            ? { media: [...listing.media.map((item) => ({ mediaId: item.mediaId, caption: item.caption ?? undefined })), ...newMedia.map((item) => ({ mediaId: item.id }))] }
-            : {}),
-        },
-      });
-      onDone("Listing saved. Approved listings with content changes return to review.");
-    } catch (reason) {
-      setError(describeHousingError(reason));
-    }
-  }
-
-  return (
-    <form onSubmit={(event) => void saveEdits(event)} className="grid gap-3 rounded-lg bg-kampmax-bg p-4 sm:grid-cols-2">
-      {([
-        ["title", "Title", listing.title, "text"],
-        ["rentAmount", "Rent (₦)", String(listing.rentAmount), "number"],
-        ["cautionFee", "Caution fee (₦)", String(listing.cautionFee), "number"],
-        ["agencyFee", "Agency fee (₦)", String(listing.agencyFee), "number"],
-        ["agreementFee", "Agreement fee (₦)", String(listing.agreementFee), "number"],
-        ["otherCharges", "Other charges (₦)", String(listing.otherCharges), "number"],
-      ] as const).map(([field, label, value, type]) => (
-        <label key={field} className="text-xs text-kampmax-text-secondary">{label}
-          <input name={field} type={type} required={field === "title" || field === "rentAmount"} min={type === "number" ? 0 : undefined} defaultValue={value} className="mt-1 block w-full rounded-md border border-kampmax-border px-3 py-2 text-sm text-kampmax-text" />
-        </label>
-      ))}
-      <label className="text-xs text-kampmax-text-secondary">Rent frequency
-        <select name="paymentFrequency" defaultValue={listing.paymentFrequency} className="mt-1 block w-full rounded-md border border-kampmax-border bg-white px-3 py-2 text-sm">
-          <option value="ANNUALLY">Annually</option><option value="BIANNUALLY">Every six months</option><option value="PER_SEMESTER">Per semester</option><option value="QUARTERLY">Quarterly</option><option value="MONTHLY">Monthly</option><option value="PER_NIGHT">Per night</option>
-        </select>
-      </label>
-      <label className="text-xs text-kampmax-text-secondary sm:col-span-2">Description
-        <textarea name="description" rows={3} maxLength={5000} defaultValue={listing.description ?? ""} className="mt-1 block w-full rounded-md border border-kampmax-border px-3 py-2 text-sm text-kampmax-text" />
-      </label>
-      <label className="text-xs text-kampmax-text-secondary sm:col-span-2">Add listing photos
-        <input type="file" accept="image/*" multiple onChange={(event) => setFiles(Array.from(event.target.files ?? []))} className="mt-1 block w-full text-sm" />
-      </label>
-      <fieldset className="sm:col-span-2">
-        <legend className="text-xs text-kampmax-text-secondary">Facilities</legend>
-        <div className="mt-2 flex flex-wrap gap-3">
-          {amenities.map((amenity) => (
-            <label key={amenity.id} className="flex items-center gap-1.5 text-xs">
-              <input type="checkbox" checked={amenityIds.includes(amenity.id)} onChange={(event) => setAmenityIds((current) => (event.target.checked ? [...current, amenity.id] : current.filter((id) => id !== amenity.id)))} />
-              {amenity.name}
-            </label>
-          ))}
-        </div>
-      </fieldset>
-      {error && <p role="alert" className="text-sm text-red-700 sm:col-span-2">{error}</p>}
-      <div className="flex items-center gap-3 sm:col-span-2">
-        <button disabled={update.isPending} className="rounded-md bg-kampmax-blue px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{update.isPending ? "Saving…" : "Save changes"}</button>
-        <button type="button" onClick={() => onDone("")} className="rounded-md border border-kampmax-border px-3 py-2 text-xs">Cancel</button>
-      </div>
-    </form>
   );
 }

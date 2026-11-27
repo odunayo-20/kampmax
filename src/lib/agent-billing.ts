@@ -88,6 +88,67 @@ export function canRenewNow(s: Pick<Sub, "status" | "endsAt">, now: Date = new D
   return Number.isFinite(ends) && ends - now.getTime() <= EARLY_RENEWAL_DAYS * DAY_MS;
 }
 
+/** "₦5,000 every 30 days · renews automatically", for a subscription row. */
+export function subscriptionLine(s: { amount: number; durationDays: number; autoRenew: boolean }, format: (n: number) => string): string {
+  return `${s.amount > 0 ? `${format(s.amount)} every ${durationText(s.durationDays)}` : "Free"} · ${s.autoRenew ? "renews automatically" : "no auto-renewal"}`;
+}
+
+// ---------- payments ----------
+
+const PAYMENT_TYPE: Record<string, string> = { INITIAL: "First payment", RENEWAL: "Automatic renewal", RECOVERY: "Renewal" };
+
+const PAYMENT_PILL: Record<string, string> = { SUCCESS: "Paid", FAILED: "Failed", REFUNDED: "Refunded", REFUND_PENDING: "Refund due", PENDING: "Waiting" };
+
+/** One payment row: what it was, how much and when, and a pill. */
+export function paymentLine(
+  p: { paymentType: string; status: string; amount: number; paidAt: string | null; createdAt: string },
+  format: (n: number) => string,
+): { title: string; detail: string; tone: ListingTone; pill: string } {
+  const title = PAYMENT_TYPE[p.paymentType] ?? "Payment";
+  const when = day(p.paidAt ?? p.createdAt);
+  const amount = p.amount > 0 ? format(p.amount) : "Free";
+  const pill = PAYMENT_PILL[p.status] ?? p.status;
+  switch (p.status) {
+    case "SUCCESS":
+      return { title, detail: `${amount} · paid ${when}`, tone: "positive", pill };
+    case "PENDING":
+      return { title, detail: `${amount} · waiting for payment`, tone: "attention", pill };
+    case "FAILED":
+      return { title, detail: `${amount} · did not go through`, tone: "bad", pill };
+    case "REFUND_PENDING":
+      return { title, detail: `${amount} · refund on its way`, tone: "info", pill };
+    case "REFUNDED":
+      return { title, detail: `${amount} · refunded`, tone: "neutral", pill };
+    default:
+      return { title, detail: amount, tone: "neutral", pill };
+  }
+}
+
+export type PaymentOutcome = "paid" | "waiting" | "failed";
+
+/** Whether the payment went through, failed, or is still open. Only the server's word counts. */
+export function paymentOutcome(status: string | undefined): PaymentOutcome {
+  if (status === "SUCCESS" || status === "REFUND_PENDING" || status === "REFUNDED") return "paid";
+  if (status === "FAILED") return "failed";
+  return "waiting";
+}
+
+/** What happens after a listing is paid for or sent for review, in one sentence. */
+export function afterPaymentText(price: number): string {
+  return price > 0
+    ? "Payment received. The Kampmax team will review your listing and publish it once it is approved. Your paid time starts at approval."
+    : "Your listing has been sent for review. The Kampmax team will publish it once it is approved.";
+}
+
+/** Seconds between automatic checks after Paystack. The server allows 60 checks an hour, so this backs off and stops. */
+export const CHECK_DELAYS = [2, 3, 4, 6, 8, 10, 10, 10];
+
+export const CHECKING_TEXT = "Confirming your payment… This usually takes a few seconds.";
+export const STILL_WAITING_TEXT = "Still waiting for payment. If you have paid, it can take a little longer to show. If you closed the payment page without paying, you can try again from the listing.";
+export const TOO_MANY_CHECKS = "Too many checks for now. Wait a minute, then check again.";
+
+export const BILLING_EMPTY = { title: "Nothing to pay yet", text: "When you publish a listing, its subscription and payments show up here." };
+
 /** Turning auto-renew off is always possible while it is on; turning it on needs an active subscription. */
 export function renewalAction(s: Pick<Sub, "status" | "autoRenew">): "turn-off" | "turn-on" | null {
   if (s.autoRenew) return "turn-off";
