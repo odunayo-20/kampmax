@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Building2, Clock, Eye, Package } from "lucide-react";
+import { Building2, CalendarDays, Clock, Eye, Package } from "lucide-react";
 import {
   useAccommodationAgentOverview,
   useAccommodationAgentProfile,
@@ -37,6 +37,7 @@ export default function AgentOverviewPage() {
   const totalListings = listingsQuery.data?.meta?.total ?? listingsQuery.data?.items?.length ?? 0;
   const interest = overviewQuery.data?.interest;
   const pendingInquiries = enquiriesQuery.data?.items?.filter((e) => e.status === "NEW").length ?? 0;
+  const visits = overviewQuery.data?.inspections;
 
   return (
     <div className="space-y-4">
@@ -48,8 +49,7 @@ export default function AgentOverviewPage() {
         </p>
       </div>
 
-      {/* 4 Top Metric Cards */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <AgentMetricCard
           label="Total properties"
           value={propertiesQuery.isPending ? "…" : totalProperties}
@@ -62,6 +62,15 @@ export default function AgentOverviewPage() {
           sublabel={pendingInquiries === 0 ? "Nothing waiting" : `${pendingInquiries} awaiting response`}
           icon={Clock}
           tone="emerald"
+          href="/agent/enquiries"
+        />
+        <AgentMetricCard
+          label="Visits"
+          value={overviewQuery.isPending ? "…" : (visits?.awaitingAnswer ?? 0) + (visits?.upcoming ?? 0)}
+          sublabel={visits?.awaitingAnswer ? `${visits.awaitingAnswer} need${visits.awaitingAnswer === 1 ? "s" : ""} an answer` : "Nothing to answer"}
+          icon={CalendarDays}
+          tone="purple"
+          href="/agent/visits"
         />
         <AgentMetricCard
           label="Listings"

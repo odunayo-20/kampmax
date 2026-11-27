@@ -466,6 +466,15 @@ export const accommodationApi = {
     );
   },
 
+  /** Visit requests and arranged visits across all the agent's listings. */
+  agentInspections(page = 1, limit = 100) {
+    return unwrap(
+      apiClient.get<AccommodationPage<AccommodationInspection>>(
+        `/accommodation/agent/inspections${queryString({ page, limit })}`
+      )
+    );
+  },
+
   enquiry(id: string) {
     return unwrap(
       apiClient.get<AccommodationEnquiry>(

@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
 import { publicAccommodationKeys } from "@/lib/query-keys";
+import { isFinalEnquiry } from "@/lib/accommodation-enquiry";
 import {
   accommodationApi,
   type AccommodationSearchQuery,
@@ -124,7 +125,8 @@ export function useSavedAccommodationListings(page = 1) {
   });
 }
 
-export function useAccommodationEnquiries(role: "USER" | "AGENT", page = 1) {
+/** `pollMs` re-checks while the page is open (and in view), so a reply shows without a reload. */
+export function useAccommodationEnquiries(role: "USER" | "AGENT", page = 1, pollMs?: number) {
   const { status, user } = useAuth();
   return useQuery({
     queryKey: publicAccommodationKeys.enquiries(user?.id, role, page),
@@ -133,15 +135,29 @@ export function useAccommodationEnquiries(role: "USER" | "AGENT", page = 1) {
         ? accommodationApi.agentEnquiries(page)
         : accommodationApi.myEnquiries(page),
     enabled: status === "authenticated" && Boolean(user?.id),
+    refetchInterval: pollMs,
   });
 }
 
-export function useAccommodationEnquiry(id: string) {
+/** The agent's visits; `pollMs` re-checks for new requests while the page is open. */
+export function useAgentAccommodationInspections(pollMs?: number) {
+  const { status, user } = useAuth();
+  return useQuery({
+    queryKey: [...publicAccommodationKeys.all, "agent-inspections", user?.id] as const,
+    queryFn: () => accommodationApi.agentInspections(),
+    enabled: status === "authenticated" && Boolean(user?.id),
+    refetchInterval: pollMs,
+  });
+}
+
+/** `pollMs` checks an open enquiry for replies; a closed one takes no more, so it stops. */
+export function useAccommodationEnquiry(id: string, pollMs?: number) {
   const { status, user } = useAuth();
   return useQuery({
     queryKey: publicAccommodationKeys.enquiry(user?.id, id),
     queryFn: () => accommodationApi.enquiry(id),
     enabled: status === "authenticated" && Boolean(user?.id && id),
+    refetchInterval: pollMs ? (query) => (query.state.data && isFinalEnquiry(query.state.data.status) ? false : pollMs) : undefined,
   });
 }
 

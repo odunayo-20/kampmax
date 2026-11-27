@@ -32,6 +32,8 @@ export interface AgentOverview {
   };
   reply: AgentReplyStats;
   interest: { views: number; saves: number };
+  /** Visit requests waiting for the agent's answer, and visits arranged and still to come. */
+  inspections: { awaitingAnswer: number; upcoming: number };
   topListings: {
     listingId: string;
     title: string;
@@ -56,6 +58,7 @@ export function readAgentOverview(raw: unknown): AgentOverview {
   const confirm = bag(r.needsConfirming);
   const reply = bag(r.reply);
   const interest = bag(r.interest);
+  const visits = bag(r.inspections);
   const rooms = (Array.isArray(confirm.listings) ? confirm.listings : [])
     .map(bag)
     .filter((x) => text(x.id));
@@ -81,6 +84,7 @@ export function readAgentOverview(raw: unknown): AgentOverview {
       typicalReplyHours: maybeNumber(reply.typicalReplyHours),
     },
     interest: { views: countOf(interest.views), saves: countOf(interest.saves) },
+    inspections: { awaitingAnswer: countOf(visits.awaitingAnswer), upcoming: countOf(visits.upcoming) },
     topListings: (Array.isArray(r.topListings) ? r.topListings : [])
       .map(bag)
       .filter((x) => text(x.listingId))

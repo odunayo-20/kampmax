@@ -26,8 +26,8 @@ export default function EnquiryRedirectPage({ params }: { params: Promise<{ id: 
   });
 
   useEffect(() => {
-    if (q.data) router.replace(q.data.role === "AGENT" ? "/agent/enquiries" : "/accommodation/my-enquiries");
-  }, [q.data, router]);
+    if (q.data) router.replace(`${q.data.role === "AGENT" ? "/agent/enquiries" : "/accommodation/my-enquiries"}?open=${encodeURIComponent(id)}`);
+  }, [q.data, router, id]);
 
   if (q.isError) {
     return (

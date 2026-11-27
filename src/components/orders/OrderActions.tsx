@@ -26,7 +26,8 @@ export function OrderActions({
 }: OrderActionsProps) {
   const isActive =
     order.status !== "delivered" && order.status !== "cancelled";
-  const canCancel = order.status === "placed" || order.status === "confirmed";
+  // The server only lets a buyer cancel before payment ("placed"); a paid order goes through a report or refund instead.
+  const canCancel = order.status === "placed";
   const isDelivered = order.status === "delivered";
   const singleProduct = order.items.length === 1 ? order.items[0].product : null;
 
@@ -58,7 +59,7 @@ export function OrderActions({
         Message
       </button>
 
-      {/* Cancel — only for placed/confirmed */}
+      {/* Cancel — only before payment */}
       {canCancel && (
         <button
           onClick={onCancel}

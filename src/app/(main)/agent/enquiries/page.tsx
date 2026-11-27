@@ -1,27 +1,15 @@
-"use client";
-
-import { MessageSquareText } from "lucide-react";
 import { AccommodationEnquiries } from "@/components/accommodation/AccommodationEnquiries";
 
-export default function AgentEnquiriesPage() {
+/** `?open=<id>` opens that enquiry, for links from a notification. */
+export default async function AgentEnquiriesPage({ searchParams }: { searchParams: Promise<{ open?: string }> }) {
+  const { open } = await searchParams;
   return (
     <div className="space-y-6">
       <div>
-        <div className="flex items-center gap-2">
-          <MessageSquareText className="h-6 w-6 text-kampmax-blue" />
-          <h1 className="text-2xl font-bold tracking-tight text-kampmax-text">
-            Student Inquiries & Leads
-          </h1>
-        </div>
-        <p className="mt-1 text-sm text-kampmax-text-secondary">
-          Respond to student inquiries, answer questions, and schedule on-campus property inspections.
-        </p>
+        <h1 className="text-2xl font-bold tracking-tight text-kampmax-text">Enquiries</h1>
+        <p className="mt-1 text-sm text-kampmax-text-secondary">Students asking about your listings. Reply, and answer their visit requests.</p>
       </div>
-
-      <section>
-        <AccommodationEnquiries role="AGENT" />
-      </section>
+      <AccommodationEnquiries initialId={open} />
     </div>
   );
 }
-

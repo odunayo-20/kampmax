@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -9,6 +10,8 @@ interface AgentMetricCardProps {
   sublabel?: string;
   icon: LucideIcon;
   tone?: "blue" | "emerald" | "indigo" | "amber" | "purple";
+  /** Makes the card open the screen behind the number. */
+  href?: string;
 }
 
 const TONE = {
@@ -25,9 +28,10 @@ export function AgentMetricCard({
   sublabel,
   icon: Icon,
   tone = "blue",
+  href,
 }: AgentMetricCardProps) {
-  return (
-    <div className="rounded-xl border border-kampmax-border bg-white p-4">
+  const body = (
+    <>
       <div className="mb-3 flex items-center justify-between">
         <div className={cn("flex h-9 w-9 items-center justify-center rounded-lg", TONE[tone])}>
           <Icon className="h-4 w-4" aria-hidden />
@@ -38,6 +42,8 @@ export function AgentMetricCard({
       {sublabel && (
         <p className="mt-0.5 text-[11px] text-kampmax-text-muted">{sublabel}</p>
       )}
-    </div>
+    </>
   );
+  const box = "block rounded-xl border border-kampmax-border bg-white p-4";
+  return href ? <Link href={href} className={cn(box, "hover:border-kampmax-blue")}>{body}</Link> : <div className={box}>{body}</div>;
 }

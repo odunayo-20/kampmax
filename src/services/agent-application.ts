@@ -100,7 +100,7 @@ export function applicationSteps(tone: StatusTone): ApplicationStep[] {
 }
 
 /** Workspace pages that only work once an agent is approved. */
-export const AFTER_APPROVAL_PATHS = ["/agent/properties", "/agent/listings", "/agent/enquiries", "/agent/billing"];
+export const AFTER_APPROVAL_PATHS = ["/agent/properties", "/agent/listings", "/agent/enquiries", "/agent/visits", "/agent/billing"];
 
 export function opensAfterApproval(pathname: string): boolean {
   return AFTER_APPROVAL_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));

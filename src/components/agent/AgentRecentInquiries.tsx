@@ -67,7 +67,7 @@ export function AgentRecentInquiries() {
               <li key={inquiry.id}>
                 <button
                   type="button"
-                  onClick={() => router.push("/agent/enquiries")}
+                  onClick={() => router.push(`/agent/enquiries?open=${encodeURIComponent(inquiry.id)}`)}
                   className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-neutral-50 transition-colors"
                 >
                   <div className="min-w-0 flex-1">

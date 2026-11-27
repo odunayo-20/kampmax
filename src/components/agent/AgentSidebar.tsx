@@ -7,7 +7,7 @@ import {
   Store,
   Building2,
   Package,
-  ShoppingCart,
+  CalendarDays,
   Megaphone,
   ShieldCheck,
   MessageSquare,
@@ -62,7 +62,8 @@ export function AgentSidebar({
     {
       title: "Inquiries & Leads",
       items: [
-        { href: "/agent/enquiries", label: "Enquiries", icon: ShoppingCart },
+        { href: "/agent/enquiries", label: "Enquiries", icon: MessageSquare },
+        { href: "/agent/visits", label: "Visits", icon: CalendarDays },
       ],
     },
     {

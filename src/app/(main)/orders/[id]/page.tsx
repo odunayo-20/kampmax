@@ -66,7 +66,6 @@ export default function OrderDetailPage({
   const [actionError, setActionError] = useState<string | null>(null);
 
   const [showCancelModal, setShowCancelModal] = useState(false);
-  const [cancelReason, setCancelReason] = useState("");
   const [isCancelled, setIsCancelled] = useState(false);
 
   // Dispute & Release Modals State
@@ -153,7 +152,6 @@ export default function OrderDetailPage({
   const displayOrder = {
     ...order,
     status: currentStatus,
-    cancelReason: cancelReason || order.cancelReason,
   };
 
   const nextStep = nextStepText(currentStatus);
@@ -405,9 +403,9 @@ export default function OrderDetailPage({
               <p className="text-xs text-kampmax-error font-medium">
                 This order has been cancelled
               </p>
-              {(cancelReason || order.cancelReason) && (
+              {order.cancelReason && (
                 <p className="text-[11px] text-kampmax-error/80 mt-0.5">
-                  Reason: {cancelReason || order.cancelReason}
+                  Reason: {order.cancelReason}
                 </p>
               )}
             </div>
@@ -557,24 +555,6 @@ export default function OrderDetailPage({
               Are you sure you want to cancel order #{order.id}? This action
               cannot be undone.
             </p>
-            <div>
-              <label className="text-xs font-medium text-kampmax-text-secondary mb-1 block">
-                Reason for cancellation
-              </label>
-              <select
-                value={cancelReason}
-                onChange={(e) => setCancelReason(e.target.value)}
-                className="w-full h-10 px-3 text-sm border border-kampmax-border rounded-lg bg-white focus:outline-none focus:border-kampmax-blue"
-              >
-                <option value="">Select a reason</option>
-                <option value="Changed my mind">Changed my mind</option>
-                <option value="Found a better deal">Found a better deal</option>
-                <option value="Item no longer needed">Item no longer needed</option>
-                <option value="Item no longer available">Item no longer available</option>
-                <option value="Duplicate order">Duplicate order</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
             <div className="flex gap-2">
               <button
                 onClick={() => setShowCancelModal(false)}
@@ -585,7 +565,7 @@ export default function OrderDetailPage({
               </button>
               <button
                 onClick={confirmCancel}
-                disabled={!cancelReason || isCancelling}
+                disabled={isCancelling}
                 className="flex-1 h-10 text-sm font-medium bg-kampmax-error text-white rounded-lg hover:bg-kampmax-error/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors inline-flex items-center justify-center gap-1.5"
               >
                 {isCancelling && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
