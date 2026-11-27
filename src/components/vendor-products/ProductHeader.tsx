@@ -5,7 +5,8 @@ import { Button } from "@/components/ui";
 import { formatNaira } from "@/lib/utils";
 
 interface ProductHeaderProps {
-  totalCount: number;
+  /** Undefined while the list is still loading. */
+  totalCount?: number;
   onAddProduct: () => void;
 }
 
@@ -15,7 +16,7 @@ export function ProductHeader({ totalCount, onAddProduct }: ProductHeaderProps) 
       <div>
         <h1 className="text-xl font-bold text-kampmax-text">Products</h1>
         <p className="text-sm text-kampmax-text-secondary">
-          {totalCount} product{totalCount !== 1 ? "s" : ""}
+          {totalCount === undefined ? "Loading…" : `${totalCount} product${totalCount !== 1 ? "s" : ""}`}
         </p>
       </div>
       <Button onClick={onAddProduct} className="flex items-center gap-2">

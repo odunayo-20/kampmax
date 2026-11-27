@@ -64,7 +64,7 @@ export function useVendorProduct(id: string) {
 }
 
 /** Any product mutation refreshes lists, counts, details and the dashboard. */
-function useInvalidateProducts() {
+export function useInvalidateProducts() {
   const queryClient = useQueryClient();
   return () => {
     queryClient.invalidateQueries({ queryKey: vendorProductKeys.all });

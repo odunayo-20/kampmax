@@ -7,10 +7,8 @@ import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Briefcase,
-  Building2,
   CalendarDays,
   Clock,
-  Eye,
   MapPin,
   Send,
   ShieldAlert,
@@ -27,7 +25,7 @@ import {
   categoryLabelFor,
   campusNameFor,
 } from "@/services/opportunity";
-import { DURATION_LABEL, WORK_ARRANGEMENT_LABEL } from "@/config/opportunity";
+import { DURATION_LABEL, JOB_EXPERIENCE_LEVELS, WORK_ARRANGEMENT_LABEL } from "@/config/opportunity";
 import { formatDate } from "@/lib/utils";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
 import { useAuth } from "@/lib/auth-context";
@@ -39,7 +37,7 @@ import { budgetText } from "@/components/freelancer/opportunities/OpportunityCar
 import { OpportunityTypeBadge } from "@/components/employer/jobs/OpportunityTypeBadge";
 import { HiringApplyPanel } from "@/components/jobs/HiringApplyPanel";
 import { ReportDialog } from "@/components/jobs/ReportDialog";
-import { monthsText, openingsText } from "@/lib/opportunity-display";
+import { closesText, monthsText, openingsText } from "@/lib/opportunity-display";
 
 export default function JobDetailPage() {
   const router = useRouter();
@@ -147,6 +145,7 @@ export default function JobDetailPage() {
   const isOwner = o.employerUserId === user?.id;
   const isHiring = isHiringType(o.opportunityType);
   const canApply = eligibility.eligible;
+  const experience = JOB_EXPERIENCE_LEVELS.find((l) => l.value === o.experienceLevel)?.label ?? null;
   const alreadyApplied = eligibility.code === ELIGIBILITY_CODE.ALREADY_APPLIED;
 
   function toggleSave() {
@@ -181,9 +180,7 @@ export default function JobDetailPage() {
                 <OpportunityTypeBadge type={o.opportunityType} />
               </div>
               <h1 className="mt-1 text-xl font-bold text-neutral-900">{o.title}</h1>
-              <p className="mt-1 text-sm text-neutral-500">
-                {o.employer.name} · {o.employer.descriptor}
-              </p>
+              {o.employer.name && <p className="mt-1 text-sm text-neutral-500">Posted by {o.employer.name}</p>}
             </div>
             <div className="flex items-center gap-2">
               <OpportunityStatusBadge status={o.status} />
@@ -245,20 +242,19 @@ export default function JobDetailPage() {
                   <Clock className="h-4 w-4 text-neutral-400" aria-hidden /> {DURATION_LABEL[o.duration]}
                 </span>
                 <span className="inline-flex items-center gap-1.5">
-                  <Eye className="h-4 w-4 text-neutral-400" aria-hidden /> {o.viewCount} views
-                </span>
-                <span className="inline-flex items-center gap-1.5">
                   <Users className="h-4 w-4 text-neutral-400" aria-hidden /> {o.proposalCount} proposals
                 </span>
               </>
             )}
-            <span className="inline-flex items-center gap-1.5">
-              <CalendarDays className="h-4 w-4 text-neutral-400" aria-hidden />
-              Closing {formatDate(o.deadline)}
-            </span>
+            {closesText(o.deadline) && (
+              <span className="inline-flex items-center gap-1.5">
+                <CalendarDays className="h-4 w-4 text-neutral-400" aria-hidden />
+                {closesText(o.deadline)}
+              </span>
+            )}
           </div>
 
-          <p className="mt-4 text-sm leading-relaxed text-neutral-700">{o.summary}</p>
+          {o.summary && <p className="mt-4 text-sm leading-relaxed text-neutral-700">{o.summary}</p>}
 
           {isHiring && (o.hiring.eligibility || o.hiring.offersCertificate) && (
             <ul className="mt-3 space-y-1 text-sm text-neutral-700">
@@ -272,9 +268,7 @@ export default function JobDetailPage() {
           )}
 
           <div className="mt-5">
-            <p className="text-sm font-medium capitalize text-neutral-700">
-              Experience: {o.experienceLevel}
-            </p>
+            {experience && <p className="text-sm font-medium text-neutral-700">Experience: {experience}</p>}
             <div className="mt-2 flex flex-wrap gap-1.5">
               {o.skills.map((skill) => (
                 <span
@@ -352,23 +346,25 @@ export default function JobDetailPage() {
         </section>
         )}
 
-        <section className="rounded-xl border border-neutral-200 bg-white p-6">
-          <h2 className="text-sm font-semibold text-neutral-900">About this job</h2>
-          <div className="mt-3 space-y-4">
-            <div>
-              <h3 className="text-sm font-medium text-neutral-800">Description</h3>
-              <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-neutral-700">
-                {o.description}
-              </p>
+        {(o.description?.trim() || o.requirements?.trim()) && (
+          <section className="rounded-xl border border-neutral-200 bg-white p-6">
+            <h2 className="text-sm font-semibold text-neutral-900">About this job</h2>
+            <div className="mt-3 space-y-4">
+              {o.description?.trim() && (
+                <div>
+                  <h3 className="text-sm font-medium text-neutral-800">Description</h3>
+                  <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-neutral-700">{o.description}</p>
+                </div>
+              )}
+              {o.requirements?.trim() && (
+                <div>
+                  <h3 className="text-sm font-medium text-neutral-800">Requirements</h3>
+                  <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-neutral-700">{o.requirements}</p>
+                </div>
+              )}
             </div>
-            <div>
-              <h3 className="text-sm font-medium text-neutral-800">Requirements</h3>
-              <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-neutral-700">
-                {o.requirements}
-              </p>
-            </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {o.screeningQuestions.length > 0 && (
           <section className="rounded-xl border border-neutral-200 bg-white p-6">
@@ -387,20 +383,13 @@ export default function JobDetailPage() {
           </section>
         )}
 
-        <section className="rounded-xl border border-neutral-200 bg-white p-6">
-          <h2 className="flex items-center gap-1.5 text-sm font-semibold text-neutral-900">
-            <Building2 className="h-4 w-4 text-neutral-400" aria-hidden /> About the client
-          </h2>
-          <div className="mt-2">
-            <p className="text-sm font-medium text-neutral-800">{o.employer.name}</p>
-            <p className="text-sm text-neutral-500">
-              {o.employer.descriptor} · {o.employer.location}
-            </p>
-            <p className="mt-1 text-xs text-neutral-500">
-              {o.employer.verified ? "Verified client account" : "Client account"}
-            </p>
-          </div>
-        </section>
+        {o.employer.name && (
+          <section className="rounded-xl border border-neutral-200 bg-white p-6">
+            <h2 className="text-sm font-semibold text-neutral-900">About the employer</h2>
+            <p className="mt-2 text-sm font-medium text-neutral-800">{o.employer.name}</p>
+            {o.employer.location && <p className="text-sm text-neutral-500">{o.employer.location}</p>}
+          </section>
+        )}
 
         {/* Postings are not checked before they go live: a report is how a bad one is found. */}
         {user && !isOwner && (

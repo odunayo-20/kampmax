@@ -73,9 +73,13 @@ export function ProfileSwitcher({ onClosed }: { onClosed?: () => void }) {
     return () => { cancelled = true; };
   }, [status]);
 
+  // The current profile comes from the URL alone. Waiting for the backend checks
+  // (which fill `profiles`) made every dashboard read "Customer" while loading.
   const currentLabel =
-    profiles?.find((p) => p.active && pathname.startsWith(p.activeHref.split("/dashboard")[0]))?.label
-    ?? "Customer";
+    PROFILE_DEFINITIONS.find((p) => {
+      const base = p.activeHref.split("/dashboard")[0];
+      return pathname === base || pathname.startsWith(base + "/");
+    })?.label ?? "Customer";
 
   return (
     <div className="relative">

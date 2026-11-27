@@ -123,7 +123,7 @@ export default function VendorProductsPage({ params }: { params: Promise<{}> }) 
 
   return (
     <div className="space-y-4">
-      <ProductHeader totalCount={total} onAddProduct={() => router.push("/vendor/products/new")} />
+      <ProductHeader totalCount={listQuery.isPending ? undefined : total} onAddProduct={() => router.push("/vendor/products/new")} />
 
       {loadError && (
         <p className="text-sm text-error-600" role="alert">{loadError}</p>
@@ -166,6 +166,14 @@ export default function VendorProductsPage({ params }: { params: Promise<{}> }) 
         statusCounts={statusCounts}
       />
 
+      {listQuery.isPending ? (
+        <div className="space-y-2" aria-busy="true" aria-label="Loading products">
+          {Array.from({ length: 6 }, (_, i) => (
+            <div key={i} className="h-14 animate-pulse rounded-lg border border-kampmax-border bg-kampmax-muted/50" />
+          ))}
+        </div>
+      ) : (
+      <>
       <div className="hidden md:block">
         <ProductsTable
           products={products}
@@ -200,6 +208,8 @@ export default function VendorProductsPage({ params }: { params: Promise<{}> }) 
         pageSize={PAGE_SIZE}
         onPageChange={setPage}
       />
+      </>
+      )}
 
       <BulkActions
         selectedCount={selectedIds.length}

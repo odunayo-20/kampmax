@@ -198,6 +198,14 @@ function vendorFieldsPayload(input: VendorFieldsInput, basePrice: number | undef
   };
 }
 
+/** The product was created, but the requested status could not be applied. */
+export class ProductSavedAsDraftError extends Error {
+  constructor(public readonly productId: string, reason: string) {
+    super(`Saved as a draft. ${reason}`);
+    this.name = "ProductSavedAsDraftError";
+  }
+}
+
 export async function createVendorProductApi(input: CreateProductInput): Promise<Product> {
   const vendorId = await getMyVendorIdApi();
   const { data, error } = await createProduct({
@@ -220,7 +228,11 @@ export async function createVendorProductApi(input: CreateProductInput): Promise
   const wanted = input.publishedStatus ?? "draft";
   if (BACKEND_STATUS[wanted] !== "DRAFT") {
     const result = await setProductPublishedStatusApi(data.id, wanted);
-    if (!result.success) return data;
+    // The product exists as a draft now, so say why it isn't live rather than
+    // pretend it saved as asked (and don't make the vendor create it twice).
+    if (!result.success) {
+      throw new ProductSavedAsDraftError(data.id, result.reason ?? "The status could not be changed.");
+    }
     return (await getVendorProductByIdApi(data.id)) ?? data;
   }
   return data;
@@ -257,9 +269,14 @@ export async function setProductPublishedStatusApi(
     if (!product.price || product.price <= 0) errors.price = "Valid price is required";
     if (!product.categoryId) errors.categoryId = "Category is required";
     if (!product.campusId) errors.campusId = "Campus is required";
-    if (!product.images?.length) errors.images = "At least one image is required";
+    if (!realImages(product.images).length) errors.images = "At least one image is required";
     if (Object.keys(errors).length > 0) {
-      return { success: false, status: "draft", reason: "Missing required information", errors };
+      return {
+        success: false,
+        status: "draft",
+        reason: `Can't publish yet. ${Object.values(errors).join(". ")}.`,
+        errors,
+      };
     }
   }
   const { data, error } = await updateProduct(productId, { status: BACKEND_STATUS[status] });

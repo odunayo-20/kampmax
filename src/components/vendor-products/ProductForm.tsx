@@ -93,6 +93,14 @@ export interface ProductFormData {
 
 const CONDITIONS: ProductCondition[] = ["New", "Used", "Fair"];
 
+const isPlaceholder = (src: string) => src.includes("placeholder-product");
+const initialImages = (p?: Product) => (p?.images ?? []).filter((src) => !isPlaceholder(src));
+
+/** Field ids in page order, so the first error is the first one scrolled to. */
+const FIELD_ORDER: (keyof ProductFormData)[] = [
+  "title", "description", "categoryId", "campusId", "price", "originalPrice", "stock", "sku", "images",
+];
+
 const PUBLISH_STATUS_OPTIONS = [
   { value: "draft", label: "Draft" },
   { value: "active", label: "Active (Visible on storefront)" },
@@ -140,7 +148,7 @@ export function ProductForm({ initialData, onSave, onCancel, isLoading }: Produc
     categoryId: initialData?.categoryId ?? "",
     campusId: initialData?.campusId ?? "rugipo",
     condition: initialData?.condition ?? "New",
-    images: initialData?.images?.length ? [...initialData.images] : ["/placeholder-product.svg"],
+    images: initialImages(initialData),
     location: initialData?.location ?? "",
     tags: initialData?.tags ?? [],
     stock: initialData?.stock ?? 1,
@@ -196,7 +204,7 @@ export function ProductForm({ initialData, onSave, onCancel, isLoading }: Produc
         categoryId: initial.categoryId ?? "",
         campusId: initial.campusId ?? "rugipo",
         condition: initial.condition ?? "New",
-        images: initial.images?.length ? [...initial.images] : ["/placeholder-product.svg"],
+        images: initialImages(initial),
         location: initial.location ?? "",
         tags: initial.tags ?? [],
         stock: initial.stock ?? 1,
@@ -245,23 +253,33 @@ export function ProductForm({ initialData, onSave, onCancel, isLoading }: Produc
     if (!formData.price || formData.price <= 0) newErrors.price = "Valid price is required";
     if (!formData.categoryId) newErrors.categoryId = "Category is required";
     if (!formData.campusId) newErrors.campusId = "Campus is required";
-    if (!formData.images.length) newErrors.images = "At least one image is required";
+    if (!formData.images.length) newErrors.images = "Add at least one product image";
     if (formData.stock === undefined || formData.stock < 0) newErrors.stock = "Stock quantity is required";
-    if (formData.publishedStatus === "active") {
-      if (!formData.title.trim()) newErrors.title = "Product name is required for publishing";
-      if (!formData.description.trim()) newErrors.description = "Description is required for publishing";
-      if (!formData.price || formData.price <= 0) newErrors.price = "Valid price is required for publishing";
-      if (!formData.categoryId) newErrors.categoryId = "Category is required for publishing";
-      if (!formData.campusId) newErrors.campusId = "Campus is required for publishing";
-      if (!formData.images.length) newErrors.images = "At least one image is required for publishing";
-      if (formData.stock === undefined || formData.stock < 0) newErrors.stock = "Stock is required for publishing";
+    if (formData.publishedStatus === "active" && !formData.description.trim()) {
+      newErrors.description = "Description is required to publish";
+    }
+    if (formData.originalPrice !== undefined && formData.originalPrice < formData.price) {
+      newErrors.originalPrice = "Original price can't be lower than the price";
     }
     if (formData.sku && !/^[A-Z0-9-]+$/.test(formData.sku)) {
       newErrors.sku = "SKU must contain only uppercase letters, numbers, and hyphens";
     }
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return newErrors;
   }, [formData]);
+
+  // Option stock is separate from the product's own stock, so a mismatch is a
+  // heads-up, not an error.
+  const stockMismatchWarnings = formData.hasVariants
+    ? (formData.variantGroups ?? []).flatMap((g) => {
+        const counted = g.options.filter((o) => o.stock !== undefined);
+        if (counted.length === 0) return [];
+        const total = counted.reduce((sum, o) => sum + (o.stock ?? 0), 0);
+        return total !== formData.stock
+          ? [`${g.name.trim() || "A variant group"} options add up to ${total}, but product stock is ${formData.stock}.`]
+          : [];
+      })
+    : [];
 
   const handleChange = <K extends keyof ProductFormData>(field: K, value: ProductFormData[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -273,7 +291,6 @@ export function ProductForm({ initialData, onSave, onCancel, isLoading }: Produc
   };
 
   const uploadImages = async (files: File[]) => {
-    const isPlaceholder = (src: string) => src.includes("placeholder-product");
     const room = 10 - formData.images.filter((src) => !isPlaceholder(src)).length;
     const batch = files.slice(0, Math.max(0, room));
     if (files.length > batch.length) setImageErrors(["Maximum 10 images allowed"]);
@@ -299,13 +316,7 @@ export function ProductForm({ initialData, onSave, onCancel, isLoading }: Produc
         if (error || !data?.url) {
           failures.push(`${file.name}: ${error?.message ?? "upload failed"}`);
           // Revert preview on failure
-          setFormData((prev) => {
-            const nextImages = prev.images.filter((img) => img !== previewUrl);
-            return {
-              ...prev,
-              images: nextImages.length > 0 ? nextImages : ["/placeholder-product.svg"],
-            };
-          });
+          setFormData((prev) => ({ ...prev, images: prev.images.filter((img) => img !== previewUrl) }));
           URL.revokeObjectURL(previewUrl);
         } else {
           const remoteUrl = data.url;
@@ -327,10 +338,7 @@ export function ProductForm({ initialData, onSave, onCancel, isLoading }: Produc
     if (target && target.startsWith("blob:")) {
       URL.revokeObjectURL(target);
     }
-    if (formData.images.length <= 1) {
-      setImageErrors(["At least one image is required"]);
-      return;
-    }
+    setImageErrors([]);
     handleChange("images", formData.images.filter((_, i) => i !== index));
   };
 
@@ -397,7 +405,14 @@ export function ProductForm({ initialData, onSave, onCancel, isLoading }: Produc
     setTouched(
       Object.keys(formData).reduce((acc, k) => ({ ...acc, [k]: true }), {} as Record<string, boolean>)
     );
-    if (!validate()) return;
+    const found = validate();
+    if (Object.keys(found).length > 0) {
+      const first = FIELD_ORDER.find((k) => found[k]);
+      const el = first ? document.getElementById(first) : null;
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      el?.focus({ preventScroll: true });
+      return;
+    }
     await onSave(formData);
   };
 
@@ -563,9 +578,14 @@ export function ProductForm({ initialData, onSave, onCancel, isLoading }: Produc
               value={formData.originalPrice?.toString() ?? ""}
               onChange={(e) => handleChange("originalPrice", e.target.value ? Number(e.target.value) : undefined)}
               placeholder="e.g., 50000"
-              className="mt-1"
+              className={cn("mt-1", touched.originalPrice && errors.originalPrice && "border-kampmax-error")}
+              aria-invalid={touched.originalPrice && !!errors.originalPrice}
             />
-            <p className="mt-1 text-xs text-kampmax-text-secondary">Shows as strikethrough price</p>
+            {touched.originalPrice && errors.originalPrice ? (
+              <p className="mt-1 text-sm text-kampmax-error" role="alert">{errors.originalPrice}</p>
+            ) : (
+              <p className="mt-1 text-xs text-kampmax-text-secondary">Shows as strikethrough price</p>
+            )}
           </div>
         </div>
 
@@ -636,7 +656,14 @@ export function ProductForm({ initialData, onSave, onCancel, isLoading }: Produc
       </div>
 
       {/* Images */}
-      <div className="border border-kampmax-border rounded-xl bg-white p-4 space-y-4">
+      <div
+        id="images"
+        tabIndex={-1}
+        className={cn(
+          "border rounded-xl bg-white p-4 space-y-4 outline-none",
+          touched.images && errors.images ? "border-kampmax-error" : "border-kampmax-border"
+        )}
+      >
         <div className="flex items-center gap-3">
           <Image className="h-5 w-5 text-kampmax-blue" />
           <h3 className="text-sm font-semibold text-kampmax-text">Images</h3>
@@ -696,8 +723,12 @@ export function ProductForm({ initialData, onSave, onCancel, isLoading }: Produc
           </button>
         </div>
 
-        {imageErrors.length > 0 && (
+        {imageErrors.length > 0 ? (
           <p className="text-sm text-kampmax-error" role="alert">{imageErrors[0]}</p>
+        ) : (
+          touched.images && errors.images && (
+            <p className="text-sm text-kampmax-error" role="alert">{errors.images}</p>
+          )
         )}
         <p className="text-xs text-kampmax-text-secondary">
           Drag to reorder. First image is the thumbnail. Max 10 images.
@@ -836,6 +867,14 @@ export function ProductForm({ initialData, onSave, onCancel, isLoading }: Produc
                 <p className="text-sm text-kampmax-text-secondary text-center py-4">
                   No variant groups yet. Add your first group below.
                 </p>
+              )}
+              {stockMismatchWarnings.length > 0 && (
+                <div className="rounded-lg border border-kampmax-border bg-kampmax-muted/50 p-3 text-sm text-kampmax-text-secondary" role="status">
+                  {stockMismatchWarnings.map((w) => (
+                    <p key={w}>{w}</p>
+                  ))}
+                  <p className="mt-1">You can still save. Check the numbers if they should match.</p>
+                </div>
               )}
               <button
                 type="button"

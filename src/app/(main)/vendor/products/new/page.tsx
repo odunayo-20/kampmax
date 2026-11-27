@@ -1,22 +1,32 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { ProductForm } from "@/components/vendor-products/ProductForm";
-import { createVendorProductApi } from "@/services/vendor-products";
+import { useInvalidateProducts } from "@/hooks/use-vendor-products";
+import { createVendorProductApi, ProductSavedAsDraftError } from "@/services/vendor-products";
 
 export default function AddProductPage() {
   const router = useRouter();
+  const invalidateProducts = useInvalidateProducts();
 
   const [error, setError] = useState<string | null>(null);
+  const [draftId, setDraftId] = useState<string | null>(null);
 
   const handleSave = async (data: any) => {
     setError(null);
+    setDraftId(null);
     try {
       await createVendorProductApi(data);
+      invalidateProducts();
       router.push("/vendor/products");
     } catch (err) {
+      if (err instanceof ProductSavedAsDraftError) {
+        invalidateProducts();
+        setDraftId(err.productId);
+      }
       setError(err instanceof Error ? err.message : "Could not create product. Please try again.");
     }
   };
@@ -30,7 +40,16 @@ export default function AddProductPage() {
         <h1 className="text-xl font-bold text-kampmax-text">Add New Product</h1>
       </div>
 
-      {error && <p className="text-sm text-error-600" role="alert">{error}</p>}
+      {error && (
+        <p className="text-sm text-error-600" role="alert">
+          {error}{" "}
+          {draftId && (
+            <Link href={`/vendor/products/${draftId}/edit`} className="underline">
+              Open the draft
+            </Link>
+          )}
+        </p>
+      )}
       <ProductForm onSave={handleSave} onCancel={() => router.push("/vendor/products")} />
     </div>
   );

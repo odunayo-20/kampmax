@@ -4,12 +4,14 @@ import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { getVendorProductByIdApi, updateVendorProductApi, setProductPublishedStatusApi } from "@/services/vendor-products";
+import { useInvalidateProducts } from "@/hooks/use-vendor-products";
 import { ProductForm } from "@/components/vendor-products/ProductForm";
 import type { Product } from "@/types";
 
 export default function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
+  const invalidateProducts = useInvalidateProducts();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,9 +30,11 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
     try {
       const { publishedStatus, ...fields } = data;
       await updateVendorProductApi(id, fields);
+      invalidateProducts();
       if (publishedStatus && publishedStatus !== product?.publishedStatus) {
         const r = await setProductPublishedStatusApi(id, publishedStatus);
-        if (!r.success) throw new Error(r.reason ?? "Saved, but the status could not be changed.");
+        if (!r.success) throw new Error(`Your changes were saved, but the status was not changed. ${r.reason ?? ""}`.trim());
+        invalidateProducts();
       }
       router.push(`/vendor/products/${id}`);
     } catch (err) {
