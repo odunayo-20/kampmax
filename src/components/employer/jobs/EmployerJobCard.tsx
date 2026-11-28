@@ -1,6 +1,7 @@
 "use client";
 
-import { CalendarDays, Clock, Eye, Users, Wallet, Briefcase } from "lucide-react";
+import Link from "next/link";
+import { CalendarDays, Clock, Users, Wallet, Briefcase } from "lucide-react";
 import type { Opportunity } from "@/types/opportunity";
 import { isHiringType } from "@/types/opportunity";
 import {
@@ -8,7 +9,8 @@ import {
   WORK_ARRANGEMENT_LABEL,
 } from "@/config/opportunity";
 import { formatDate, timeAgo } from "@/lib/utils";
-import { monthsText, openingsText } from "@/lib/opportunity-display";
+import { closesText, monthsText, openingsText } from "@/lib/opportunity-display";
+import { LAPSED_NOTE, postingLapsed, reviewLink } from "@/lib/employer-job-groups";
 import { OpportunityStatusBadge } from "@/components/freelancer/opportunities/StatusBadges";
 import { budgetText } from "@/components/freelancer/opportunities/OpportunityCard";
 import { EmployerJobActions } from "./EmployerJobActions";
@@ -21,6 +23,9 @@ import { OpportunityTypeBadge } from "./OpportunityTypeBadge";
 export function EmployerJobCard({ job }: { job: Opportunity }) {
   const category = job.categoryName ?? "Other";
   const hiring = isHiringType(job.opportunityType);
+  const lapsed = postingLapsed(job);
+  const closes = job.status === "open" && !lapsed ? closesText(job.deadline) : null;
+  const review = job.status === "draft" ? null : reviewLink(job);
 
   return (
     <article className="rounded-xl border border-neutral-200 bg-white p-5">
@@ -34,10 +39,15 @@ export function EmployerJobCard({ job }: { job: Opportunity }) {
           </div>
           <h3 className="mt-1 text-base font-semibold text-neutral-900">{job.title}</h3>
         </div>
-        <OpportunityStatusBadge status={job.status} />
+        {lapsed ? (
+          <span className="rounded-full bg-warning-50 px-2 py-0.5 text-xs font-semibold text-warning-700">Expired</span>
+        ) : (
+          <OpportunityStatusBadge status={job.status} />
+        )}
       </div>
 
-      <p className="mt-2 line-clamp-2 text-sm text-neutral-600">{job.summary}</p>
+      {job.summary && <p className="mt-2 line-clamp-2 text-sm text-neutral-600">{job.summary}</p>}
+      {lapsed && <p className="mt-2 text-sm font-medium text-warning-700">{LAPSED_NOTE}</p>}
 
       <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs text-neutral-600 sm:grid-cols-3">
         <div className="flex items-center gap-1.5">
@@ -58,20 +68,18 @@ export function EmployerJobCard({ job }: { job: Opportunity }) {
               : DURATION_LABEL[job.duration]}
           </span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <CalendarDays className="h-3.5 w-3.5 text-neutral-400" aria-hidden />
-          <span>Closes {formatDate(job.deadline)}</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Eye className="h-3.5 w-3.5 text-neutral-400" aria-hidden />
-          <span>{hiring ? openingsText(job.hiring.openings) : `${job.viewCount} views`}</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Users className="h-3.5 w-3.5 text-neutral-400" aria-hidden />
-          <span>
-            {job.proposalCount} {hiring ? "applications" : "proposals"}
-          </span>
-        </div>
+        {closes && (
+          <div className="flex items-center gap-1.5">
+            <CalendarDays className="h-3.5 w-3.5 text-neutral-400" aria-hidden />
+            <span>{closes}</span>
+          </div>
+        )}
+        {hiring && (
+          <div className="flex items-center gap-1.5">
+            <Users className="h-3.5 w-3.5 text-neutral-400" aria-hidden />
+            <span>{openingsText(job.hiring.openings)}</span>
+          </div>
+        )}
       </dl>
 
       <div className="mt-3 flex items-center justify-between border-t border-neutral-100 pt-3">
@@ -84,6 +92,21 @@ export function EmployerJobCard({ job }: { job: Opportunity }) {
           </span>
         )}
       </div>
+
+      {review && (
+        <div className="mt-3">
+          {review.enabled ? (
+            <Link
+              href={review.href}
+              className={review.strong ? "inline-flex rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-primary-700" : "inline-flex rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50"}
+            >
+              {review.label}
+            </Link>
+          ) : (
+            <span className="text-sm text-neutral-500">{review.label}</span>
+          )}
+        </div>
+      )}
 
       <EmployerJobActions job={job} />
     </article>

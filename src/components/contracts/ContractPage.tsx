@@ -1,8 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import { getEngagementById } from "@/services/jobs";
@@ -21,7 +19,7 @@ import { EngagementNotices } from "@/components/engagements/EngagementNotices";
 import { EngagementRevisions } from "@/components/engagements/EngagementRevisions";
 import { ContractMoneyPanel } from "@/components/trust/ContractMoneyPanel";
 import { Avatar } from "@/components/ui";
-import { openDirectConversation } from "@/services/messages-api";
+import { MessagePersonButton } from "@/components/messages/MessagePersonButton";
 
 /**
  * One contract, for either side: where it stands and what to do next, the other person, the payment parts, the
@@ -128,22 +126,6 @@ export function ContractPage({ id, party }: { id: string; party: Party }) {
 
 /** The other person, with a way to message them; a freelancer can also offer more work in the chat (mobile's PersonCard). */
 function PersonCard({ userId, name, avatar, role, canOffer }: { userId: string; name: string; avatar: string | null; role: string; canOffer: boolean }) {
-  const router = useRouter();
-  const [opening, setOpening] = useState<"chat" | "offer" | null>(null);
-  const [problem, setProblem] = useState<string | null>(null);
-
-  async function go(then: "chat" | "offer") {
-    setOpening(then);
-    setProblem(null);
-    try {
-      const id = await openDirectConversation(userId);
-      router.push(then === "offer" ? `/chat/${id}?offer=1` : `/chat/${id}`);
-    } catch (e) {
-      setProblem(getFriendlyErrorMessage(e));
-      setOpening(null);
-    }
-  }
-
   return (
     <section className="flex flex-wrap items-center gap-3 rounded-xl border border-kampmax-border bg-white p-4">
       <Avatar src={avatar ?? undefined} name={name} size="sm" />
@@ -151,15 +133,8 @@ function PersonCard({ userId, name, avatar, role, canOffer }: { userId: string; 
         <span className="block text-sm font-semibold text-kampmax-text">{name}</span>
         <span className="block text-xs text-kampmax-text-secondary">{role}</span>
       </span>
-      <button type="button" disabled={opening !== null} onClick={() => void go("chat")} className="rounded-md border border-kampmax-border px-3 py-1.5 text-sm font-semibold disabled:opacity-50">
-        {opening === "chat" ? "Opening…" : "Message"}
-      </button>
-      {canOffer && (
-        <button type="button" disabled={opening !== null} onClick={() => void go("offer")} className="text-sm font-semibold text-primary-700 underline disabled:opacity-50">
-          {opening === "offer" ? "Opening…" : "Send an offer for extra work"}
-        </button>
-      )}
-      {problem && <p role="alert" className="w-full text-xs text-error-600">{problem}</p>}
+      <MessagePersonButton userId={userId} />
+      {canOffer && <MessagePersonButton userId={userId} offer label="Send an offer for extra work" className="text-sm font-semibold text-primary-700 underline disabled:opacity-50" />}
     </section>
   );
 }

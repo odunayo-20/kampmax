@@ -1,5 +1,6 @@
 "use client";
 
+import { APPLICATION_REJECTABLE_FROM, lowestOpenAmount } from "@/config/applications";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertCircle, ArrowLeft, Inbox, Search, Users } from "lucide-react";
@@ -102,6 +103,8 @@ export function EmployerApplicationsView({
   const counts = listQuery.data?.counts;
   const total = listQuery.data?.total ?? 0;
   const jobTitle = jobQuery.data?.title;
+
+  const lowest = lowestOpenAmount((listQuery.data?.items ?? []).map((a) => a.proposal));
 
   return (
     <div className="space-y-5">
@@ -239,6 +242,7 @@ export function EmployerApplicationsView({
               <EmployerApplicationCard
                 key={application.proposal.id}
                 application={application}
+                lowest={lowest !== null && application.proposal.proposedAmount === lowest && APPLICATION_REJECTABLE_FROM.includes(application.proposal.status)}
               />
             ))}
           </div>

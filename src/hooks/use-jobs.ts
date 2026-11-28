@@ -12,9 +12,9 @@ import {
 } from "@/lib/query-keys";
 import {
   closeJobApi,
+  cancelJobApi,
   createJobApi,
   getMyJobByIdApi,
-  getMyJobCountsApi,
   getMyJobsApi,
   publishJobApi,
   renewJobApi,
@@ -151,20 +151,6 @@ export function useEmployerJob(id: string) {
   });
 }
 
-export function useEmployerJobsSummary() {
-  const { status, user } = useAuth();
-  const userId = user?.id ?? "";
-  return useQuery({
-    queryKey: jobKeys.employerCounts(userId),
-    enabled: status === "authenticated" && !!userId,
-    queryFn: async (): Promise<Record<OpportunityStatus, number> & { all: number }> => {
-      const { counts, error } = await getMyJobCountsApi();
-      if (error) throw error;
-      return counts;
-    },
-  });
-}
-
 function invalidateAllJobs(queryClient: ReturnType<typeof useQueryClient>) {
   void queryClient.invalidateQueries({ queryKey: jobKeys.all });
   void queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
@@ -230,6 +216,15 @@ export function useFillJob() {
       void queryClient.invalidateQueries({ queryKey: jobApplicationKeys.all });
       void queryClient.invalidateQueries({ queryKey: ["employer-people"] });
     },
+  });
+}
+
+/** Discards a draft job (POST /jobs/:id/cancel), as mobile's "Discard draft" does. */
+export function useCancelJob() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => throwIfJobError(await cancelJobApi(id)),
+    onSuccess: () => invalidateAllJobs(queryClient),
   });
 }
 

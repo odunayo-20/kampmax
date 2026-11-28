@@ -19,6 +19,7 @@
 //   GET    /employer/profile/verification -> verification status
 //   POST   /employer/profile/submit     → submit for review
 
+import { nextProfileStep, type NextStep } from "@/lib/employer-hub";
 import { getCurrentUser } from "@/services/users";
 import { getCampuses, getCampusById } from "@/services/campus";
 import { apiClient } from "@/lib/api-client";
@@ -307,20 +308,21 @@ export function backendProfileToDraft(profile: EmployerBackendProfile): Employer
  * Company details only count for business-type accounts, so an individual
  * can reach 100%.
  */
-export function backendProfileCompletion(profile: EmployerBackendProfile): number {
+/** The one profile step to do next (the mobile app's order and words), or null once the profile is complete. */
+export function employerNextStep(profile: EmployerBackendProfile): NextStep | null {
   const d = backendProfileToDraft(profile);
-  const orgLike = isOrgLikeClientType(d.clientType);
-  const checks = [
-    !!d.profile.displayName?.trim(),
-    !!d.profile.headline?.trim(),
-    !!(d.profile.about?.trim() || d.organization.description?.trim()),
-    !!(d.profile.industry?.trim() || d.organization.industry?.trim()),
-    !!(d.location.city?.trim() || d.location.campusId),
-    !!(d.contact.email?.trim() && d.contact.phone?.trim()),
-    (d.preferences.categories?.length ?? 0) > 0,
-    ...(orgLike ? [!!d.organization.name?.trim(), !!d.organization.businessType?.trim()] : []),
-  ];
-  return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+  return nextProfileStep({
+    displayName: d.profile.displayName,
+    headline: d.profile.headline,
+    about: d.profile.about || d.organization.description,
+    industry: d.profile.industry || d.organization.industry,
+    city: d.location.city,
+    campusId: d.location.campusId,
+    email: d.contact.email,
+    phone: d.contact.phone,
+    categories: d.preferences.categories?.length ?? 0,
+    organization: isOrgLikeClientType(d.clientType) ? { name: d.organization.name, businessType: d.organization.businessType } : null,
+  });
 }
 
 function isOrgLikeClientType(t: string | undefined): boolean {

@@ -9,8 +9,6 @@ import {
   Building2,
   CalendarDays,
   Clock,
-  Eye,
-  EyeOff,
   MapPin,
   ShieldAlert,
   Users,
@@ -25,11 +23,13 @@ import {
   OPPORTUNITY_STATUS_META,
   OPPORTUNITY_TYPE_META,
   DURATION_LABEL,
+  JOB_EXPERIENCE_LEVELS,
   WORK_ARRANGEMENT_LABEL,
 } from "@/config/opportunity";
 import { isHiringType } from "@/types/opportunity";
-import { formatNaira, formatDate } from "@/lib/utils";
-import { monthsText, openingsText } from "@/lib/opportunity-display";
+import { formatDate } from "@/lib/utils";
+import { closesText, monthsText, openingsText } from "@/lib/opportunity-display";
+import { reviewLink } from "@/lib/employer-job-groups";
 import { OpportunityTypeBadge } from "@/components/employer/jobs/OpportunityTypeBadge";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
 import { useEmployerJob } from "@/hooks/use-jobs";
@@ -95,6 +95,9 @@ export default function EmployerJobDetailPage() {
   const campus = campusNameFor(o.location.campusId);
   const isListed = o.status === "open";
   const hiring = isHiringType(o.opportunityType);
+  const closes = o.status === "open" ? closesText(o.deadline) : null;
+  const review = o.status === "draft" ? null : reviewLink(o);
+  const experience = JOB_EXPERIENCE_LEVELS.find((l) => l.value === o.experienceLevel)?.label ?? null;
 
   return (
     <div className="space-y-5">
@@ -142,39 +145,35 @@ export default function EmployerJobDetailPage() {
                 : "Length not set"
               : DURATION_LABEL[o.duration]}
           </span>
-          <span className="inline-flex items-center gap-1.5">
-            <CalendarDays className="h-4 w-4 text-neutral-400" aria-hidden />
-            Closing {formatDate(o.deadline)}
-          </span>
+          {closes && (
+            <span className="inline-flex items-center gap-1.5">
+              <CalendarDays className="h-4 w-4 text-neutral-400" aria-hidden />
+              {closes}
+            </span>
+          )}
         </div>
 
-        <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-neutral-500">
-          <span className="inline-flex items-center gap-1.5">
-            <Eye className="h-4 w-4 text-neutral-400" aria-hidden />
-            {o.viewCount} views
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <Users className="h-4 w-4 text-neutral-400" aria-hidden />
-            {o.proposalCount} {hiring ? "applications" : "proposals"}
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            {isListed ? (
-              <Eye className="h-4 w-4 text-neutral-400" aria-hidden />
-            ) : (
-              <EyeOff className="h-4 w-4 text-neutral-400" aria-hidden />
-            )}
-            {isListed
-              ? "Listed on the marketplace"
-              : "Not visible on the marketplace"}
-          </span>
-        </div>
+        {review && (
+          <Link
+            href={review.enabled ? review.href : "#"}
+            aria-disabled={!review.enabled}
+            onClick={(ev) => !review.enabled && ev.preventDefault()}
+            className={`mt-5 flex items-center gap-3 rounded-lg border p-4 ${review.enabled ? "border-primary-200 bg-primary-50 hover:bg-primary-100" : "border-neutral-200 bg-neutral-50"}`}
+          >
+            <Users className="h-5 w-5 text-primary-700" aria-hidden />
+            <span>
+              <span className="block text-sm font-semibold text-neutral-900">{review.label}</span>
+              <span className="block text-xs text-neutral-500">
+                {hiring ? "People who applied, with their CV and answers." : review.enabled ? "Open them to compare prices and reply." : "Proposals show up here with their price."}
+              </span>
+            </span>
+          </Link>
+        )}
 
-        <p className="mt-4 text-sm leading-relaxed text-neutral-700">{o.summary}</p>
+        {o.summary && <p className="mt-4 text-sm leading-relaxed text-neutral-700">{o.summary}</p>}
 
         <div className="mt-5">
-          <p className="text-sm font-medium capitalize text-neutral-700">
-            Experience: {o.experienceLevel.replace(/_/g, " ")}
-          </p>
+          {experience && <p className="text-sm font-medium text-neutral-700">Experience: {experience}</p>}
           <div className="mt-2 flex flex-wrap gap-1.5">
             {o.skills.map((skill) => (
               <span
@@ -188,25 +187,27 @@ export default function EmployerJobDetailPage() {
         </div>
       </div>
 
-      <EmployerJobActions job={o} />
+      <EmployerJobActions job={o} onPage onDiscarded={() => router.replace("/employer/jobs")} />
 
-      <div className="rounded-xl border border-neutral-200 bg-white p-6">
-        <h2 className="text-sm font-semibold text-neutral-900">About this job</h2>
-        <div className="mt-3 space-y-4">
-          <div>
-            <h3 className="text-sm font-medium text-neutral-800">Description</h3>
-            <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-neutral-700">
-              {o.description}
-            </p>
-          </div>
-          <div>
-            <h3 className="text-sm font-medium text-neutral-800">Requirements</h3>
-            <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-neutral-700">
-              {o.requirements}
-            </p>
+      {(o.description?.trim() || o.requirements?.trim()) && (
+        <div className="rounded-xl border border-neutral-200 bg-white p-6">
+          <h2 className="text-sm font-semibold text-neutral-900">About this job</h2>
+          <div className="mt-3 space-y-4">
+            {o.description?.trim() && (
+              <div>
+                <h3 className="text-sm font-medium text-neutral-800">Description</h3>
+                <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-neutral-700">{o.description}</p>
+              </div>
+            )}
+            {o.requirements?.trim() && (
+              <div>
+                <h3 className="text-sm font-medium text-neutral-800">Requirements</h3>
+                <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-neutral-700">{o.requirements}</p>
+              </div>
+            )}
           </div>
         </div>
-      </div>
+      )}
 
       {o.screeningQuestions.length > 0 && (
         <div className="rounded-xl border border-neutral-200 bg-white p-6">
@@ -230,14 +231,10 @@ export default function EmployerJobDetailPage() {
           {hiring ? (
             <>
               <DetailRow label="Pay">{budgetText(o)}</DetailRow>
-              <DetailRow label="Start date">
-                {o.hiring.startDate ? formatDate(o.hiring.startDate) : undefined}
-              </DetailRow>
-              <DetailRow label="Length">
-                {o.hiring.durationMonths !== undefined ? monthsText(o.hiring.durationMonths) : undefined}
-              </DetailRow>
+              {o.hiring.startDate && <DetailRow label="Start date">{formatDate(o.hiring.startDate)}</DetailRow>}
+              {o.hiring.durationMonths !== undefined && <DetailRow label="Length">{monthsText(o.hiring.durationMonths)}</DetailRow>}
               <DetailRow label="Openings">{openingsText(o.hiring.openings)}</DetailRow>
-              <DetailRow label="Who can apply">{o.hiring.eligibility || undefined}</DetailRow>
+              {o.hiring.eligibility && <DetailRow label="Who can apply">{o.hiring.eligibility}</DetailRow>}
               <DetailRow label="Certificate">
                 {o.hiring.offersCertificate ? "Offered" : "Not offered"}
               </DetailRow>
@@ -247,19 +244,12 @@ export default function EmployerJobDetailPage() {
             </>
           ) : (
             <>
-              <DetailRow label="Budget type">{o.budget.type}</DetailRow>
-              <DetailRow label="Budget range">
-                {o.budget.min !== undefined || o.budget.max !== undefined
-                  ? `${o.budget.min !== undefined ? formatNaira(o.budget.min) : "0"} – ${
-                      o.budget.max !== undefined ? formatNaira(o.budget.max) : "Open"
-                    }`
-                  : "Negotiable"}
-              </DetailRow>
+              <DetailRow label="Budget">{budgetText(o)}</DetailRow>
               <DetailRow label="Duration">{DURATION_LABEL[o.duration]}</DetailRow>
             </>
           )}
-          <DetailRow label="Experience level">{o.experienceLevel.replace(/_/g, " ")}</DetailRow>
-          <DetailRow label="Deadline">{formatDate(o.deadline)}</DetailRow>
+          {experience && <DetailRow label="Experience">{experience}</DetailRow>}
+          {closesText(o.deadline) && <DetailRow label="Deadline">{`${formatDate(o.deadline)} · ${closesText(o.deadline)}`}</DetailRow>}
           <DetailRow label="Posted">{formatDate(o.postedAt)}</DetailRow>
         </dl>
       </div>
@@ -280,7 +270,7 @@ export default function EmployerJobDetailPage() {
               href={`/jobs/${o.id}`}
               className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-medium text-primary-600 hover:underline"
             >
-              <ArrowLeft className="h-3.5 w-3.5 rotate-180" aria-hidden /> View on marketplace
+              <ArrowLeft className="h-3.5 w-3.5 rotate-180" aria-hidden /> See it the way candidates do
             </Link>
           ) : (
             <Link

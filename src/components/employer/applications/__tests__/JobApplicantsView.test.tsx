@@ -22,6 +22,9 @@ const setStatus = vi.fn();
 const downloadCv = vi.fn();
 const getApplicationCvLink = vi.fn();
 
+// Opening a chat needs the app router; these tests are about the applicants themselves.
+vi.mock("@/components/messages/MessagePersonButton", () => ({ MessagePersonButton: () => null }));
+
 vi.mock("@/hooks/use-job-applications", () => ({
   useJobApplicants: (...args: unknown[]) => {
     queryArgs(...args);

@@ -2,59 +2,30 @@
 
 import { Suspense, useCallback } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import type { OpportunityStatus, OpportunityType } from "@/types/opportunity";
-import { EMPLOYER_JOB_FILTER_TABS, EMPLOYER_JOB_TYPE_TABS } from "@/config/jobs";
+import type { OpportunityType } from "@/types/opportunity";
+import { EMPLOYER_JOB_TYPE_TABS } from "@/config/jobs";
 import { EmployerJobsView } from "@/components/employer/jobs/EmployerJobsView";
+import { groupFromParams } from "@/lib/employer-job-groups";
 
+/** `?type=` keeps the kind filter in the address; `?group=` (from the dashboard) opens on live, not-live or ended jobs. */
 function EmployerJobsContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const statusParam = searchParams.get("status") ?? "";
   const typeParam = searchParams.get("type") ?? "";
-  const pageParam = Math.max(1, Number(searchParams.get("page") ?? "1") || 1);
+  const type: OpportunityType | "all" = EMPLOYER_JOB_TYPE_TABS.some((t) => t.value === typeParam) ? (typeParam as OpportunityType | "all") : "all";
 
-  const status: OpportunityStatus | "all" = EMPLOYER_JOB_FILTER_TABS.some(
-    (t) => t.value === statusParam
-  )
-    ? (statusParam as OpportunityStatus | "all")
-    : "all";
-
-  const type: OpportunityType | "all" = EMPLOYER_JOB_TYPE_TABS.some((t) => t.value === typeParam)
-    ? (typeParam as OpportunityType | "all")
-    : "all";
-
-  const syncUrl = useCallback(
-    (overrides: {
-      status?: OpportunityStatus | "all";
-      type?: OpportunityType | "all";
-      page?: number;
-    }) => {
-      const nextStatus = overrides.status ?? status;
-      const nextType = overrides.type ?? type;
-      const nextPage = overrides.page ?? pageParam;
+  const setType = useCallback(
+    (next: OpportunityType | "all") => {
       const params = new URLSearchParams(searchParams.toString());
-      if (nextStatus !== "all") params.set("status", nextStatus);
-      else params.delete("status");
-      if (nextType !== "all") params.set("type", nextType);
+      if (next !== "all") params.set("type", next);
       else params.delete("type");
-      if (nextPage > 1) params.set("page", String(nextPage));
-      else params.delete("page");
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     },
-    [router, pathname, searchParams, status, type, pageParam]
+    [router, pathname, searchParams]
   );
 
-  return (
-    <EmployerJobsView
-      status={status}
-      type={type}
-      page={pageParam}
-      onStatusChange={(s) => syncUrl({ status: s, page: 1 })}
-      onTypeChange={(t) => syncUrl({ type: t, page: 1 })}
-      onPageChange={(p) => syncUrl({ page: p })}
-    />
-  );
+  return <EmployerJobsView type={type} onTypeChange={setType} initialGroup={groupFromParams(searchParams)} />;
 }
 
 export default function EmployerJobsPage() {

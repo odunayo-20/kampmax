@@ -9,5 +9,4 @@ export { EmployerContractsOverview } from "./EmployerContractsOverview";
 export { EmployerMessagesOverview } from "./EmployerMessagesOverview";
 export { EmployerNotificationsOverview } from "./EmployerNotificationsOverview";
 export { EmployerQuickActions } from "./EmployerQuickActions";
-export { EmployerProfileCompletion } from "./EmployerProfileCompletion";
 export { EmployerContracts } from "./EmployerContracts";

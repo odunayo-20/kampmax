@@ -11,6 +11,7 @@
 import { apiClient } from "@/lib/api-client";
 import { countOf, replyFacts } from "@/lib/reading";
 import { pluralize } from "@/lib/utils";
+import { watchFrom, type WatchedPosting } from "@/lib/employer-hub";
 
 export interface HiringPipeline {
   /** Waiting for a decision: not yet looked at, or looked at and left. */
@@ -52,6 +53,8 @@ export interface EmployerInsights {
   pipeline: HiringPipeline;
   reputation: EmployerReputation | null;
   interviews: InterviewSummary;
+  /** Open postings worth a look first (people waiting, or closing soon). */
+  watch: WatchedPosting[];
 }
 
 /** The interview summary the server sent, or "none" when it sent nothing usable. */
@@ -126,14 +129,16 @@ export async function getEmployerInsightsApi(): Promise<EmployerInsights> {
   const { data, error } = await apiClient.get<{
     pipeline?: Partial<HiringPipeline>;
     interviews?: unknown;
+    watch?: unknown;
     profile?: { reputation?: Partial<EmployerReputation> | null };
   }>("/employers/me/dashboard");
   if (error || !data) {
-    return { pipeline: pipelineFrom(null), reputation: null, interviews: NO_INTERVIEWS };
+    return { pipeline: pipelineFrom(null), reputation: null, interviews: NO_INTERVIEWS, watch: [] };
   }
   return {
     pipeline: pipelineFrom(data.pipeline),
     reputation: reputationFrom(data.profile?.reputation),
     interviews: interviewsFrom(data.interviews),
+    watch: watchFrom(data.watch),
   };
 }

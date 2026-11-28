@@ -9,7 +9,7 @@ import { getCampusById } from "@/services/campus";
 import { EmployerProfileSkeleton } from "./EmployerProfileSkeleton";
 import { EmployerProfileHeader } from "./EmployerProfileHeader";
 import { EmployerVerificationNotice } from "./EmployerVerificationNotice";
-import { EmployerProfileCompletionCard } from "./EmployerProfileCompletionCard";
+import { EmployerNextStepCard } from "./EmployerNextStepCard";
 import { EmployerProfileView } from "./EmployerProfileView";
 
 export function EmployerProfilePage() {
@@ -19,7 +19,7 @@ export function EmployerProfilePage() {
     return <EmployerProfileSkeleton />;
   }
 
-  const { draft, completion } = profileQuery.data;
+  const { draft, nextStep } = profileQuery.data;
   const clientType = draft.clientType
     ? (EMPLOYER_CLIENT_TYPES.find((t) => t.value === draft.clientType)?.label ?? draft.clientType)
     : "—";
@@ -63,7 +63,7 @@ export function EmployerProfilePage() {
           <EmployerProfileView draft={draft} editHref="/employer/profile/edit" editLabel="Edit" />
         </div>
         <aside className="space-y-6">
-          <EmployerProfileCompletionCard completion={completion} />
+          <EmployerNextStepCard step={nextStep} />
         </aside>
       </div>
     </div>

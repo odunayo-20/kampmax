@@ -2,17 +2,13 @@
 
 import Link from "next/link";
 import { AlertCircle, Briefcase, Inbox, Plus } from "lucide-react";
-import type { OpportunityStatus, OpportunityType } from "@/types/opportunity";
-import {
-  EMPLOYER_JOBS_PAGE_SIZE,
-  EMPLOYER_JOB_FILTER_TABS,
-  EMPLOYER_JOB_TYPE_TABS,
-} from "@/config/jobs";
-import { useEmployerJobs, useEmployerJobsSummary } from "@/hooks/use-jobs";
+import type { OpportunityType } from "@/types/opportunity";
+import { EMPLOYER_JOB_TYPE_TABS } from "@/config/jobs";
+import { useEmployerJobs } from "@/hooks/use-jobs";
+import { defaultJobGroup, JOB_GROUPS, jobGroup, jobsHeadline, visibleJobs, type JobGroup } from "@/lib/employer-job-groups";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
 import { Skeleton } from "@/components/home/Skeleton";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { JobsPagination } from "@/components/jobs/JobsPagination";
 import { EmployerJobCard } from "./EmployerJobCard";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -37,124 +33,104 @@ function ListSkeleton() {
   );
 }
 
-const EMPTY_COPY: Record<OpportunityStatus | "all", string> = {
-  all: "You haven't posted any jobs yet.",
-  draft: "You don't have any draft jobs.",
-  pending_review: "Nothing is waiting for moderation.",
-  open: "You don't have any open jobs right now.",
-  closed: "You haven't closed any jobs.",
-  expired: "No expired jobs.",
-  cancelled: "No cancelled jobs.",
-};
+/** Every posting is loaded at once (up to 100) so the groups, counts and search cover all of them, as on mobile. */
+const ALL = 100;
 
 /**
- * Employer job management surface: status tabs (with counts), the job list
- * and pagination. Status is the only navigation state — the rest lives in
- * the query cache.
+ * The employer's postings in three groups (live, not live yet, ended), with a headline for what is waiting, a
+ * search once there are more than a few, and a filter by kind. The same screen as the mobile app's my-jobs.
  */
 export function EmployerJobsView({
-  status,
   type,
-  page,
-  onStatusChange,
   onTypeChange,
-  onPageChange,
+  initialGroup = null,
 }: {
-  status: OpportunityStatus | "all";
   type: OpportunityType | "all";
-  page: number;
-  onStatusChange: (status: OpportunityStatus | "all") => void;
   onTypeChange: (type: OpportunityType | "all") => void;
-  onPageChange: (page: number) => void;
+  /** The group a link asked for; otherwise the first one with jobs in it. */
+  initialGroup?: JobGroup | null;
 }) {
   const [createHintOpen, setCreateHintOpen] = useState(false);
-  const countsQuery = useEmployerJobsSummary();
-  const listQuery = useEmployerJobs({
-    status,
-    type,
-    page,
-    size: EMPLOYER_JOBS_PAGE_SIZE,
-  });
+  const [picked, setPicked] = useState<JobGroup | null>(initialGroup);
+  const [search, setSearch] = useState("");
+  const listQuery = useEmployerJobs({ status: "all", type, page: 1, size: ALL });
 
-  const counts = countsQuery.data ?? null;
-  const total = listQuery.data?.total ?? 0;
+  const jobs = listQuery.data?.items ?? [];
+  const group = picked ?? defaultJobGroup(jobs);
+  const counts: Record<JobGroup, number> = { live: 0, draft: 0, ended: 0 };
+  for (const j of jobs) counts[jobGroup(j.status)] += 1;
+  const shown = visibleJobs(jobs, group, search);
+  const headline = jobsHeadline(jobs);
+  const groupMeta = JOB_GROUPS.find((g) => g.id === group)!;
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-neutral-900">My Jobs</h1>
-          <p className="mt-1 text-sm text-neutral-500">
-            Post and manage your gigs, internships and vacancies as an employer.
-          </p>
+          <h1 className="text-xl font-bold text-neutral-900">My jobs</h1>
+          <p className="mt-1 text-sm text-neutral-500">Your gigs, internships and vacancies, and the people responding to them.</p>
         </div>
         <Link
           href="/employer/jobs/create"
           className="inline-flex h-10 items-center justify-center gap-1.5 rounded-md bg-primary-600 px-5 text-sm font-semibold text-white hover:bg-primary-700"
         >
-          <Plus className="h-4 w-4" aria-hidden /> Post an opportunity
+          <Plus className="h-4 w-4" aria-hidden /> Post a job
         </Link>
       </div>
 
-      <div
-        role="tablist"
-        aria-label="Filter by type"
-        className="flex gap-1.5 overflow-x-auto pb-1"
-      >
-        {EMPLOYER_JOB_TYPE_TABS.map((tab) => {
-          const active = type === tab.value;
+      {headline && <p role="status" className="rounded-lg bg-accent-50 px-4 py-3 text-sm font-semibold text-accent-700">{headline}</p>}
+
+      <div role="tablist" aria-label="Show jobs" className="flex gap-1.5 overflow-x-auto pb-1">
+        {JOB_GROUPS.map((g) => {
+          const active = group === g.id;
           return (
             <button
-              key={tab.value}
+              key={g.id}
               role="tab"
               aria-selected={active}
-              onClick={() => onTypeChange(tab.value)}
+              onClick={() => setPicked(g.id)}
               className={cn(
-                "shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors",
-                active
-                  ? "border-neutral-900 bg-neutral-900 text-white"
-                  : "border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50"
+                "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                active ? "border-primary-600 bg-primary-600 text-white" : "border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50"
               )}
             >
-              {tab.label}
+              {g.label}
+              <span className={cn("rounded-full px-1.5 text-[10px] font-bold", active ? "bg-white/20 text-white" : "bg-neutral-100 text-neutral-500")}>{counts[g.id]}</span>
             </button>
           );
         })}
       </div>
 
-      <div
-        role="tablist"
-        aria-label="Filter jobs by status"
-        className="flex gap-1.5 overflow-x-auto pb-1"
-      >
-        {EMPLOYER_JOB_FILTER_TABS.map((tab) => {
-          const active = status === tab.value;
-          const tabTotal = counts ? counts[tab.value] : 0;
-          return (
-            <button
-              key={tab.value}
-              role="tab"
-              aria-selected={active}
-              onClick={() => onStatusChange(tab.value)}
-              className={cn(
-                "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                active
-                  ? "border-primary-600 bg-primary-600 text-white"
-                  : "border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50"
-              )}
-            >
-              {tab.label}
-              <span
+      <div className="flex flex-wrap items-center gap-3">
+        <div role="tablist" aria-label="Filter by kind" className="flex gap-1.5 overflow-x-auto pb-1">
+          {EMPLOYER_JOB_TYPE_TABS.map((tab) => {
+            const active = type === tab.value;
+            return (
+              <button
+                key={tab.value}
+                role="tab"
+                aria-selected={active}
+                onClick={() => onTypeChange(tab.value)}
                 className={cn(
-                  "rounded-full px-1.5 text-[10px] font-bold",
-                  active ? "bg-white/20 text-white" : "bg-neutral-100 text-neutral-500"
+                  "shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors",
+                  active ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50"
                 )}
               >
-                {tabTotal}
-              </span>
-            </button>
-          );
-        })}
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+        {jobs.length > 4 && (
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search your jobs"
+            aria-label="Search your jobs"
+            className="h-9 min-w-48 flex-1 rounded-md border border-neutral-200 px-3 text-sm"
+          />
+        )}
       </div>
 
       {listQuery.isPending ? (
@@ -177,21 +153,21 @@ export function EmployerJobsView({
             </button>
           </div>
         </div>
-      ) : total === 0 ? (
+      ) : jobs.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white py-16 text-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-neutral-100 text-neutral-400">
             <Briefcase className="h-7 w-7" aria-hidden />
           </div>
-          <h3 className="mt-4 text-sm font-semibold text-neutral-900">No jobs here</h3>
+          <h3 className="mt-4 text-sm font-semibold text-neutral-900">No jobs yet</h3>
           <p className="mt-1 max-w-xs text-xs text-neutral-500">
-            {EMPTY_COPY[status]}
+            Post a gig and freelancers on campus can send you proposals. It is free.
           </p>
           <div className="mt-4 flex gap-2">
             <Link
               href="/employer/jobs/create"
               className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-primary-600 px-3 text-xs font-semibold text-white hover:bg-primary-700"
             >
-              <Plus className="h-3.5 w-3.5" aria-hidden /> Post an opportunity
+              <Plus className="h-3.5 w-3.5" aria-hidden /> Post a job
             </Link>
             <button
               onClick={() => setCreateHintOpen(true)}
@@ -202,19 +178,14 @@ export function EmployerJobsView({
           </div>
         </div>
       ) : (
-        <>
-          <div className="space-y-4">
-            {(listQuery.data?.items ?? []).map((job) => (
-              <EmployerJobCard key={job.id} job={job} />
-            ))}
-          </div>
-          <JobsPagination
-            page={listQuery.data?.page ?? 1}
-            totalPages={listQuery.data?.totalPages ?? 1}
-            total={total}
-            onPageChange={onPageChange}
-          />
-        </>
+        <div className="space-y-4">
+          {shown.length === 0 && (
+            <p className="py-8 text-center text-sm text-neutral-500">{search.trim() ? "No job matches that search." : groupMeta.empty}</p>
+          )}
+          {shown.map((job) => (
+            <EmployerJobCard key={job.id} job={job} />
+          ))}
+        </div>
       )}
 
       <ConfirmDialog

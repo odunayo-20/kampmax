@@ -1,15 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import {
-  CheckCircle2,
-  Eye,
-  MessageSquare,
-  Send,
-  UserCheck,
-  UserX,
-} from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import type { EmployerApplicationSummary } from "@/types/opportunity";
 import { PROPOSAL_STATUS } from "@/types/opportunity";
 import {
@@ -20,170 +12,99 @@ import {
   APPLICATION_SHORTLISTABLE_FROM,
 } from "@/config/applications";
 import { Button } from "@/components/ui";
-import {
-  useAcceptApplication,
-  useCandidateConversation,
-  useRejectApplication,
-  useReviewApplication,
-  useShortlistApplication,
-} from "@/hooks/use-applications";
-import { getFriendlyErrorMessage } from "@/lib/error-messages";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { MessagePersonButton } from "@/components/messages/MessagePersonButton";
+import { useAcceptApplication, useRejectApplication, useReviewApplication, useShortlistApplication } from "@/hooks/use-applications";
+import { getRefusalMessage } from "@/lib/error-messages";
+import { formatNaira } from "@/lib/utils";
 
-const linkButtonClass =
-  "inline-flex items-center justify-center gap-1.5 font-semibold rounded-md h-8 px-3 text-xs border border-neutral-300 bg-white text-neutral-800 hover:bg-neutral-100";
+type Step = "review" | "shortlist" | "reject" | "accept";
 
 /**
- * Status-aware action set for a single application. Every transition is
- * backend-owned: the client never writes a status itself. Reject captures an
- * optional employer-facing reason; Hire is destructive and explains exactly
- * what accepting does (accepted proposal + closed job + contract on its way
- * to the candidate).
+ * What the employer can do with one freelancer's proposal on a gig: mark it seen, shortlist, decline with optional
+ * feedback, or accept it and create the contract. Each is confirmed in the shared dialog; the backend owns every
+ * status change. The same steps and words as the mobile app's job-proposals screen.
  */
-export function ApplicationActions({
-  application,
-}: {
-  application: EmployerApplicationSummary;
-}) {
-  const status = application.proposal.status;
-  const candidateName = application.candidate.name;
-  const router = useRouter();
+export function ApplicationActions({ application }: { application: EmployerApplicationSummary }) {
+  const { proposal, candidate } = application;
+  const status = proposal.status;
+  const name = candidate.name;
+  const amount = proposal.proposedAmount !== undefined ? formatNaira(proposal.proposedAmount) : "the agreed price";
 
-  const [confirm, setConfirm] = useState<
-    "review" | "shortlist" | "reject" | "hire" | null
-  >(null);
-  const [rejectReason, setRejectReason] = useState("");
+  const [asking, setAsking] = useState<Step | null>(null);
+  const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const reviewMutation = useReviewApplication();
-  const shortlistMutation = useShortlistApplication();
-  const rejectMutation = useRejectApplication();
-  const acceptMutation = useAcceptApplication();
-  const openConversation = useCandidateConversation();
+  const review = useReviewApplication();
+  const shortlist = useShortlistApplication();
+  const reject = useRejectApplication();
+  const accept = useAcceptApplication();
+  const pending = review.isPending || shortlist.isPending || reject.isPending || accept.isPending;
 
-  const pending =
-    reviewMutation.isPending ||
-    shortlistMutation.isPending ||
-    rejectMutation.isPending ||
-    acceptMutation.isPending;
+  const can: Record<Step, boolean> = {
+    review: APPLICATION_REVIEWABLE_FROM.includes(status),
+    shortlist: APPLICATION_SHORTLISTABLE_FROM.includes(status),
+    reject: APPLICATION_REJECTABLE_FROM.includes(status),
+    accept: APPLICATION_ACCEPTABLE_FROM.includes(status),
+  };
+  const canMessage = status !== PROPOSAL_STATUS.WITHDRAWN && status !== PROPOSAL_STATUS.REJECTED;
 
-  const canReview = APPLICATION_REVIEWABLE_FROM.includes(status);
-  const canShortlist = APPLICATION_SHORTLISTABLE_FROM.includes(status);
-  const canReject = APPLICATION_REJECTABLE_FROM.includes(status);
-  const canHire = APPLICATION_ACCEPTABLE_FROM.includes(status);
-  const canMessage =
-    status !== PROPOSAL_STATUS.WITHDRAWN && status !== PROPOSAL_STATUS.REJECTED;
+  const STEPS: Record<Step, { button: string; title: string; body: string; confirm: string; done: string; destructive?: boolean }> = {
+    review: { button: "Mark as seen", title: "Mark this proposal as seen?", body: `${name} is told you are looking at it.`, confirm: "Mark as seen", done: "Marked as seen." },
+    shortlist: { button: "Shortlist", title: `Shortlist ${name}?`, body: "They are told they made your shortlist. You can still accept or decline them later.", confirm: "Shortlist", done: `${name} is on your shortlist.` },
+    reject: { button: "Decline proposal", title: "Decline this proposal?", body: `${name} is told, with your note if you add one. This cannot be undone.`, confirm: "Decline proposal", done: "Proposal declined.", destructive: true },
+    accept: {
+      button: "Accept & create contract",
+      title: `Accept ${name}'s proposal?`,
+      body: `You'll agree a contract of ${amount}. You then fund it from your wallet before work starts, and the money stays held until you approve the work. The job stops taking new proposals.`,
+      confirm: "Accept & create contract",
+      done: `Contract created with ${name}. Fund it from your contracts to start the work.`,
+    },
+  };
 
-  const dismiss = () => {
-    setConfirm(null);
+  const close = () => {
+    setAsking(null);
     setError(null);
   };
 
-  const runReview = () => {
+  function run(step: Step) {
     setError(null);
-    reviewMutation.mutate(application.proposal.id, {
+    const options = {
       onSuccess: () => {
-        dismiss();
-        setSuccess("Marked as under review.");
+        close();
+        setReason("");
+        setSuccess(STEPS[step].done);
       },
-      onError: (err) => setError(getFriendlyErrorMessage(err)),
-    });
-  };
+      onError: (err: unknown) => setError(getRefusalMessage(err)),
+    };
+    if (step === "review") review.mutate(proposal.id, options);
+    else if (step === "shortlist") shortlist.mutate(proposal.id, options);
+    else if (step === "reject") reject.mutate({ id: proposal.id, reason: reason.trim() || undefined }, options);
+    else accept.mutate(proposal.id, options);
+  }
 
-  const runShortlist = () => {
-    setError(null);
-    shortlistMutation.mutate(application.proposal.id, {
-      onSuccess: () => {
-        dismiss();
-        setSuccess(`${candidateName} has been shortlisted.`);
-      },
-      onError: (err) => setError(getFriendlyErrorMessage(err)),
-    });
-  };
-
-  const runReject = () => {
-    setError(null);
-    rejectMutation.mutate(
-      { id: application.proposal.id, reason: rejectReason.trim() || undefined },
-      {
-        onSuccess: () => {
-          dismiss();
-          setRejectReason("");
-          setSuccess(`Application rejected.`);
-        },
-        onError: (err) => setError(getFriendlyErrorMessage(err)),
-      }
-    );
-  };
-
-  const runHire = () => {
-    setError(null);
-    acceptMutation.mutate(application.proposal.id, {
-      onSuccess: () => {
-        dismiss();
-        setSuccess(
-          `Hired ${candidateName} — the job is closed and a contract is waiting for them.`
-        );
-      },
-      onError: (err) => setError(getFriendlyErrorMessage(err)),
-    });
-  };
-
-  const handleMessage = async () => {
-    setError(null);
-    const conversationId = await openConversation(application.candidate.id);
-    if (conversationId) {
-      router.push(`/chat/${conversationId}`);
-    } else {
-      setError("We couldn't open a conversation with this candidate.");
-    }
-  };
+  const order: Step[] = ["accept", "shortlist", "review", "reject"];
+  const def = asking ? STEPS[asking] : null;
 
   return (
     <div>
       <div className="flex flex-wrap items-center gap-2">
-        {canReview && (
-          <Button size="sm" disabled={pending} onClick={() => setConfirm("review")}>
-            <Eye className="mr-1 h-3.5 w-3.5" aria-hidden /> Review
-          </Button>
+        {order.filter((s) => can[s]).map((s) =>
+          s === "reject" ? (
+            <button key={s} type="button" disabled={pending} onClick={() => setAsking(s)} className="text-sm font-semibold text-error-600 underline disabled:opacity-50">
+              {STEPS[s].button}
+            </button>
+          ) : (
+            <Button key={s} size="sm" variant={s === "accept" ? "primary" : "outline"} disabled={pending} onClick={() => setAsking(s)}>
+              {STEPS[s].button}
+            </Button>
+          )
         )}
-
-        {canShortlist && (
-          <Button size="sm" variant="outline" disabled={pending} onClick={() => setConfirm("shortlist")}>
-            <Send className="mr-1 h-3.5 w-3.5" aria-hidden /> Shortlist
-          </Button>
-        )}
-
-        {canReject && (
-          <Button
-            size="sm"
-            variant="destructive"
-            disabled={pending}
-            onClick={() => setConfirm("reject")}
-          >
-            <UserX className="mr-1 h-3.5 w-3.5" aria-hidden /> Reject
-          </Button>
-        )}
-
-        {canHire && (
-          <Button size="sm" disabled={pending} onClick={() => setConfirm("hire")}>
-            <UserCheck className="mr-1 h-3.5 w-3.5" aria-hidden /> Hire
-          </Button>
-        )}
-
-        {canMessage && (
-          <button
-            type="button"
-            onClick={handleMessage}
-            disabled={pending}
-            className={linkButtonClass}
-          >
-            <MessageSquare className="h-3.5 w-3.5" aria-hidden /> Message
-          </button>
-        )}
+        {canMessage && <MessagePersonButton userId={candidate.id} className="inline-flex h-8 items-center rounded-md border border-neutral-300 px-3 text-xs font-semibold text-neutral-800 hover:bg-neutral-100 disabled:opacity-50" />}
       </div>
 
-      {error && (
+      {error && !asking && (
         <p role="alert" className="mt-2 text-xs text-error-600">
           {error}
         </p>
@@ -194,114 +115,31 @@ export function ApplicationActions({
         </p>
       )}
 
-      {/* Review */}
-      {confirm === "review" && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Move to reviewing">
-          <div className="absolute inset-0 bg-black/40" aria-hidden onClick={pending ? undefined : dismiss} />
-          <div className="relative w-full max-w-sm rounded-2xl border border-kampmax-border bg-white p-6 shadow-xl">
-            <h2 className="text-base font-bold text-kampmax-text">Review this application?</h2>
-            <p className="mt-2 text-sm text-kampmax-text-secondary">
-              This marks {candidateName}&apos;s application as under review and
-              notifies them.
-            </p>
-            <div className="mt-5 flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={dismiss} disabled={pending}>
-                Cancel
-              </Button>
-              <Button size="sm" onClick={runReview} disabled={pending}>
-                {pending ? "Working…" : "Move to reviewing"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Shortlist */}
-      {confirm === "shortlist" && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Shortlist candidate">
-          <div className="absolute inset-0 bg-black/40" aria-hidden onClick={pending ? undefined : dismiss} />
-          <div className="relative w-full max-w-sm rounded-2xl border border-kampmax-border bg-white p-6 shadow-xl">
-            <h2 className="text-base font-bold text-kampmax-text">Shortlist {candidateName}?</h2>
-            <p className="mt-2 text-sm text-kampmax-text-secondary">
-              This keeps them in the running and notifies them. You can still
-              hire or reject them later.
-            </p>
-            <div className="mt-5 flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={dismiss} disabled={pending}>
-                Cancel
-              </Button>
-              <Button size="sm" onClick={runShortlist} disabled={pending}>
-                {pending ? "Working…" : "Shortlist"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Reject */}
-      {confirm === "reject" && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Reject application"
-        >
-          <div className="absolute inset-0 bg-black/40" aria-hidden onClick={pending ? undefined : dismiss} />
-          <div className="relative w-full max-w-sm rounded-2xl border border-kampmax-border bg-white p-6 shadow-xl">
-            <h2 className="text-base font-bold text-kampmax-text">Reject this application?</h2>
-            <p className="mt-2 text-sm text-kampmax-text-secondary">
-              Optional feedback is shown to {candidateName}. This can&apos;t be undone.
-            </p>
-            <label
-              htmlFor="reject-reason"
-              className="mt-4 block text-sm font-medium text-kampmax-text"
-            >
-              Feedback (optional)
-            </label>
+      <ConfirmDialog
+        open={!!asking && !!def}
+        title={def?.title ?? ""}
+        body={def?.body ?? ""}
+        confirmLabel={pending ? "Working…" : (def?.confirm ?? "")}
+        destructive={def?.destructive}
+        pending={pending}
+        onConfirm={() => asking && run(asking)}
+        onCancel={close}
+      >
+        {asking === "reject" && (
+          <label className="mt-3 block text-sm font-medium text-kampmax-text">
+            Note for {name} (optional)
             <textarea
-              id="reject-reason"
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value.slice(0, APPLICATION_REJECT_REASON_MAX))}
+              value={reason}
+              onChange={(e) => setReason(e.target.value.slice(0, APPLICATION_REJECT_REASON_MAX))}
               rows={3}
-              placeholder="e.g. We went with a candidate with more experience…"
-              className="mt-1.5 w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm placeholder:text-neutral-400 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
+              placeholder="For example: we went with someone closer to our budget."
+              className="mt-1.5 w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm font-normal"
             />
-            <p className="mt-1 text-right text-[11px] text-neutral-400">
-              {rejectReason.length}/{APPLICATION_REJECT_REASON_MAX}
-            </p>
-            <div className="mt-3 flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={dismiss} disabled={pending}>
-                Cancel
-              </Button>
-              <Button variant="destructive" size="sm" onClick={runReject} disabled={pending}>
-                {pending ? "Working…" : "Reject application"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Hire */}
-      {confirm === "hire" && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Hire candidate">
-          <div className="absolute inset-0 bg-black/40" aria-hidden onClick={pending ? undefined : dismiss} />
-          <div className="relative w-full max-w-sm rounded-2xl border border-kampmax-border bg-white p-6 shadow-xl">
-            <h2 className="text-base font-bold text-kampmax-text">Hire {candidateName}?</h2>
-            <p className="mt-2 text-sm text-kampmax-text-secondary">
-              This accepts their application, closes the job to new proposals
-              and sends them a contract to review. This can&apos;t be undone.
-            </p>
-            <div className="mt-5 flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={dismiss} disabled={pending}>
-                Cancel
-              </Button>
-              <Button size="sm" onClick={runHire} disabled={pending}>
-                {pending ? "Working…" : "Hire candidate"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+            <span className="block text-right text-[11px] font-normal text-neutral-400">{reason.length}/{APPLICATION_REJECT_REASON_MAX}</span>
+          </label>
+        )}
+        {error && asking && <p role="alert" className="mt-2 text-xs text-error-600">{error}</p>}
+      </ConfirmDialog>
     </div>
   );
 }

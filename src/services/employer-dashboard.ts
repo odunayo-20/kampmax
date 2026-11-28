@@ -20,7 +20,7 @@ import { getReceivedApplicationsApi } from "@/services/proposals";
 import { ENGAGEMENT_TO_CONTRACT_STATUS } from "@/services/contract";
 import { listMyEmployerEngagements, type Engagement, type EngagementStatus } from "@/services/jobs";
 import {
-  backendProfileCompletion,
+  employerNextStep,
   getEmployerProfileApi,
 } from "@/services/employer";
 import { getEmployerInsightsApi, type EmployerInsights, type HiringPipeline } from "@/services/employer-insights";
@@ -31,6 +31,8 @@ import type {
   OpportunityStatus,
 } from "@/types/opportunity";
 import { peopleHref } from "@/services/employer-people";
+import { isMyMove } from "@/lib/contract-groups";
+import { heldInEscrow, type NextStep } from "@/lib/employer-hub";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -74,7 +76,8 @@ export interface EmployerDashboardSummary {
     descriptor: string;
     location: string;
     verified: boolean;
-    profileCompletion: number;
+    /** The one profile step to do next, or null once it is complete. */
+    nextStep: NextStep | null;
   };
   jobCounts: Record<OpportunityStatus, number> & { all: number };
   recentJobs: EmployerDashboardJob[];
@@ -83,10 +86,12 @@ export interface EmployerDashboardSummary {
     total: number;
     active: number;
     awaitingClientReview: number;
-    awaitingFunding: number;
+    /** Contracts where the next move is the employer's (fund it, or review sent work). */
+    waitingOnYou: number;
+    /** The money held for the current step of each funded contract. */
+    held: { total: number; count: number };
     recent: EmployerDashboardContract[];
   };
-  pendingActions: number;
   attention: EmployerAttentionItem[];
   /** Where people stand across open postings, and how candidates see this employer. */
   insights: EmployerInsights;
@@ -96,65 +101,68 @@ export interface EmployerDashboardSummary {
 
 function buildAttentionFrom(
   pipeline: HiringPipeline,
-  contracts: { status: ContractStatus }[],
-  jobCounts: Record<OpportunityStatus, number> & { all: number },
-  profileCompletion: number
+  waitingOnYou: number,
+  drafts: number,
+  verificationRejected: boolean,
+  nextStep: NextStep | null
 ): EmployerAttentionItem[] {
   const items: EmployerAttentionItem[] = [];
+  const people = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
+  if (waitingOnYou > 0) {
+    items.push({
+      id: "contracts",
+      tone: "warning",
+      title: `${people(waitingOnYou, "contract", "contracts")} waiting for you`,
+      detail: "Fund a contract to start the work, or review work that was sent.",
+      href: "/employer/contracts",
+    });
+  }
   if (pipeline.new > 0) {
     items.push({
       id: "new_applications",
       tone: "info",
       title: "Review new applications",
-      detail: `${pipeline.new} ${pipeline.new === 1 ? "person is" : "people are"} waiting for your first look.`,
+      detail: `${people(pipeline.new, "person is", "people are")} waiting for your first look.`,
       href: peopleHref("NEW"),
     });
   }
-
   if (pipeline.shortlisted > 0) {
     items.push({
       id: "shortlisted",
       tone: "neutral",
       title: "Decide on shortlisted candidates",
-      detail: `${pipeline.shortlisted} ${pipeline.shortlisted === 1 ? "candidate is" : "candidates are"} shortlisted in your pipeline.`,
+      detail: `${people(pipeline.shortlisted, "candidate is", "candidates are")} on your shortlist.`,
       href: peopleHref("SHORTLISTED"),
     });
   }
-
-  const awaitingClientReview = contracts.filter(
-    (c) => c.status === CONTRACT_STATUS.AWAITING_CLIENT_REVIEW
-  ).length;
-  if (awaitingClientReview > 0) {
+  if (verificationRejected) {
     items.push({
-      id: "contracts_review",
+      id: "verify",
       tone: "warning",
-      title: "Review submitted deliverables",
-      detail: `${awaitingClientReview} contract${awaitingClientReview === 1 ? "" : "s"} with work ready for your review.`,
-      href: "/employer/contracts",
+      title: "Your verification was not approved",
+      detail: "Update your profile, then contact support.",
+      href: "/employer/profile",
     });
   }
-
-  if (jobCounts.draft > 0) {
+  if (drafts > 0) {
     items.push({
       id: "draft_jobs",
       tone: "neutral",
-      title: "Finish drafting a job",
-      detail: `${jobCounts.draft} draft job${jobCounts.draft === 1 ? "" : "s"} ready to submit for review.`,
-      href: "/employer/jobs?status=draft",
+      title: drafts === 1 ? "You have a job that is not live yet" : `You have ${drafts} jobs that are not live yet`,
+      detail: "Publish it when it is ready, or discard it.",
+      href: "/employer/jobs?group=draft",
     });
   }
-
-  if (profileCompletion < 100) {
+  if (nextStep) {
     items.push({
       id: "profile",
-      tone: "warning",
-      title: "Complete your employer profile",
-      detail: `Profile is ${profileCompletion}% complete — finishing it unlocks trust badges and better candidates.`,
-      href: "/onboarding/employer",
+      tone: "neutral",
+      title: nextStep.title,
+      detail: nextStep.detail,
+      href: "/employer/profile/edit",
     });
   }
-
   return items;
 }
 
@@ -218,10 +226,13 @@ export async function getEmployerDashboardApi(): Promise<EmployerDashboardSummar
   ]);
   for (const { error } of [jobs, apps, jobCounts]) if (error) throw error;
 
-  // Same calculation as the profile page, so the two always show one number.
-  const profileCompletion = backendProfileCompletion(profile);
+  // The same next step as the profile page.
+  const nextStep = employerNextStep(profile);
+  const engagements = contracts.map((c) => c.engagement);
+  const waitingOnYou = engagements.filter((e) => isMyMove(e, "employer")).length;
+  const rejected = String(profile.verificationStatus).toUpperCase() === "REJECTED";
 
-  const attention = buildAttentionFrom(insights.pipeline, contracts, jobCounts.counts, profileCompletion);
+  const attention = buildAttentionFrom(insights.pipeline, waitingOnYou, jobCounts.counts.draft, rejected, nextStep);
 
   return {
     company: {
@@ -229,7 +240,7 @@ export async function getEmployerDashboardApi(): Promise<EmployerDashboardSummar
       descriptor: String(profile.industry ?? ""),
       location: String(profile.location ?? ""),
       verified: String(profile.verificationStatus).toUpperCase() === "VERIFIED",
-      profileCompletion,
+      nextStep,
     },
     jobCounts: jobCounts.counts,
     recentJobs: jobs.page.items.map((job) => ({
@@ -249,12 +260,10 @@ export async function getEmployerDashboardApi(): Promise<EmployerDashboardSummar
       awaitingClientReview: contracts.filter(
         (c) => c.status === CONTRACT_STATUS.AWAITING_CLIENT_REVIEW
       ).length,
-      awaitingFunding: contracts.filter(
-        (c) => c.status === CONTRACT_STATUS.AWAITING_FUNDING
-      ).length,
+      waitingOnYou,
+      held: heldInEscrow(engagements),
       recent: contracts.slice(0, 5),
     },
-    pendingActions: attention.length,
     attention,
     insights,
   };

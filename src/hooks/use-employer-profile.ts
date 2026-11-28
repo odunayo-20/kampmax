@@ -5,13 +5,14 @@ import { useAuth } from "@/lib/auth-context";
 import { uploadFileDirect } from "@/services/media";
 import { employerKeys, dashboardKeys } from "@/lib/query-keys";
 import {
-  backendProfileCompletion,
   backendProfileToDraft,
   buildOnboardingDetails,
+  employerNextStep,
   getEmployerProfileApi,
   updateEmployerProfileApi,
 } from "@/services/employer";
 import type { EmployerOnboardingDraft, EmployerProfileUpdatePayload } from "@/types/employer";
+import type { NextStep } from "@/lib/employer-hub";
 
 /** Employer profile read (owner-scoped). */
 export function useEmployerProfile() {
@@ -24,7 +25,7 @@ export function useEmployerProfile() {
     enabled,
     queryFn: async (): Promise<{
       draft: EmployerOnboardingDraft;
-      completion: number;
+      nextStep: NextStep | null;
     } | null> => {
       const { profile, error } = await getEmployerProfileApi();
       if (error) {
@@ -32,7 +33,7 @@ export function useEmployerProfile() {
         throw error;
       }
       if (!profile) return null;
-      return { draft: backendProfileToDraft(profile), completion: backendProfileCompletion(profile) };
+      return { draft: backendProfileToDraft(profile), nextStep: employerNextStep(profile) };
     },
   });
 }

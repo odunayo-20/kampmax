@@ -8,7 +8,6 @@ export {
   useUnsaveJob,
   useEmployerJobs,
   useEmployerJob,
-  useEmployerJobsSummary,
   useCreateJob,
   useUpdateJob,
   usePublishJob,

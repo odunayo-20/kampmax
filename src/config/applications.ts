@@ -84,3 +84,11 @@ export const APPLICATION_ACCEPTABLE_FROM: ProposalStatus[] = [
   PROPOSAL_STATUS.UNDER_REVIEW,
   PROPOSAL_STATUS.SHORTLISTED,
 ];
+/**
+ * The lowest price among proposals still open to a decision, when there are at least two to compare; null otherwise.
+ * The mobile app's freelance-ux lowestAmount says the same.
+ */
+export function lowestOpenAmount(items: { status: ProposalStatus; proposedAmount?: number }[]): number | null {
+  const open = items.filter((p) => APPLICATION_REJECTABLE_FROM.includes(p.status) && p.proposedAmount !== undefined).map((p) => p.proposedAmount as number);
+  return open.length > 1 ? Math.min(...open) : null;
+}

@@ -2,39 +2,23 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Eye, PencilLine, Send, Ban, ExternalLink, RefreshCw, Users, CheckCheck, Copy } from "lucide-react";
 import type { Opportunity } from "@/types/opportunity";
 import { OPPORTUNITY_STATUS, isHiringType } from "@/types/opportunity";
-import { OPPORTUNITY_STATUS_META } from "@/config/opportunity";
 import { Button } from "@/components/ui";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { usePublishJob, useCloseJob } from "@/hooks/use-jobs";
-import { getFriendlyErrorMessage } from "@/lib/error-messages";
-import { cn } from "@/lib/utils";
+import { usePublishJob, useCloseJob, useCancelJob } from "@/hooks/use-jobs";
+import { getRefusalMessage } from "@/lib/error-messages";
+import { postingLapsed as canRenew } from "@/lib/employer-job-groups";
 import { FillJobDialog } from "./FillJobDialog";
 import { PublishJobDialog } from "./PublishJobDialog";
 import { RenewJobDialog } from "./RenewJobDialog";
 
-/**
- * A vacancy or internship whose paid live period has ended can be renewed. It
- * counts as ended even before the backend's sweep has marked it expired.
- */
-export function canRenew(job: Opportunity, now = Date.now()): boolean {
-  if (!isHiringType(job.opportunityType)) return false;
-  if (job.status === OPPORTUNITY_STATUS.EXPIRED) return true;
-  return (
-    job.status === OPPORTUNITY_STATUS.OPEN &&
-    !!job.expiresAt &&
-    new Date(job.expiresAt).getTime() <= now
-  );
-}
+/** One rule for "this paid posting has lapsed and can be renewed", shared with the jobs list. */
+export { canRenew };
 
 /** A vacancy or internship that is open or has just lapsed can be marked filled; a gig is filled by accepting a proposal. */
 export function canFill(job: Opportunity): boolean {
-  return (
-    isHiringType(job.opportunityType) &&
-    (job.status === OPPORTUNITY_STATUS.OPEN || job.status === OPPORTUNITY_STATUS.EXPIRED)
-  );
+  return isHiringType(job.opportunityType) && (job.status === OPPORTUNITY_STATUS.OPEN || job.status === OPPORTUNITY_STATUS.EXPIRED);
 }
 
 /** Anything that has ended can be posted again as a fresh draft. */
@@ -42,124 +26,117 @@ export function canPostAgain(job: Opportunity): boolean {
   return job.status === OPPORTUNITY_STATUS.CLOSED || job.status === OPPORTUNITY_STATUS.EXPIRED;
 }
 
-const linkButtonClass =
-  "inline-flex items-center justify-center gap-1.5 font-semibold rounded-md h-8 px-3 text-xs border border-neutral-300 bg-white text-neutral-800 hover:bg-neutral-100";
+type Step = "publish" | "renew" | "edit" | "fill" | "repost";
+
+/** The one step worth doing now, as on mobile's employer-job page; everything else is a quieter link. */
+function mainStep(job: Opportunity): Step | null {
+  if (job.status === OPPORTUNITY_STATUS.DRAFT) return "publish";
+  if (canRenew(job)) return "renew";
+  if (canFill(job)) return "fill";
+  if (canPostAgain(job)) return "repost";
+  return null;
+}
+
+const linkClass = "text-sm font-semibold text-kampmax-text underline";
 
 /**
- * Status-aware action set for an employer's own job. Status transitions are
- * backend-owned: Publish only ever moves DRAFT → PENDING_REVIEW, Close only
- * moves OPEN → CLOSED. Every transition is confirmed first and its error is
- * mapped to a friendly message.
+ * What the employer can do with their own job now. Status changes are the backend's: Publish only moves DRAFT to
+ * PENDING_REVIEW, Close only OPEN to CLOSED, Discard only removes a draft. Each is confirmed first.
+ * `onPage`: shown on the job's own page, so there is no "View" link back to it.
  */
-export function EmployerJobActions({ job }: { job: Opportunity }) {
-  const [confirm, setConfirm] = useState<"publish" | "close" | "renew" | "fill" | null>(null);
+export function EmployerJobActions({ job, onPage = false, onDiscarded }: { job: Opportunity; onPage?: boolean; onDiscarded?: () => void }) {
+  const [confirm, setConfirm] = useState<"publish" | "close" | "renew" | "fill" | "discard" | null>(null);
   const hiring = isHiringType(job.opportunityType);
   const [error, setError] = useState<string | null>(null);
   const publishMutation = usePublishJob();
   const closeMutation = useCloseJob();
-  const pending = publishMutation.isPending || closeMutation.isPending;
+  const cancelMutation = useCancelJob();
+  const pending = publishMutation.isPending || closeMutation.isPending || cancelMutation.isPending;
+  const main = mainStep(job);
+  const draft = job.status === OPPORTUNITY_STATUS.DRAFT;
+  const open = job.status === OPPORTUNITY_STATUS.OPEN;
 
   const dismiss = () => {
     setConfirm(null);
     setError(null);
   };
+  const fail = (err: unknown) => setError(getRefusalMessage(err));
 
   const runPublish = () => {
     setError(null);
-    publishMutation.mutate(job.id, {
-      onSuccess: dismiss,
-      onError: (err) => setError(getFriendlyErrorMessage(err)),
+    publishMutation.mutate(job.id, { onSuccess: dismiss, onError: fail });
+  };
+  const runClose = () => {
+    setError(null);
+    closeMutation.mutate(job.id, { onSuccess: dismiss, onError: fail });
+  };
+  const runDiscard = () => {
+    setError(null);
+    cancelMutation.mutate(job.id, {
+      onSuccess: () => {
+        dismiss();
+        onDiscarded?.();
+      },
+      onError: fail,
     });
   };
 
-  const runClose = () => {
-    setError(null);
-    closeMutation.mutate(job.id, {
-      onSuccess: dismiss,
-      onError: (err) => setError(getFriendlyErrorMessage(err)),
-    });
-  };
+  const mainButton =
+    main === "publish" ? (
+      <Button size="sm" disabled={pending} onClick={() => setConfirm("publish")}>Publish</Button>
+    ) : main === "renew" ? (
+      <Button size="sm" disabled={pending} onClick={() => setConfirm("renew")}>Renew</Button>
+    ) : main === "fill" ? (
+      <Button size="sm" disabled={pending} onClick={() => setConfirm("fill")}>Mark as filled</Button>
+    ) : main === "repost" ? (
+      <Link href={`/employer/jobs/create?from=${job.id}`} className="inline-flex h-8 items-center rounded-md bg-primary-600 px-3 text-xs font-semibold text-white hover:bg-primary-700">
+        Post again
+      </Link>
+    ) : null;
 
   return (
     <div>
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        {job.status !== OPPORTUNITY_STATUS.DRAFT && (
-          <Link
-            href={`/employer/jobs/${job.id}/applications`}
-            className={linkButtonClass}
-            aria-label={`View applications for ${job.title}`}
-          >
-            <Users className="h-3.5 w-3.5" aria-hidden /> Applications
-          </Link>
-        )}
-
-        {job.status === OPPORTUNITY_STATUS.DRAFT && (
-          <>
-            <Link href={`/employer/jobs/${job.id}`} className={linkButtonClass}>
-              <Eye className="h-3.5 w-3.5" aria-hidden /> View
-            </Link>
-            <Link href={`/employer/jobs/${job.id}/edit`} className={linkButtonClass}>
-              <PencilLine className="h-3.5 w-3.5" aria-hidden /> Edit
-            </Link>
-            <Button size="sm" disabled={pending} onClick={() => setConfirm("publish")}>
-              <Send className="mr-1 h-3.5 w-3.5" aria-hidden /> Publish
-            </Button>
-          </>
-        )}
-
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+        {mainButton}
         {job.status === OPPORTUNITY_STATUS.PENDING_REVIEW && (
-          <>
-            <Link href={`/employer/jobs/${job.id}`} className={linkButtonClass}>
-              <Eye className="h-3.5 w-3.5" aria-hidden /> View
-            </Link>
-            <span
-              className={cn(
-                "inline-flex h-8 items-center rounded-md bg-warning-50 px-3 text-xs font-medium text-warning-700 ring-1 ring-inset ring-warning-200"
-              )}
-            >
-              Awaiting moderation — goes live after review
-            </span>
-          </>
+          <span className="inline-flex h-8 items-center rounded-md bg-warning-50 px-3 text-xs font-medium text-warning-700 ring-1 ring-inset ring-warning-200">
+            Waiting for review. It goes live once Kampmax approves it.
+          </span>
         )}
-
-        {job.status === OPPORTUNITY_STATUS.OPEN && (
-          <>
-            <Link href={`/jobs/${job.id}`} className={linkButtonClass}>
-              <ExternalLink className="h-3.5 w-3.5" aria-hidden /> View on marketplace
-            </Link>
-            <Link href={`/employer/jobs/${job.id}`} className={linkButtonClass}>
-              <Eye className="h-3.5 w-3.5" aria-hidden /> View
-            </Link>
-            <Button variant="destructive" size="sm" disabled={pending} onClick={() => setConfirm("close")}>
-              <Ban className="mr-1 h-3.5 w-3.5" aria-hidden /> Close
-            </Button>
-          </>
-        )}
-
-        {(job.status === OPPORTUNITY_STATUS.CLOSED ||
-          job.status === OPPORTUNITY_STATUS.EXPIRED ||
-          job.status === OPPORTUNITY_STATUS.CANCELLED) && (
-          <Link href={`/employer/jobs/${job.id}`} className={linkButtonClass}>
-            <Eye className="h-3.5 w-3.5" aria-hidden /> View
+        {!onPage && (
+          <Link href={`/employer/jobs/${job.id}`} className={linkClass}>
+            View
           </Link>
         )}
-
-        {canRenew(job) && (
-          <Button size="sm" disabled={pending} onClick={() => setConfirm("renew")}>
-            <RefreshCw className="mr-1 h-3.5 w-3.5" aria-hidden /> Renew
-          </Button>
-        )}
-
-        {canFill(job) && (
-          <Button variant="outline" size="sm" disabled={pending} onClick={() => setConfirm("fill")}>
-            <CheckCheck className="mr-1 h-3.5 w-3.5" aria-hidden /> Mark as filled
-          </Button>
-        )}
-
-        {canPostAgain(job) && (
-          <Link href={`/employer/jobs/create?from=${job.id}`} className={linkButtonClass}>
-            <Copy className="h-3.5 w-3.5" aria-hidden /> Post again
+        {draft && (
+          <Link href={`/employer/jobs/${job.id}/edit`} className={linkClass}>
+            Edit
           </Link>
+        )}
+        {open && (
+          <Link href={`/jobs/${job.id}`} className={linkClass}>
+            See it the way candidates do
+          </Link>
+        )}
+        {main !== "fill" && canFill(job) && (
+          <button type="button" disabled={pending} onClick={() => setConfirm("fill")} className={linkClass}>
+            Mark as filled
+          </button>
+        )}
+        {main !== "repost" && canPostAgain(job) && (
+          <Link href={`/employer/jobs/create?from=${job.id}`} className={linkClass}>
+            Post again
+          </Link>
+        )}
+        {open && (
+          <button type="button" disabled={pending} onClick={() => setConfirm("close")} className="text-sm font-semibold text-error-600 underline disabled:opacity-50">
+            Close this job
+          </button>
+        )}
+        {draft && (
+          <button type="button" disabled={pending} onClick={() => setConfirm("discard")} className="text-sm font-semibold text-error-600 underline disabled:opacity-50">
+            Discard draft
+          </button>
         )}
       </div>
 
@@ -171,11 +148,7 @@ export function EmployerJobActions({ job }: { job: Opportunity }) {
 
       {hiring ? (
         <>
-          <PublishJobDialog
-            jobId={job.id}
-            open={confirm === "publish"}
-            onClose={dismiss}
-          />
+          <PublishJobDialog jobId={job.id} open={confirm === "publish"} onClose={dismiss} />
           <RenewJobDialog job={job} open={confirm === "renew"} onClose={dismiss} />
           <FillJobDialog jobId={job.id} open={confirm === "fill"} onClose={dismiss} />
         </>
@@ -183,7 +156,7 @@ export function EmployerJobActions({ job }: { job: Opportunity }) {
         <ConfirmDialog
           open={confirm === "publish"}
           title="Publish this job?"
-          body="This submits the job for moderation (Draft → Pending Review). It will go live on the marketplace once approved."
+          body="Kampmax checks it first, then it goes live and freelancers can send proposals."
           confirmLabel="Publish"
           pending={pending}
           onConfirm={runPublish}
@@ -193,11 +166,21 @@ export function EmployerJobActions({ job }: { job: Opportunity }) {
       <ConfirmDialog
         open={confirm === "close"}
         title="Close this job?"
-        body={OPPORTUNITY_STATUS_META[OPPORTUNITY_STATUS.CLOSED].hint}
+        body={`"${job.title}" will stop taking ${hiring ? "applications" : "proposals"}. What you already have stays.`}
         confirmLabel="Close job"
         destructive
         pending={pending}
         onConfirm={runClose}
+        onCancel={dismiss}
+      />
+      <ConfirmDialog
+        open={confirm === "discard"}
+        title="Discard this draft?"
+        body={`"${job.title}" will be deleted. This cannot be undone.`}
+        confirmLabel="Discard"
+        destructive
+        pending={pending}
+        onConfirm={runDiscard}
         onCancel={dismiss}
       />
     </div>

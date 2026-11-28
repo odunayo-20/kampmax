@@ -1,5 +1,6 @@
 "use client";
 
+import { MessagePersonButton } from "@/components/messages/MessagePersonButton";
 import { useState } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
@@ -127,6 +128,7 @@ function ApplicantCard({
           <Download className="mr-1.5 h-3.5 w-3.5" aria-hidden />
           {!a.cvAvailable ? "CV no longer available" : opening ? "Opening…" : "Download CV"}
         </Button>
+        <MessagePersonButton userId={a.applicant.id} className="inline-flex h-8 items-center rounded-md border border-neutral-300 px-3 text-xs font-semibold text-neutral-800 hover:bg-neutral-50 disabled:opacity-50" />
       </div>
 
       {a.coverNote && (
