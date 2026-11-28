@@ -27,7 +27,7 @@ export default function ContractRedirectPage({ params }: { params: Promise<{ id:
 
   useEffect(() => {
     if (!q.data || !user) return;
-    router.replace(q.data.freelancer.userId === user.id ? `/freelancer/contracts/${id}` : "/employer/contracts");
+    router.replace(q.data.freelancer.userId === user.id ? `/freelancer/contracts/${id}` : `/employer/contracts/${id}`);
   }, [q.data, user, id, router]);
 
   if (q.isError) {

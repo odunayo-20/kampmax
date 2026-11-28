@@ -1,19 +1,9 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
-import { ContractStatusBadge } from "@/components/contracts/ContractStatusBadge";
+import { ContractList } from "@/components/contracts/ContractList";
 import { EmployerWalletCard } from "./EmployerWalletCard";
-import { EngagementActions } from "@/components/engagements/EngagementActions";
-import { EngagementMilestones } from "@/components/engagements/EngagementMilestones";
-import { HourlyTimesheet } from "@/components/engagements/HourlyTimesheet";
-import { EngagementNotices } from "@/components/engagements/EngagementNotices";
-import { EngagementRevisions } from "@/components/engagements/EngagementRevisions";
-import { contractPriceLabel, describeCurrentMilestone } from "@/lib/engagement-milestones";
-import { dashboardKeys } from "@/lib/query-keys";
 import { useEmployerContracts } from "@/hooks/use-employer-dashboard";
-import { formatDate } from "@/lib/utils";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
-import { ContractMoneyPanel } from "@/components/trust/ContractMoneyPanel";
 import {
   EmployerDashboardEmpty,
   EmployerDashboardError,
@@ -21,23 +11,20 @@ import {
 } from "./EmployerDashboardSection";
 import { peopleHref } from "@/services/employer-people";
 
+/**
+ * The employer's contracts: the wallet first, then the contracts in three groups (needs you, in progress, finished).
+ * Each card opens the contract's own page, where funding, reviewing and paying happen. The freelancer area uses the
+ * same list.
+ */
 export function EmployerContracts() {
   const query = useEmployerContracts();
-  const queryClient = useQueryClient();
   const contracts = query.data ?? [];
-  // A step changes the contract list and the dashboard counts/prompts.
-  const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
-    void queryClient.invalidateQueries({ queryKey: ["wallet"] });
-  };
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-bold text-kampmax-text">Contracts</h1>
-        <p className="mt-0.5 text-sm text-kampmax-text-secondary">
-          Work that started from the applications you hired.
-        </p>
+        <p className="mt-0.5 text-sm text-kampmax-text-secondary">Work that started from the people you hired.</p>
       </div>
 
       <EmployerWalletCard />
@@ -57,64 +44,7 @@ export function EmployerContracts() {
           action={{ href: peopleHref(), label: "Review applicants" }}
         />
       ) : (
-        <ul className="space-y-3">
-          {contracts.map((contract) => (
-            <li key={contract.id} className="rounded-xl border border-kampmax-border bg-white p-4 sm:p-5">
-              <article>
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <h2 className="text-sm font-bold text-kampmax-text">{contract.projectTitle}</h2>
-                    <p className="mt-0.5 text-xs text-kampmax-text-secondary">
-                      {contract.freelancerName}
-                      {" · "}
-                      {contractPriceLabel(contract.engagement)} · Due{" "}
-                      {formatDate(contract.deadline)}
-                    </p>
-                  </div>
-                  <ContractStatusBadge status={contract.status} />
-                </div>
-
-                {contract.nextAction && (
-                  <p className="mt-3 rounded-lg bg-kampmax-bg px-3 py-2 text-xs text-kampmax-text-secondary">
-                    {contract.nextAction}
-                  </p>
-                )}
-
-                <EngagementMilestones milestones={contract.engagement.milestones} />
-                <ContractMoneyPanel engagement={contract.engagement} party="employer" />
-                <EngagementNotices engagement={contract.engagement} role="employer" />
-                <EngagementRevisions
-                  revisions={contract.engagement.revisions}
-                  status={contract.engagementStatus}
-                  role="employer"
-                />
-                {contract.engagement.paymentType === "HOURLY" && (
-                  <HourlyTimesheet
-                    engagementId={contract.id}
-                    role="employer"
-                    status={contract.engagementStatus}
-                    onChanged={refresh}
-                  />
-                )}
-                <EngagementActions
-                  engagementId={contract.id}
-                  status={contract.engagementStatus}
-                  role="employer"
-                  revisions={contract.engagement.revisions}
-                  milestone={describeCurrentMilestone(contract.engagement)}
-                  onChanged={refresh}
-                />
-
-                {contract.outstandingDeliverables > 0 && (
-                  <p className="mt-2 text-xs font-medium text-info-700">
-                    {contract.outstandingDeliverables}{" "}
-                    {contract.outstandingDeliverables === 1 ? "deliverable" : "deliverables"} outstanding
-                  </p>
-                )}
-              </article>
-            </li>
-          ))}
-        </ul>
+        <ContractList engagements={contracts.map((c) => c.engagement)} party="employer" hrefFor={(id) => `/employer/contracts/${id}`} />
       )}
     </div>
   );
