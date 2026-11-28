@@ -11,7 +11,7 @@ import { EmployerDashboardHeader } from "./EmployerDashboardHeader";
 import { EmployerJobsOverview } from "./EmployerJobsOverview";
 import { EmployerMessagesOverview } from "./EmployerMessagesOverview";
 import { EmployerNotificationsOverview } from "./EmployerNotificationsOverview";
-import { EmployerNextStepCard } from "@/components/employer/profile/EmployerNextStepCard";
+import { NextStepCard } from "@/components/ui/NextStepCard";
 import { EmployerTodayStrip } from "./EmployerTodayStrip";
 import { EmployerQuickActions } from "./EmployerQuickActions";
 import { EmployerStatsGrid } from "./EmployerStatsGrid";
@@ -58,7 +58,7 @@ export function EmployerDashboard() {
 
         <aside className="space-y-6">
           <EmployerQuickActions />
-          <EmployerNextStepCard step={company?.nextStep ?? null} />
+          <NextStepCard step={company?.nextStep ?? null} href="/employer/profile/edit" kicker="Attract better people" />
           <EmployerNotificationsOverview />
           <EmployerMessagesOverview />
         </aside>

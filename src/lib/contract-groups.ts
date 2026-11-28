@@ -78,3 +78,22 @@ export function paidPercent(e: Pick<Engagement, "status" | "agreedAmount" | "mil
   const paid = e.milestones.filter((m) => m.status === "COMPLETED").reduce((sum, m) => sum + m.amount, 0);
   return Math.max(0, Math.min(100, Math.round((paid / total) * 100)));
 }
+
+// ---- money held in escrow ---------------------------------------------------------------
+
+/** A contract holds its current step's money from funding until it is paid out or refunded. */
+const HELD = new Set(["FUNDED", "IN_PROGRESS", "SUBMITTED", "REVISION_REQUESTED", "DISPUTED"]);
+
+/** What is held across these contracts: the current step of each funded one (the mobile app's heldInEscrow). */
+export function heldInEscrow(contracts: Pick<Engagement, "status" | "milestones" | "currentMilestonePosition">[]): { total: number; count: number } {
+  let kobo = 0;
+  let count = 0;
+  for (const c of contracts) {
+    if (!HELD.has(c.status)) continue;
+    const current = c.milestones.find((m) => m.position === c.currentMilestonePosition);
+    if (!current) continue;
+    kobo += Math.round(current.amount * 100);
+    count += 1;
+  }
+  return { total: kobo / 100, count };
+}

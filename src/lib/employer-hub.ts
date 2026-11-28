@@ -1,29 +1,8 @@
 /**
- * The employer dashboard's own rules, the same as the mobile app's hiring hub: the money held in escrow, the one
- * posting worth a look today, and the one profile step to do next (mobile lib/employer-hub, freelancer-hub
- * heldInEscrow, employer-portal buildCompletion). Pure.
+ * The employer dashboard's own rules, the same as the mobile app's hiring hub: the one posting worth a look today
+ * and the one profile step to do next (mobile lib/employer-hub, employer-portal buildCompletion). Escrow is
+ * contract-groups heldInEscrow, shared with the freelancer dashboard. Pure.
  */
-
-import type { Engagement } from "@/services/jobs";
-
-// ---- money held in escrow ---------------------------------------------------------------
-
-/** A contract holds its current step's money from funding until it is paid out or refunded. */
-const HELD = new Set(["FUNDED", "IN_PROGRESS", "SUBMITTED", "REVISION_REQUESTED", "DISPUTED"]);
-
-/** What the employer has held across their contracts: the current step of each funded one. */
-export function heldInEscrow(contracts: Pick<Engagement, "status" | "milestones" | "currentMilestonePosition">[]): { total: number; count: number } {
-  let kobo = 0;
-  let count = 0;
-  for (const c of contracts) {
-    if (!HELD.has(c.status)) continue;
-    const current = c.milestones.find((m) => m.position === c.currentMilestonePosition);
-    if (!current) continue;
-    kobo += Math.round(current.amount * 100);
-    count += 1;
-  }
-  return { total: kobo / 100, count };
-}
 
 // ---- the posting worth a look today -----------------------------------------------------
 

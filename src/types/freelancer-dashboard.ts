@@ -1,3 +1,4 @@
+import type { Callout, FreelancerNextStep, JobPipeline, VerificationState } from "@/lib/freelancer-hub";
 // ============================================================
 // FREELANCER DASHBOARD TYPES  (Module 22 — Dashboard)
 // ============================================================
@@ -34,26 +35,20 @@ export interface FreelancerProfileSummary {
 }
 
 export interface FreelancerProfileStatus {
-  status: FreelancerOnboardingStatus;
-  completionPercentage: number;
-  /** Missing/incomplete sections (for the "Complete profile" guidance). */
-  missing: FreelancerProfileMissing[];
   /** Publicly discoverable. Backend-owned — never forced here. */
   isPublic: boolean;
-  /** Identity verification state (user-facing only). */
-  verification: "verified" | "pending" | "rejected" | "not_required";
-}
-
-export interface FreelancerProfileMissing {
-  key: string;
-  label: string;
-  description: string;
-  href: string;
+  /** Identity verification as the backend has it; only Kampmax changes it. */
+  verification: VerificationState;
+  /** The one profile step to do next, or null once the profile is complete. */
+  nextStep: FreelancerNextStep | null;
 }
 
 // ── Proposal / contract / earnings summaries ────────────────
 
 export interface FreelancerProposalSummary {
+  /** Sent and still open (submitted, under review or shortlisted). */
+  waiting: number;
+  won: number;
   submitted: number;
   underReview: number;
   accepted: number;
@@ -65,22 +60,10 @@ export interface FreelancerContractSummary {
   completed: number;
 }
 
-export interface FreelancerDeadline {
-  id: string;
-  title: string;
-  dueDate: string;
-}
-
-/** Wallet figures. The dashboard's `earnings` is null when the wallet can't be read. */
-export interface FreelancerEarningsSummary {
-  pending: number;
-  available: number;
-}
-
 // ── Dashboard statistics (backend-supplied or —) ────────────
 
 export interface FreelancerDashboardMetric {
-  key: "active_proposals" | "active_contracts" | "completed_projects" | "wallet_balance";
+  key: "available" | "held" | "active_proposals" | "to_do";
   label: string;
   /** Pre-formatted display string. `—` when no real data exists. */
   valueLabel: string;
@@ -133,7 +116,11 @@ export interface FreelancerDashboard {
   };
   proposals: FreelancerProposalSummary;
   contracts: FreelancerContractSummary;
-  deadlines: FreelancerDeadline[];
-  earnings: FreelancerEarningsSummary | null;
+  /** Where the jobs stand: the freelancer's moves, work with clients, paid jobs. */
+  pipeline: JobPipeline;
+  /** What needs the freelancer now, in the mobile hub's words. Empty when nothing does. */
+  callouts: Callout[];
+  /** "Received ₦12,000 · Payment for Logo design", or null. */
+  latestPayment: string | null;
   activity: FreelancerActivityEvent[];
 }

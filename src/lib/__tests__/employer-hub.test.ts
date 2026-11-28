@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { closesSoonText, heldInEscrow, nextProfileStep, todayLine, watchFrom } from "../employer-hub";
+import { closesSoonText, nextProfileStep, todayLine, watchFrom } from "../employer-hub";
+import { heldInEscrow } from "../contract-groups";
 
 const now = new Date("2026-11-28T10:00:00Z");
 const contract = (status: string, amount: number) =>

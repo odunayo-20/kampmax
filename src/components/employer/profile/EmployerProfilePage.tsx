@@ -9,7 +9,7 @@ import { getCampusById } from "@/services/campus";
 import { EmployerProfileSkeleton } from "./EmployerProfileSkeleton";
 import { EmployerProfileHeader } from "./EmployerProfileHeader";
 import { EmployerVerificationNotice } from "./EmployerVerificationNotice";
-import { EmployerNextStepCard } from "./EmployerNextStepCard";
+import { NextStepCard } from "@/components/ui/NextStepCard";
 import { EmployerProfileView } from "./EmployerProfileView";
 
 export function EmployerProfilePage() {
@@ -63,7 +63,7 @@ export function EmployerProfilePage() {
           <EmployerProfileView draft={draft} editHref="/employer/profile/edit" editLabel="Edit" />
         </div>
         <aside className="space-y-6">
-          <EmployerNextStepCard step={nextStep} />
+          <NextStepCard step={nextStep} href="/employer/profile/edit" kicker="Attract better people" />
         </aside>
       </div>
     </div>

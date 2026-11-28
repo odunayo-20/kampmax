@@ -31,8 +31,8 @@ import type {
   OpportunityStatus,
 } from "@/types/opportunity";
 import { peopleHref } from "@/services/employer-people";
-import { isMyMove } from "@/lib/contract-groups";
-import { heldInEscrow, type NextStep } from "@/lib/employer-hub";
+import { heldInEscrow, isMyMove } from "@/lib/contract-groups";
+import type { NextStep } from "@/lib/employer-hub";
 
 // ── Types ────────────────────────────────────────────────────
 

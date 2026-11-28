@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { X, ArrowRight, Bell, FileText, Handshake, Lightbulb, Search } from "lucide-react";
+import { Bell, CheckCircle2, FileText, Handshake, Search } from "lucide-react";
 import { useFreelancerAccess, useFreelancerDashboard } from "@/hooks/use-freelancer-dashboard";
 import { useNotificationSummary } from "@/hooks/use-notifications";
 import { FreelancerSkeleton } from "@/components/freelancer/dashboard/FreelancerSkeleton";
@@ -13,15 +12,12 @@ import { FreelancerProfilePreview } from "@/components/freelancer/dashboard/Free
 import { FreelancerAvailability } from "@/components/freelancer/dashboard/FreelancerAvailability";
 import { FreelancerActivityFeed } from "@/components/freelancer/dashboard/FreelancerActivityFeed";
 import { FreelancerSectionLink } from "@/components/freelancer/dashboard/FreelancerSectionLink";
-import { FreelancerNextContractAction } from "@/components/freelancer/dashboard/FreelancerNextContractAction";
-import { FreelancerFinancialSummary } from "@/components/freelancer/dashboard/FreelancerFinancialSummary";
 
 export default function FreelancerDashboardPage() {
   // Access is already cached by the layout, so this is not a second request.
   const accessQuery = useFreelancerAccess();
   const overview = useFreelancerDashboard();
   const notif = useNotificationSummary();
-  const [showWelcome, setShowWelcome] = useState(true);
 
   const dashboard = overview.data ?? null;
   const displayName = accessQuery.data?.displayName ?? "Freelancer";
@@ -49,32 +45,6 @@ export default function FreelancerDashboardPage() {
   return (
     <div className="space-y-6">
       <FreelancerQuickActions displayName={displayName} />
-
-      {/* Welcome guidance (dismissible) */}
-      {showWelcome && (
-        <div className="relative overflow-hidden rounded-xl border border-primary-200 bg-primary-50 p-5">
-          <button
-            type="button"
-            onClick={() => setShowWelcome(false)}
-            aria-label="Dismiss guidance"
-            className="absolute right-3 top-3 rounded-md p-1 text-primary-400 hover:bg-primary-100 hover:text-primary-700"
-          >
-            <X className="h-4 w-4" aria-hidden />
-          </button>
-          <div className="flex items-start gap-3 pr-8">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-primary-600 ring-1 ring-primary-200">
-              <Lightbulb className="h-5 w-5" aria-hidden />
-            </div>
-            <div>
-              <h2 className="text-sm font-bold text-kampmax-text">Make the most of your profile</h2>
-              <p className="mt-1 text-sm text-kampmax-text-secondary">
-                Keep your profile complete and your availability up to date to get found by clients,
-                then browse jobs and send proposals to start winning work.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Metrics */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -122,7 +92,7 @@ export default function FreelancerDashboardPage() {
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-bold text-kampmax-text">Find work & grow</h2>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-3">
           <FreelancerSectionLink
             href="/freelancer/find-work"
             icon={Search}
@@ -137,8 +107,8 @@ export default function FreelancerDashboardPage() {
             tone="bg-info-50 text-info-700"
             title="Your proposals"
             description={
-              dashboard.proposals.submitted > 0
-                ? `${dashboard.proposals.submitted} submitted · ${dashboard.proposals.accepted} accepted`
+              dashboard.proposals.waiting + dashboard.proposals.won > 0
+                ? `${dashboard.proposals.waiting} waiting · ${dashboard.proposals.won} won`
                 : "Track proposals you've sent to clients and their status."
             }
             cta="View proposals"
@@ -151,39 +121,46 @@ export default function FreelancerDashboardPage() {
             description={`${dashboard.contracts.active} active · ${dashboard.contracts.completed} completed`}
             cta="Manage contracts"
           />
-          <FreelancerFinancialSummary earnings={dashboard.earnings} />
         </div>
       </section>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
+          {dashboard.latestPayment && (
+            <Link href="/freelancer/transactions" className="mb-4 block rounded-xl border border-kampmax-border bg-white px-4 py-3 text-sm text-kampmax-text hover:bg-neutral-50">
+              {dashboard.latestPayment}
+            </Link>
+          )}
           <FreelancerActivityFeed events={activity} />
         </div>
         <div className="space-y-4">
-          <FreelancerNextContractAction />
-          <div className="rounded-xl border border-kampmax-border bg-white p-5">
-            <h2 className="text-sm font-bold text-kampmax-text">Next steps</h2>
-            <ul className="mt-3 space-y-2">
-              {profileStatus.missing.length > 0 ? (
-                profileStatus.missing.slice(0, 4).map((m) => (
-                  <li key={m.key}>
-                    <Link
-                      href={m.href}
-                      className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-kampmax-text hover:bg-neutral-50"
-                    >
-                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary-600" aria-hidden />
-                      <span className="flex-1">{m.label}</span>
-                      <ArrowRight className="h-3.5 w-3.5 text-neutral-400" aria-hidden />
-                    </Link>
-                  </li>
-                ))
-              ) : (
-                <li className="text-sm text-kampmax-text-secondary">
-                  Your profile is complete. Browse jobs to find your next project.
-                </li>
-              )}
-            </ul>
-          </div>
+          <section aria-label="Needs you now" className="space-y-2">
+            {dashboard.callouts.length > 0 ? (
+              dashboard.callouts.map((c) => (
+                <Link
+                  key={c.id}
+                  href={c.href}
+                  className={
+                    c.tone === "attention"
+                      ? "block rounded-xl border border-warning-200 bg-warning-50 p-4 hover:opacity-90"
+                      : c.tone === "positive"
+                      ? "block rounded-xl border border-success-200 bg-success-50 p-4 hover:opacity-90"
+                      : "block rounded-xl border border-kampmax-border bg-white p-4 hover:bg-neutral-50"
+                  }
+                >
+                  <p className="text-sm font-semibold text-kampmax-text">{c.title}</p>
+                  <p className="mt-0.5 text-xs text-kampmax-text-secondary">{c.text}</p>
+                </Link>
+              ))
+            ) : (
+              <p className="flex items-center gap-2 rounded-xl border border-kampmax-border bg-white p-4 text-sm text-kampmax-text-secondary">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-success-600" aria-hidden />
+                {dashboard.pipeline.withClient > 0
+                  ? `${dashboard.pipeline.withClient} ${dashboard.pipeline.withClient === 1 ? "job" : "jobs"} with clients for approval. Nothing needs you right now.`
+                  : "You're all caught up. Nothing needs you right now."}
+              </p>
+            )}
+          </section>
         </div>
       </div>
     </div>

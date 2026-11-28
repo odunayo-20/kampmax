@@ -1,14 +1,14 @@
 "use client";
 
-import { Briefcase, Handshake, CheckCircle2, Wallet } from "lucide-react";
+import { Briefcase, ListChecks, Lock, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { FreelancerDashboardMetric } from "@/types/freelancer-dashboard";
 
 const ICON: Record<FreelancerDashboardMetric["key"], typeof Briefcase> = {
+  available: Wallet,
+  held: Lock,
+  to_do: ListChecks,
   active_proposals: Briefcase,
-  active_contracts: Handshake,
-  completed_projects: CheckCircle2,
-  wallet_balance: Wallet,
 };
 
 const TONE: Record<FreelancerDashboardMetric["tone"], string> = {

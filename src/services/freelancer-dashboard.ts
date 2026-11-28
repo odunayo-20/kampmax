@@ -23,7 +23,11 @@ import {
   type FreelancerPrivateProfile,
 } from "@/services/freelancer";
 import { fromBackendPortfolio, type BackendPortfolioItem } from "@/services/freelancer-services";
-import { getFreelancerContractsApi } from "@/services/contract";
+import { engagementToContract, getFreelancerEngagementsApi } from "@/services/contract";
+import { fetchMyWalletTransactions } from "@/services/wallet";
+import { heldInEscrow } from "@/lib/contract-groups";
+import { proposalGroup } from "@/lib/proposal-groups";
+import { freelancerCallouts, freelancerNextStep, heldFooter, jobPipeline, latestPaymentLine, verificationState } from "@/lib/freelancer-hub";
 import { getMyProposalsApi } from "@/services/proposals";
 import { CONTRACT_STATUS, type Contract } from "@/types/contract";
 import type { Proposal } from "@/types/opportunity";
@@ -33,7 +37,6 @@ import type {
   FreelancerDashboard,
   FreelancerDashboardMetric,
   FreelancerDashAvailability,
-  FreelancerProfileStatus,
 } from "@/types/freelancer-dashboard";
 import { FREELANCER_DASHBOARD_SECTIONS } from "@/config/freelancer-dashboard";
 import { formatNaira } from "@/lib/utils";
@@ -253,13 +256,16 @@ export async function getFreelancerDashboardApi(): Promise<FreelancerDashboard |
   if (error) throw error;
   if (!profile) return null;
 
-  const [contracts, { proposals }, sections, portfolio, wallet] = await Promise.all([
-    getFreelancerContractsApi(),
+  const [engagements, { proposals }, sections, portfolio, wallet, recent] = await Promise.all([
+    getFreelancerEngagementsApi(),
     getMyProposalsApi({ limit: 100 }),
     loadProfileSections("me"),
     apiClient.get<{ items?: unknown[]; meta?: { total?: number } }>("/portfolio/me?limit=1"),
     apiClient.get<{ balance: number; heldBalance?: number; availableBalance?: number }>("/wallet"),
+    // The latest movement is a nice-to-have: a failure just leaves it out.
+    fetchMyWalletTransactions({ page: 1, limit: 5 }).catch(() => []),
   ]);
+  const contracts = engagements.map(engagementToContract);
 
   const active = contracts.filter(
     (c) => c.status !== CONTRACT_STATUS.COMPLETED && c.status !== CONTRACT_STATUS.CANCELLED
@@ -267,35 +273,31 @@ export async function getFreelancerDashboardApi(): Promise<FreelancerDashboard |
   const completed = contracts.filter((c) => c.status === CONTRACT_STATUS.COMPLETED).length;
 
   const countOf = (status: string) => proposals.filter((p) => p.status === status).length;
-  const submittedProposals = countOf("submitted");
-  const underReview = countOf("under_review");
+  const waiting = proposals.filter((p) => proposalGroup(p.status) === "waiting").length;
+  const won = proposals.filter((p) => proposalGroup(p.status) === "won").length;
 
   const walletData = wallet.error ? null : wallet.data;
   // Show what can be used now; earnings still clearing are not spendable yet.
-  const balance =
+  const available =
     walletData && typeof walletData.balance === "number"
       ? (walletData.availableBalance ?? Math.max(0, walletData.balance - (walletData.heldBalance ?? 0)))
       : null;
+  const clearing = Number(walletData?.heldBalance ?? 0);
 
+  const pipeline = jobPipeline(engagements);
+  const held = heldInEscrow(engagements);
+  const verification = verificationState(profile.verificationStatus);
+
+  // Labels and sublines in the mobile hub's words.
   const metrics: FreelancerDashboardMetric[] = [
-    { key: "active_proposals", label: "Active Proposals", valueLabel: String(submittedProposals + underReview), tone: "neutral" },
-    { key: "active_contracts", label: "Active Contracts", valueLabel: String(active), tone: "info" },
-    { key: "completed_projects", label: "Completed Projects", valueLabel: String(completed), tone: "success" },
-    {
-      key: "wallet_balance",
-      label: "Available balance",
-      valueLabel: balance === null ? "—" : formatNaira(balance),
-      tone: "neutral",
-    },
+    { key: "available", label: "Available", valueLabel: available === null ? "—" : formatNaira(available), tone: "neutral", sublabel: clearing > 0 ? `${formatNaira(clearing)} still clearing` : "Your earnings land here" },
+    { key: "held", label: "Held for you", valueLabel: formatNaira(held.total), tone: "info", sublabel: heldFooter(held) },
+    { key: "to_do", label: "To do", valueLabel: String(pipeline.toDo), tone: "gold", sublabel: `${pipeline.withClient} with clients · ${pipeline.paid} paid` },
+    { key: "active_proposals", label: "Proposals waiting", valueLabel: String(waiting), tone: "success", sublabel: won > 0 ? `${won} won` : undefined },
   ];
 
   const portfolioCount = portfolio.error ? 0 : portfolio.data?.meta?.total ?? portfolio.data?.items?.length ?? 0;
-  const profileStatus = buildProfileStatus(profile, sections, portfolioCount);
-
-  const deadlines = contracts
-    .filter((c) => c.status !== CONTRACT_STATUS.COMPLETED && c.status !== CONTRACT_STATUS.CANCELLED && c.deadline)
-    .slice(0, 5)
-    .map((c) => ({ id: c.id, title: c.projectTitle, dueDate: c.deadline }));
+  const availability = availabilityLabel(profile.availabilityStatus);
 
   return {
     profile: {
@@ -306,61 +308,35 @@ export async function getFreelancerDashboardApi(): Promise<FreelancerDashboard |
       remoteAvailable: false,
       skills: profile.skills?.map((sk) => sk.name) ?? [],
     },
-    profileStatus,
+    profileStatus: {
+      isPublic: profile.isPublic,
+      verification,
+      nextStep: freelancerNextStep({
+        headline: profile.professionalTitle,
+        bio: profile.bio,
+        skills: profile.skills?.length ?? 0,
+        experience: sections?.experience.length ?? 0,
+        education: sections?.education.length ?? 0,
+        certifications: sections?.certifications.length ?? 0,
+        portfolio: portfolioCount,
+        hourlyRate: profile.hourlyRate,
+      }),
+    },
     metrics,
-    availability: availabilityLabel(profile.availabilityStatus),
+    availability,
     proposals: {
-      submitted: submittedProposals,
-      underReview,
+      waiting,
+      won,
+      submitted: countOf("submitted"),
+      underReview: countOf("under_review"),
       accepted: countOf("accepted"),
       rejected: countOf("rejected"),
     },
     contracts: { active, completed },
-    deadlines,
-    earnings:
-      walletData && balance !== null
-        ? { available: balance, pending: Number(walletData.heldBalance ?? 0) }
-        : null,
+    pipeline,
+    callouts: freelancerCallouts({ toDo: pipeline.toDo, proposalsWon: won, unavailable: availability.status === "unavailable", verification }),
+    latestPayment: latestPaymentLine(recent, formatNaira),
     activity: buildActivity(proposals, contracts),
-  };
-}
-
-const VERIFICATION_TO_STATUS: Record<string, FreelancerOnboardingStatus> = {
-  VERIFIED: FREELANCER_ONBOARDING_STATUS.APPROVED,
-  PENDING: FREELANCER_ONBOARDING_STATUS.PENDING_REVIEW,
-  REJECTED: FREELANCER_ONBOARDING_STATUS.REJECTED,
-};
-
-/** How complete the real profile is, and what is still missing. */
-function buildProfileStatus(
-  profile: FreelancerPrivateProfile,
-  sections: Awaited<ReturnType<typeof loadProfileSections>>,
-  portfolioCount: number
-): FreelancerProfileStatus {
-  const checks: { key: string; label: string; description: string; href: string; ok: boolean }[] = [
-    { key: "headline", label: "Professional headline", description: "Add a headline that describes your work.", href: "/freelancer/profile", ok: !!profile.professionalTitle?.trim() },
-    { key: "bio", label: "Bio", description: "Tell clients about your experience.", href: "/freelancer/profile", ok: !!profile.bio?.trim() },
-    { key: "skills", label: "Skills", description: "Add your key skills.", href: "/freelancer/profile", ok: (profile.skills?.length ?? 0) > 0 },
-    { key: "experience", label: "Experience", description: "Add your work history.", href: "/freelancer/profile", ok: (sections?.experience.length ?? 0) > 0 },
-    { key: "education", label: "Education", description: "Add your educational background.", href: "/freelancer/profile", ok: (sections?.education.length ?? 0) > 0 },
-    { key: "certifications", label: "Certifications", description: "Add certifications to strengthen your profile.", href: "/freelancer/profile", ok: (sections?.certifications.length ?? 0) > 0 },
-    { key: "portfolio", label: "Portfolio", description: "Showcase your best work.", href: "/freelancer/portfolio", ok: portfolioCount > 0 },
-    { key: "rates", label: "Rates", description: "Set your hourly rate.", href: "/freelancer/profile", ok: profile.hourlyRate != null && Number(profile.hourlyRate) > 0 },
-  ];
-  const vs = profile.verificationStatus?.toUpperCase();
-  return {
-    status: VERIFICATION_TO_STATUS[vs] ?? FREELANCER_ONBOARDING_STATUS.IN_PROGRESS,
-    completionPercentage: Math.round((checks.filter((c) => c.ok).length / checks.length) * 100),
-    missing: checks.filter((c) => !c.ok).map(({ key, label, description, href }) => ({ key, label, description, href })),
-    isPublic: profile.isPublic,
-    verification:
-      vs === "VERIFIED"
-        ? "verified"
-        : vs === "PENDING"
-        ? "pending"
-        : vs === "REJECTED"
-        ? "rejected"
-        : "not_required",
   };
 }
 
