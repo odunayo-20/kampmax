@@ -13,7 +13,7 @@ export function EmployerStatCard({
   iconClassName,
 }: {
   label: string;
-  value: number;
+  value: number | string;
   context?: string;
   icon: LucideIcon;
   href?: string;

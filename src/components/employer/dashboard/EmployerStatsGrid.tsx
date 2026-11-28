@@ -1,17 +1,22 @@
 "use client";
 
-import { Briefcase, ClipboardList, FileText, Star, Users } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Briefcase, FileText, Lock, Wallet } from "lucide-react";
 import { Skeleton } from "@/components/home/Skeleton";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
-import { peopleHref } from "@/services/employer-people";
+import { formatNaira } from "@/lib/utils";
+import { fetchMyWalletBalance } from "@/services/wallet";
 import { EmployerStatCard } from "./EmployerStatCard";
 import type { EmployerDashboardQuerySource } from "./EmployerDashboardSection";
 
+/** The money first (wallet and what is held in escrow), then the live jobs and contracts. The mobile hub opens the same way. */
 export function EmployerStatsGrid({ query }: { query: EmployerDashboardQuerySource }) {
+  const balance = useQuery({ queryKey: ["wallet", "balance"], queryFn: fetchMyWalletBalance });
+
   if (query.isPending && !query.data) {
     return (
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
-        {Array.from({ length: 5 }).map((_, i) => (
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="rounded-xl border border-kampmax-border bg-white p-4">
             <Skeleton className="h-3 w-16" />
             <Skeleton className="mt-2 h-7 w-10" />
@@ -34,43 +39,37 @@ export function EmployerStatsGrid({ query }: { query: EmployerDashboardQuerySour
 
   const s = query.data;
   if (!s) return null;
+  const held = s.contracts.held;
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <EmployerStatCard
+        label="Wallet"
+        value={balance.isSuccess ? formatNaira(balance.data.balance) : balance.isError ? "Unavailable" : "…"}
+        context="Pays for postings and contracts"
+        icon={Wallet}
+        href="/employer/billing"
+      />
+      <EmployerStatCard
+        label="In escrow"
+        value={formatNaira(held.total)}
+        context={held.count === 0 ? "Nothing held right now" : `${held.count} ${held.count === 1 ? "job" : "jobs"} funded`}
+        icon={Lock}
+        href="/employer/contracts"
+      />
       <EmployerStatCard
         label="Active jobs"
         value={s.jobCounts.open}
-        context={`${s.jobCounts.all} posted total`}
+        context={`${s.jobCounts.all} posted in total`}
         icon={Briefcase}
-        href="/employer/jobs?status=open"
-      />
-      <EmployerStatCard
-        label="New applicants"
-        value={s.insights.pipeline.new}
-        context="waiting for your first look"
-        icon={Users}
-        href={peopleHref("NEW")}
-      />
-      <EmployerStatCard
-        label="Shortlisted"
-        value={s.insights.pipeline.shortlisted}
-        context="candidates in the pipeline"
-        icon={Star}
-        href={peopleHref("SHORTLISTED")}
+        href="/employer/jobs?group=live"
       />
       <EmployerStatCard
         label="Active contracts"
         value={s.contracts.active}
-        context={`${s.contracts.awaitingClientReview} awaiting your review`}
+        context={s.contracts.waitingOnYou > 0 ? `${s.contracts.waitingOnYou} waiting for you` : "Nothing waiting for you"}
         icon={FileText}
         href="/employer/contracts"
-      />
-      <EmployerStatCard
-        label="Pending actions"
-        value={s.pendingActions}
-        context="need your attention"
-        icon={ClipboardList}
-        href="#attention"
       />
     </div>
   );

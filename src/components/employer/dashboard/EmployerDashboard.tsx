@@ -11,7 +11,8 @@ import { EmployerDashboardHeader } from "./EmployerDashboardHeader";
 import { EmployerJobsOverview } from "./EmployerJobsOverview";
 import { EmployerMessagesOverview } from "./EmployerMessagesOverview";
 import { EmployerNotificationsOverview } from "./EmployerNotificationsOverview";
-import { EmployerProfileCompletion } from "./EmployerProfileCompletion";
+import { EmployerNextStepCard } from "@/components/employer/profile/EmployerNextStepCard";
+import { EmployerTodayStrip } from "./EmployerTodayStrip";
 import { EmployerQuickActions } from "./EmployerQuickActions";
 import { EmployerStatsGrid } from "./EmployerStatsGrid";
 import type { EmployerDashboardQuerySource } from "./EmployerDashboardSection";
@@ -44,6 +45,8 @@ export function EmployerDashboard() {
 
       <EmployerStatsGrid query={query} />
 
+      <EmployerTodayStrip query={query} />
+
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <EmployerHiringSnapshot query={query} />
@@ -55,7 +58,7 @@ export function EmployerDashboard() {
 
         <aside className="space-y-6">
           <EmployerQuickActions />
-          <EmployerProfileCompletion query={query} />
+          <EmployerNextStepCard step={company?.nextStep ?? null} />
           <EmployerNotificationsOverview />
           <EmployerMessagesOverview />
         </aside>

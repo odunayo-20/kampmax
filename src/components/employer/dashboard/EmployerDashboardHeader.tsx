@@ -6,12 +6,6 @@ import { Badge } from "@/components/ui";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { useUnreadMessageCount } from "@/hooks/use-messages";
 
-function greetingForHour(hour: number): string {
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
-}
-
 export function EmployerDashboardHeader({
   displayName,
   descriptor,
@@ -32,12 +26,10 @@ export function EmployerDashboardHeader({
     <div className="flex flex-wrap items-center justify-between gap-4">
       <div className="min-w-0">
         <h1 className="text-xl font-bold text-kampmax-text">
-          {displayName
-            ? `${greetingForHour(new Date().getHours())}, ${displayName}.`
-            : "Welcome back."}
+          {displayName || "Your hiring"}
         </h1>
         <p className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-kampmax-text-secondary">
-          {context || "Here's what's happening with your hiring."}
+          {context}
           {verified && (
             <Badge variant="success" className="text-[10px]">
               Verified
