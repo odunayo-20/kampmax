@@ -27,7 +27,8 @@ import { engagementToContract, getFreelancerEngagementsApi } from "@/services/co
 import { fetchMyWalletTransactions } from "@/services/wallet";
 import { heldInEscrow } from "@/lib/contract-groups";
 import { proposalGroup } from "@/lib/proposal-groups";
-import { freelancerCallouts, freelancerNextStep, heldFooter, jobPipeline, latestPaymentLine, verificationState } from "@/lib/freelancer-hub";
+import { freelancerCallouts, freelancerNextStep, heldFooter, jobPipeline, verificationState } from "@/lib/freelancer-hub";
+import { latestPaymentLine } from "@/lib/hub-common";
 import { getMyProposalsApi } from "@/services/proposals";
 import { CONTRACT_STATUS, type Contract } from "@/types/contract";
 import type { Proposal } from "@/types/opportunity";

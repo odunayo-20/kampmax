@@ -1,5 +1,6 @@
 "use client";
 
+import { latestPaymentLine } from "@/lib/hub-common";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, ExternalLink } from "lucide-react";
@@ -18,7 +19,8 @@ import {
   verificationNotice,
 } from "@/lib/provider-hub";
 import { fetchProviderBookingSummary, fetchProviderBookings } from "@/services/booking";
-import { fetchMyWallet } from "@/services/wallet";
+import { fetchMyWallet, fetchMyWalletTransactions } from "@/services/wallet";
+import { formatNaira } from "@/lib/utils";
 import { fetchMyPortfolio } from "@/services/service-provider-media";
 import { fetchSpHours, fetchSpProfileDetails, fetchSpServicesLive } from "@/services/service-provider-dashboard";
 
@@ -38,7 +40,8 @@ export default function ServiceProviderOverviewPage() {
   const services = useQuery({ queryKey: ["service-provider", "services"], queryFn: fetchSpServicesLive, enabled: ready, retry: false });
   const hours = useQuery({ queryKey: ["service-provider", "hours"], queryFn: fetchSpHours, enabled: ready, retry: false });
   const portfolio = useQuery({ queryKey: ["service-provider", "portfolio"], queryFn: fetchMyPortfolio, enabled: ready, retry: false });
-  // Optional card: left out when the summary can't load.
+  // Optional lines: left out when they can't load.
+  const recent = useQuery({ queryKey: ["wallet", "recent"], queryFn: () => fetchMyWalletTransactions({ page: 1, limit: 5 }), enabled: ready, retry: false });
   const reviews = useServiceProviderReviewsSummary().data;
 
   if (profile.isPending) return <ServiceProviderOverviewSkeleton />;
@@ -64,6 +67,7 @@ export default function ServiceProviderOverviewPage() {
   const money = s?.money;
   const requests = requestsCallout(s?.pending ?? 0, money?.awaitingAnswer);
   const today = todayLine(s, next.data);
+  const latest = latestPaymentLine(recent.data ?? [], formatNaira);
   const notice = verificationNotice(p.verificationStatus);
   // Wait for the counts so the banner never says "nothing done" while they are still loading.
   const loaded = services.isSuccess && hours.isSuccess && portfolio.isSuccess;
@@ -109,6 +113,12 @@ export default function ServiceProviderOverviewPage() {
         </Link>
       </div>
 
+      {latest && (
+        <Link href="/service-provider/financials" className="block rounded-xl border border-kampmax-border bg-white px-4 py-3 text-sm text-kampmax-text hover:bg-neutral-50">
+          {latest}
+        </Link>
+      )}
+
       {requests && (
         <Link
           href="/service-provider/bookings"
@@ -148,10 +158,10 @@ export default function ServiceProviderOverviewPage() {
 
       {s && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Count label="Requests" value={s.pending} />
-          <Count label="Upcoming" value={s.upcoming} />
-          <Count label="In progress" value={s.inProgress} />
-          <Count label="Completed" value={s.completed} />
+          <Count label="Requests" value={s.pending} tab="pending" />
+          <Count label="Upcoming" value={s.upcoming} tab="upcoming" />
+          <Count label="In progress" value={s.inProgress} tab="in_progress" />
+          <Count label="Completed" value={s.completed} tab="completed" />
         </div>
       )}
 
@@ -185,9 +195,9 @@ export default function ServiceProviderOverviewPage() {
   );
 }
 
-function Count({ label, value }: { label: string; value: number }) {
+function Count({ label, value, tab }: { label: string; value: number; tab: string }) {
   return (
-    <Link href="/service-provider/bookings" className="rounded-xl border border-kampmax-border bg-white p-4 hover:border-primary-300">
+    <Link href={`/service-provider/bookings?tab=${tab}`} className="rounded-xl border border-kampmax-border bg-white p-4 hover:border-primary-300">
       <p className="text-xs font-semibold text-kampmax-text-secondary">{label}</p>
       <p className="mt-0.5 text-xl font-bold text-kampmax-text">{value}</p>
     </Link>

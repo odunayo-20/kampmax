@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { freelancerCallouts, freelancerNextStep, heldFooter, jobPipeline, latestPaymentLine, verificationState } from "../freelancer-hub";
+import { freelancerCallouts, freelancerNextStep, heldFooter, jobPipeline, verificationState } from "../freelancer-hub";
+import { latestPaymentLine } from "../hub-common";
 
 const naira = (n: number) => `₦${n.toLocaleString("en-NG")}`;
 const c = (status: string) => ({ status, paymentType: "FIXED" }) as never;

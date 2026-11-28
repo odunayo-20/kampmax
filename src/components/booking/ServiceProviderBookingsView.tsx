@@ -44,8 +44,9 @@ function tabCount(tab: MyBookingTab, summary: ProviderBookingSummary | null): nu
   }
 }
 
-export function ServiceProviderBookingsView() {
-  const [picked, setPicked] = useState<MyBookingTab | null>(null);
+/** `initialTab` comes from `?tab=` (the dashboard's count tiles); otherwise it opens where something is waiting. */
+export function ServiceProviderBookingsView({ initialTab = null }: { initialTab?: MyBookingTab | null }) {
+  const [picked, setPicked] = useState<MyBookingTab | null>(initialTab);
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<Filters>({});
 
