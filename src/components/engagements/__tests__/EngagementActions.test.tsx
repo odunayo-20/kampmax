@@ -43,6 +43,9 @@ function renderActions(props: Partial<React.ComponentProps<typeof EngagementActi
   return { onChanged };
 }
 
+/** A refusal as the API client really returns one: an error carrying the HTTP status. */
+const refusal = (message: string) => Object.assign(new Error(message), { status: 409 });
+
 describe("asking for a written reason", () => {
   it("won't send a change request until the note is long enough, then sends it trimmed", async () => {
     const { onChanged } = renderActions();
@@ -78,7 +81,7 @@ describe("asking for a written reason", () => {
   });
 
   it("keeps the dialog open and shows the backend's reason when it refuses", async () => {
-    jobs.openEngagementDispute.mockResolvedValue({ engagement: null, error: { message: "Already disputed" } });
+    jobs.openEngagementDispute.mockResolvedValue({ engagement: null, error: refusal("Already disputed") });
     const { onChanged } = renderActions({ role: "freelancer", status: "IN_PROGRESS" });
 
     fireEvent.click(screen.getByRole("button", { name: "Report a problem" }));
@@ -388,7 +391,7 @@ describe("an hourly contract", () => {
     });
 
     it("shows why when the backend refuses to end it", async () => {
-      jobs.endEngagement.mockResolvedValue({ engagement: null, error: { message: "A week is under way" } });
+      jobs.endEngagement.mockResolvedValue({ engagement: null, error: refusal("A week is under way") });
       renderActions({ status: "PENDING_PAYMENT", milestone: week });
       fireEvent.click(screen.getByRole("button", { name: "End contract" }));
       fireEvent.click(within_dialog("End contract"));
@@ -482,7 +485,7 @@ describe("responding to submitted work", () => {
   it("keeps the form open with the backend's refusal, so the note is not lost", async () => {
     jobs.requestEngagementRevision.mockResolvedValue({
       engagement: null,
-      error: { message: "All 3 revisions have been used." },
+      error: refusal("All 3 revisions have been used."),
     });
     const { onChanged } = renderActions();
     open();

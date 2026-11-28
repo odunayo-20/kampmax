@@ -1,5 +1,6 @@
 "use client";
 
+import { getRefusalMessage } from "@/lib/error-messages";
 import { useState } from "react";
 import { Button } from "@/components/ui";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -254,6 +255,9 @@ function actionFor(
   return base;
 }
 
+/** The steps that move a contract forward; the mobile app calls them MAIN_ACTIONS. */
+const MAIN_KINDS: Kind[] = ["fund", "start", "submit", "complete"];
+
 /** Which actions each party may take at each status (mirrors the backend state machine). */
 const ALLOWED: Record<Role, Partial<Record<EngagementStatus, Kind[]>>> = {
   employer: {
@@ -326,7 +330,7 @@ export function EngagementActions({
     const { error: failure } = await def.run(engagementId, text, kind);
     setBusy(null);
     if (failure) {
-      setError(failure.message ?? "That didn't work. Please try again.");
+      setError(getRefusalMessage(failure));
       // A written reason is worth keeping on screen; a plain confirm is not.
       if (!def.ask && !def.form) setAsking(null);
       return;
@@ -349,26 +353,40 @@ export function EngagementActions({
     else void perform(def);
   }
 
+  // One main step (fund, start, submit, approve) as the big button; everything else is a quieter link below it.
+  const main = kinds.find((k) => MAIN_KINDS.includes(k));
+  const rest = kinds.filter((k) => k !== main);
+
   return (
-    <div className="mt-3">
-      <div className="flex flex-wrap gap-2">
-        {kinds.map((kind) => {
-          const def = actionFor(kind, role, status, milestone);
-          return (
-            <Button
-              key={kind}
-              type="button"
-              size="sm"
-              variant={def.variant}
-              className={def.className}
-              disabled={busy !== null}
-              onClick={() => choose(def)}
-            >
-              {busy === kind && !def.ask ? def.busyLabel : def.label}
-            </Button>
-          );
-        })}
-      </div>
+    <div className="mt-3 space-y-3">
+      {main && (() => {
+        const def = actionFor(main, role, status, milestone);
+        return (
+          <Button type="button" className="w-full sm:w-auto" disabled={busy !== null} onClick={() => choose(def)}>
+            {busy === main && !def.ask ? def.busyLabel : def.label}
+          </Button>
+        );
+      })()}
+      {rest.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          {main && <span className="text-xs text-kampmax-text-secondary">More:</span>}
+          {rest.map((kind) => {
+            const def = actionFor(kind, role, status, milestone);
+            const danger = kind === "dispute" || kind === "cancel" || kind === "end";
+            return (
+              <button
+                key={kind}
+                type="button"
+                disabled={busy !== null}
+                onClick={() => choose(def)}
+                className={`text-sm font-semibold underline disabled:opacity-50 ${danger ? "text-error-600" : "text-kampmax-text"}`}
+              >
+                {busy === kind && !def.ask ? def.busyLabel : def.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {error && !askingDef?.ask && !askingDef?.form && (
         <p role="alert" className="mt-2 text-xs text-error-600">

@@ -12,7 +12,8 @@ import { SendOfferModal } from "./SendOfferModal";
  */
 export function OfferBar({ conversation }: { conversation: Conversation }) {
   const access = useFreelancerAccess();
-  const [open, setOpen] = useState(false);
+  // `?offer=1` (from "Send an offer for extra work" on a contract) opens the form straight away.
+  const [open, setOpen] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("offer") === "1");
 
   const canSend =
     access.data?.canUseDashboard === true &&

@@ -74,7 +74,7 @@ export function EngagementNotices({ engagement, role }: { engagement: Engagement
     const who = dispute.openedBy === me ? "You" : dispute.openedBy ? PARTY_LABEL[dispute.openedBy] : "Someone";
     return (
       <Notice tone="danger" icon={AlertTriangle} title="Dispute open — payment on hold">
-        {who} reported a problem: “{dispute.reason}”. Our team will review it and settle the payment.
+        {who} reported a problem: “{dispute.reason}”. Kampmax support is reviewing this. The money stays held until it is settled.
       </Notice>
     );
   }
