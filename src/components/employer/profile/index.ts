@@ -3,7 +3,6 @@ export { EmployerProfileEditPage } from "./EmployerProfileEditPage";
 export { EmployerProfileEditForm } from "./EmployerProfileEditForm";
 export { EmployerProfileView } from "./EmployerProfileView";
 export { EmployerProfileHeader } from "./EmployerProfileHeader";
-export { EmployerProfileStatusNotice } from "./EmployerProfileStatusNotice";
 export { EmployerProfileCompletionCard } from "./EmployerProfileCompletionCard";
-export { EmployerVerificationBadge } from "./EmployerVerificationBadge";
+export { EmployerVerificationNotice, EMPLOYER_VERIFICATION_VIEW } from "./EmployerVerificationNotice";
 export { EmployerProfileSkeleton } from "./EmployerProfileSkeleton";

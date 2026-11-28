@@ -3,17 +3,7 @@
 import Link from "next/link";
 import { Gift } from "lucide-react";
 import { usePostingPricing } from "@/hooks/use-posting-billing";
-import type { PostingPricing } from "@/services/jobs";
-
-/** True once an admin has set a price on any paid type; until then nothing is charged. */
-export function anyPostingFeeSet(pricing: PostingPricing): boolean {
-  return (
-    pricing.internshipFee > 0 ||
-    pricing.partTimeFee > 0 ||
-    pricing.fullTimeFee > 0 ||
-    pricing.contractFee > 0
-  );
-}
+import { anyPostingFeeSet } from "@/lib/posting-billing";
 
 /**
  * Tells a new employer, on the dashboard, that they have free postings to use
@@ -56,7 +46,7 @@ export function FreePostingsNotice() {
         href="/employer/jobs/create"
         className="inline-flex h-8 items-center rounded-md bg-success-600 px-3 text-xs font-semibold text-white hover:bg-success-700"
       >
-        Post an opportunity
+        Post a job
       </Link>
     </section>
   );

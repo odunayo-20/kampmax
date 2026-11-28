@@ -11,7 +11,7 @@ vi.mock("@/hooks/use-posting-billing", () => ({
 
 import { OpportunityTypePicker } from "../OpportunityTypePicker";
 import { canRenew } from "../EmployerJobActions";
-import { anyPostingFeeSet } from "@/components/employer/billing/FreePostingsNotice";
+import { anyPostingFeeSet } from "@/lib/posting-billing";
 
 afterEach(cleanup);
 beforeEach(() => {
@@ -125,12 +125,12 @@ describe("canRenew", () => {
 describe("anyPostingFeeSet", () => {
   it("is false until an admin sets a price", () => {
     expect(
-      anyPostingFeeSet(pricing({ internshipFee: 0, partTimeFee: 0, fullTimeFee: 0, contractFee: 0 }))
+      anyPostingFeeSet(pricing({ internshipFee: 0, unpaidInternshipFee: 0, partTimeFee: 0, fullTimeFee: 0, contractFee: 0 }))
     ).toBe(false);
   });
   it("is true once any paid type has a price", () => {
     expect(
-      anyPostingFeeSet(pricing({ internshipFee: 0, partTimeFee: 0, fullTimeFee: 0, contractFee: 500 }))
+      anyPostingFeeSet(pricing({ internshipFee: 0, unpaidInternshipFee: 0, partTimeFee: 0, fullTimeFee: 0, contractFee: 500 }))
     ).toBe(true);
   });
 });

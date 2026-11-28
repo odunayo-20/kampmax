@@ -112,3 +112,13 @@ describe("the old applications page", () => {
     expect(peopleHref("INTERVIEWING")).toBe("/employer/people?stage=INTERVIEWING");
   });
 });
+
+describe("the interview and the kind of job on a person", () => {
+  it("reads the interview time and answer, and nothing when there is none", async () => {
+    const { opportunityTypeLabel } = await import("@/config/opportunity");
+    expect(personFrom(raw({ interview: { at: "2026-12-05T14:00:00Z", response: "CONFIRMED" } }))?.interview?.response).toBe("CONFIRMED");
+    expect(personFrom(raw())?.interview).toBeNull();
+    expect(opportunityTypeLabel("PART_TIME")).toBe("Part-time");
+    expect(opportunityTypeLabel("MYSTERY")).toBe("MYSTERY");
+  });
+});

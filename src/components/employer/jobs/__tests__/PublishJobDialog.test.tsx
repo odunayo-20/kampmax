@@ -148,7 +148,7 @@ describe("PublishJobDialog", () => {
   it("offers a retry message when the cost cannot be checked", () => {
     state.quoteError = true;
     open();
-    expect(screen.getByRole("alert").textContent).toMatch(/could not check the cost/);
+    expect(screen.getByRole("alert").textContent).toMatch(/couldn’t check the cost/);
     expect(confirm("Publish").disabled).toBe(true);
   });
 

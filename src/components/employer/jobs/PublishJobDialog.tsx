@@ -85,7 +85,7 @@ export function PublishJobDialog({
   return (
     <ConfirmDialog
       open={open}
-      title="Publish this posting?"
+      title="Publish this job?"
       body={
         quote
           ? "Check the cost below. Nothing is charged until you confirm."
@@ -101,7 +101,7 @@ export function PublishJobDialog({
         {quoteQuery.isPending && <p>Loading…</p>}
         {quoteQuery.isError && (
           <p role="alert" className="text-error-600">
-            We could not check the cost. Close this and try again.
+            We couldn’t check the cost. Check your connection, then close this and try again.
           </p>
         )}
         {closed && (

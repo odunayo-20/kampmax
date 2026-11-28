@@ -57,7 +57,7 @@ export function EmployerSidebar({
     {
       title: "Account",
       items: [
-        { label: "Billing & Credits", href: "/employer/billing", icon: CreditCard },
+        { label: "Billing and postings", href: "/employer/billing", icon: CreditCard },
         { label: "Employer Profile", href: "/employer/profile", icon: Building2 },
         { label: "Settings", href: "/employer/settings", icon: Settings },
         { href: "/chat", label: "Messages", icon: MessageSquare, badgeCount: unreadMessages },

@@ -129,6 +129,8 @@ export interface EmployerOnboardingDraft {
   adminMessage?: string;
   reviewReason?: string;
   approvedSlug?: string;
+  /** Whether candidates can open the profile page. Jobs show the name either way. */
+  isPublic?: boolean;
 
   clientType: EmployerClientType | "";
 
@@ -200,6 +202,7 @@ export type EmployerSubmitResult =
 export interface EmployerProfileUpdatePayload {
   /** A new logo to upload; null removes it; undefined leaves it unchanged. */
   logoFile?: File | null;
+  isPublic?: boolean;
   profile?: {
     displayName?: string;
     headline?: string;

@@ -238,7 +238,7 @@ describe("drafts, answers and attachments", () => {
     expect(p.timeline).toEqual([]);
     expect(p.screeningAnswers).toEqual([{ questionId: "q1", answer: "Because I ship." }]);
     expect(p.attachments).toEqual([
-      { id: "m1", filename: "cv.pdf", sizeBytes: 4096, mimeType: "application/pdf" },
+      { id: "m1", filename: "cv.pdf", sizeBytes: 4096, mimeType: "application/pdf", url: null },
     ]);
   });
 

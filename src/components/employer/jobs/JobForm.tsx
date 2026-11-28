@@ -138,11 +138,10 @@ export function validateJobFormValues(values: OpportunityInput): Record<string, 
   if (!values.description.trim()) errors.description = "A full description is required.";
   else if (values.description.trim().length > JOB_DESCRIPTION_MAX_CHARS)
     errors.description = `Description must be ${JOB_DESCRIPTION_MAX_CHARS} characters or fewer.`;
-  if (!values.requirements.trim()) errors.requirements = "Job requirements are required.";
-  else if (values.requirements.trim().length > JOB_REQUIREMENTS_MAX_CHARS)
+  // Requirements and skills are optional, as on the backend and in the mobile app.
+  if (values.requirements.trim().length > JOB_REQUIREMENTS_MAX_CHARS)
     errors.requirements = `Requirements must be ${JOB_REQUIREMENTS_MAX_CHARS} characters or fewer.`;
-  if (values.skills.length === 0) errors.skills = "Add at least one skill.";
-  else if (values.skills.length > JOB_SKILL_MAX_COUNT)
+  if (values.skills.length > JOB_SKILL_MAX_COUNT)
     errors.skills = `Jobs can have at most ${JOB_SKILL_MAX_COUNT} skills.`;
   const hiringPost = !!values.opportunityType && isHiringType(values.opportunityType);
   const quotesPay = hiringPost ? (values.hiring ?? defaultHiring()).isPaid : true;
@@ -344,7 +343,7 @@ export function JobForm({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-xl font-bold text-neutral-900">
-            {mode === "create" ? "Post an opportunity" : "Edit draft"}
+            {mode === "create" ? "Post a job" : "Edit draft"}
           </h1>
           <p className="mt-1 text-sm text-neutral-500">
             Build a clear post so campus talent can find and apply for it.
@@ -449,7 +448,7 @@ export function JobForm({
 
           <div>
             <label className="mb-1 block text-xs font-medium text-neutral-700" htmlFor="job-requirements">
-              Requirements *
+              Requirements (optional)
             </label>
             <textarea
               id="job-requirements"
@@ -789,7 +788,7 @@ export function JobForm({
             type="SKILL"
             valueBy="name"
             leafOnly
-            label="Required skills *"
+            label="Skills (optional)"
             value={values.skills}
             onChange={(skills) => set("skills", skills)}
             max={JOB_SKILL_MAX_COUNT}

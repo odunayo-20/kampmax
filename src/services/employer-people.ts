@@ -11,10 +11,20 @@
 
 import { apiClient } from "@/lib/api-client";
 import { countOf } from "@/lib/reading";
+import { interviewFrom, type Interview } from "@/lib/interviews";
 import type { ApiError } from "@/lib/api-client";
 
 export const PEOPLE_STAGES = ["NEW", "SHORTLISTED", "INTERVIEWING", "HIRED", "DECLINED"] as const;
 export type PeopleStage = (typeof PEOPLE_STAGES)[number];
+
+/** The badge colour for each stage. The mobile app's STAGE_TONE matches it. */
+export const STAGE_TONE: Record<PeopleStage, "info" | "success" | "outline" | "default"> = {
+  NEW: "info",
+  SHORTLISTED: "outline",
+  INTERVIEWING: "outline",
+  HIRED: "success",
+  DECLINED: "default",
+};
 
 export const STAGE_LABEL: Record<PeopleStage, string> = {
   NEW: "New",
@@ -73,6 +83,8 @@ export interface Person {
   amount: number | null;
   currency: string | null;
   sentAt: string | null;
+  /** The interview time and whether the applicant said yes, while they are being interviewed. */
+  interview: Interview | null;
 }
 
 export type PeopleCounts = Record<PeopleStage | "ALL", number>;
@@ -134,6 +146,7 @@ export function personFrom(raw: unknown): Person | null {
     amount: typeof r.amount === "number" && Number.isFinite(r.amount) ? r.amount : null,
     currency: str(r.currency) || null,
     sentAt: str(r.sentAt) || null,
+    interview: interviewFrom(r.interview),
   };
 }
 

@@ -33,7 +33,7 @@ vi.mock("@/hooks/use-jobs", () => ({
   useRenewJob: () => ({ mutate, isPending: false }),
 }));
 
-import { RenewJobDialog, deadlinePassed } from "../RenewJobDialog";
+import { RenewJobDialog, deadlinePassed, renewDeadline } from "../RenewJobDialog";
 
 afterEach(cleanup);
 beforeEach(() => {
@@ -71,7 +71,7 @@ describe("RenewJobDialog", () => {
   it("shows the renewal fee and renews without asking for a deadline while the old one holds", () => {
     open(future);
     expect(screen.getByText(/₦7,500 will be taken from your wallet/)).toBeTruthy();
-    expect(screen.queryByLabelText("New application deadline")).toBeNull();
+    expect(screen.queryByText("Take applications for")).toBeNull();
     fireEvent.click(confirm("Pay ₦7,500 & renew"));
     expect(mutate).toHaveBeenCalledWith(
       { id: "job-1", applicationDeadline: undefined },
@@ -79,19 +79,20 @@ describe("RenewJobDialog", () => {
     );
   });
 
-  it("asks for a new deadline when the old one has passed, and will not renew without it", () => {
+  it("asks how long to take applications when the old deadline has passed, one month unless changed", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-28T10:00:00Z"));
     open(past);
-    expect(confirm(/Pay ₦7,500/).disabled).toBe(true);
-
-    fireEvent.change(screen.getByLabelText("New application deadline"), {
-      target: { value: future },
-    });
-    expect(confirm(/Pay ₦7,500/).disabled).toBe(false);
+    expect(screen.getByText("Take applications for")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "1 month" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "2 weeks" }));
     fireEvent.click(confirm(/Pay ₦7,500/));
     expect(mutate).toHaveBeenCalledWith(
-      { id: "job-1", applicationDeadline: new Date(`${future}T23:59:59`).toISOString() },
+      { id: "job-1", applicationDeadline: renewDeadline(14) },
       expect.any(Object)
     );
+    expect(renewDeadline(14)).toBe("2026-12-12T10:00:00.000Z");
+    vi.useRealTimers();
   });
 
   it("says renewing is free when the fee is zero", () => {

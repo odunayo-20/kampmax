@@ -58,6 +58,7 @@ interface EditFormState {
   projectDuration: string;
   budgetMin: string;
   budgetMax: string;
+  isPublic: boolean;
 }
 
 function toFormState(draft: EmployerOnboardingDraft): EditFormState {
@@ -88,6 +89,7 @@ function toFormState(draft: EmployerOnboardingDraft): EditFormState {
     projectDuration: field(draft.preferences.projectDuration),
     budgetMin: typeof draft.preferences.budgetMin === "number" ? String(draft.preferences.budgetMin) : "",
     budgetMax: typeof draft.preferences.budgetMax === "number" ? String(draft.preferences.budgetMax) : "",
+    isPublic: draft.isPublic !== false,
   };
 }
 
@@ -97,7 +99,7 @@ function toFormState(draft: EmployerOnboardingDraft): EditFormState {
  * admin fields are backend-owned and never leave the client here.
  */
 function toPayload(form: EditFormState): EmployerProfileUpdatePayload {
-  const payload: EmployerProfileUpdatePayload = {};
+  const payload: EmployerProfileUpdatePayload = { isPublic: form.isPublic };
 
   payload.profile = {
     displayName: form.displayName.trim() || undefined,
@@ -308,7 +310,7 @@ export function EmployerProfileEditForm({
         </h2>
         <div className="mt-4 space-y-4">
           <Input
-            label="Display name"
+            label="Name freelancers will see"
             id="emp-display-name"
             maxLength={80}
             required
@@ -317,7 +319,7 @@ export function EmployerProfileEditForm({
             error={fieldErrors.displayName}
           />
           <Input
-            label="Professional headline"
+            label="Headline"
             id="emp-headline"
             maxLength={100}
             required
@@ -606,7 +608,7 @@ export function EmployerProfileEditForm({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Input
-              label="Budget min (₦)"
+              label="Budget from (₦)"
               id="emp-budget-min"
               type="number"
               min={0}
@@ -615,7 +617,7 @@ export function EmployerProfileEditForm({
               error={fieldErrors.budgetMin}
             />
             <Input
-              label="Budget max (₦)"
+              label="Budget to (₦)"
               id="emp-budget-max"
               type="number"
               min={0}
@@ -629,6 +631,30 @@ export function EmployerProfileEditForm({
               : "Your budget helps freelancers scope their proposal."}
           </p>
         </div>
+      </section>
+
+      <section aria-labelledby="edit-visibility-heading" className="rounded-xl border border-kampmax-border bg-white p-5">
+        <h2 id="edit-visibility-heading" className="text-sm font-bold text-kampmax-text">
+          Who can see your profile
+        </h2>
+        <label className="mt-4 flex items-start justify-between gap-4">
+          <span>
+            <span className="block text-sm font-medium text-kampmax-text">Show my profile to candidates</span>
+            <span className="block text-xs text-kampmax-text-secondary">
+              {form.isPublic
+                ? "Anyone who opens one of your jobs can see who posted it."
+                : "Your profile page is hidden. Your jobs still show your name."}
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            role="switch"
+            aria-checked={form.isPublic}
+            checked={form.isPublic}
+            onChange={(e) => set("isPublic", e.target.checked)}
+            className="mt-1 h-5 w-5 accent-primary-600"
+          />
+        </label>
       </section>
 
       {/* Actions */}

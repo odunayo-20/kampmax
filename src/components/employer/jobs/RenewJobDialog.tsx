@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import type { Opportunity } from "@/types/opportunity";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { Input } from "@/components/ui";
 import { useRenewJob } from "@/hooks/use-jobs";
 import {
   usePostingBillingSummary,
@@ -22,6 +21,17 @@ export function deadlinePassed(deadline: string, now = Date.now()): boolean {
     : new Date(deadline);
   return !Number.isNaN(d.getTime()) && d.getTime() <= now;
 }
+
+/** How long a renewed posting takes applications when its old deadline has passed. The mobile app offers the same. */
+export const RENEW_DEADLINE_CHOICES = [
+  { days: 7, label: "1 week" },
+  { days: 14, label: "2 weeks" },
+  { days: 30, label: "1 month" },
+  { days: 60, label: "2 months" },
+] as const;
+
+/** The new deadline, `days` from now, as the timestamp the backend expects. */
+export const renewDeadline = (days: number, now = Date.now()): string => new Date(now + days * 86_400_000).toISOString();
 
 /**
  * Confirms putting an expired vacancy or internship live again. Shows the
@@ -42,7 +52,7 @@ export function RenewJobDialog({
   const pricing = usePostingPricing();
   const renewMutation = useRenewJob();
   const closed = pricing.data?.hiringEnabled === false;
-  const [deadline, setDeadline] = useState("");
+  const [days, setDays] = useState<number>(30);
   const [error, setError] = useState<string | null>(null);
 
   const quote = quoteQuery.data;
@@ -52,7 +62,6 @@ export function RenewJobDialog({
     quote && quote.amountDue > 0 && available !== undefined && available < quote.amountDue
       ? quote.amountDue - available
       : 0;
-  const deadlineMissing = needsDeadline && !deadline;
 
   const close = () => {
     setError(null);
@@ -64,7 +73,7 @@ export function RenewJobDialog({
     renewMutation.mutate(
       {
         id: job.id,
-        applicationDeadline: needsDeadline ? new Date(`${deadline}T23:59:59`).toISOString() : undefined,
+        applicationDeadline: needsDeadline ? renewDeadline(days) : undefined,
       },
       { onSuccess: close, onError: (err) => setError(getRefusalMessage(err)) }
     );
@@ -73,11 +82,11 @@ export function RenewJobDialog({
   return (
     <ConfirmDialog
       open={open}
-      title="Renew this posting?"
+      title="Renew this job?"
       body="Renewing puts it back on the marketplace for another live period."
       confirmLabel={quote && quote.amountDue > 0 ? `Pay ${formatNaira(quote.amountDue)} & renew` : "Renew"}
       pending={renewMutation.isPending}
-      confirmDisabled={closed || !quote || deadlineMissing || short > 0}
+      confirmDisabled={closed || !quote || short > 0}
       onConfirm={renew}
       onCancel={close}
     >
@@ -91,7 +100,7 @@ export function RenewJobDialog({
         {quoteQuery.isPending && <p>Loading…</p>}
         {quoteQuery.isError && (
           <p role="alert" className="text-error-600">
-            We could not check the cost. Close this and try again.
+            We couldn’t check the cost. Check your connection, then close this and try again.
           </p>
         )}
         {quote && (
@@ -103,18 +112,23 @@ export function RenewJobDialog({
           </p>
         )}
         {needsDeadline && (
-          <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-700" htmlFor="renew-deadline">
-              New application deadline
-            </label>
-            <Input
-              id="renew-deadline"
-              type="date"
-              min={new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)}
-              value={deadline}
-              onChange={(e) => setDeadline(e.target.value)}
-            />
-          </div>
+          <fieldset>
+            <legend className="mb-1 text-xs font-medium text-neutral-700">Take applications for</legend>
+            <p className="mb-2 text-xs text-neutral-500">The old deadline has passed, so pick a new one.</p>
+            <div className="flex flex-wrap gap-2">
+              {RENEW_DEADLINE_CHOICES.map((c) => (
+                <button
+                  key={c.days}
+                  type="button"
+                  aria-pressed={days === c.days}
+                  onClick={() => setDays(c.days)}
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold ${days === c.days ? "border-primary-600 bg-primary-50 text-primary-700" : "border-neutral-300 text-neutral-700 hover:bg-neutral-50"}`}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </fieldset>
         )}
         {short > 0 && (
           <p role="alert" className="rounded-lg bg-warning-50 p-3 text-warning-700">

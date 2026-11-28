@@ -7,7 +7,7 @@ import { isHiringType } from "@/types/opportunity";
 import { useEmployerJob, useUpdateJob, usePublishJob } from "@/hooks/use-jobs";
 import { JobForm, opportunityToInput } from "@/components/employer/jobs/JobForm";
 import { PublishJobDialog } from "@/components/employer/jobs/PublishJobDialog";
-import { getFriendlyErrorMessage } from "@/lib/error-messages";
+import { getRefusalMessage } from "@/lib/error-messages";
 import { Button } from "@/components/ui";
 import { ArrowLeft, ShieldAlert } from "lucide-react";
 
@@ -60,7 +60,7 @@ export default function EditJobPage() {
       { id: jobId, input: values },
       {
         onSuccess: () => router.push(`/employer/jobs/${jobId}`),
-        onError: (err) => setSubmissionError(getFriendlyErrorMessage(err)),
+        onError: (err) => setSubmissionError(getRefusalMessage(err)),
       }
     );
   };
@@ -77,7 +77,7 @@ export default function EditJobPage() {
       await publishMutation.mutateAsync(jobId);
       router.push(`/employer/jobs/${jobId}`);
     } catch (err) {
-      setSubmissionError(getFriendlyErrorMessage(err));
+      setSubmissionError(getRefusalMessage(err));
     }
   };
 

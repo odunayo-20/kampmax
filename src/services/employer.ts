@@ -296,7 +296,9 @@ export function backendProfileToDraft(profile: EmployerBackendProfile): Employer
     },
     preferences: { categories: [], ...(extra.preferences ?? {}) },
     verification: { status: employerVerificationFrom(p.verificationStatus) },
-    approvedSlug: p.isPublic && employerVerificationFrom(p.verificationStatus) === "verified" ? (profile.id as string) : undefined,
+    // The public page opens for any profile shown to candidates (GET /employers/:id), verified or not.
+    approvedSlug: p.isPublic !== false ? (profile.id as string) : undefined,
+    isPublic: p.isPublic !== false,
   };
 }
 

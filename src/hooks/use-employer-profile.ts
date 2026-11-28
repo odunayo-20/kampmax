@@ -62,9 +62,11 @@ export function useUpdateEmployerProfile() {
         city: payload.location?.city || undefined,
         state: payload.location?.state || undefined,
         campusId: payload.location?.campusId,
+        isPublic: payload.isPublic,
         onboardingDetails: buildOnboardingDetails(payload),
       });
-      if (error) throw new Error(error.message || "Could not save changes.");
+      // Keep the status so a refusal (a bad website, a name too long) is shown in the server's words.
+      if (error) throw Object.assign(new Error(error.message || "Could not save changes."), { status: (error as { status?: number }).status });
       return { success: true };
     },
     onSuccess: () => {

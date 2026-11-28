@@ -6,13 +6,16 @@ import { Users } from "lucide-react";
 import { Avatar, Badge, Button } from "@/components/ui";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useDecidePerson, useEmployerPeople } from "@/hooks/use-employer-people";
-import { getFriendlyErrorMessage } from "@/lib/error-messages";
+import { getFriendlyErrorMessage, getRefusalMessage } from "@/lib/error-messages";
+import { employerResponseView, interviewLine } from "@/lib/interviews";
+import { opportunityTypeLabel } from "@/config/opportunity";
 import { formatNaira, timeAgo } from "@/lib/utils";
 import {
   EMPTY_COUNTS,
   PEOPLE_STAGES,
   STAGE_EMPTY,
   STAGE_LABEL,
+  STAGE_TONE,
   defaultStage,
   offerLine,
   personActions,
@@ -26,14 +29,6 @@ const ACTION_LABEL: Record<PersonAction, string> = {
   shortlist: "Shortlist",
   interview: "Interview",
   decline: "Turn down",
-};
-
-const STAGE_TONE: Record<PeopleStage, "info" | "success" | "outline" | "default"> = {
-  NEW: "info",
-  SHORTLISTED: "outline",
-  INTERVIEWING: "outline",
-  HIRED: "success",
-  DECLINED: "default",
 };
 
 /**
@@ -120,29 +115,33 @@ export function EmployerPeopleView({
         ))}
       </div>
 
-      {counts.ALL > 4 && (
+      {(counts.ALL > 4 || people.length > 1) && (
         <div className="flex flex-wrap gap-3">
-          <input
-            type="search"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            maxLength={80}
-            placeholder="Search by name or job"
-            aria-label="Search by name or job"
-            className="min-w-0 flex-1 rounded-lg border border-neutral-200 px-3 py-2 text-sm"
-          />
-          <select
-            value={sort}
-            onChange={(e) => {
-              setSort(e.target.value as "newest" | "oldest");
-              setPage(1);
-            }}
-            aria-label="Sort by"
-            className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm"
-          >
-            <option value="newest">Newest first</option>
-            <option value="oldest">Oldest first</option>
-          </select>
+          {counts.ALL > 4 && (
+            <input
+              type="search"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              maxLength={80}
+              placeholder="Search by name or job"
+              aria-label="Search by name or job"
+              className="min-w-0 flex-1 rounded-lg border border-neutral-200 px-3 py-2 text-sm"
+            />
+          )}
+          {people.length > 1 && (
+            <select
+              value={sort}
+              onChange={(e) => {
+                setSort(e.target.value as "newest" | "oldest");
+                setPage(1);
+              }}
+              aria-label="Sort by"
+              className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm"
+            >
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+            </select>
+          )}
         </div>
       )}
 
@@ -176,7 +175,9 @@ export function EmployerPeopleView({
                   <div className="flex min-w-0 items-center gap-3">
                     <Avatar name={p.person.name} src={p.person.avatar ?? undefined} size="md" />
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-neutral-900">{p.person.name}</p>
+                      <Link href={reviewHref(p)} className="block truncate text-sm font-semibold text-neutral-900 hover:underline">
+                        {p.person.name}
+                      </Link>
                       <p className="truncate text-xs text-neutral-500">
                         {[offer, p.sentAt ? `sent ${timeAgo(p.sentAt)}` : ""].filter(Boolean).join(" · ")}
                       </p>
@@ -185,11 +186,16 @@ export function EmployerPeopleView({
                   <Badge variant={STAGE_TONE[p.stage]}>{STAGE_LABEL[p.stage]}</Badge>
                 </div>
                 <p className="mt-3 text-xs font-medium text-neutral-600">
-                  For: {p.jobTitle}{" "}
+                  For: {p.jobTitle} · {opportunityTypeLabel(p.opportunityType)}{" "}
                   <Link href={reviewHref(p)} className="ml-1 text-primary-700 hover:underline">
                     Open
                   </Link>
                 </p>
+                {p.interview && (
+                  <p className="mt-1 text-xs text-neutral-500">
+                    Interview {interviewLine({ at: p.interview.at, place: null })} · {employerResponseView(p.interview.response).label}
+                  </p>
+                )}
                 {actions.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2 border-t border-neutral-100 pt-3">
                     {actions.map((a) => (
@@ -213,7 +219,7 @@ export function EmployerPeopleView({
 
       {decide.isError && (
         <p role="alert" className="text-sm text-error-700">
-          {getFriendlyErrorMessage(decide.error)}
+          {getRefusalMessage(decide.error)}
         </p>
       )}
 
@@ -239,7 +245,7 @@ export function EmployerPeopleView({
       <ConfirmDialog
         open={declining !== null}
         title={`Turn down ${declining?.person.name ?? "this person"}?`}
-        body="They are told they were not selected. This is final: you can't change it afterwards."
+        body="They are told they were not selected. This can’t be undone."
         confirmLabel="Turn down"
         destructive
         pending={decide.isPending}

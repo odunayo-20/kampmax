@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowLeft, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEmployerProfile, useUpdateEmployerProfile } from "@/hooks/use-employer-profile";
-import { getFriendlyErrorMessage } from "@/lib/error-messages";
+import { getRefusalMessage } from "@/lib/error-messages";
 import { EMPLOYER_CLIENT_TYPES } from "@/config/employer";
 import { EmployerProfileSkeleton } from "./EmployerProfileSkeleton";
 import { EmployerProfileEditForm } from "./EmployerProfileEditForm";
@@ -47,7 +47,7 @@ export function EmployerProfileEditPage() {
       <div>
         <h1 className="text-xl font-bold text-kampmax-text">Edit employer profile</h1>
         <p className="mt-0.5 text-sm text-kampmax-text-secondary">
-          Review and update your profile. Changes are saved for review.
+          Freelancers and applicants see these details on your jobs.
         </p>
       </div>
 
@@ -63,14 +63,14 @@ export function EmployerProfileEditPage() {
           {updateMutation.isError && (
             <div className="flex items-start gap-2 rounded-lg border border-error-200 bg-error-50 px-3 py-2.5 text-sm text-error-700">
               <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
-              <span>{getFriendlyErrorMessage(updateMutation.error)}</span>
+              <span>{getRefusalMessage(updateMutation.error)}</span>
             </div>
           )}
 
           {updateMutation.isSuccess && (
             <div className="flex items-start gap-2 rounded-lg border border-success-200 bg-success-50 px-3 py-2.5 text-sm text-success-700">
               <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />
-              <span>Profile updated. It will appear after review.</span>
+              <span>Saved. Candidates see these changes now.</span>
             </div>
           )}
 

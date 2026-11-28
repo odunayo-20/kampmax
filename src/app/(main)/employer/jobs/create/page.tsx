@@ -10,7 +10,7 @@ import { getEmployerProfileApi } from "@/services/employer";
 import { useCreateJob, useEmployerJob, usePublishJob, useUpdateJob } from "@/hooks/use-jobs";
 import { JobForm, emptyJobFormValues, repostInput } from "@/components/employer/jobs/JobForm";
 import { PublishJobDialog } from "@/components/employer/jobs/PublishJobDialog";
-import { getFriendlyErrorMessage } from "@/lib/error-messages";
+import { getRefusalMessage } from "@/lib/error-messages";
 
 function CreateJob() {
   const router = useRouter();
@@ -51,14 +51,14 @@ function CreateJob() {
         { id: draftId, input: values },
         {
           onSuccess: () => router.push(`/employer/jobs/${draftId}`),
-          onError: (err) => setSubmissionError(getFriendlyErrorMessage(err)),
+          onError: (err) => setSubmissionError(getRefusalMessage(err)),
         }
       );
       return;
     }
     createMutation.mutate(values, {
       onSuccess: (job) => router.push(`/employer/jobs/${job.id}`),
-      onError: (err) => setSubmissionError(getFriendlyErrorMessage(err)),
+      onError: (err) => setSubmissionError(getRefusalMessage(err)),
     });
   };
 
@@ -78,7 +78,7 @@ function CreateJob() {
       await publishMutation.mutateAsync(job.id);
       router.push(`/employer/jobs/${job.id}`);
     } catch (err) {
-      setSubmissionError(getFriendlyErrorMessage(err));
+      setSubmissionError(getRefusalMessage(err));
     }
   };
 

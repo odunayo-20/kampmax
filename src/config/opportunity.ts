@@ -76,6 +76,11 @@ export const OPPORTUNITY_TYPE_META: Record<OpportunityType, OpportunityTypeMeta>
   },
 };
 
+/** The label for a kind as the backend writes it ("PART_TIME" reads "Part-time"); the raw text when unknown. */
+export function opportunityTypeLabel(type: string): string {
+  return OPPORTUNITY_TYPE_META[type.toLowerCase() as OpportunityType]?.label ?? type;
+}
+
 // ── Pay period (hiring postings) ────────────────────────────
 
 export const PAY_PERIOD_OPTIONS: { value: OpportunityPayPeriod; label: string; unit: string }[] = [

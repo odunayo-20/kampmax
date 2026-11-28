@@ -5,7 +5,7 @@ import { peopleHref } from "@/services/employer-people";
 import { Building2, FilePlus, FileText, MessageSquare, Search, Users } from "lucide-react";
 
 const ACTIONS = [
-  { href: "/employer/jobs/create", label: "Post an opportunity", icon: FilePlus, hint: "Gigs, internships, vacancies" },
+  { href: "/employer/jobs/create", label: "Post a job", icon: FilePlus, hint: "Gigs, internships, vacancies" },
   { href: peopleHref(), label: "Review applicants", icon: Users, hint: "Manage candidates" },
   { href: "/jobs", label: "Find talent", icon: Search, hint: "Browse the marketplace" },
   { href: "/employer/contracts", label: "View contracts", icon: FileText, hint: "Track hired work" },

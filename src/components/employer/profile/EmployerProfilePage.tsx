@@ -7,9 +7,8 @@ import { EMPLOYER_CLIENT_TYPES } from "@/config/employer";
 import { isOrganizationLikeClientType } from "@/config/employer";
 import { getCampusById } from "@/services/campus";
 import { EmployerProfileSkeleton } from "./EmployerProfileSkeleton";
-import { EmployerProfileStatusNotice } from "./EmployerProfileStatusNotice";
 import { EmployerProfileHeader } from "./EmployerProfileHeader";
-import { EmployerVerificationBadge } from "./EmployerVerificationBadge";
+import { EmployerVerificationNotice } from "./EmployerVerificationNotice";
 import { EmployerProfileCompletionCard } from "./EmployerProfileCompletionCard";
 import { EmployerProfileView } from "./EmployerProfileView";
 
@@ -46,11 +45,7 @@ export function EmployerProfilePage() {
         </Link>
       </div>
 
-      <EmployerProfileStatusNotice status={draft.status} />
-
-      <div className="flex flex-wrap items-center gap-2">
-        <EmployerVerificationBadge status={draft.verification.status} />
-      </div>
+      <EmployerVerificationNotice status={draft.verification.status} />
 
       <EmployerProfileHeader
         avatarUrl={draft.profile.logoUrl}

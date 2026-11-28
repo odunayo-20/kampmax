@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Gift, ReceiptText } from "lucide-react";
 import { Badge } from "@/components/ui";
-import { OPPORTUNITY_TYPE_META } from "@/config/opportunity";
+import { opportunityTypeLabel } from "@/config/opportunity";
 import { usePostingCharges, usePostingPricing } from "@/hooks/use-posting-billing";
 import { getFriendlyErrorMessage } from "@/lib/error-messages";
 import { formatDate, formatNaira } from "@/lib/utils";
@@ -17,7 +17,7 @@ import {
   EmployerDashboardSection,
   EmployerDashboardSkeleton,
 } from "@/components/employer/dashboard/EmployerDashboardSection";
-import { anyPostingFeeSet } from "./FreePostingsNotice";
+import { anyPostingFeeSet, FREE_POSTINGS_NOTE, liveAndRenewalLine, showFreePostings } from "@/lib/posting-billing";
 
 const KIND_LABEL: Record<PostingCharge["kind"], string> = {
   FREE_ALLOWANCE: "Free posting",
@@ -48,10 +48,7 @@ function FreePostingsCard({ pricing }: { pricing: PostingPricing }) {
           >
             <div className="h-full rounded-full bg-success-500" style={{ width: `${pct}%` }} />
           </div>
-          <p className="mt-2 text-xs text-kampmax-text-secondary">
-            A free posting is used first when you publish a vacancy or internship, and one is given
-            back if a posting is rejected. Gigs never use one.
-          </p>
+          <p className="mt-2 text-xs text-kampmax-text-secondary">{FREE_POSTINGS_NOTE}</p>
         </div>
       </div>
     </EmployerDashboardSection>
@@ -93,10 +90,7 @@ function PriceList({ pricing }: { pricing: PostingPricing }) {
               <dd className="font-medium text-kampmax-text">Free</dd>
             </div>
           </dl>
-          <p className="mt-3 text-xs text-kampmax-text-secondary">
-            Each posting stays live for {pricing.liveDays} days. Renewing an expired posting costs{" "}
-            {100 - pricing.renewalDiscountPercent}% of its fee.
-          </p>
+          <p className="mt-3 text-xs text-kampmax-text-secondary">{liveAndRenewalLine(pricing)}</p>
         </>
       ) : (
         <p className="text-sm text-kampmax-text-secondary">
@@ -118,7 +112,7 @@ function ChargeRow({ charge }: { charge: PostingCharge }) {
         </p>
         <p className="mt-0.5 text-xs text-kampmax-text-secondary">
           {KIND_LABEL[charge.kind]}
-          {charge.opportunityType && ` · ${OPPORTUNITY_TYPE_META[mapType(charge.opportunityType)].label}`}
+          {charge.opportunityType && ` · ${opportunityTypeLabel(charge.opportunityType)}`}
           {" · "}
           {formatDate(charge.createdAt)}
         </p>
@@ -136,9 +130,6 @@ function ChargeRow({ charge }: { charge: PostingCharge }) {
   );
 }
 
-function mapType(type: NonNullable<PostingCharge["opportunityType"]>) {
-  return type.toLowerCase() as keyof typeof OPPORTUNITY_TYPE_META;
-}
 
 function ChargeHistory() {
   const [page, setPage] = useState(1);
@@ -173,13 +164,13 @@ function ChargeHistory() {
   );
 }
 
-/** Billing & Credits: free postings left, the wallet, the price list and the receipts. */
+/** Billing and postings: free postings left, the wallet, the price list and the receipts. */
 export function EmployerBilling() {
   const pricing = usePostingPricing();
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-kampmax-text">Billing &amp; Credits</h1>
+        <h1 className="text-xl font-bold text-kampmax-text">Billing and postings</h1>
         <p className="mt-0.5 text-sm text-kampmax-text-secondary">
           What posting a vacancy or internship costs, your free postings and your wallet.
         </p>
@@ -194,8 +185,8 @@ export function EmployerBilling() {
           <EmployerDashboardError message={getFriendlyErrorMessage(pricing.error)} onRetry={pricing.refetch} />
         </div>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-2">
-          <FreePostingsCard pricing={pricing.data} />
+        <div className={showFreePostings(pricing.data) ? "grid gap-6 lg:grid-cols-2" : ""}>
+          {showFreePostings(pricing.data) && <FreePostingsCard pricing={pricing.data} />}
           <PriceList pricing={pricing.data} />
         </div>
       )}
